@@ -102,6 +102,42 @@ function createOntologyConfigSeed(projectName: string): OntologyConfig {
       projectName,
       packageManager: 'npm',
       defaultTarget: 'react-web',
+      llm: {
+        provider: 'ollama',
+        profile: 'mac-light',
+        baseUrl: 'http://localhost:11434',
+        keepAlive: '5m',
+        pipeline: {
+          parser: {
+            enabled: true,
+            model: 'qwen2.5-coder:3b',
+            temperature: 0,
+            topP: 0.8,
+            numCtx: 4096
+          },
+          planner: {
+            enabled: true,
+            model: 'qwen2.5-coder:3b',
+            temperature: 0,
+            topP: 0.8,
+            numCtx: 4096
+          },
+          critic: {
+            enabled: false,
+            model: 'qwen2.5-coder:3b',
+            temperature: 0,
+            topP: 0.8,
+            numCtx: 4096
+          },
+          absorber: {
+            enabled: true,
+            model: 'qwen2.5-coder:3b',
+            temperature: 0,
+            topP: 0.8,
+            numCtx: 4096
+          }
+        }
+      },
       paths: {
         ontologyRoot: 'ontology',
         canonDir: 'ontology/canon',
@@ -366,24 +402,16 @@ function createComponentRegistrySeed(): ComponentRegistry {
           semanticType: 'screen-container',
           purpose:
             'Provide the semantic frame for an operator workflow screen and its major zones.',
-          implementationPath: 'src/generated/views/components/Screen.tsx',
+          implementationPath: 'src/components/ontology/Screen.tsx',
           propsSchema: {
             title: 'string',
-            subtitle: 'string',
-            density: 'compact | comfortable',
-            showOfflineBadge: 'boolean'
+            mode: 'operator | manager | auditor',
+            className: 'string'
           },
-          eventsSchema: {
-            onVisible: {
-              payload: {
-                viewId: 'string',
-                actor: 'string'
-              }
-            }
-          },
+          eventsSchema: {},
           constraints: [
-            'Must allow the primary action region to remain visible near the bottom edge.',
-            'Must preserve readable contrast under warehouse and outdoor lighting.'
+            'Must preserve a landmark main region for screen-reader navigation.',
+            'Must support mode-specific presentation without embedding workflow rules.'
           ],
           supportedTargets: ['react-web']
         },
@@ -391,24 +419,18 @@ function createComponentRegistrySeed(): ComponentRegistry {
           id: 'HeaderSummary',
           semanticType: 'context-summary',
           purpose:
-            'Summarize the batch, lot, and operational context before the operator confirms changes.',
-          implementationPath:
-            'src/generated/views/components/HeaderSummary.tsx',
+            'Summarize key operational context for the current confirmation screen.',
+          implementationPath: 'src/components/ontology/HeaderSummary.tsx',
           propsSchema: {
             title: 'string',
-            summaryRows: 'array',
-            statusTone: 'neutral | caution | alert'
+            fields: 'array',
+            syncStatus: 'online | offline | queued | syncing',
+            className: 'string'
           },
-          eventsSchema: {
-            onDetailsRequested: {
-              payload: {
-                section: 'string'
-              }
-            }
-          },
+          eventsSchema: {},
           constraints: [
-            'Must present key identifiers above numeric input fields.',
-            'Must keep variance context visible when the task enters review mode.'
+            'Must present labels and values in an accessible summary structure.',
+            'Must allow sync state to be surfaced without deciding synchronization policy.'
           ],
           supportedTargets: ['react-web']
         },
@@ -416,15 +438,19 @@ function createComponentRegistrySeed(): ComponentRegistry {
           id: 'NumericWeightInput',
           semanticType: 'numeric-measurement-input',
           purpose:
-            'Capture an operator-confirmed weight measurement with explicit units and origin.',
-          implementationPath:
-            'src/generated/views/components/NumericWeightInput.tsx',
+            'Capture an operator-entered weight value and expose semantic change and commit callbacks.',
+          implementationPath: 'src/components/ontology/NumericWeightInput.tsx',
           propsSchema: {
             field: 'string',
             label: 'string',
-            value: 'number | null',
             unit: 'string',
-            sourceHint: 'manual | sensor | computed'
+            size: 'small | medium | large',
+            required: 'boolean',
+            autofocus: 'boolean',
+            disabled: 'boolean',
+            value: 'number | null',
+            error: 'string | null',
+            className: 'string'
           },
           eventsSchema: {
             onValueChange: {
@@ -439,20 +465,13 @@ function createComponentRegistrySeed(): ComponentRegistry {
                 field: 'string',
                 value: 'number',
                 unit: 'string',
-                source: 'manual | sensor | computed'
-              }
-            },
-            onValidationHint: {
-              payload: {
-                field: 'string',
-                hint: 'string',
-                severity: 'info | warning | blocking'
+                source: 'manual'
               }
             }
           },
           constraints: [
-            'Must keep the unit visible while the value is edited.',
-            'Must support fast manual entry with large tap targets suitable for operators.'
+            'Must emit semantic callbacks only and must not infer workflow validity.',
+            'Must keep the unit and error state accessible while the user edits the value.'
           ],
           supportedTargets: ['react-web']
         },
@@ -460,31 +479,33 @@ function createComponentRegistrySeed(): ComponentRegistry {
           id: 'VarianceAlert',
           semanticType: 'variance-explanation-alert',
           purpose:
-            'Highlight meaningful variance between expected and actual weight and collect operator rationale.',
-          implementationPath: 'src/generated/views/components/VarianceAlert.tsx',
+            'Present variance context and optionally collect an operator reason.',
+          implementationPath: 'src/components/ontology/VarianceAlert.tsx',
           propsSchema: {
-            expectedWeight: 'number',
-            actualWeight: 'number',
-            variance: 'number',
+            variance: 'number | null',
             threshold: 'number',
-            reasonRequired: 'boolean'
+            requiresReason: 'boolean',
+            reason: 'string',
+            className: 'string'
           },
           eventsSchema: {
+            onReasonChange: {
+              payload: {
+                reason: 'string'
+              }
+            },
             onReasonProvided: {
               payload: {
-                variance: 'number',
                 reason: 'string'
               }
             },
             onDismissRequested: {
-              payload: {
-                variance: 'number'
-              }
+              payload: {}
             }
           },
           constraints: [
-            'Must preserve the operator-entered reason if the alert closes and reopens.',
-            'Must make the severity of the variance understandable without color alone.'
+            'Must not decide whether a reason is sufficient for workflow completion.',
+            'Must present variance messaging accessibly without relying on color alone.'
           ],
           supportedTargets: ['react-web']
         },
@@ -492,14 +513,14 @@ function createComponentRegistrySeed(): ComponentRegistry {
           id: 'StickyPrimaryButton',
           semanticType: 'sticky-primary-action',
           purpose:
-            'Keep the primary commit action persistent and reachable during the confirmation workflow.',
-          implementationPath:
-            'src/generated/views/components/StickyPrimaryButton.tsx',
+            'Keep the primary action reachable while exposing semantic intent callbacks.',
+          implementationPath: 'src/components/ontology/StickyPrimaryButton.tsx',
           propsSchema: {
-            label: 'string',
             action: 'string',
+            label: 'string',
+            loading: 'boolean',
             disabled: 'boolean',
-            confirmationRequired: 'boolean'
+            className: 'string'
           },
           eventsSchema: {
             onIntent: {
@@ -514,39 +535,25 @@ function createComponentRegistrySeed(): ComponentRegistry {
             }
           },
           constraints: [
-            'Must remain visible while the operator reviews the batch.',
-            'Must expose a tap target that satisfies operator-mode minimum sizing.'
+            'Must remain accessible while loading or disabled.',
+            'Must not determine whether an action is allowed or final.'
           ],
           supportedTargets: ['react-web']
         },
         OfflineSyncBadge: {
           id: 'OfflineSyncBadge',
-          semanticType: 'offline-sync-state',
+          semanticType: 'sync-state-indicator',
           purpose:
-            'Expose whether confirmation is synced, queued, or waiting on connectivity.',
-          implementationPath:
-            'src/generated/views/components/OfflineSyncBadge.tsx',
+            'Surface online, offline, queued, or syncing status in a compact accessible badge.',
+          implementationPath: 'src/components/ontology/OfflineSyncBadge.tsx',
           propsSchema: {
-            state: 'synced | queued | offline',
-            pendingCount: 'number',
-            lastAttemptAt: 'string | null'
+            status: 'online | offline | queued | syncing',
+            className: 'string'
           },
-          eventsSchema: {
-            onQueueViewed: {
-              payload: {
-                pendingCount: 'number'
-              }
-            },
-            onRetryRequested: {
-              payload: {
-                pendingCount: 'number',
-                state: 'queued | offline'
-              }
-            }
-          },
+          eventsSchema: {},
           constraints: [
-            'Must be visible whenever a confirmation has not yet synchronized.',
-            'Must communicate offline status semantically, not only visually.'
+            'Must expose state textually for assistive technologies.',
+            'Must remain presentation-only and avoid triggering synchronization behavior.'
           ],
           supportedTargets: ['react-web']
         }

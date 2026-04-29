@@ -6,6 +6,7 @@ export * from './machine-ast.js';
 export * from './ontology-config.js';
 export * from './osl-view.js';
 export * from './package-json.js';
+export * from './prompt-packet.js';
 export * from './render-ast.js';
 export * from './render-node.js';
 export * from './task.js';

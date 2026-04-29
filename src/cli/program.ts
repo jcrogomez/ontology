@@ -1,6 +1,8 @@
 import { Command } from 'commander';
 
+import { registerContextCommand } from '../commands/context.js';
 import { registerInitCommand } from '../commands/init.js';
+import { registerPlanCommand } from '../commands/plan.js';
 import { registerVersionCommand } from '../commands/version.js';
 import { CLI_DESCRIPTION, CLI_NAME } from '../core/meta.js';
 
@@ -18,10 +20,24 @@ export function createCliProgram(options: CliProgramOptions): Command {
   program
     .name(CLI_NAME)
     .description(CLI_DESCRIPTION)
+    .option(
+      '--mock',
+      'Use deterministic mock LLM responses for upcoming LLM-backed commands'
+    )
     .version(options.version)
     .showHelpAfterError('(run with --help for usage details)');
 
+  registerContextCommand(program, {
+    getCwd,
+    write
+  });
+
   registerInitCommand(program, {
+    getCwd,
+    write
+  });
+
+  registerPlanCommand(program, {
     getCwd,
     write
   });

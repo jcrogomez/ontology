@@ -1,0 +1,129 @@
+version: 1.0.0
+target: react-web
+components:
+  Screen:
+    id: Screen
+    semanticType: screen-container
+    purpose: Provide the semantic frame for an operator workflow screen and its major zones.
+    implementationPath: src/components/ontology/Screen.tsx
+    propsSchema:
+      title: string
+      mode: operator | manager | auditor
+      className: string
+    eventsSchema: {}
+    constraints:
+      - Must preserve a landmark main region for screen-reader navigation.
+      - Must support mode-specific presentation without embedding workflow rules.
+    supportedTargets:
+      - react-web
+  HeaderSummary:
+    id: HeaderSummary
+    semanticType: context-summary
+    purpose: Summarize key operational context for the current confirmation screen.
+    implementationPath: src/components/ontology/HeaderSummary.tsx
+    propsSchema:
+      title: string
+      fields: array
+      syncStatus: online | offline | queued | syncing
+      className: string
+    eventsSchema: {}
+    constraints:
+      - Must present labels and values in an accessible summary structure.
+      - Must allow sync state to be surfaced without deciding synchronization policy.
+    supportedTargets:
+      - react-web
+  NumericWeightInput:
+    id: NumericWeightInput
+    semanticType: numeric-measurement-input
+    purpose: Capture an operator-entered weight value and expose semantic change and commit callbacks.
+    implementationPath: src/components/ontology/NumericWeightInput.tsx
+    propsSchema:
+      field: string
+      label: string
+      unit: string
+      size: small | medium | large
+      required: boolean
+      autofocus: boolean
+      disabled: boolean
+      value: number | null
+      error: string | null
+      className: string
+    eventsSchema:
+      onValueChange:
+        payload:
+          field: string
+          value: number | null
+          unit: string
+      onValueCommit:
+        payload:
+          field: string
+          value: number
+          unit: string
+          source: manual
+    constraints:
+      - Must emit semantic callbacks only and must not infer workflow validity.
+      - Must keep the unit and error state accessible while the user edits the value.
+    supportedTargets:
+      - react-web
+  VarianceAlert:
+    id: VarianceAlert
+    semanticType: variance-explanation-alert
+    purpose: Present variance context and optionally collect an operator reason.
+    implementationPath: src/components/ontology/VarianceAlert.tsx
+    propsSchema:
+      variance: number | null
+      threshold: number
+      requiresReason: boolean
+      reason: string
+      className: string
+    eventsSchema:
+      onReasonChange:
+        payload:
+          reason: string
+      onReasonProvided:
+        payload:
+          reason: string
+      onDismissRequested:
+        payload: {}
+    constraints:
+      - Must not decide whether a reason is sufficient for workflow completion.
+      - Must present variance messaging accessibly without relying on color alone.
+    supportedTargets:
+      - react-web
+  StickyPrimaryButton:
+    id: StickyPrimaryButton
+    semanticType: sticky-primary-action
+    purpose: Keep the primary action reachable while exposing semantic intent callbacks.
+    implementationPath: src/components/ontology/StickyPrimaryButton.tsx
+    propsSchema:
+      action: string
+      label: string
+      loading: boolean
+      disabled: boolean
+      className: string
+    eventsSchema:
+      onIntent:
+        payload:
+          action: string
+      onConfirmRequested:
+        payload:
+          action: string
+    constraints:
+      - Must remain accessible while loading or disabled.
+      - Must not determine whether an action is allowed or final.
+    supportedTargets:
+      - react-web
+  OfflineSyncBadge:
+    id: OfflineSyncBadge
+    semanticType: sync-state-indicator
+    purpose: Surface online, offline, queued, or syncing status in a compact accessible badge.
+    implementationPath: src/components/ontology/OfflineSyncBadge.tsx
+    propsSchema:
+      status: online | offline | queued | syncing
+      className: string
+    eventsSchema: {}
+    constraints:
+      - Must expose state textually for assistive technologies.
+      - Must remain presentation-only and avoid triggering synchronization behavior.
+    supportedTargets:
+      - react-web
