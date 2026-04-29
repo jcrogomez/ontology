@@ -83,10 +83,8 @@ describe('onto init', () => {
     expect(config.projectName).toBe(basename(cwd));
     expect(config.packageManager).toBe('npm');
     expect(config.llm.provider).toBe('ollama');
-    expect(config.llm.profile).toBe('mac-light');
     expect(config.llm.keepAlive).toBe('5m');
     expect(config.llm.pipeline.parser.model).toBe('qwen2.5-coder:3b');
-    expect(config.llm.pipeline.critic.enabled).toBe(false);
     expect(Object.keys(registry.components)).toEqual([
       'Screen',
       'HeaderSummary',
@@ -132,9 +130,7 @@ describe('onto init', () => {
     expect(config.projectName).toBe(projectName);
     expect(config.llm).toBeDefined();
     expect(config.llm.pipeline.parser.model).toBe('qwen2.5-coder:3b');
-    expect(config.llm.pipeline.critic.enabled).toBe(false);
     expect(config.llm.keepAlive).toBe('5m');
-    expect(config.llm.profile).toBe('mac-light');
   });
 });
 

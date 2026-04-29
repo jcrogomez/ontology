@@ -16,9 +16,6 @@ export const PipelineStageConfigSchema = z
 export const LLMConfigSchema = z
   .object({
     provider: z.enum(['ollama', 'mock', 'cloud']).default('ollama'),
-    profile: z
-      .enum(['mac-light', 'mac-balanced', 'strong-critic', 'custom'])
-      .default('mac-light'),
     baseUrl: NonEmptyStringSchema.default('http://localhost:11434'),
     keepAlive: NonEmptyStringSchema.default('5m'),
     pipeline: z

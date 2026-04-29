@@ -104,38 +104,13 @@ function createOntologyConfigSeed(projectName: string): OntologyConfig {
       defaultTarget: 'react-web',
       llm: {
         provider: 'ollama',
-        profile: 'mac-light',
         baseUrl: 'http://localhost:11434',
         keepAlive: '5m',
         pipeline: {
-          parser: {
-            enabled: true,
-            model: 'qwen2.5-coder:3b',
-            temperature: 0,
-            topP: 0.8,
-            numCtx: 4096
-          },
-          planner: {
-            enabled: true,
-            model: 'qwen2.5-coder:3b',
-            temperature: 0,
-            topP: 0.8,
-            numCtx: 4096
-          },
-          critic: {
-            enabled: false,
-            model: 'qwen2.5-coder:3b',
-            temperature: 0,
-            topP: 0.8,
-            numCtx: 4096
-          },
-          absorber: {
-            enabled: true,
-            model: 'qwen2.5-coder:3b',
-            temperature: 0,
-            topP: 0.8,
-            numCtx: 4096
-          }
+          parser: { model: 'qwen2.5-coder:3b', temperature: 0 },
+          planner: { model: 'qwen2.5-coder:3b', temperature: 0 },
+          critic: { model: 'deepseek-r1:8b', temperature: 0.3 },
+          absorber: { model: 'qwen2.5-coder:7b', temperature: 0 }
         }
       },
       paths: {

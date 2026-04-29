@@ -20,7 +20,7 @@ describe('Ontology schemas', () => {
     const parsed = validateOrThrow(OSLViewSchema, fixture, 'OSL view');
 
     expectType<OSLView>(parsed);
-    expect(parsed.id).toBe('weigh-patient');
+    expect(parsed.id).toBe('WeighPatient');
     expect(parsed.components[0]?.events).toContain('onValueCommit');
   });
 
@@ -39,7 +39,7 @@ describe('Ontology schemas', () => {
 
     const messages = parsed.error.issues.map((issue) => issue.message).join(' | ');
 
-    expect(messages).toContain('Expected a non-empty string');
+    expect(messages).toContain('View ID must be PascalCase and alphanumeric');
     expect(messages).toContain('Unrecognized key(s) in object');
   });
 
