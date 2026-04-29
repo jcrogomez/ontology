@@ -8,7 +8,7 @@ import {
   loadWorkspace
 } from './contextResolver.js';
 import type { LLMProvider } from '../llm/ollamaProvider.js';
-import { OSLViewSchema, type OSLView } from '../schemas/index.js';
+import { OSLViewSchema, RenderASTSchema, type OSLView, type RenderAST } from '../schemas/index.js';
 import { writeYamlFile } from '../utils/fs.js';
 import { validateOrThrow } from '../utils/validation.js';
 
@@ -27,9 +27,12 @@ export interface RunSemanticParserOptions {
 
 export interface RunSemanticParserResult {
   osl: OSLView;
+  ast: RenderAST;
   outputPath: string;
+  astOutputPath: string;
   pipeline: string[];
   yaml: string;
+  astYaml: string;
 }
 
 export async function runSemanticParser(
@@ -69,23 +72,57 @@ export async function runSemanticParser(
   );
   const yaml = stringify(validatedOsl);
 
+  const plannerModel = options.model ?? workspace.config.llm.pipeline.planner.model;
+
+  const generatedAst = await options.provider.structuredGenerate({
+    schema: RenderASTSchema,
+    system:
+      'You are the Ontology UX Planner. Convert the provided OSL View into a Render AST. Map the interface strictly to the available semantic components. Do not invent components.',
+    prompt: JSON.stringify({
+      osl: validatedOsl,
+      components: promptPacket.componentSummaries
+    }, null, 2),
+    model: plannerModel,
+    root: options.root
+  });
+
+  const validatedAst = validateOrThrow(
+    RenderASTSchema,
+    generatedAst,
+    'UX Planner AST'
+  );
+
+  validatedAst.viewId = validatedOsl.id;
+
+  const astOutputPath = join(
+    options.root,
+    workspace.config.paths.viewsDir,
+    `${validatedOsl.id}.ast.yaml`
+  );
+  const astYaml = stringify(validatedAst);
+
   if (options.dryRun !== true) {
     await mkdir(join(options.root, workspace.config.paths.viewsDir), {
       recursive: true
     });
     await writeYamlFile(outputPath, validatedOsl);
+    await writeYamlFile(astOutputPath, validatedAst);
   }
 
   return {
     osl: validatedOsl,
+    ast: validatedAst,
     outputPath,
+    astOutputPath,
     pipeline: [
       '[✓] Context resolved',
       '[✓] Semantic Parser: OSL generated',
       '[✓] Validator: OSL valid',
-      '[→] Next: onto plan --ast <view> or onto build <view>'
+      '[✓] UX Planner: AST generated',
+      '[→] Next: onto build <view>'
     ],
-    yaml
+    yaml,
+    astYaml
   };
 }
 
