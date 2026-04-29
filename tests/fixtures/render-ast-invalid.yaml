@@ -1,0 +1,18 @@
+id: render-weigh-patient
+viewId: weigh-patient
+version: 1.0.0
+entityRefs:
+  - patient
+taskRef: record-patient-weight
+layout:
+  kind: stack
+nodes:
+  - id: broken-node
+    props:
+      label: Missing component
+dataBindings:
+  - id: bind-weight-value
+    source: weightMeasurement.value
+    target: weight-input.props.value
+target: react-web
+unknownTopLevel: true

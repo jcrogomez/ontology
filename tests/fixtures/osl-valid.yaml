@@ -1,0 +1,48 @@
+id: weigh-patient
+version: 1.0.0
+task: record-patient-weight
+actor: nurse
+context:
+  facility: triage
+  locale: en-US
+domainEntities:
+  - patient
+  - weightMeasurement
+information:
+  captures:
+    - currentWeight
+  displays:
+    - previousWeight
+interaction:
+  flow:
+    - reviewPatient
+    - enterWeight
+    - confirmMeasurement
+components:
+  - id: NumericWeightInput
+    semanticType: numeric-input
+    purpose: capture patient weight
+    bindsTo:
+      - weightMeasurement.value
+    events:
+      - onValueChange
+      - onValueCommit
+      - onValidationHint
+    props:
+      unit: kg
+  - id: StickyPrimaryButton
+    semanticType: primary-action
+    purpose: submit recorded weight
+    events:
+      - onIntent
+layout:
+  type: form
+  sections:
+    - measurement
+visual:
+  emphasis: calm-clinical
+data:
+  sourceEntities:
+    - patient
+    - weightMeasurement
+target: react-web

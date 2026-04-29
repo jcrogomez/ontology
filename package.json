@@ -1,0 +1,39 @@
+{
+  "name": "ontology",
+  "version": "0.1.0",
+  "description": "Ontology semantic compiler for operational interfaces.",
+  "type": "module",
+  "bin": {
+    "onto": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx watch src/cli.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "echo \"Lint not configured yet\""
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.10.1",
+    "@xstate/react": "^5.0.5",
+    "commander": "^13.1.0",
+    "ink": "^6.0.1",
+    "react": "^19.1.0",
+    "ts-morph": "^26.0.0",
+    "xstate": "^5.19.4",
+    "yaml": "^2.7.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.8"
+  }
+}
