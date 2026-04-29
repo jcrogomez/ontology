@@ -5,6 +5,7 @@ import {
   OllamaLLMProvider
 } from '../llm/ollamaProvider.js';
 import { runSemanticParser } from '../core/plan.js';
+import * as p from '@clack/prompts';
 
 export interface PlanCommandOptions {
   getCwd: () => string;
@@ -43,6 +44,10 @@ export function registerPlanCommand(
                 ? {}
                 : { model: commandOptions.model })
             });
+        p.intro('Ecolístico Semantic Parser');
+        const s = p.spinner();
+        s.start('Parsing intent to OSL...');
+
         const result = await runSemanticParser({
           naturalLanguageIntent,
           provider,
@@ -53,9 +58,9 @@ export function registerPlanCommand(
             : { model: commandOptions.model })
         });
 
-        for (const line of result.pipeline) {
-          options.write(`${line}\n`);
-        }
+        s.stop('OSL generated and validated successfully.');
+
+        p.outro(`Saved to: ${result.outputPath}`);
 
         if (commandOptions.dryRun === true) {
           options.write('\n');
