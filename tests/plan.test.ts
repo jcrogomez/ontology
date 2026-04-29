@@ -74,7 +74,7 @@ describe('onto plan', () => {
     );
   });
 
-  it('does not create AST artifacts yet', async () => {
+  it('creates an AST file in mock mode', async () => {
     const workspaceRoot = await createInitializedWorkspace();
     const program = createCliProgram({
       version: '0.1.0-test',
@@ -94,7 +94,7 @@ describe('onto plan', () => {
       await pathExists(
         join(workspaceRoot, 'ontology/views/HarvestConfirmation.ast.yaml')
       )
-    ).toBe(false);
+    ).toBe(true);
     expect(
       await readdir(join(workspaceRoot, 'src/generated/views'))
     ).toEqual([]);

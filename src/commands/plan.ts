@@ -58,13 +58,16 @@ export function registerPlanCommand(
             : { model: commandOptions.model })
         });
 
-        s.stop('OSL generated and validated successfully.');
+        s.stop('OSL and AST generated and validated successfully.');
 
-        p.outro(`Saved to: ${result.outputPath}`);
+        p.outro(`Saved OSL to: ${result.outputPath}\nSaved AST to: ${result.astOutputPath}`);
 
         if (commandOptions.dryRun === true) {
           options.write('\n');
+          options.write('--- OSL ---\n');
           options.write(result.yaml);
+          options.write('\n--- AST ---\n');
+          options.write(result.astYaml);
         }
       }
     );
