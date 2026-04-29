@@ -14,6 +14,7 @@ import { validateOrThrow } from '../utils/validation.js';
 
 const HARVEST_INTENT_TERMS = ['harvest', 'cosecha', 'merma', 'weight', 'peso'];
 const DEFAULT_HARVEST_VIEW_ID = 'HarvestConfirmation';
+const DEFAULT_GENERIC_VIEW_ID = 'GeneratedView';
 const CLEAN_VIEW_ID_PATTERN = /^[A-Z][A-Za-z0-9]*$/;
 
 export interface RunSemanticParserOptions {
@@ -105,13 +106,12 @@ function normalizePlannedOsl(
   osl: OSLView,
   naturalLanguageIntent: string
 ): OSLView {
-  if (
-    isHarvestIntent(naturalLanguageIntent) &&
-    !CLEAN_VIEW_ID_PATTERN.test(osl.id)
-  ) {
+  if (!CLEAN_VIEW_ID_PATTERN.test(osl.id)) {
     return {
       ...osl,
-      id: DEFAULT_HARVEST_VIEW_ID
+      id: isHarvestIntent(naturalLanguageIntent)
+        ? DEFAULT_HARVEST_VIEW_ID
+        : DEFAULT_GENERIC_VIEW_ID
     };
   }
 
