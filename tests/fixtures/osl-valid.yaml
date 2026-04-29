@@ -1,48 +1,51 @@
-id: WeighPatient
+id: HarvestConfirmation
 version: 1.0.0
-task: record-patient-weight
-actor: nurse
+task: confirm_harvest_batch
+actor: operator
 context:
-  facility: triage
+  operation: harvest_confirmation
   locale: en-US
 domainEntities:
-  - patient
-  - weightMeasurement
+  - HarvestBatch
+  - InventoryLot
 information:
-  captures:
-    - currentWeight
-  displays:
-    - previousWeight
+  summary:
+    - batch_id
+    - crop_name
+    - expected_weight
+    - lot_id
 interaction:
-  flow:
-    - reviewPatient
-    - enterWeight
-    - confirmMeasurement
+  primaryAction: confirm_harvest_batch
+  varianceHandling: reason_when_threshold_exceeded
 components:
+  - id: Screen
+    semanticType: screen-container
+  - id: HeaderSummary
+    semanticType: context-summary
   - id: NumericWeightInput
-    semanticType: numeric-input
-    purpose: capture patient weight
-    bindsTo:
-      - weightMeasurement.value
+    semanticType: numeric-measurement-input
     events:
       - onValueChange
       - onValueCommit
-      - onValidationHint
-    props:
-      unit: kg
+  - id: VarianceAlert
+    semanticType: variance-explanation-alert
+    events:
+      - onReasonChange
+      - onReasonProvided
+      - onDismissRequested
   - id: StickyPrimaryButton
-    semanticType: primary-action
-    purpose: submit recorded weight
+    semanticType: sticky-primary-action
     events:
       - onIntent
+      - onConfirmRequested
+  - id: OfflineSyncBadge
+    semanticType: sync-state-indicator
 layout:
-  type: form
-  sections:
-    - measurement
+  type: stack
 visual:
-  emphasis: calm-clinical
+  emphasis: high-clarity
 data:
-  sourceEntities:
-    - patient
-    - weightMeasurement
+  writes:
+    - HarvestBatch.actual_weight
+    - HarvestBatch.loss_reason
 target: react-web
