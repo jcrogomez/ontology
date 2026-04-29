@@ -40,14 +40,25 @@ describe('contextResolver', () => {
     expect(Object.keys(workspace.components).length).toBeGreaterThan(0);
   });
 
-  it('buildPromptPacket filters correctly for harvest intent', async () => {
+  it('buildPromptPacket filters correctly for harvest intent (substring match)', async () => {
     const workspace = await loadWorkspace(cwd);
-    const packet = buildPromptPacket(workspace, 'I need a harvest batch form');
+    const packet = buildPromptPacket(workspace, 'estoy cosechando unos frutos');
 
-    expect(packet.intent).toBe('I need a harvest batch form');
+    expect(packet.intent).toBe('estoy cosechando unos frutos');
     expect(packet.domainEntities.map(d => d.name).sort()).toEqual(['HarvestBatch', 'InventoryLot'].sort());
     expect(packet.tasks.map(t => t.id)).toEqual(['confirm_harvest_batch']);
     expect(packet.target).toBe('react-web');
+  });
+
+  it('buildPromptPacket throws an aggregated error if required entities are missing', async () => {
+    const workspace = await loadWorkspace(cwd);
+
+    // Explicitly remove InventoryLot domain and confirm_harvest_batch task, and a component
+    workspace.domainEntities = workspace.domainEntities.filter(d => d.name !== 'InventoryLot');
+    workspace.tasks = workspace.tasks.filter(t => t.id !== 'confirm_harvest_batch');
+    delete workspace.components['NumericWeightInput'];
+
+    expect(() => buildPromptPacket(workspace, 'harvest')).toThrowError("Semantic context resolution failed. The following required entities are missing from the workspace: Domain('InventoryLot'), Task('confirm_harvest_batch'), Component('NumericWeightInput').");
   });
 
   it('buildPromptPacket returns all entities for non-harvest intent', async () => {
