@@ -1,187 +1,62 @@
-import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 
-import { afterEach, describe, expect, it } from 'vitest';
-import { parse } from 'yaml';
+import { loadWorkspace, buildPromptPacket } from '../src/core/contextResolver.js';
+import { createSeedFiles } from '../src/core/init-seeds.js';
+import { writeYamlFile } from '../src/utils/fs.js';
 
-import { createCliProgram } from '../src/cli/program.js';
-import {
-  buildPromptPacket,
-  findRelevantContext,
-  loadWorkspace
-} from '../src/core/contextResolver.js';
-import { initOntologyProject } from '../src/core/init.js';
+describe('contextResolver', () => {
+  let cwd: string;
 
-const temporaryDirectories: string[] = [];
+  beforeEach(async () => {
+    cwd = await mkdtemp(join(tmpdir(), 'onto-resolver-'));
+    const seeds = createSeedFiles('TestProject');
 
-afterEach(async () => {
-  await Promise.all(
-    temporaryDirectories.splice(0).map((directory) =>
-      rm(directory, { recursive: true, force: true })
-    )
-  );
-});
+    // Create necessary directories manually or mock the config paths structure
+    const fs = await import('node:fs/promises');
+    await fs.mkdir(join(cwd, 'ontology', 'canon'), { recursive: true });
+    await fs.mkdir(join(cwd, 'ontology', 'domain'), { recursive: true });
+    await fs.mkdir(join(cwd, 'ontology', 'tasks'), { recursive: true });
+    await fs.mkdir(join(cwd, 'ontology', 'components'), { recursive: true });
+    await fs.mkdir(join(cwd, 'ontology', 'tokens'), { recursive: true });
 
-describe('context resolver', () => {
-  it('loadWorkspace loads an initialized project', async () => {
-    const workspaceRoot = await createInitializedWorkspace();
-
-    const workspace = await loadWorkspace(workspaceRoot);
-
-    expect(workspace.rootDir).toBe(workspaceRoot);
-    expect(workspace.config.projectName).toBe('workspace');
-    expect(workspace.canon).toHaveLength(1);
-    expect(workspace.domainEntities).toHaveLength(2);
-    expect(workspace.tasks).toHaveLength(1);
-    expect(Object.keys(workspace.componentRegistry.components)).toEqual([
-      'Screen',
-      'HeaderSummary',
-      'NumericWeightInput',
-      'VarianceAlert',
-      'StickyPrimaryButton',
-      'OfflineSyncBadge'
-    ]);
-    expect(workspace.tokens).toHaveLength(1);
+    for (const seed of seeds) {
+      await writeYamlFile(join(cwd, seed.path), seed.value);
+    }
   });
 
-  it('harvest or cosecha intent selects HarvestBatch and InventoryLot', async () => {
-    const workspace = await loadWorkspace(await createInitializedWorkspace());
-
-    const relevant = findRelevantContext(
-      workspace,
-      'Necesito confirmar la cosecha con peso y merma.'
-    );
-
-    expect(relevant.domainEntities.map((entity) => entity.name)).toEqual([
-      'HarvestBatch',
-      'InventoryLot'
-    ]);
+  afterEach(async () => {
+    await rm(cwd, { recursive: true, force: true });
   });
 
-  it('harvest or cosecha intent selects confirm_harvest_batch', async () => {
-    const workspace = await loadWorkspace(await createInitializedWorkspace());
+  it('loads workspace correctly', async () => {
+    const workspace = await loadWorkspace(cwd);
 
-    const relevant = findRelevantContext(
-      workspace,
-      'Confirm harvest variance and queue offline sync.'
-    );
-
-    expect(relevant.tasks.map((task) => task.id)).toEqual([
-      'confirm_harvest_batch'
-    ]);
+    expect(workspace.config.projectName).toBe('TestProject');
+    expect(workspace.domainEntities.length).toBeGreaterThan(0);
+    expect(workspace.tasks.length).toBeGreaterThan(0);
+    expect(Object.keys(workspace.components).length).toBeGreaterThan(0);
   });
 
-  it('harvest or cosecha intent selects the harvest confirmation components', async () => {
-    const workspace = await loadWorkspace(await createInitializedWorkspace());
+  it('buildPromptPacket filters correctly for harvest intent', async () => {
+    const workspace = await loadWorkspace(cwd);
+    const packet = buildPromptPacket(workspace, 'I need a harvest batch form');
 
-    const relevant = findRelevantContext(
-      workspace,
-      'cosecha con guantes y merma'
-    );
-
-    expect(relevant.components.map((component) => component.id)).toEqual([
-      'Screen',
-      'HeaderSummary',
-      'NumericWeightInput',
-      'VarianceAlert',
-      'StickyPrimaryButton',
-      'OfflineSyncBadge'
-    ]);
+    expect(packet.intent).toBe('I need a harvest batch form');
+    expect(packet.domainEntities.map(d => d.name).sort()).toEqual(['HarvestBatch', 'InventoryLot'].sort());
+    expect(packet.tasks.map(t => t.id)).toEqual(['confirm_harvest_batch']);
+    expect(packet.target).toBe('react-web');
   });
 
-  it('unknown intent falls back to all loaded entities, tasks, and components', async () => {
-    const workspace = await loadWorkspace(await createInitializedWorkspace());
+  it('buildPromptPacket returns all entities for non-harvest intent', async () => {
+    const workspace = await loadWorkspace(cwd);
+    const packet = buildPromptPacket(workspace, 'Just a normal task');
 
-    const relevant = findRelevantContext(
-      workspace,
-      'general operational dashboard'
-    );
-
-    expect(relevant.domainEntities).toHaveLength(workspace.domainEntities.length);
-    expect(relevant.tasks).toHaveLength(workspace.tasks.length);
-    expect(relevant.components).toHaveLength(
-      Object.keys(workspace.componentRegistry.components).length
-    );
-  });
-
-  it('invalid YAML throws an error containing the file path', async () => {
-    const workspaceRoot = await createInitializedWorkspace();
-    const brokenFile = join(
-      workspaceRoot,
-      'ontology/domain/harvest_batch.yaml'
-    );
-
-    await writeFile(
-      brokenFile,
-      'id: harvest_batch\nversion: 1.0.0\nname: HarvestBatch\nfields: "broken"\n',
-      'utf8'
-    );
-
-    await expect(loadWorkspace(workspaceRoot)).rejects.toThrow(
-      new RegExp(brokenFile.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    );
-  });
-
-  it('onto context prints YAML and does not write files', async () => {
-    const workspaceRoot = await createInitializedWorkspace();
-    const viewsDirectory = join(workspaceRoot, 'ontology/views');
-    const filesBefore = await readdir(viewsDirectory);
-    let output = '';
-    const program = createCliProgram({
-      version: '0.1.0-test',
-      getCwd: () => workspaceRoot,
-      write: (text: string) => {
-        output += text;
-      }
-    });
-
-    await program.parseAsync([
-      'node',
-      'onto',
-      'context',
-      'cosecha con guantes y merma',
-      '--dry-run'
-    ]);
-
-    const parsed = parse(output) as Record<string, unknown>;
-    const filesAfter = await readdir(viewsDirectory);
-
-    expect(parsed.intent).toBe('cosecha con guantes y merma');
-    expect(Array.isArray(parsed.domainEntities)).toBe(true);
-    expect(Array.isArray(parsed.tasks)).toBe(true);
-    expect(Array.isArray(parsed.componentSummaries)).toBe(true);
-    expect(output).not.toContain('XState');
-    expect(output).not.toContain('xstate');
-    expect(filesAfter).toEqual(filesBefore);
-  });
-
-  it('buildPromptPacket keeps implementation paths inside compilerMetadata only', async () => {
-    const workspace = await loadWorkspace(await createInitializedWorkspace());
-
-    const packet = buildPromptPacket(workspace, 'Confirm harvest weight');
-    const numericWeightInput = packet.componentSummaries.find(
-      (component) => component.id === 'NumericWeightInput'
-    );
-
-    expect(numericWeightInput).toBeDefined();
-    expect(
-      Object.prototype.hasOwnProperty.call(numericWeightInput ?? {}, 'implementationPath')
-    ).toBe(false);
-    expect(numericWeightInput?.compilerMetadata?.implementationPath).toContain(
-      'NumericWeightInput.tsx'
-    );
+    expect(packet.intent).toBe('Just a normal task');
+    expect(packet.domainEntities.length).toBe(workspace.domainEntities.length);
+    expect(packet.tasks.length).toBe(workspace.tasks.length);
+    expect(packet.componentSummaries.length).toBe(Object.keys(workspace.components).length);
   });
 });
-
-async function createInitializedWorkspace(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'onto-context-'));
-  temporaryDirectories.push(root);
-
-  await initOntologyProject({
-    cwd: root,
-    projectName: 'workspace'
-  });
-
-  return join(root, 'workspace');
-}

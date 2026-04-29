@@ -1,4 +1,4 @@
-id: weigh-patient
+id: WeighPatient
 version: 1.0.0
 task: record-patient-weight
 actor: nurse
