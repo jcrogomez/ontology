@@ -1,74 +1,48 @@
-id: render-weigh-patient
-viewId: weigh-patient
+id: render-harvest-confirmation
+viewId: HarvestConfirmation
 version: 1.0.0
 entityRefs:
-  - patient
-  - weightMeasurement
-taskRef: record-patient-weight
-machine:
-  initial: editing
-  context:
-    dirty: false
-    value: null
-  states:
-    editing:
-      on:
-        COMMIT:
-          target: confirming
-          effects:
-            - persistWeight
-    confirming:
-      on:
-        CONFIRM:
-          target: completed
-          guard: hasValidWeight
-    completed:
-      type: final
-  events:
-    - name: COMMIT
-      description: Commit the entered weight value
-    - name: CONFIRM
-      description: Confirm the measurement
-  guards:
-    - name: hasValidWeight
-      description: Weight must be within allowable clinical limits
-      condition: context.value != null
-  effects:
-    - name: persistWeight
-      description: Persist the drafted measurement
-      kind: io
+  - harvest_batch
+  - inventory_lot
+taskRef: confirm_harvest_batch
 layout:
-  kind: stack
-  gap: md
+  type: stack
+  gap: comfortable
 nodes:
-  - id: root
-    component: FormFrame
+  - id: screen
+    component: Screen
     props:
-      title: Record patient weight
+      title: Confirm harvest batch
+      mode: operator
     children:
-      - id: weight-input
+      - id: summary
+        component: HeaderSummary
+        props:
+          title: Batch summary
+          syncStatus: queued
+      - id: weight
         component: NumericWeightInput
         props:
-          label: Weight
-          unit: kg
-      - id: alerts
+          field: actual_weight
+          label: Actual weight
+          unit: g
+          size: large
+      - id: variance
         component: VarianceAlert
         props:
-          threshold: 2
-        condition:
-          field: weightMeasurement.delta
-          operator: ">"
-          value: 2
-        children:
-          - id: explain-button
-            component: StickyPrimaryButton
-            props:
-              label: Provide reason
+          threshold: 5
+          requiresReason: true
+      - id: offline
+        component: OfflineSyncBadge
+        props:
+          status: queued
+      - id: confirm
+        component: StickyPrimaryButton
+        props:
+          action: confirm_harvest_batch
+          label: Confirm batch
 dataBindings:
-  - id: bind-weight-value
-    source: weightMeasurement.value
-    target: weight-input.props.value
-  - id: bind-delta
-    source: weightMeasurement.delta
-    target: alerts.props.delta
+  - id: bind-actual-weight
+    source: HarvestBatch.actual_weight
+    target: weight.props.value
 target: react-web
