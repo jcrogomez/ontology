@@ -20,7 +20,12 @@ export const OSLViewComponentSchema = z
 
 export const OSLViewSchema = z
   .object({
-    id: NonEmptyStringSchema,
+    id: z
+      .string()
+      .regex(
+        /^[A-Z][A-Za-z0-9]*$/,
+        'View ID must be PascalCase and alphanumeric'
+      ),
     version: VersionSchema,
     task: NonEmptyStringSchema,
     actor: NonEmptyStringSchema,
