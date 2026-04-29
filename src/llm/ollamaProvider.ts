@@ -11,6 +11,15 @@ import { validateOrThrow } from '../utils/validation.js';
 
 export const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
 
+export interface LLMProviderOptions<T> {
+  model: string;
+  system: string;
+  prompt: string;
+  schema: z.ZodType<T>;
+  temperature?: number;
+  keepAlive?: string;
+}
+
 export interface StructuredGenerateArgs<TSchema extends z.ZodTypeAny> {
   model?: string;
   system: string;
@@ -71,6 +80,32 @@ export class OllamaLLMProvider implements LLMProvider {
   }
 }
 
+export async function generateStructuredOutput<T>(
+  options: LLMProviderOptions<T>
+): Promise<T> {
+  const jsonSchema = toJsonSchema(options.schema, 'OntologyStructuredOutput');
+  const response = await fetch(`${DEFAULT_OLLAMA_BASE_URL}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: options.model,
+      messages: [
+        { role: 'system', content: options.system },
+        { role: 'user', content: options.prompt }
+      ],
+      format: jsonSchema,
+      options: { temperature: options.temperature ?? 0 },
+      keep_alive: options.keepAlive ?? '5m'
+    })
+  });
+  const responseText = await parseOllamaHttpResponse(response, options.model, 'chat');
+  const parsed = parseStructuredJson(responseText);
+  if (!parsed.success) {
+    throw new Error('Failed to parse structured output from LLM.');
+  }
+  return validateOrThrow(options.schema, parsed.value, 'generated structured output');
+}
+
 export class MockLLMProvider implements LLMProvider {
   constructor(_options: MockLLMProviderOptions = {}) {}
 
@@ -84,6 +119,15 @@ export class MockLLMProvider implements LLMProvider {
       fixture,
       'mock structured output'
     );
+  }
+
+  async generateStructuredOutput<T>(
+    options: LLMProviderOptions<T>
+  ): Promise<T> {
+    return this.structuredGenerate({
+      ...options,
+      model: options.model
+    }) as Promise<T>;
   }
 }
 
