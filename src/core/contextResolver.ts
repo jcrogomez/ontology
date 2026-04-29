@@ -82,24 +82,57 @@ export async function loadWorkspace(cwd: string): Promise<WorkspaceContext> {
 }
 
 export function buildPromptPacket(workspace: WorkspaceContext, intent: string): PromptPacket {
-  const isHarvest = /harvest|cosecha|peso|merma/i.test(intent);
+  const isHarvest = /(harvest|cosech|peso|merma)/i.test(intent);
 
   let filteredDomains = workspace.domainEntities;
   let filteredTasks = workspace.tasks;
   let filteredComponentEntries = Object.values(workspace.components);
 
   if (isHarvest) {
-    filteredDomains = workspace.domainEntities.filter(d => d.name === 'HarvestBatch' || d.name === 'InventoryLot');
-    filteredTasks = workspace.tasks.filter(t => t.id === 'confirm_harvest_batch');
-    const allowedComponentIds = new Set([
+    const requiredDomains = ['HarvestBatch', 'InventoryLot'];
+    const requiredTasks = ['confirm_harvest_batch'];
+    const requiredComponents = [
       'Screen',
       'HeaderSummary',
       'NumericWeightInput',
       'VarianceAlert',
       'StickyPrimaryButton',
       'OfflineSyncBadge'
-    ]);
+    ];
+
+    const missingEntities: string[] = [];
+
+    // Filter Domains
+    filteredDomains = workspace.domainEntities.filter(d => requiredDomains.includes(d.name));
+    const foundDomains = filteredDomains.map(d => d.name);
+    for (const d of requiredDomains) {
+      if (!foundDomains.includes(d)) {
+        missingEntities.push(`Domain('${d}')`);
+      }
+    }
+
+    // Filter Tasks
+    filteredTasks = workspace.tasks.filter(t => requiredTasks.includes(t.id));
+    const foundTasks = filteredTasks.map(t => t.id);
+    for (const t of requiredTasks) {
+      if (!foundTasks.includes(t)) {
+        missingEntities.push(`Task('${t}')`);
+      }
+    }
+
+    // Filter Components
+    const allowedComponentIds = new Set(requiredComponents);
     filteredComponentEntries = filteredComponentEntries.filter(c => allowedComponentIds.has(c.id));
+    const foundComponents = new Set(filteredComponentEntries.map(c => c.id));
+    for (const c of requiredComponents) {
+      if (!foundComponents.has(c)) {
+        missingEntities.push(`Component('${c}')`);
+      }
+    }
+
+    if (missingEntities.length > 0) {
+      throw new Error(`Semantic context resolution failed. The following required entities are missing from the workspace: ${missingEntities.join(', ')}.`);
+    }
   }
 
   const componentSummaries: ComponentPromptSummary[] = filteredComponentEntries.map(c => ({
