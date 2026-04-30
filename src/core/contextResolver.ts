@@ -98,8 +98,6 @@ export async function loadWorkspace(cwd: string): Promise<WorkspaceContext> {
       }
     }
   }
-  const views = await loadYamlFilesInDir<OSLView>(viewsDir, OSLViewSchema, 'OSL View', '.osl.yaml');
-  const renders = await loadYamlFilesInDir<RenderAST>(viewsDir, RenderASTSchema, 'Render AST', '.ast.yaml');
 
   return {
     config,
