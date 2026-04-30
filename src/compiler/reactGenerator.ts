@@ -4,6 +4,8 @@ import { Project, QuoteKind } from 'ts-morph';
 
 import type { ComponentRegistryEntry, RenderAST, RenderNode } from '../schemas/index.js';
 
+import { generateXStateMachine } from './xstateGenerator.js';
+
 export async function generateReactComponent(
   ast: RenderAST,
   componentsRegistry: Record<string, ComponentRegistryEntry>,
@@ -58,6 +60,28 @@ export async function generateReactComponent(
     });
   }
 
+  if (ast.machine) {
+    sourceFile.addImportDeclaration({
+      moduleSpecifier: '@xstate/react',
+      namedImports: ['useMachine']
+    });
+
+    const machineOutputPath = join(root, 'src', 'generated', 'machines', `${ast.viewId}.machine.ts`);
+    let machineRelPath = relative(outputDir, machineOutputPath);
+    if (!machineRelPath.startsWith('.')) {
+      machineRelPath = `./${machineRelPath}`;
+    }
+    machineRelPath = machineRelPath.replace(/\.ts$/, '');
+
+    sourceFile.addImportDeclaration({
+      moduleSpecifier: machineRelPath,
+      namedImports: [{ name: 'machine', alias: 'viewMachine' }]
+    });
+
+    // Also trigger generation of the state machine file itself
+    await generateXStateMachine(ast.machine, ast.viewId, machineOutputPath);
+  }
+
   function generateJsx(node: RenderNode, indentLevel: number): string {
     const indent = '  '.repeat(indentLevel);
     let jsx = `${indent}<${node.component}`;
@@ -85,7 +109,16 @@ export async function generateReactComponent(
     return jsx;
   }
 
-  let functionBody = '  return (\n';
+  let functionBody = '';
+
+  if (ast.machine) {
+    functionBody += `  const [state, send] = useMachine(viewMachine, {
+    actions: {},
+    guards: {}
+  });\n\n`;
+  }
+
+  functionBody += '  return (\n';
   if (ast.nodes.length === 1) {
     functionBody += generateJsx(ast.nodes[0]!, 2) + '\n';
   } else {
