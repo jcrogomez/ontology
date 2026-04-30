@@ -7,6 +7,7 @@ import { registerPlanCommand } from '../commands/plan.js';
 import { registerVersionCommand } from '../commands/version.js';
 import { registerWhyCommand } from '../commands/why.js';
 import { registerDoctorCommand } from '../commands/doctor.js';
+import { registerPromptCommand } from '../commands/prompt.js';
 import { CLI_DESCRIPTION, CLI_NAME } from '../core/meta.js';
 
 export interface CliProgramOptions {
@@ -31,6 +32,11 @@ export function createCliProgram(options: CliProgramOptions): Command {
     .showHelpAfterError('(run with --help for usage details)');
 
   registerContextCommand(program, {
+    getCwd,
+    write
+  });
+
+  registerPromptCommand(program, {
     getCwd,
     write
   });
