@@ -7,6 +7,9 @@ import {
   buildPromptPacket,
   loadWorkspace
 } from './contextResolver.js';
+import { SymbolTable } from './symbolTable.js';
+import { SemanticLinker } from './linker.js';
+import type { Diagnostic } from './diagnostics.js';
 import type { LLMProvider } from '../llm/ollamaProvider.js';
 import { OSLViewSchema, RenderASTSchema, type OSLView, type RenderAST } from '../schemas/index.js';
 import { writeYamlFile } from '../utils/fs.js';
@@ -25,15 +28,21 @@ export interface RunSemanticParserOptions {
   model?: string;
 }
 
-export interface RunSemanticParserResult {
-  osl: OSLView;
-  ast: RenderAST;
-  outputPath: string;
-  astOutputPath: string;
-  pipeline: string[];
-  yaml: string;
-  astYaml: string;
-}
+export type RunSemanticParserResult =
+  | {
+      success: true;
+      osl: OSLView;
+      ast: RenderAST;
+      outputPath: string;
+      astOutputPath: string;
+      pipeline: string[];
+      yaml: string;
+      astYaml: string;
+    }
+  | {
+      success: false;
+      diagnostics: Diagnostic[];
+    };
 
 export async function runSemanticParser(
   options: RunSemanticParserOptions
@@ -94,6 +103,14 @@ export async function runSemanticParser(
 
   validatedAst.viewId = validatedOsl.id;
 
+  const symbolTable = SymbolTable.fromWorkspace(workspace);
+  const linker = new SemanticLinker(symbolTable);
+  const diagnostics = linker.linkRenderAST(validatedAst);
+
+  if (diagnostics.some(d => d.severity === 'error')) {
+    return { success: false, diagnostics };
+  }
+
   const astOutputPath = join(
     options.root,
     workspace.config.paths.viewsDir,
@@ -110,6 +127,7 @@ export async function runSemanticParser(
   }
 
   return {
+    success: true,
     osl: validatedOsl,
     ast: validatedAst,
     outputPath,
@@ -119,6 +137,7 @@ export async function runSemanticParser(
       '[✓] Semantic Parser: OSL generated',
       '[✓] Validator: OSL valid',
       '[✓] UX Planner: AST generated',
+      '[✓] Linker: AST verified',
       '[→] Next: onto build <view>'
     ],
     yaml,

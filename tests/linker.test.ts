@@ -31,10 +31,10 @@ describe('Semantic Linker', () => {
     const view: OSLView = {
       id: 'ConfirmHarvestView',
       version: '1.0.0',
-      task: 'confirm_harvest_batch',
-      actor: 'operator',
+      task: 'trigger_compilation',
+      actor: 'developer',
       context: {},
-      domainEntities: ['HarvestBatch', 'InventoryLot'],
+      domainEntities: ['Workspace', 'Pipeline'],
       information: {},
       interaction: {},
       components: [
@@ -54,8 +54,8 @@ describe('Semantic Linker', () => {
     const view: OSLView = {
       id: 'MissingEntityView',
       version: '1.0.0',
-      task: 'confirm_harvest_batch',
-      actor: 'operator',
+      task: 'trigger_compilation',
+      actor: 'developer',
       context: {},
       domainEntities: ['MissingEntity'],
       information: {},
@@ -81,19 +81,19 @@ describe('Semantic Linker', () => {
       id: 'ast1',
       viewId: 'ConfirmHarvestView',
       version: '1.0.0',
-      entityRefs: ['HarvestBatch'],
-      taskRef: 'confirm_harvest_batch',
+      entityRefs: ['Workspace'],
+      taskRef: 'trigger_compilation',
       layout: {},
       nodes: [
         {
           id: 'node1',
           component: 'Screen',
-          props: {},
+          props: { title: 'Some Title' },
           children: [
             {
               id: 'node2',
-              component: 'HeaderSummary',
-              props: {}
+              component: 'StatusBadge',
+              props: { status: 'Compiling' }
             }
           ]
         }
@@ -101,7 +101,7 @@ describe('Semantic Linker', () => {
       dataBindings: [
         {
           id: 'bind1',
-          source: 'HarvestBatch.actual_weight',
+          source: 'Workspace.pendingChanges',
           target: 'someTarget'
         }
       ],
@@ -117,14 +117,14 @@ describe('Semantic Linker', () => {
       id: 'ast2',
       viewId: 'ConfirmHarvestView',
       version: '1.0.0',
-      entityRefs: ['HarvestBatch'],
-      taskRef: 'confirm_harvest_batch',
+      entityRefs: ['Workspace'],
+      taskRef: 'trigger_compilation',
       layout: {},
       nodes: [],
       dataBindings: [
         {
           id: 'bind1',
-          source: 'HarvestBatch.non_existent_field',
+          source: 'Workspace.non_existent_field',
           target: 'someTarget'
         }
       ],
@@ -137,6 +137,37 @@ describe('Semantic Linker', () => {
       severity: 'error',
       code: 'LINK_MISSING_FIELD',
       path: ['dataBindings', '0', 'source']
+    });
+  });
+
+  it('reports illegal prop usage in RenderAST', () => {
+    const ast: RenderAST = {
+      id: 'ast3',
+      viewId: 'ConfirmHarvestView',
+      version: '1.0.0',
+      entityRefs: ['Workspace'],
+      taskRef: 'trigger_compilation',
+      layout: {},
+      nodes: [
+        {
+          id: 'node1',
+          component: 'Screen',
+          props: {
+            title: 'Some Title',
+            mood: 'lechuga cósmica' // Invalid prop!
+          }
+        }
+      ],
+      dataBindings: [],
+      target: 'react-web'
+    };
+
+    const diagnostics = linker.linkRenderAST(ast);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]).toMatchObject({
+      severity: 'error',
+      code: 'LINK_INVALID_PROP',
+      path: ['nodes', '0', 'props', 'mood']
     });
   });
 });
