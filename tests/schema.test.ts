@@ -20,8 +20,8 @@ describe('Ontology schemas', () => {
     const parsed = validateOrThrow(OSLViewSchema, fixture, 'OSL view');
 
     expectType<OSLView>(parsed);
-    expect(parsed.id).toBe('HarvestConfirmation');
-    expect(parsed.components[2]?.events).toContain('onValueCommit');
+    expect(parsed.id).toBe('IdeMainView');
+    expect(parsed.components[2]?.id).toBe('NodeCard');
   });
 
   it('rejects an invalid OSL fixture', async () => {

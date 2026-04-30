@@ -12,8 +12,8 @@ import { OSLViewSchema, RenderASTSchema, type OSLView, type RenderAST } from '..
 import { writeYamlFile } from '../utils/fs.js';
 import { validateOrThrow } from '../utils/validation.js';
 
-const HARVEST_INTENT_TERMS = ['harvest', 'cosecha', 'merma', 'weight', 'peso'];
-const DEFAULT_HARVEST_VIEW_ID = 'HarvestConfirmation';
+const IDE_INTENT_TERMS = ['compile', 'build', 'workspace', 'view', 'ide', 'node', 'graph'];
+const DEFAULT_IDE_VIEW_ID = 'IdeMainView';
 const DEFAULT_GENERIC_VIEW_ID = 'GeneratedView';
 const CLEAN_VIEW_ID_PATTERN = /^[A-Z][A-Za-z0-9]*$/;
 
@@ -135,7 +135,7 @@ function buildSemanticParserPrompt(
     `Natural language intent:\n${naturalLanguageIntent.trim()}`,
     'Compact context packet:',
     JSON.stringify(promptPacket, null, 2),
-    `If the intent is harvest-related and no clean view id is obvious, use "${DEFAULT_HARVEST_VIEW_ID}" as the view id.`
+    `If the intent is IDE-related and no clean view id is obvious, use "${DEFAULT_IDE_VIEW_ID}" as the view id.`
   ].join('\n\n');
 }
 
@@ -146,8 +146,8 @@ function normalizePlannedOsl(
   if (!CLEAN_VIEW_ID_PATTERN.test(osl.id)) {
     return {
       ...osl,
-      id: isHarvestIntent(naturalLanguageIntent)
-        ? DEFAULT_HARVEST_VIEW_ID
+      id: isIdeIntent(naturalLanguageIntent)
+        ? DEFAULT_IDE_VIEW_ID
         : DEFAULT_GENERIC_VIEW_ID
     };
   }
@@ -155,10 +155,10 @@ function normalizePlannedOsl(
   return osl;
 }
 
-function isHarvestIntent(intent: string): boolean {
+function isIdeIntent(intent: string): boolean {
   const normalizedIntent = intent.toLocaleLowerCase();
 
-  return HARVEST_INTENT_TERMS.some((term) =>
+  return IDE_INTENT_TERMS.some((term) =>
     normalizedIntent.includes(term)
   );
 }

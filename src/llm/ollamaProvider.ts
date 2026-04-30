@@ -508,6 +508,7 @@ async function loadOntologyConfig(
 function selectMockFixture(prompt: string): unknown {
   const normalizedPrompt = prompt.toLocaleLowerCase();
 
+
   if (
     normalizedPrompt.includes('render ast') ||
     normalizedPrompt.includes('renderast')
@@ -515,11 +516,11 @@ function selectMockFixture(prompt: string): unknown {
     return validateOrThrow(
       RenderASTSchema,
       {
-        id: 'render-harvest-confirmation',
-        viewId: 'HarvestConfirmation',
+        id: 'render-ide-main-view',
+        viewId: 'IdeMainView',
         version: '1.0.0',
-        entityRefs: ['harvest_batch', 'inventory_lot'],
-        taskRef: 'confirm_harvest_batch',
+        entityRefs: ['workspace', 'pipeline'],
+        taskRef: 'trigger_compilation',
         layout: {
           type: 'stack',
           gap: 'comfortable'
@@ -529,59 +530,37 @@ function selectMockFixture(prompt: string): unknown {
             id: 'screen',
             component: 'Screen',
             props: {
-              title: 'Confirm harvest batch',
-              mode: 'operator'
+              title: 'Ontology Studio IDE',
+              mode: 'developer'
             },
             children: [
               {
-                id: 'summary',
-                component: 'HeaderSummary',
+                id: 'split',
+                component: 'SplitPane',
                 props: {
-                  title: 'Batch summary',
-                  syncStatus: 'queued'
-                }
-              },
-              {
-                id: 'weight',
-                component: 'NumericWeightInput',
-                props: {
-                  field: 'actual_weight',
-                  label: 'Actual weight',
-                  unit: 'g',
-                  size: 'large'
-                }
-              },
-              {
-                id: 'variance',
-                component: 'VarianceAlert',
-                props: {
-                  threshold: 5,
-                  requiresReason: true
-                }
-              },
-              {
-                id: 'offline',
-                component: 'OfflineSyncBadge',
-                props: {
-                  status: 'queued'
-                }
-              },
-              {
-                id: 'confirm',
-                component: 'StickyPrimaryButton',
-                props: {
-                  action: 'confirm_harvest_batch',
-                  label: 'Confirm batch'
-                }
+                  orientation: 'horizontal'
+                },
+                children: [
+                  {
+                    id: 'minimap',
+                    component: 'TopologicalMinimap',
+                    props: {}
+                  },
+                  {
+                    id: 'node-card',
+                    component: 'NodeCard',
+                    props: {}
+                  }
+                ]
               }
             ]
           }
         ],
         dataBindings: [
           {
-            id: 'bind-actual-weight',
-            source: 'HarvestBatch.actual_weight',
-            target: 'weight.props.value'
+            id: 'bind-workspace-status',
+            source: 'Workspace.pendingChanges',
+            target: 'split.props.status'
           }
         ],
         target: 'react-web'
@@ -591,29 +570,47 @@ function selectMockFixture(prompt: string): unknown {
   }
 
   if (
-    normalizedPrompt.includes('harvest confirmation osl') ||
-    normalizedPrompt.includes('confirm harvest') ||
+    normalizedPrompt.includes('critic report') ||
+    /\bcritic\b/.test(normalizedPrompt)
+  ) {
+    return {
+      verdict: 'revise',
+      summary: 'IDE main view is structurally sound but needs better visual distinction between parsed nodes.',
+      findings: [
+        {
+          id: 'node-distinction',
+          severity: 'warning',
+          message: 'Explain how semantic nodes differentiate between read-only and editable states.'
+        }
+      ]
+    };
+  }
+
+  if (
+    normalizedPrompt.includes('ide main view osl') ||
     normalizedPrompt.includes('ontology specification language') ||
-    normalizedPrompt.includes('osl')
+    normalizedPrompt.includes('osl') ||
+    normalizedPrompt.includes('ide') ||
+    normalizedPrompt.includes('ide main view')
   ) {
     return validateOrThrow(
       OSLViewSchema,
       {
-        id: 'HarvestConfirmation',
+        id: 'IdeMainView',
         version: '1.0.0',
-        task: 'confirm_harvest_batch',
-        actor: 'operator',
+        task: 'trigger_compilation',
+        actor: 'developer',
         context: {
-          operation: 'harvest_confirmation',
+          operation: 'ide_interaction',
           locale: 'en-US'
         },
-        domainEntities: ['HarvestBatch', 'InventoryLot'],
+        domainEntities: ['Workspace', 'Pipeline'],
         information: {
-          summary: ['batch_id', 'crop_name', 'expected_weight', 'lot_id']
+          summary: ['activeView', 'pendingChanges', 'intent', 'status']
         },
         interaction: {
-          primaryAction: 'confirm_harvest_batch',
-          varianceHandling: 'reason_when_threshold_exceeded'
+          primaryAction: 'trigger_compilation',
+          varianceHandling: 'log_errors'
         },
         components: [
           {
@@ -621,27 +618,16 @@ function selectMockFixture(prompt: string): unknown {
             semanticType: 'screen-container'
           },
           {
-            id: 'HeaderSummary',
-            semanticType: 'context-summary'
+            id: 'TopologicalMinimap',
+            semanticType: 'minimap'
           },
           {
-            id: 'NumericWeightInput',
-            semanticType: 'numeric-measurement-input',
-            events: ['onValueChange', 'onValueCommit']
+            id: 'NodeCard',
+            semanticType: 'card'
           },
           {
-            id: 'VarianceAlert',
-            semanticType: 'variance-explanation-alert',
-            events: ['onReasonChange', 'onReasonProvided', 'onDismissRequested']
-          },
-          {
-            id: 'StickyPrimaryButton',
-            semanticType: 'sticky-primary-action',
-            events: ['onIntent', 'onConfirmRequested']
-          },
-          {
-            id: 'OfflineSyncBadge',
-            semanticType: 'sync-state-indicator'
+            id: 'SplitPane',
+            semanticType: 'layout'
           }
         ],
         layout: {
@@ -651,31 +637,12 @@ function selectMockFixture(prompt: string): unknown {
           emphasis: 'high-clarity'
         },
         data: {
-          writes: ['HarvestBatch.actual_weight', 'HarvestBatch.loss_reason']
+          writes: ['Workspace.activeView', 'Pipeline.status']
         },
         target: 'react-web'
       },
-      'mock harvest confirmation osl'
+      'mock ide main view osl'
     );
-  }
-
-  if (
-    normalizedPrompt.includes('critic report') ||
-    /\bcritic\b/.test(normalizedPrompt)
-  ) {
-    return {
-      verdict: 'revise',
-      summary:
-        'Harvest confirmation is structurally sound but needs clearer variance reason guidance.',
-      findings: [
-        {
-          id: 'variance-reason-clarity',
-          severity: 'warning',
-          message:
-            'Explain when a reason is required so the operator can recover without hesitation.'
-        }
-      ]
-    };
   }
 
   throw new Error(

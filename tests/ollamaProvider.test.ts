@@ -40,23 +40,23 @@ describe('Ollama providers', () => {
     });
 
     const osl = await provider.structuredGenerate({
-      system: 'Generate a harvest confirmation OSL view.',
-      prompt: 'Produce harvest confirmation OSL.',
+      system: 'Generate an IDE main view OSL view.',
+      prompt: 'Produce ide main view osl.',
       schema: OSLViewSchema
     });
     const renderAst = await provider.structuredGenerate({
-      system: 'Generate a harvest confirmation Render AST.',
-      prompt: 'Produce a Render AST for harvest confirmation.',
+      system: 'Generate an IDE main view Render AST.',
+      prompt: 'Produce a Render AST for IDE main view.',
       schema: RenderASTSchema
     });
     const critic = await provider.structuredGenerate({
       system: 'Act as a critic.',
-      prompt: 'Write a critic report for harvest confirmation.',
+      prompt: 'Write a critic report for IDE main view.',
       schema: criticReportSchema
     });
 
-    expect(osl.id).toBe('HarvestConfirmation');
-    expect(renderAst.viewId).toBe('HarvestConfirmation');
+    expect(osl.id).toBe('IdeMainView');
+    expect(renderAst.viewId).toBe('IdeMainView');
     expect(renderAst.nodes[0]?.component).toBe('Screen');
     expect(critic.verdict).toBe('revise');
     expect(critic.findings[0]?.severity).toBe('warning');

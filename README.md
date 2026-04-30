@@ -1,6 +1,6 @@
-# Ecolístico Ontology Compiler
+# Ontology Studio Compiler
 
-The Ecolístico Ontology Compiler is a deterministic, antifragile toolchain for semantic UI generation. It acts as a CLI bridge between human intent and strictly validated Ontology Specification Language (OSL) views.
+The Ontology Studio Compiler is a deterministic, antifragile toolchain for semantic UI generation. It acts as a CLI bridge between human intent and strictly validated Ontology Specification Language (OSL) views.
 
 ## Features
 
@@ -16,7 +16,7 @@ The Ecolístico Ontology Compiler is a deterministic, antifragile toolchain for 
 onto init workspace
 
 # Plan a view based on an intent
-onto plan "Confirm harvest weight and queue offline sync if needed." --mock
+onto plan "Design the main canvas of Ontology Studio..." --mock
 ```
 
 ## Testing
@@ -104,16 +104,16 @@ onto init
 * `onto why <node>` - Traces the deterministic lineage of any compiled element back to its origin in reality.
 
 ```text
-$ onto why views/HarvestConfirmation confirm_action.position
+$ onto why views/IdeMainView minimap.position
 
-<path> confirm_action.position = "sticky_bottom"
+<path> minimap.position = "sticky_right"
 
 Because:
-1. task.actor = "operator"
-2. context.environment = "wet_hands_or_gloves"
-3. canon.rule[operator_mode_requires_large_tap_targets] = true
-4. canon.rule[primary_action_always_visible] = true
+1. task.actor = "developer"
+2. context.operation = "ide_interaction"
+3. canon.rule[high_information_density] = true
+4. canon.rule[keyboard_first_interfaces] = true
 
-Generated in: ontology/views/HarvestConfirmation.ast.yaml
-Compiled to: src/generated/views/HarvestConfirmation.tsx
+Generated in: ontology/views/IdeMainView.ast.yaml
+Compiled to: src/generated/views/IdeMainView.tsx
 ```

@@ -82,22 +82,24 @@ export async function loadWorkspace(cwd: string): Promise<WorkspaceContext> {
 }
 
 export function buildPromptPacket(workspace: WorkspaceContext, intent: string): PromptPacket {
-  const isHarvest = /(harvest|cosech|peso|merma)/i.test(intent);
+  const isIde = /(compile|build|workspace|view|ide|node|graph)/i.test(intent);
 
   let filteredDomains = workspace.domainEntities;
   let filteredTasks = workspace.tasks;
   let filteredComponentEntries = Object.values(workspace.components);
 
-  if (isHarvest) {
-    const requiredDomains = ['HarvestBatch', 'InventoryLot'];
-    const requiredTasks = ['confirm_harvest_batch'];
+  if (isIde) {
+    const requiredDomains = ['Workspace', 'Pipeline'];
+    const requiredTasks = ['trigger_compilation', 'shift_abstraction_level'];
     const requiredComponents = [
       'Screen',
-      'HeaderSummary',
-      'NumericWeightInput',
-      'VarianceAlert',
-      'StickyPrimaryButton',
-      'OfflineSyncBadge'
+      'CodeViewer',
+      'TerminalPanel',
+      'GraphVisualizer',
+      'StatusBadge',
+      'SplitPane',
+      'TopologicalMinimap',
+      'NodeCard'
     ];
 
     const missingEntities: string[] = [];
