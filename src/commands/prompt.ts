@@ -1,7 +1,7 @@
 import type { Command } from 'commander';
 import * as p from '@clack/prompts';
 import {
-  branchPrompt,
+
   type HierarchyLevel,
   loadPromptGraph,
   savePromptGraph
@@ -53,14 +53,14 @@ export function registerPromptCommand(
           throw new Error();
         }
 
-        const parentId = commandOptions.parent || graph.head;
+        const parentId = commandOptions.parent || graph.getHead();
 
         if (!parentId) {
           p.log.error('Prompt graph has no HEAD. Run `onto init` or create a root prompt first.');
           throw new Error();
         }
 
-        if (!graph.nodes[parentId]) {
+        if (!graph.getNode(parentId)) {
           if (commandOptions.parent) {
             p.log.error(`Parent node ${parentId} not found in graph.`);
           } else {
@@ -69,12 +69,11 @@ export function registerPromptCommand(
           throw new Error();
         }
 
-        const newNode = branchPrompt(
-          graph,
+        const newNode = graph.branch(
           parentId,
           promptText,
           commandOptions.level as HierarchyLevel,
-          'developer' // Hardcoded author for MVP, could come from git/config later
+          'developer'
         );
 
         await savePromptGraph(cwd, graph);
