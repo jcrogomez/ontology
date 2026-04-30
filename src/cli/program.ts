@@ -60,6 +60,7 @@ export function createCliProgram(options: CliProgramOptions): Command {
     getCwd,
     write
   });
+
   registerDoctorCommand(program, {
     getCwd,
     write
