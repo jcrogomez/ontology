@@ -5,7 +5,7 @@ import { classNames } from './classNames.js';
 
 export interface ScreenProps {
   title?: string;
-  mode?: 'operator' | 'manager' | 'auditor';
+  mode?: 'operator' | 'manager' | 'auditor' | 'developer';
   className?: string;
   children: ReactNode;
 }
