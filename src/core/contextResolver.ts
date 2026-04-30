@@ -81,6 +81,23 @@ export async function loadWorkspace(cwd: string): Promise<WorkspaceContext> {
   const tasks = await loadYamlFilesInDir<Task>(tasksDir, TaskSchema, 'Task');
 
   const viewsDir = join(cwd, config.paths.viewsDir);
+  let views: OSLView[] = [];
+  let renders: RenderAST[] = [];
+
+  if (await pathExists(viewsDir)) {
+    const files = await readdir(viewsDir);
+    for (const file of files) {
+      if (file.endsWith('.osl.yaml') || file.endsWith('.osl.yml')) {
+        const fullPath = join(viewsDir, file);
+        const content = await readYamlFile<unknown>(fullPath);
+        views.push(validateOrThrow(OSLViewSchema, content, `OSL View (${file})`));
+      } else if (file.endsWith('.ast.yaml') || file.endsWith('.ast.yml')) {
+        const fullPath = join(viewsDir, file);
+        const content = await readYamlFile<unknown>(fullPath);
+        renders.push(validateOrThrow(RenderASTSchema, content, `Render AST (${file})`));
+      }
+    }
+  }
   const views = await loadYamlFilesInDir<OSLView>(viewsDir, OSLViewSchema, 'OSL View', '.osl.yaml');
   const renders = await loadYamlFilesInDir<RenderAST>(viewsDir, RenderASTSchema, 'Render AST', '.ast.yaml');
 
