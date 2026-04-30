@@ -69,14 +69,29 @@ export class SemanticLinker {
     }
 
     const checkNode = (node: RenderNode, path: string[]) => {
-      if (node.component && !this.symbolTable.components.has(node.component)) {
-        diagnostics.push({
-          severity: 'error',
-          code: 'LINK_MISSING_COMPONENT',
-          message: `Component '${node.component}' not found in registry`,
-          path: [...path, 'component']
-        });
+      if (node.component) {
+        if (!this.symbolTable.components.has(node.component)) {
+          diagnostics.push({
+            severity: 'error',
+            code: 'LINK_MISSING_COMPONENT',
+            message: `Component '${node.component}' not found in registry`,
+            path: [...path, 'component']
+          });
+        } else if (node.props) {
+          const allowedProps = this.symbolTable.componentProps.get(node.component) || [];
+          for (const propName of Object.keys(node.props)) {
+            if (!allowedProps.includes(propName)) {
+              diagnostics.push({
+                severity: 'error',
+                code: 'LINK_INVALID_PROP',
+                message: `Prop '${propName}' is illegal for component '${node.component}'`,
+                path: [...path, 'props', propName]
+              });
+            }
+          }
+        }
       }
+
       if (node.children) {
         node.children.forEach((child, idx) => checkNode(child, [...path, 'children', idx.toString()]));
       }
