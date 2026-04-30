@@ -5,6 +5,7 @@ import { registerBuildCommand } from '../commands/build.js';
 import { registerInitCommand } from '../commands/init.js';
 import { registerPlanCommand } from '../commands/plan.js';
 import { registerVersionCommand } from '../commands/version.js';
+import { registerDoctorCommand } from '../commands/doctor.js';
 import { CLI_DESCRIPTION, CLI_NAME } from '../core/meta.js';
 
 export interface CliProgramOptions {
@@ -44,6 +45,11 @@ export function createCliProgram(options: CliProgramOptions): Command {
   });
 
   registerBuildCommand(program, {
+    getCwd,
+    write
+  });
+
+  registerDoctorCommand(program, {
     getCwd,
     write
   });
