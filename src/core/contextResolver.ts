@@ -7,6 +7,8 @@ import {
   DomainEntitySchema,
   OntologyConfigSchema,
   TaskSchema,
+  OSLViewSchema,
+  RenderASTSchema
 } from '../schemas/index.js';
 import type {
   CanonRule,
@@ -15,7 +17,9 @@ import type {
   OntologyConfig,
   Task,
   PromptPacket,
-  ComponentPromptSummary
+  ComponentPromptSummary,
+  OSLView,
+  RenderAST
 } from '../schemas/index.js';
 import { pathExists, readYamlFile } from '../utils/fs.js';
 import { validateOrThrow } from '../utils/validation.js';
@@ -26,18 +30,22 @@ export interface WorkspaceContext {
   domainEntities: DomainEntity[];
   tasks: Task[];
   components: Record<string, ComponentRegistryEntry>;
+  views: OSLView[];
+  renders: RenderAST[];
 }
 
 async function loadYamlFilesInDir<T>(
   dirPath: string,
   schema: any,
-  label: string
+  label: string,
+  filterExtension?: string
 ): Promise<T[]> {
   if (!(await pathExists(dirPath))) {
     return [];
   }
   const files = await readdir(dirPath);
-  const yamlFiles = files.filter(f => f.endsWith('.yaml') || f.endsWith('.yml'));
+  const extFilter = filterExtension || '.yaml';
+  const yamlFiles = filterExtension ? files.filter(f => f.endsWith(extFilter)) : files.filter(f => f.endsWith('.yaml') || f.endsWith('.yml'));
   const results: T[] = [];
   for (const file of yamlFiles) {
     const fullPath = join(dirPath, file);
@@ -72,12 +80,18 @@ export async function loadWorkspace(cwd: string): Promise<WorkspaceContext> {
   const tasksDir = join(cwd, config.paths.tasksDir);
   const tasks = await loadYamlFilesInDir<Task>(tasksDir, TaskSchema, 'Task');
 
+  const viewsDir = join(cwd, config.paths.viewsDir);
+  const views = await loadYamlFilesInDir<OSLView>(viewsDir, OSLViewSchema, 'OSL View', '.osl.yaml');
+  const renders = await loadYamlFilesInDir<RenderAST>(viewsDir, RenderASTSchema, 'Render AST', '.ast.yaml');
+
   return {
     config,
     canonRules,
     domainEntities,
     tasks,
-    components
+    components,
+    views,
+    renders
   };
 }
 

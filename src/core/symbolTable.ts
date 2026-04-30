@@ -36,6 +36,14 @@ export class SymbolTable {
       table.componentEvents.set(id, Object.keys(component.eventsSchema || {}));
     }
 
+    for (const view of workspace.views) {
+      table.views.set(view.id, view);
+    }
+
+    for (const render of workspace.renders) {
+      table.renders.set(render.viewId, render);
+    }
+
     return table;
   }
 }
