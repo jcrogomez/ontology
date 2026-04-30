@@ -51,6 +51,10 @@ export function createCliProgram(options: CliProgramOptions): Command {
   });
 
   registerWhyCommand(program, {
+    getCwd,
+    write
+  });
+
   registerDoctorCommand(program, {
     getCwd,
     write
