@@ -57,27 +57,27 @@ describe('onto init', () => {
       await readYamlFile<unknown>(join(cwd, 'ontology/components/registry.yaml')),
       'component registry'
     );
-    const harvestBatch = validateOrThrow(
+    const workspaceDomain = validateOrThrow(
       DomainEntitySchema,
-      await readYamlFile<unknown>(join(cwd, 'ontology/domain/harvest_batch.yaml')),
-      'HarvestBatch domain entity'
+      await readYamlFile<unknown>(join(cwd, 'ontology/domain/workspace.yaml')),
+      'Workspace domain entity'
     );
-    const inventoryLot = validateOrThrow(
+    const pipelineDomain = validateOrThrow(
       DomainEntitySchema,
-      await readYamlFile<unknown>(join(cwd, 'ontology/domain/inventory_lot.yaml')),
-      'InventoryLot domain entity'
+      await readYamlFile<unknown>(join(cwd, 'ontology/domain/pipeline.yaml')),
+      'Pipeline domain entity'
     );
     const canon = validateOrThrow(
       CanonSchema,
-      await readYamlFile<unknown>(join(cwd, 'ontology/canon/ops_canon.yaml')),
-      'ops canon'
+      await readYamlFile<unknown>(join(cwd, 'ontology/canon/ide-rules.yaml')),
+      'ide canon'
     );
     const task = validateOrThrow(
       TaskSchema,
       await readYamlFile<unknown>(
-        join(cwd, 'ontology/tasks/confirm_harvest_batch.yaml')
+        join(cwd, 'ontology/tasks/compile_view.yaml')
       ),
-      'confirm harvest batch task'
+      'compile view task'
     );
 
     expect(config.projectName).toBe(basename(cwd));
@@ -87,27 +87,29 @@ describe('onto init', () => {
     expect(config.llm.pipeline.parser.model).toBe('qwen2.5-coder:3b');
     expect(Object.keys(registry.components)).toEqual([
       'Screen',
-      'HeaderSummary',
-      'NumericWeightInput',
-      'VarianceAlert',
-      'StickyPrimaryButton',
-      'OfflineSyncBadge'
+      'CodeViewer',
+      'TerminalPanel',
+      'GraphVisualizer',
+      'StatusBadge',
+      'SplitPane',
+      'TopologicalMinimap',
+      'NodeCard'
     ]);
-    expect(harvestBatch.name).toBe('HarvestBatch');
-    expect(inventoryLot.name).toBe('InventoryLot');
+    expect(workspaceDomain.name).toBe('Workspace');
+    expect(pipelineDomain.name).toBe('Pipeline');
     expect(canon.rules.map((rule) => rule.id)).toContain(
       'generated_code_is_not_source_of_truth'
     );
-    expect(task.successConditions).toContain('confirmation_synced_or_queued');
+    expect(task.successConditions).toContain('compilation_successful');
     expect(output).toContain('Initialized Ontology project in');
-    expect(output).toContain('1. `onto plan "..."`');
-    expect(output).toContain('2. `onto build HarvestConfirmation`');
-    expect(output).toContain('3. `onto inspect HarvestConfirmation`');
+    expect(output).toContain('1. `onto plan "Design the main canvas of Ontology Studio..."`');
+    expect(output).toContain('2. `onto build IdeMainView`');
+    expect(output).toContain('3. `onto why IdeMainView TopologicalMinimap`');
   });
 
   it('creates a named project directory and initializes inside it', async () => {
     const cwd = await createTemporaryDirectory();
-    const projectName = 'harvest-console';
+    const projectName = 'ide-console';
     const projectRoot = join(cwd, projectName);
     const program = createCliProgram({
       version: '0.1.0-test',

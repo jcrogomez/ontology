@@ -42,18 +42,19 @@ export const INIT_DIRECTORY_PATHS = [
 
 export const SEED_FILE_PATHS = [
   'ontology/ontology.config.yaml',
-  'ontology/canon/ops_canon.yaml',
-  'ontology/domain/harvest_batch.yaml',
-  'ontology/domain/inventory_lot.yaml',
-  'ontology/tasks/confirm_harvest_batch.yaml',
+  'ontology/canon/ide-rules.yaml',
+  'ontology/domain/workspace.yaml',
+  'ontology/domain/pipeline.yaml',
+  'ontology/tasks/compile_view.yaml',
+  'ontology/tasks/navigate_graph.yaml',
   'ontology/components/registry.yaml',
   'ontology/tokens/default_tokens.yaml'
 ] as const;
 
 export const INIT_NEXT_STEPS = [
-  'onto plan "..."',
-  'onto build HarvestConfirmation',
-  'onto inspect HarvestConfirmation'
+  'onto plan "Design the main canvas of Ontology Studio..."',
+  'onto build IdeMainView',
+  'onto why IdeMainView TopologicalMinimap'
 ] as const;
 
 export interface SeedFileDefinition {
@@ -68,20 +69,24 @@ export function createSeedFiles(projectName: string): SeedFileDefinition[] {
       value: createOntologyConfigSeed(projectName)
     },
     {
-      path: 'ontology/canon/ops_canon.yaml',
-      value: createOpsCanonSeed()
+      path: 'ontology/canon/ide-rules.yaml',
+      value: createIdeCanonSeed()
     },
     {
-      path: 'ontology/domain/harvest_batch.yaml',
-      value: createHarvestBatchSeed()
+      path: 'ontology/domain/workspace.yaml',
+      value: createWorkspaceDomainSeed()
     },
     {
-      path: 'ontology/domain/inventory_lot.yaml',
-      value: createInventoryLotSeed()
+      path: 'ontology/domain/pipeline.yaml',
+      value: createPipelineDomainSeed()
     },
     {
-      path: 'ontology/tasks/confirm_harvest_batch.yaml',
-      value: createConfirmHarvestBatchTaskSeed()
+      path: 'ontology/tasks/compile_view.yaml',
+      value: createCompileViewTaskSeed()
+    },
+    {
+      path: 'ontology/tasks/navigate_graph.yaml',
+      value: createNavigateGraphTaskSeed()
     },
     {
       path: 'ontology/components/registry.yaml',
@@ -135,233 +140,146 @@ function createOntologyConfigSeed(projectName: string): OntologyConfig {
   );
 }
 
-function createOpsCanonSeed(): Canon {
+function createIdeCanonSeed(): Canon {
   return validateOrThrow(
     CanonSchema,
     {
-      id: 'ops_canon',
+      id: 'ide_rules',
       version: '1.0.0',
       rules: [
         {
-          id: 'primary_action_always_visible',
-          description:
-            'Primary completion actions must remain visible during the critical task path.',
+          id: 'high_information_density',
+          description: 'Information density is critical. Do not waste whitespace.',
           severity: 'blocking',
           appliesTo: ['views', 'layout']
         },
         {
-          id: 'errors_must_be_reversible',
-          description:
-            'Operators must be able to understand and reverse recoverable errors without losing work.',
+          id: 'always_show_compilation_state',
+          description: 'Always provide visual feedback for compilation states (Parsing, Planning, Building).',
           severity: 'blocking',
           appliesTo: ['interaction', 'validation']
         },
         {
-          id: 'operator_mode_requires_large_tap_targets',
-          description:
-            'Operator-facing controls must preserve large tap targets for use with gloves or fast-paced handling.',
-          severity: 'warning',
+          id: 'keyboard_first_interfaces',
+          description: 'Interfaces must be keyboard-first. Read-only code should be distinct from editable semantic prompts.',
+          severity: 'blocking',
           appliesTo: ['components', 'tokens']
         },
         {
-          id: 'offline_state_must_be_visible',
-          description:
-            'Any queued or offline operational state must be visible before confirmation is finalized.',
-          severity: 'blocking',
-          appliesTo: ['views', 'components']
-        },
-        {
           id: 'generated_code_is_not_source_of_truth',
-          description:
-            'Generated code is compiled residue and must never replace ontology source artifacts as the system of record.',
+          description: 'Generated code is compiled residue and must never replace ontology source artifacts as the system of record.',
           severity: 'blocking',
           appliesTo: ['src/generated', 'compiler']
         }
       ]
     },
-    'ops canon seed'
+    'ide canon seed'
   );
 }
 
-function createHarvestBatchSeed(): DomainEntity {
+function createWorkspaceDomainSeed(): DomainEntity {
   return validateOrThrow(
     DomainEntitySchema,
     {
-      id: 'harvest_batch',
+      id: 'workspace',
       version: '1.0.0',
-      name: 'HarvestBatch',
+      name: 'Workspace',
       fields: [
         {
-          name: 'batch_id',
-          type: 'string',
-          required: true,
-          description: 'Unique identifier for the harvest batch'
-        },
-        {
-          name: 'crop_name',
-          type: 'string',
-          required: true,
-          description: 'Human-readable crop name for the batch'
-        },
-        {
-          name: 'expected_weight',
-          type: 'number',
-          required: true,
-          unit: 'g',
-          description: 'Expected total harvested weight'
-        },
-        {
-          name: 'actual_weight',
-          type: 'number',
-          required: true,
-          unit: 'g',
-          description: 'Observed measured harvested weight'
-        },
-        {
-          name: 'variance',
-          type: 'number',
-          required: false,
-          unit: 'percentage',
-          description: 'Difference between expected and actual weight'
-        },
-        {
-          name: 'loss_reason',
+          name: 'activeView',
           type: 'string',
           required: false,
-          description: 'Operator-provided explanation for significant loss'
+          description: 'The currently active view in the IDE'
         },
         {
-          name: 'ambient_temperature',
+          name: 'pendingChanges',
           type: 'number',
-          required: false,
-          unit: 'celsius',
-          description: 'Ambient temperature during measurement'
-        },
-        {
-          name: 'operator_id',
-          type: 'string',
           required: true,
-          description: 'Identifier for the operator confirming the batch'
-        },
-        {
-          name: 'lot_id',
-          type: 'string',
-          required: true,
-          description: 'Inventory lot to create or associate'
+          description: 'Number of pending changes in the workspace'
         }
       ],
-      relations: [
-        {
-          name: 'inventory_lot',
-          targetEntity: 'InventoryLot',
-          kind: 'oneToOne',
-          description: 'Confirmed batch materializes into an inventory lot'
-        }
-      ],
-      constraints: [
-        {
-          id: 'actual_weight_must_be_positive',
-          description: 'Actual measured weight must be greater than zero',
-          expression: 'actual_weight > 0'
-        },
-        {
-          id: 'variance_requires_reason_when_high',
-          description:
-            'A significant variance should capture a loss reason before confirmation.',
-          expression:
-            'variance == null || variance <= 5 || loss_reason != null'
-        }
-      ],
-      requiredFields: [
-        'batch_id',
-        'crop_name',
-        'expected_weight',
-        'actual_weight',
-        'operator_id',
-        'lot_id'
-      ]
+      relations: [],
+      constraints: [],
+      requiredFields: ['pendingChanges']
     },
-    'HarvestBatch seed'
+    'Workspace seed'
   );
 }
 
-function createInventoryLotSeed(): DomainEntity {
+function createPipelineDomainSeed(): DomainEntity {
   return validateOrThrow(
     DomainEntitySchema,
     {
-      id: 'inventory_lot',
+      id: 'pipeline',
       version: '1.0.0',
-      name: 'InventoryLot',
+      name: 'Pipeline',
       fields: [
         {
-          name: 'lot_id',
+          name: 'intent',
           type: 'string',
           required: true,
-          description: 'Unique inventory lot identifier'
+          description: 'The semantic intent'
         },
         {
-          name: 'sku',
+          name: 'contextLinks',
+          type: 'string', // Adjust type if needed to be array
+          required: true,
+          description: 'Links to relevant context'
+        },
+        {
+          name: 'status',
           type: 'string',
           required: true,
-          description: 'Stock keeping unit associated with the lot'
+          description: 'Status of the compile result'
         },
         {
-          name: 'quantity',
-          type: 'number',
-          required: true,
-          description: 'Counted quantity for the lot'
-        },
-        {
-          name: 'unit',
+          name: 'errorLog',
           type: 'string',
-          required: true,
-          description: 'Unit used to interpret the quantity'
+          required: false,
+          description: 'Error log from compilation'
         },
         {
-          name: 'created_at',
-          type: 'date',
-          required: true,
-          description: 'Timestamp when the lot was created'
+          name: 'generatedTsx',
+          type: 'string',
+          required: false,
+          description: 'Generated TSX code'
         }
       ],
-      relations: [
-        {
-          name: 'source_batch',
-          targetEntity: 'HarvestBatch',
-          kind: 'oneToOne',
-          description: 'Inventory lot originates from a confirmed harvest batch'
-        }
-      ],
-      constraints: [
-        {
-          id: 'quantity_must_be_positive',
-          description: 'Inventory lot quantity must be greater than zero',
-          expression: 'quantity > 0'
-        }
-      ],
-      requiredFields: ['lot_id', 'sku', 'quantity', 'unit', 'created_at']
+      relations: [],
+      constraints: [],
+      requiredFields: ['intent', 'contextLinks', 'status']
     },
-    'InventoryLot seed'
+    'Pipeline seed'
   );
 }
 
-function createConfirmHarvestBatchTaskSeed(): Task {
+function createCompileViewTaskSeed(): Task {
   return validateOrThrow(
     TaskSchema,
     {
-      id: 'confirm_harvest_batch',
+      id: 'trigger_compilation',
       version: '1.0.0',
-      actor: 'operator',
-      goal: 'confirm_harvest_batch',
-      successConditions: [
-        'actual_weight_recorded',
-        'variance_validated',
-        'inventory_lot_created',
-        'confirmation_synced_or_queued'
-      ],
-      relatedEntities: ['HarvestBatch', 'InventoryLot']
+      actor: 'developer',
+      goal: 'compile_view',
+      successConditions: ['compilation_successful', 'tsx_generated'],
+      relatedEntities: ['Pipeline', 'Workspace']
     },
-    'confirm harvest batch task seed'
+    'compile view task seed'
+  );
+}
+
+function createNavigateGraphTaskSeed(): Task {
+  return validateOrThrow(
+    TaskSchema,
+    {
+      id: 'shift_abstraction_level',
+      version: '1.0.0',
+      actor: 'developer',
+      goal: 'navigate_graph',
+      successConditions: ['graph_rendered', 'node_focused'],
+      relatedEntities: ['Pipeline']
+    },
+    'navigate graph task seed'
   );
 }
 
@@ -375,161 +293,81 @@ function createComponentRegistrySeed(): ComponentRegistry {
         Screen: {
           id: 'Screen',
           semanticType: 'screen-container',
-          purpose:
-            'Provide the semantic frame for an operator workflow screen and its major zones.',
+          purpose: 'Provide the semantic frame for the IDE.',
           implementationPath: 'src/components/ontology/Screen.tsx',
-          propsSchema: {
-            title: 'string',
-            mode: 'operator | manager | auditor',
-            className: 'string'
-          },
+          propsSchema: { title: 'string', className: 'string' },
           eventsSchema: {},
-          constraints: [
-            'Must preserve a landmark main region for screen-reader navigation.',
-            'Must support mode-specific presentation without embedding workflow rules.'
-          ],
+          constraints: [],
           supportedTargets: ['react-web']
         },
-        HeaderSummary: {
-          id: 'HeaderSummary',
-          semanticType: 'context-summary',
-          purpose:
-            'Summarize key operational context for the current confirmation screen.',
-          implementationPath: 'src/components/ontology/HeaderSummary.tsx',
-          propsSchema: {
-            title: 'string',
-            fields: 'array',
-            syncStatus: 'online | offline | queued | syncing',
-            className: 'string'
-          },
+        CodeViewer: {
+          id: 'CodeViewer',
+          semanticType: 'code-viewer',
+          purpose: 'Displays syntax highlighted code.',
+          implementationPath: 'src/components/ide/CodeViewer.tsx',
+          propsSchema: { code: 'string', language: 'string' },
           eventsSchema: {},
-          constraints: [
-            'Must present labels and values in an accessible summary structure.',
-            'Must allow sync state to be surfaced without deciding synchronization policy.'
-          ],
+          constraints: [],
           supportedTargets: ['react-web']
         },
-        NumericWeightInput: {
-          id: 'NumericWeightInput',
-          semanticType: 'numeric-measurement-input',
-          purpose:
-            'Capture an operator-entered weight value and expose semantic change and commit callbacks.',
-          implementationPath: 'src/components/ontology/NumericWeightInput.tsx',
-          propsSchema: {
-            field: 'string',
-            label: 'string',
-            unit: 'string',
-            size: 'small | medium | large',
-            required: 'boolean',
-            autofocus: 'boolean',
-            disabled: 'boolean',
-            value: 'number | null',
-            error: 'string | null',
-            className: 'string'
-          },
-          eventsSchema: {
-            onValueChange: {
-              payload: {
-                field: 'string',
-                value: 'number | null',
-                unit: 'string'
-              }
-            },
-            onValueCommit: {
-              payload: {
-                field: 'string',
-                value: 'number',
-                unit: 'string',
-                source: 'manual'
-              }
-            }
-          },
-          constraints: [
-            'Must emit semantic callbacks only and must not infer workflow validity.',
-            'Must keep the unit and error state accessible while the user edits the value.'
-          ],
-          supportedTargets: ['react-web']
-        },
-        VarianceAlert: {
-          id: 'VarianceAlert',
-          semanticType: 'variance-explanation-alert',
-          purpose:
-            'Present variance context and optionally collect an operator reason.',
-          implementationPath: 'src/components/ontology/VarianceAlert.tsx',
-          propsSchema: {
-            variance: 'number | null',
-            threshold: 'number',
-            requiresReason: 'boolean',
-            reason: 'string',
-            className: 'string'
-          },
-          eventsSchema: {
-            onReasonChange: {
-              payload: {
-                reason: 'string'
-              }
-            },
-            onReasonProvided: {
-              payload: {
-                reason: 'string'
-              }
-            },
-            onDismissRequested: {
-              payload: {}
-            }
-          },
-          constraints: [
-            'Must not decide whether a reason is sufficient for workflow completion.',
-            'Must present variance messaging accessibly without relying on color alone.'
-          ],
-          supportedTargets: ['react-web']
-        },
-        StickyPrimaryButton: {
-          id: 'StickyPrimaryButton',
-          semanticType: 'sticky-primary-action',
-          purpose:
-            'Keep the primary action reachable while exposing semantic intent callbacks.',
-          implementationPath: 'src/components/ontology/StickyPrimaryButton.tsx',
-          propsSchema: {
-            action: 'string',
-            label: 'string',
-            loading: 'boolean',
-            disabled: 'boolean',
-            className: 'string'
-          },
-          eventsSchema: {
-            onIntent: {
-              payload: {
-                action: 'string'
-              }
-            },
-            onConfirmRequested: {
-              payload: {
-                action: 'string'
-              }
-            }
-          },
-          constraints: [
-            'Must remain accessible while loading or disabled.',
-            'Must not determine whether an action is allowed or final.'
-          ],
-          supportedTargets: ['react-web']
-        },
-        OfflineSyncBadge: {
-          id: 'OfflineSyncBadge',
-          semanticType: 'sync-state-indicator',
-          purpose:
-            'Surface online, offline, queued, or syncing status in a compact accessible badge.',
-          implementationPath: 'src/components/ontology/OfflineSyncBadge.tsx',
-          propsSchema: {
-            status: 'online | offline | queued | syncing',
-            className: 'string'
-          },
+        TerminalPanel: {
+          id: 'TerminalPanel',
+          semanticType: 'terminal',
+          purpose: 'Shows CLI output.',
+          implementationPath: 'src/components/ide/TerminalPanel.tsx',
+          propsSchema: { output: 'string' },
           eventsSchema: {},
-          constraints: [
-            'Must expose state textually for assistive technologies.',
-            'Must remain presentation-only and avoid triggering synchronization behavior.'
-          ],
+          constraints: [],
+          supportedTargets: ['react-web']
+        },
+        GraphVisualizer: {
+          id: 'GraphVisualizer',
+          semanticType: 'graph',
+          purpose: 'Shows node connections.',
+          implementationPath: 'src/components/ide/GraphVisualizer.tsx',
+          propsSchema: { nodes: 'array', edges: 'array' },
+          eventsSchema: {},
+          constraints: [],
+          supportedTargets: ['react-web']
+        },
+        StatusBadge: {
+          id: 'StatusBadge',
+          semanticType: 'badge',
+          purpose: 'Shows compilation status.',
+          implementationPath: 'src/components/ide/StatusBadge.tsx',
+          propsSchema: { status: 'string' },
+          eventsSchema: {},
+          constraints: [],
+          supportedTargets: ['react-web']
+        },
+        SplitPane: {
+          id: 'SplitPane',
+          semanticType: 'layout',
+          purpose: 'Layout component.',
+          implementationPath: 'src/components/ide/SplitPane.tsx',
+          propsSchema: { orientation: 'string' },
+          eventsSchema: {},
+          constraints: [],
+          supportedTargets: ['react-web']
+        },
+        TopologicalMinimap: {
+          id: 'TopologicalMinimap',
+          semanticType: 'minimap',
+          purpose: 'Minimap for topological view.',
+          implementationPath: 'src/components/ide/TopologicalMinimap.tsx',
+          propsSchema: {},
+          eventsSchema: {},
+          constraints: [],
+          supportedTargets: ['react-web']
+        },
+        NodeCard: {
+          id: 'NodeCard',
+          semanticType: 'card',
+          purpose: 'Card representing a semantic node.',
+          implementationPath: 'src/components/ide/NodeCard.tsx',
+          propsSchema: {},
+          eventsSchema: {},
+          constraints: [],
           supportedTargets: ['react-web']
         }
       }

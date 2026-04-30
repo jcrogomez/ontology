@@ -1,10 +1,10 @@
-id: render-harvest-confirmation
-viewId: HarvestConfirmation
+id: render-ide-main-view
+viewId: IdeMainView
 version: 1.0.0
 entityRefs:
-  - harvest_batch
-  - inventory_lot
-taskRef: confirm_harvest_batch
+  - workspace
+  - pipeline
+taskRef: trigger_compilation
 layout:
   type: stack
   gap: comfortable
@@ -12,37 +12,22 @@ nodes:
   - id: screen
     component: Screen
     props:
-      title: Confirm harvest batch
-      mode: operator
+      title: Ontology Studio IDE
+      mode: developer
     children:
-      - id: summary
-        component: HeaderSummary
+      - id: split
+        component: SplitPane
         props:
-          title: Batch summary
-          syncStatus: queued
-      - id: weight
-        component: NumericWeightInput
-        props:
-          field: actual_weight
-          label: Actual weight
-          unit: g
-          size: large
-      - id: variance
-        component: VarianceAlert
-        props:
-          threshold: 5
-          requiresReason: true
-      - id: offline
-        component: OfflineSyncBadge
-        props:
-          status: queued
-      - id: confirm
-        component: StickyPrimaryButton
-        props:
-          action: confirm_harvest_batch
-          label: Confirm batch
+          orientation: horizontal
+        children:
+          - id: minimap
+            component: TopologicalMinimap
+            props: {}
+          - id: node-card
+            component: NodeCard
+            props: {}
 dataBindings:
-  - id: bind-actual-weight
-    source: HarvestBatch.actual_weight
-    target: weight.props.value
+  - id: bind-workspace-status
+    source: Workspace.pendingChanges
+    target: split.props.status
 target: react-web

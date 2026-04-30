@@ -10,12 +10,12 @@ describe('LLM Provider', () => {
     const result = await provider.generateStructuredOutput({
       model: 'test-model',
       system: 'Generate an ontology specification language view.',
-      prompt: 'Confirm harvest',
+      prompt: 'Ide main view osl',
       schema: OSLViewSchema,
     });
 
-    expect(result.id).toBe('HarvestConfirmation');
-    expect(result.domainEntities).toContain('HarvestBatch');
+    expect(result.id).toBe('IdeMainView');
+    expect(result.domainEntities).toContain('Workspace');
   });
 
   it('MockLLMProvider falls back on unsupported prompts', async () => {

@@ -40,28 +40,28 @@ describe('contextResolver', () => {
     expect(Object.keys(workspace.components).length).toBeGreaterThan(0);
   });
 
-  it('buildPromptPacket filters correctly for harvest intent (substring match)', async () => {
+  it('buildPromptPacket filters correctly for IDE intent (substring match)', async () => {
     const workspace = await loadWorkspace(cwd);
-    const packet = buildPromptPacket(workspace, 'estoy cosechando unos frutos');
+    const packet = buildPromptPacket(workspace, 'estoy compilando una vista');
 
-    expect(packet.intent).toBe('estoy cosechando unos frutos');
-    expect(packet.domainEntities.map(d => d.name).sort()).toEqual(['HarvestBatch', 'InventoryLot'].sort());
-    expect(packet.tasks.map(t => t.id)).toEqual(['confirm_harvest_batch']);
+    expect(packet.intent).toBe('estoy compilando una vista');
+    expect(packet.domainEntities.map(d => d.name).sort()).toEqual(['Pipeline', 'Workspace'].sort());
+    expect(packet.tasks.map(t => t.id).sort()).toEqual(['shift_abstraction_level', 'trigger_compilation'].sort());
     expect(packet.target).toBe('react-web');
   });
 
   it('buildPromptPacket throws an aggregated error if required entities are missing', async () => {
     const workspace = await loadWorkspace(cwd);
 
-    // Explicitly remove InventoryLot domain and confirm_harvest_batch task, and a component
-    workspace.domainEntities = workspace.domainEntities.filter(d => d.name !== 'InventoryLot');
-    workspace.tasks = workspace.tasks.filter(t => t.id !== 'confirm_harvest_batch');
-    delete workspace.components['NumericWeightInput'];
+    // Explicitly remove Pipeline domain and trigger_compilation task, and a component
+    workspace.domainEntities = workspace.domainEntities.filter(d => d.name !== 'Pipeline');
+    workspace.tasks = workspace.tasks.filter(t => t.id !== 'trigger_compilation');
+    delete workspace.components['CodeViewer'];
 
-    expect(() => buildPromptPacket(workspace, 'harvest')).toThrowError("Semantic context resolution failed. The following required entities are missing from the workspace: Domain('InventoryLot'), Task('confirm_harvest_batch'), Component('NumericWeightInput').");
+    expect(() => buildPromptPacket(workspace, 'compile')).toThrowError("Semantic context resolution failed. The following required entities are missing from the workspace: Domain('Pipeline'), Task('trigger_compilation'), Component('CodeViewer').");
   });
 
-  it('buildPromptPacket returns all entities for non-harvest intent', async () => {
+  it('buildPromptPacket returns all entities for non-ide intent', async () => {
     const workspace = await loadWorkspace(cwd);
     const packet = buildPromptPacket(workspace, 'Just a normal task');
 

@@ -1,51 +1,37 @@
-id: HarvestConfirmation
+id: IdeMainView
 version: 1.0.0
-task: confirm_harvest_batch
-actor: operator
+task: trigger_compilation
+actor: developer
 context:
-  operation: harvest_confirmation
+  operation: ide_interaction
   locale: en-US
 domainEntities:
-  - HarvestBatch
-  - InventoryLot
+  - Workspace
+  - Pipeline
 information:
   summary:
-    - batch_id
-    - crop_name
-    - expected_weight
-    - lot_id
+    - activeView
+    - pendingChanges
+    - intent
+    - status
 interaction:
-  primaryAction: confirm_harvest_batch
-  varianceHandling: reason_when_threshold_exceeded
+  primaryAction: trigger_compilation
+  varianceHandling: log_errors
 components:
   - id: Screen
     semanticType: screen-container
-  - id: HeaderSummary
-    semanticType: context-summary
-  - id: NumericWeightInput
-    semanticType: numeric-measurement-input
-    events:
-      - onValueChange
-      - onValueCommit
-  - id: VarianceAlert
-    semanticType: variance-explanation-alert
-    events:
-      - onReasonChange
-      - onReasonProvided
-      - onDismissRequested
-  - id: StickyPrimaryButton
-    semanticType: sticky-primary-action
-    events:
-      - onIntent
-      - onConfirmRequested
-  - id: OfflineSyncBadge
-    semanticType: sync-state-indicator
+  - id: TopologicalMinimap
+    semanticType: minimap
+  - id: NodeCard
+    semanticType: card
+  - id: SplitPane
+    semanticType: layout
 layout:
   type: stack
 visual:
   emphasis: high-clarity
 data:
   writes:
-    - HarvestBatch.actual_weight
-    - HarvestBatch.loss_reason
+    - Workspace.activeView
+    - Pipeline.status
 target: react-web

@@ -32,13 +32,13 @@ describe('onto plan', () => {
       'node',
       'onto',
       'plan',
-      'Confirm harvest weight and queue offline sync if needed.',
+      'Design the IDE view to trigger compilation.',
       '--mock'
     ]);
 
     expect(
       await pathExists(
-        join(workspaceRoot, 'ontology/views/HarvestConfirmation.osl.yaml')
+        join(workspaceRoot, 'ontology/views/IdeMainView.osl.yaml')
       )
     ).toBe(true);
   });
@@ -55,22 +55,22 @@ describe('onto plan', () => {
       'node',
       'onto',
       'plan',
-      'Confirm harvest weight and capture variance reason.',
+      'Design the IDE view and show nodes.',
       '--mock'
     ]);
 
     const osl = validateOrThrow(
       OSLViewSchema,
       await readYamlFile<unknown>(
-        join(workspaceRoot, 'ontology/views/HarvestConfirmation.osl.yaml')
+        join(workspaceRoot, 'ontology/views/IdeMainView.osl.yaml')
       ),
       'planned OSL'
     );
 
-    expect(osl.id).toBe('HarvestConfirmation');
-    expect(osl.task).toBe('confirm_harvest_batch');
+    expect(osl.id).toBe('IdeMainView');
+    expect(osl.task).toBe('trigger_compilation');
     expect(osl.components.map((component) => component.id)).toContain(
-      'NumericWeightInput'
+      'TopologicalMinimap'
     );
   });
 
@@ -86,13 +86,13 @@ describe('onto plan', () => {
       'node',
       'onto',
       'plan',
-      'Confirm harvest weight and review inventory lot creation.',
+      'Design the IDE workspace layout.',
       '--mock'
     ]);
 
     expect(
       await pathExists(
-        join(workspaceRoot, 'ontology/views/HarvestConfirmation.ast.yaml')
+        join(workspaceRoot, 'ontology/views/IdeMainView.ast.yaml')
       )
     ).toBe(true);
     expect(
