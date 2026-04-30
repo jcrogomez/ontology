@@ -1,6 +1,6 @@
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -63,10 +63,40 @@ describe('onto build', () => {
     expect(generatedTsx).toContain('import { TopologicalMinimap }');
     expect(generatedTsx).toContain('import { NodeCard }');
 
+
     expect(generatedTsx).toContain('<Screen');
     expect(generatedTsx).toContain('<SplitPane');
     expect(generatedTsx).toContain('<TopologicalMinimap');
     expect(generatedTsx).toContain('<NodeCard');
+
+    // Assert that the seeded components exist in the workspace
+    expect(await pathExists(join(workspaceRoot, 'src/components/ontology/Screen.tsx'))).toBe(true);
+    expect(await pathExists(join(workspaceRoot, 'src/components/ontology/classNames.ts'))).toBe(true);
+    expect(await pathExists(join(workspaceRoot, 'src/components/ide/SplitPane.tsx'))).toBe(true);
+    expect(await pathExists(join(workspaceRoot, 'src/components/ide/TopologicalMinimap.tsx'))).toBe(true);
+    expect(await pathExists(join(workspaceRoot, 'src/components/ide/NodeCard.tsx'))).toBe(true);
+
+    // Verify that all relative imports correctly resolve to real files
+    const importLines = generatedTsx.split('\n').filter(line => line.startsWith('import '));
+    for (const line of importLines) {
+      const match = line.match(/from\s+['"](.+)['"]/);
+      if (match) {
+        const importPath = match[1];
+        if (importPath && importPath.startsWith('.')) {
+          // Resolve relative path
+          const absoluteImportPath = resolve(dirname(generatedPath), importPath);
+          let exists = await pathExists(absoluteImportPath);
+          if (!exists) {
+            exists = await pathExists(absoluteImportPath + '.tsx');
+          }
+          if (!exists) {
+            exists = await pathExists(absoluteImportPath + '.ts');
+          }
+          expect(exists).toBe(true);
+        }
+      }
+    }
+
   });
 });
 

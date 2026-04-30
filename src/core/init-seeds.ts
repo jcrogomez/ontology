@@ -34,10 +34,16 @@ export const GENERATED_DIRECTORY_PATHS = [
 
 export const CACHE_DIRECTORY_PATHS = ['.ontology/cache'] as const;
 
+export const SEED_COMPONENT_DIRECTORY_PATHS = [
+  'src/components/ontology',
+  'src/components/ide'
+] as const;
+
 export const INIT_DIRECTORY_PATHS = [
   ...ONTOLOGY_DIRECTORY_PATHS,
   ...GENERATED_DIRECTORY_PATHS,
-  ...CACHE_DIRECTORY_PATHS
+  ...CACHE_DIRECTORY_PATHS,
+  ...SEED_COMPONENT_DIRECTORY_PATHS
 ] as const;
 
 export const SEED_FILE_PATHS = [
@@ -403,4 +409,195 @@ function createDefaultTokensSeed(): Record<string, unknown> {
       text: '#101828'
     }
   };
+}
+
+
+export type TextSeedFileDefinition = {
+  path: string;
+  content: string;
+};
+
+export function createTextSeedFiles(): TextSeedFileDefinition[] {
+  return [
+    {
+      path: 'src/components/ontology/Screen.tsx',
+      content: `import type { ReactNode } from 'react';
+import { useId } from 'react';
+
+import { classNames } from './classNames.js';
+
+export interface ScreenProps {
+  title?: string;
+  mode?: 'operator' | 'manager' | 'auditor' | 'developer';
+  className?: string;
+  children: ReactNode;
+}
+
+export function Screen({
+  title,
+  mode = 'operator',
+  className,
+  children
+}: ScreenProps): React.JSX.Element {
+  const titleId = useId();
+  const hasHeader = title !== undefined || mode !== undefined;
+
+  return (
+    <main
+      aria-labelledby={title === undefined ? undefined : titleId}
+      className={classNames('ontology-screen', \`ontology-screen--\${mode}\`, className)}
+      data-mode={mode}
+    >
+      {hasHeader ? (
+        <header className="ontology-screen__header">
+          {title === undefined ? null : (
+            <h1 id={titleId} className="ontology-screen__title">
+              {title}
+            </h1>
+          )}
+          <p className="ontology-screen__mode" aria-label={\`Mode: \${mode}\`}>
+            {mode}
+          </p>
+        </header>
+      ) : null}
+      <div className="ontology-screen__body">{children}</div>
+    </main>
+  );
+}
+`
+    },
+    {
+      path: 'src/components/ontology/classNames.ts',
+      content: `export function classNames(
+  ...values: Array<string | false | null | undefined>
+): string {
+  return values.filter((value): value is string => Boolean(value)).join(' ');
+}
+`
+    },
+    {
+      path: 'src/components/ide/CodeViewer.tsx',
+      content: `export interface CodeViewerProps {
+  code?: string;
+  language?: string;
+  className?: string;
+}
+
+export function CodeViewer({ code, language, className }: CodeViewerProps): React.JSX.Element {
+  return (
+    <div className={className}>
+      <pre>
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+`
+    },
+    {
+      path: 'src/components/ide/TerminalPanel.tsx',
+      content: `export interface TerminalPanelProps {
+  output?: string;
+  className?: string;
+}
+
+export function TerminalPanel({ output, className }: TerminalPanelProps): React.JSX.Element {
+  return (
+    <div className={className}>
+      <pre>{output}</pre>
+    </div>
+  );
+}
+`
+    },
+    {
+      path: 'src/components/ide/GraphVisualizer.tsx',
+      content: `export interface GraphVisualizerProps {
+  nodes?: unknown[];
+  edges?: unknown[];
+  className?: string;
+}
+
+export function GraphVisualizer({ nodes, edges, className }: GraphVisualizerProps): React.JSX.Element {
+  return (
+    <div className={className}>
+      <p>GraphVisualizer</p>
+    </div>
+  );
+}
+`
+    },
+    {
+      path: 'src/components/ide/StatusBadge.tsx',
+      content: `export interface StatusBadgeProps {
+  status?: string;
+  className?: string;
+}
+
+export function StatusBadge({ status, className }: StatusBadgeProps): React.JSX.Element {
+  return (
+    <div className={className}>
+      <span>{status}</span>
+    </div>
+  );
+}
+`
+    },
+    {
+      path: 'src/components/ide/SplitPane.tsx',
+      content: `import type { ReactNode } from 'react';
+
+export interface SplitPaneProps {
+  orientation?: 'horizontal' | 'vertical' | string;
+  className?: string;
+  children?: ReactNode;
+}
+
+export function SplitPane({ orientation, className, children }: SplitPaneProps): React.JSX.Element {
+  return (
+    <div className={className} data-orientation={orientation}>
+      {children}
+    </div>
+  );
+}
+`
+    },
+    {
+      path: 'src/components/ide/TopologicalMinimap.tsx',
+      content: `export interface TopologicalMinimapProps {
+  className?: string;
+}
+
+export function TopologicalMinimap({ className }: TopologicalMinimapProps): React.JSX.Element {
+  return (
+    <div className={className}>
+      <p>TopologicalMinimap</p>
+    </div>
+  );
+}
+`
+    },
+    {
+      path: 'src/components/ide/NodeCard.tsx',
+      content: `import type { ReactNode } from 'react';
+
+export interface NodeCardProps {
+  title?: string;
+  description?: string;
+  className?: string;
+  children?: ReactNode;
+}
+
+export function NodeCard({ title, description, className, children }: NodeCardProps): React.JSX.Element {
+  return (
+    <div className={className}>
+      <h3>{title}</h3>
+      <p>{description}</p>
+      {children}
+    </div>
+  );
+}
+`
+    },
+  ];
 }

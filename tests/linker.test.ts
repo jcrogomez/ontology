@@ -29,12 +29,12 @@ describe('Semantic Linker', () => {
 
   it('validates OSLView successfully when all references exist', () => {
     const view: OSLView = {
-      id: 'ConfirmHarvestView',
+      id: 'TriggerCompilationView',
       version: '1.0.0',
-      task: 'confirm_harvest_batch',
+      task: 'trigger_compilation',
       actor: 'operator',
       context: {},
-      domainEntities: ['HarvestBatch', 'InventoryLot'],
+      domainEntities: ['Workspace', 'Pipeline'],
       information: {},
       interaction: {},
       components: [
@@ -54,7 +54,7 @@ describe('Semantic Linker', () => {
     const view: OSLView = {
       id: 'MissingEntityView',
       version: '1.0.0',
-      task: 'confirm_harvest_batch',
+      task: 'trigger_compilation',
       actor: 'operator',
       context: {},
       domainEntities: ['MissingEntity'],
@@ -79,10 +79,10 @@ describe('Semantic Linker', () => {
   it('validates RenderAST successfully when all references exist', () => {
     const ast: RenderAST = {
       id: 'ast1',
-      viewId: 'ConfirmHarvestView',
+      viewId: 'TriggerCompilationView',
       version: '1.0.0',
-      entityRefs: ['HarvestBatch'],
-      taskRef: 'confirm_harvest_batch',
+      entityRefs: ['Workspace'],
+      taskRef: 'trigger_compilation',
       layout: {},
       nodes: [
         {
@@ -92,7 +92,7 @@ describe('Semantic Linker', () => {
           children: [
             {
               id: 'node2',
-              component: 'HeaderSummary',
+              component: 'CodeViewer',
               props: {}
             }
           ]
@@ -101,7 +101,7 @@ describe('Semantic Linker', () => {
       dataBindings: [
         {
           id: 'bind1',
-          source: 'HarvestBatch.actual_weight',
+          source: 'Workspace.pendingChanges',
           target: 'someTarget'
         }
       ],
@@ -115,16 +115,16 @@ describe('Semantic Linker', () => {
   it('reports missing field in RenderAST data bindings', () => {
     const ast: RenderAST = {
       id: 'ast2',
-      viewId: 'ConfirmHarvestView',
+      viewId: 'TriggerCompilationView',
       version: '1.0.0',
-      entityRefs: ['HarvestBatch'],
-      taskRef: 'confirm_harvest_batch',
+      entityRefs: ['Workspace'],
+      taskRef: 'trigger_compilation',
       layout: {},
       nodes: [],
       dataBindings: [
         {
           id: 'bind1',
-          source: 'HarvestBatch.non_existent_field',
+          source: 'Workspace.non_existent_field',
           target: 'someTarget'
         }
       ],

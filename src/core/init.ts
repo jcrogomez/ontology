@@ -1,8 +1,8 @@
 import { mkdir } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 
-import { pathExists, writeYamlFile } from '../utils/fs.js';
-import { createSeedFiles, INIT_DIRECTORY_PATHS, INIT_NEXT_STEPS } from './init-seeds.js';
+import { pathExists, writeYamlFile, writeUtf8File } from '../utils/fs.js';
+import { createSeedFiles, createTextSeedFiles, INIT_DIRECTORY_PATHS, INIT_NEXT_STEPS } from './init-seeds.js';
 
 export interface InitOntologyProjectOptions {
   cwd: string;
@@ -58,5 +58,17 @@ async function writeSeedFiles(
     }
 
     await writeYamlFile(absolutePath, seedFile.value);
+  }
+
+  for (const seedFile of createTextSeedFiles()) {
+    const absolutePath = join(projectRoot, seedFile.path);
+
+    if (await pathExists(absolutePath)) {
+      throw new Error(
+        `Ontology init aborted because "${seedFile.path}" already exists.`
+      );
+    }
+
+    await writeUtf8File(absolutePath, seedFile.content);
   }
 }
