@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 
 import { registerContextCommand } from '../commands/context.js';
+import { registerBuildCommand } from '../commands/build.js';
 import { registerInitCommand } from '../commands/init.js';
 import { registerPlanCommand } from '../commands/plan.js';
 import { registerVersionCommand } from '../commands/version.js';
@@ -38,6 +39,11 @@ export function createCliProgram(options: CliProgramOptions): Command {
   });
 
   registerPlanCommand(program, {
+    getCwd,
+    write
+  });
+
+  registerBuildCommand(program, {
     getCwd,
     write
   });
