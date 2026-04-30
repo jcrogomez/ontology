@@ -29,7 +29,7 @@ describe('Semantic Linker', () => {
 
   it('validates OSLView successfully when all references exist', () => {
     const view: OSLView = {
-      id: 'ConfirmHarvestView',
+      id: 'TriggerCompilationView',
       version: '1.0.0',
       task: 'trigger_compilation',
       actor: 'developer',
@@ -79,7 +79,7 @@ describe('Semantic Linker', () => {
   it('validates RenderAST successfully when all references exist', () => {
     const ast: RenderAST = {
       id: 'ast1',
-      viewId: 'ConfirmHarvestView',
+      viewId: 'TriggerCompilationView',
       version: '1.0.0',
       entityRefs: ['Workspace'],
       taskRef: 'trigger_compilation',
@@ -115,7 +115,7 @@ describe('Semantic Linker', () => {
   it('reports missing field in RenderAST data bindings', () => {
     const ast: RenderAST = {
       id: 'ast2',
-      viewId: 'ConfirmHarvestView',
+      viewId: 'TriggerCompilationView',
       version: '1.0.0',
       entityRefs: ['Workspace'],
       taskRef: 'trigger_compilation',
