@@ -58,6 +58,14 @@ export function registerPlanCommand(
             : { model: commandOptions.model })
         });
 
+        if (!result.success) {
+          s.stop('Compilation failed with semantic errors.');
+          result.diagnostics.forEach((diag) => {
+            p.log.error(`[${diag.severity.toUpperCase()}] ${diag.code}: ${diag.message} (Path: ${diag.path.join('.')})`);
+          });
+          process.exit(1);
+        }
+
         s.stop('OSL and AST generated and validated successfully.');
 
         p.outro(`Saved OSL to: ${result.outputPath}\nSaved AST to: ${result.astOutputPath}`);

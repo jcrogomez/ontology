@@ -519,7 +519,7 @@ function selectMockFixture(prompt: string): unknown {
         id: 'render-ide-main-view',
         viewId: 'IdeMainView',
         version: '1.0.0',
-        entityRefs: ['workspace', 'pipeline'],
+        entityRefs: ['Workspace', 'Pipeline'],
         taskRef: 'trigger_compilation',
         layout: {
           type: 'stack',
@@ -531,7 +531,7 @@ function selectMockFixture(prompt: string): unknown {
             component: 'Screen',
             props: {
               title: 'Ontology Studio IDE',
-              mode: 'developer'
+              className: 'developer'
             },
             children: [
               {

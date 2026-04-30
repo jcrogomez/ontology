@@ -32,7 +32,7 @@ describe('Semantic Linker', () => {
       id: 'TriggerCompilationView',
       version: '1.0.0',
       task: 'trigger_compilation',
-      actor: 'operator',
+      actor: 'developer',
       context: {},
       domainEntities: ['Workspace', 'Pipeline'],
       information: {},
@@ -55,7 +55,7 @@ describe('Semantic Linker', () => {
       id: 'MissingEntityView',
       version: '1.0.0',
       task: 'trigger_compilation',
-      actor: 'operator',
+      actor: 'developer',
       context: {},
       domainEntities: ['MissingEntity'],
       information: {},
@@ -88,12 +88,12 @@ describe('Semantic Linker', () => {
         {
           id: 'node1',
           component: 'Screen',
-          props: {},
+          props: { title: 'Some Title' },
           children: [
             {
               id: 'node2',
-              component: 'CodeViewer',
-              props: {}
+              component: 'StatusBadge',
+              props: { status: 'Compiling' }
             }
           ]
         }
@@ -137,6 +137,37 @@ describe('Semantic Linker', () => {
       severity: 'error',
       code: 'LINK_MISSING_FIELD',
       path: ['dataBindings', '0', 'source']
+    });
+  });
+
+  it('reports illegal prop usage in RenderAST', () => {
+    const ast: RenderAST = {
+      id: 'ast3',
+      viewId: 'ConfirmHarvestView',
+      version: '1.0.0',
+      entityRefs: ['Workspace'],
+      taskRef: 'trigger_compilation',
+      layout: {},
+      nodes: [
+        {
+          id: 'node1',
+          component: 'Screen',
+          props: {
+            title: 'Some Title',
+            mood: 'lechuga cósmica' // Invalid prop!
+          }
+        }
+      ],
+      dataBindings: [],
+      target: 'react-web'
+    };
+
+    const diagnostics = linker.linkRenderAST(ast);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]).toMatchObject({
+      severity: 'error',
+      code: 'LINK_INVALID_PROP',
+      path: ['nodes', '0', 'props', 'mood']
     });
   });
 });
