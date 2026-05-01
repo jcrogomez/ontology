@@ -15,6 +15,25 @@ import {
   type OntologyEdge,
   type OntologyState
 } from "../schemas/ontology.js";
+import { z } from "zod";
+
+function summarizeError(error: unknown): string {
+  if (error instanceof z.ZodError) {
+    return error.errors
+      .slice(0, 3)
+      .map((issue) => `${issue.path.join(".") || "root"}: ${issue.message}`)
+      .join("; ");
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "Unknown error";
+}
+
+type CorruptFile = {
+  fileName: string;
+  reason: string;
+};
 
 // Validation compares declared state with physical state. If they diverge, the network is no longer trustworthy.
 
@@ -69,121 +88,190 @@ export async function validateCommand(): Promise<void> {
   }
 
   const nodeFiles = fs.readdirSync(paths.nodesDir).filter((f) => f.endsWith(".json"));
-  const nodeIds = new Set<string>();
-  let rootNodeFound: OntologyNode | null = null;
+
+  const validNodes: OntologyNode[] = [];
+  const corruptNodeFiles: CorruptFile[] = [];
+  const validNodeIds = new Set<string>();
 
   for (const file of nodeFiles) {
     try {
       const rawNode = readJson<OntologyNode>(path.join(paths.nodesDir, file));
-      // Each node is parsed through Zod before hashing. Shape errors and integrity errors are reported separately.
       const node = OntologyNodeSchema.parse(rawNode);
-      nodeIds.add(node.id);
-
-      if (node.id === state.rootNodeId) {
-        rootNodeFound = node;
-      }
 
       const nodeWithoutHash = removeIntegrityHash(node);
       const computedHash = hashObject(nodeWithoutHash);
 
-      // If this hash differs, the node was changed outside Ontology's mutation path.
+      // Hash mismatch means the node changed outside Ontology's mutation path.
       if (computedHash !== node.integrity.hash) {
         reportError(`Hash mismatch in node ${node.id}`);
       }
+
+      validNodes.push(node);
+      validNodeIds.add(node.id);
     } catch (err: unknown) {
-      reportError(`Failed to parse node ${file}: ${(err as Error).message}`);
+      // Corrupt node files still count as physical nodes, but cannot participate in topology.
+      // Root corruption is reported separately because the network cannot have a trustworthy origin without it.
+      const reason = summarizeError(err);
+      corruptNodeFiles.push({ fileName: file, reason });
+      console.error(`✖ Node file is schema-corrupt: ${file}`);
+      console.error(`  ${reason}`);
+      reportError(`Node file is schema-corrupt: ${file}`);
     }
   }
 
-  if (nodeIds.size !== state.nodeCount) {
-    reportError(`Node count mismatch: state declares ${state.nodeCount}, found ${nodeIds.size}`);
+  const totalPhysicalNodes = validNodes.length + corruptNodeFiles.length;
+  if (totalPhysicalNodes !== state.nodeCount) {
+    reportError(`Node count mismatch: state declares ${state.nodeCount}, found ${totalPhysicalNodes}`);
   }
 
-  if (!rootNodeFound) {
-    reportError(`Root node ${state.rootNodeId} declared in state not found.`);
+  const rootNodeFileName = `${state.rootNodeId}.json`;
+  const rootNodePath = path.join(paths.nodesDir, rootNodeFileName);
+
+  if (!fs.existsSync(rootNodePath)) {
+    reportError(`Root node file missing: ${rootNodeFileName}`);
+  } else if (corruptNodeFiles.some(c => c.fileName === rootNodeFileName)) {
+    reportError(`Root node exists but is schema-corrupt: ${rootNodeFileName}`);
   } else {
-    if (rootNodeFound.kind !== "canon") {
-      reportError(`Root node is not kind 'canon'.`);
-    }
-    if (rootNodeFound.coordinates.abstraction !== "canon") {
-      reportError(`Root node abstraction is not 'canon'.`);
-    }
-    if (!rootNodeFound.integrity.frozen) {
-      reportError(`Root node is not frozen.`);
-    }
+    const rootNodeFound = validNodes.find(n => n.id === state.rootNodeId);
+    if (rootNodeFound) {
+      if (rootNodeFound.kind !== "canon") {
+        reportError(`Root node is not kind 'canon'.`);
+      }
+      if (rootNodeFound.coordinates.abstraction !== "canon") {
+        reportError(`Root node abstraction is not 'canon'.`);
+      }
+      if (!rootNodeFound.integrity.frozen) {
+        reportError(`Root node is not frozen.`);
+      }
 
-    const rulesStr = rootNodeFound.rules.join(" ");
-    if (!rulesStr.includes("Code is not the source of truth")) {
-      reportError(`Root canon missing rule: "Code is not the source of truth"`);
-    }
-    if (!rulesStr.includes("structure-preserving functor")) {
-      reportError(`Root canon missing rule: "structure-preserving functor"`);
-    }
+      const rulesStr = rootNodeFound.rules.join(" ");
+      if (!rulesStr.includes("Code is not the source of truth")) {
+        reportError(`Root canon missing rule: "Code is not the source of truth"`);
+      }
+      if (!rulesStr.includes("structure-preserving functor")) {
+        reportError(`Root canon missing rule: "structure-preserving functor"`);
+      }
 
-    const inputsText = rootNodeFound.inputs
-      .filter((i) => i.type === "text")
-      .map((i) => (i as { type: "text", value: string }).value)
-      .join(" ");
+      const inputsText = rootNodeFound.inputs
+        .filter((i) => i.type === "text")
+        .map((i) => (i as { type: "text", value: string }).value)
+        .join(" ");
 
-    const requiredPhrases = [
-      "typed, temporal, directed graph",
-      "partial order of abstraction",
-      "rewrite rules",
-      "presheaf",
-      "structure-preserving functor",
-      "compiled shadow"
-    ];
+      const requiredPhrases = [
+        "typed, temporal, directed graph",
+        "partial order of abstraction",
+        "rewrite rules",
+        "presheaf",
+        "structure-preserving functor",
+        "compiled shadow"
+      ];
 
-    for (const phrase of requiredPhrases) {
-      if (!inputsText.includes(phrase) && !rulesStr.includes(phrase)) {
-        reportError(`Root canon missing essential phrase: "${phrase}"`);
+      for (const phrase of requiredPhrases) {
+        if (!inputsText.includes(phrase) && !rulesStr.includes(phrase)) {
+          reportError(`Root canon missing essential phrase: "${phrase}"`);
+        }
       }
     }
   }
 
-  let events: OntologyEvent[] = [];
-  try {
-    events = readJsonl<OntologyEvent>(paths.eventsPath).map((e) => OntologyEventSchema.parse(e));
-  } catch (err: unknown) {
-    reportError(`Failed to parse events.jsonl: ${(err as Error).message}`);
+  // --- EVENTS ---
+  type CorruptLine = { lineNumber: number; reason: string; };
+
+  const validEvents: OntologyEvent[] = [];
+  const corruptEventLines: CorruptLine[] = [];
+
+  if (fs.existsSync(paths.eventsPath)) {
+    const content = fs.readFileSync(paths.eventsPath, "utf-8");
+    const lines = content.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      try {
+        const rawEvent = JSON.parse(line);
+        const ev = OntologyEventSchema.parse(rawEvent);
+        validEvents.push(ev);
+      } catch (err: unknown) {
+        const reason = summarizeError(err);
+        corruptEventLines.push({ lineNumber: i + 1, reason });
+        console.error(`✖ Event line is schema-corrupt at events.jsonl:${i + 1}`);
+        console.error(`  ${reason}`);
+        reportError(`Event line is schema-corrupt at events.jsonl:${i + 1}`);
+      }
+    }
   }
 
-  if (events.length !== state.eventCount) {
-    reportError(`Event count mismatch: state declares ${state.eventCount}, found ${events.length}`);
+  const totalEventLines = validEvents.length + corruptEventLines.length;
+  if (totalEventLines !== state.eventCount) {
+    reportError(`Event count mismatch: state declares ${state.eventCount}, found ${totalEventLines}`);
   }
 
-  if (events.length > 0) {
-    const lastEvent = events[events.length - 1];
-    if (lastEvent.eventId !== state.lastEventId) {
-      reportError(`Last event mismatch: state declares ${state.lastEventId}, found ${lastEvent.eventId}`);
+  if (totalEventLines > 0) {
+    // Check if the last non-empty line was corrupt
+    const content = fs.existsSync(paths.eventsPath) ? fs.readFileSync(paths.eventsPath, "utf-8") : "";
+    const lines = content.split("\n");
+    let lastNonEmptyIdx = lines.length - 1;
+    while (lastNonEmptyIdx >= 0 && lines[lastNonEmptyIdx].trim() === "") {
+      lastNonEmptyIdx--;
+    }
+
+    if (lastNonEmptyIdx >= 0) {
+      const isCorrupt = corruptEventLines.some(c => c.lineNumber === lastNonEmptyIdx + 1);
+      if (isCorrupt) {
+        reportError(`Last event is corrupt, cannot verify lastEventId`);
+      } else if (validEvents.length > 0) {
+        const lastEvent = validEvents[validEvents.length - 1];
+        if (lastEvent.eventId !== state.lastEventId) {
+          reportError(`Last event mismatch: state declares ${state.lastEventId}, found ${lastEvent.eventId}`);
+        }
+      }
     }
   } else if (state.eventCount > 0) {
-      reportError(`State declares events but events.jsonl is empty.`);
+    reportError(`State declares events but events.jsonl is empty.`);
   }
 
-  let edges: OntologyEdge[] = [];
-  try {
-    edges = readJsonl<OntologyEdge>(paths.edgesPath).map((e) => OntologyEdgeSchema.parse(e));
-    for (const edge of edges) {
-      // Edges must point to existing nodes. A dangling edge means the topology no longer describes a valid network.
-      if (!nodeIds.has(edge.from)) {
-        reportError(`Edge ${edge.edgeId} 'from' reference ${edge.from} does not exist.`);
-      }
-      if (!nodeIds.has(edge.to)) {
-        reportError(`Edge ${edge.edgeId} 'to' reference ${edge.to} does not exist.`);
-      }
-      const edgeWithoutHash = removeIntegrityHash(edge);
-      const computedHash = hashObject(edgeWithoutHash);
-      if (computedHash !== edge.integrity.hash) {
-         reportError(`Hash mismatch in edge ${edge.edgeId}`);
+  // --- EDGES ---
+  const validEdges: OntologyEdge[] = [];
+  const corruptEdgeLines: CorruptLine[] = [];
+
+  if (fs.existsSync(paths.edgesPath)) {
+    const content = fs.readFileSync(paths.edgesPath, "utf-8");
+    const lines = content.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      try {
+        const rawEdge = JSON.parse(line);
+        const edge = OntologyEdgeSchema.parse(rawEdge);
+
+        if (!validNodeIds.has(edge.from)) {
+          reportError(`Edge ${edge.edgeId} 'from' reference ${edge.from} does not exist.`);
+        }
+        if (!validNodeIds.has(edge.to)) {
+          reportError(`Edge ${edge.edgeId} 'to' reference ${edge.to} does not exist.`);
+        }
+
+        const edgeWithoutHash = removeIntegrityHash(edge);
+        const computedHash = hashObject(edgeWithoutHash);
+        if (computedHash !== edge.integrity.hash) {
+           reportError(`Hash mismatch in edge ${edge.edgeId}`);
+        }
+
+        validEdges.push(edge);
+      } catch (err: unknown) {
+        const reason = summarizeError(err);
+        corruptEdgeLines.push({ lineNumber: i + 1, reason });
+        console.error(`✖ Edge line is schema-corrupt at edges.jsonl:${i + 1}`);
+        console.error(`  ${reason}`);
+        reportError(`Edge line is schema-corrupt at edges.jsonl:${i + 1}`);
       }
     }
-  } catch (err: unknown) {
-    reportError(`Failed to parse edges.jsonl: ${(err as Error).message}`);
   }
 
-  if (edges.length !== state.edgeCount) {
-    reportError(`Edge count mismatch: state declares ${state.edgeCount}, found ${edges.length}`);
+  const totalEdgeLines = validEdges.length + corruptEdgeLines.length;
+  if (totalEdgeLines !== state.edgeCount) {
+    reportError(`Edge count mismatch: state declares ${state.edgeCount}, found ${totalEdgeLines}`);
   }
 
   try {
