@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { DefaultOllamaRouting, getDefaultRoutingForTask, RoutingTask } from '../src/runtime/llm/registry.js';
+import { DefaultOllamaRouting, getDefaultRoutingForTask } from '../src/runtime/llm/registry.js';
+import { LlmTask } from '../src/runtime/llm/types.js';
 
 describe('Ollama Model Registry Schema', () => {
   it('routing contains semantic_parse', () => {
@@ -7,12 +8,17 @@ describe('Ollama Model Registry Schema', () => {
     expect(DefaultOllamaRouting.semantic_parse.preferred).toBeDefined();
   });
 
+  it('routing contains node_expand', () => {
+    expect(DefaultOllamaRouting).toHaveProperty('node_expand');
+    expect(DefaultOllamaRouting.node_expand.preferred).toBeDefined();
+  });
+
   it('routing contains code_sketch', () => {
     expect(DefaultOllamaRouting).toHaveProperty('code_sketch');
     expect(DefaultOllamaRouting.code_sketch.preferred).toBeDefined();
   });
 
-  it('getDefaultRoutingForTask returns full routing object including preferred models', () => {
+  it('getDefaultRoutingForTask returns tier and preferred', () => {
     const routing = getDefaultRoutingForTask('semantic_parse');
     expect(routing).toBeDefined();
     expect(routing.tier).toBe('fast');
@@ -21,6 +27,6 @@ describe('Ollama Model Registry Schema', () => {
 
   it('unknown task fails clearly', () => {
     // Cast an unknown string to test the runtime error throwing
-    expect(() => getDefaultRoutingForTask('unknown_task' as RoutingTask)).toThrow('Unknown routing task: unknown_task');
+    expect(() => getDefaultRoutingForTask('unknown_task' as LlmTask)).toThrow('Unknown routing task: unknown_task');
   });
 });
