@@ -1,7 +1,12 @@
 import { z } from "zod";
 
+// Ontology invariant:
+// Schema definitions enforce the shape of the typed intention network.
+
 export const OntologySchemaVersion = "0.1.0";
 
+// Abstraction levels define the poset coordinates.
+// Lower nodes can refine but not mutate higher nodes.
 export const AbstractionLevelSchema = z.enum([
   "canon",
   "project",
@@ -94,6 +99,8 @@ export const NodeCoordinatesSchema = z.object({
 });
 
 // Node inputs are intentionally multimodal from the start. Bootstrap 0.1 only uses text, but future nodes may reference images, files, URLs, audio, video or datasets.
+// Future extension point:
+// Multimodal support will be expanded to encompass generic files and datasets.
 export const NodeInputSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("text"),
@@ -158,6 +165,8 @@ export const TechnicalDescriptorSchema = z.object({
   architectureProfile: z.string().optional(),
 }).default({});
 
+// Ontology invariant:
+// Nodes are semantic intentions, code is merely the compiled shadow.
 export const OntologyNodeSchema = z.object({
   id: z.string().startsWith("node_"),
   label: z.string(),
@@ -200,6 +209,8 @@ export const OntologyNodeSchema = z.object({
 
 export type OntologyNode = z.infer<typeof OntologyNodeSchema>;
 
+// Semantic relations are stored independently from nodes.
+// Failure mode: orphaned edges break graph integrity and queryability.
 export const OntologyEdgeSchema = z.object({
   edgeId: z.string().startsWith("edge_"),
   from: z.string().startsWith("node_"),
@@ -288,6 +299,8 @@ export const OntologyProcessorSchema = z.object({
 
 export type OntologyProcessor = z.infer<typeof OntologyProcessorSchema>;
 
+// Bootstrap boundary:
+// State provides high-level metrics for quick inspection without graph traversal.
 export const OntologyStateSchema = z.object({
   initialized: z.boolean(),
   schemaVersion: z.string(),
