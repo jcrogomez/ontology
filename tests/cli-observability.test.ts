@@ -16,7 +16,7 @@ describe("CLI Observability", () => {
   it("onto doctor works before init", () => {
     const result = runCli(tmpDir, ["doctor"]);
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("Not implemented: doctor");
+    expect(result.stdout).toContain("Project not initialized");
   });
 
   it("onto doctor --json outputs parseable JSON before init", () => {
@@ -25,6 +25,7 @@ describe("CLI Observability", () => {
     expect(() => JSON.parse(result.stdout)).not.toThrow();
     const parsed = JSON.parse(result.stdout);
     expect(parsed.module).toBe("doctor");
+    expect(parsed.checks.network.nodes).toBe(0);
   });
 
   describe("after init", () => {
@@ -36,12 +37,17 @@ describe("CLI Observability", () => {
     it("onto doctor works after init", () => {
       const result = runCli(tmpDir, ["doctor"]);
       expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Developer observability ready.");
+      expect(result.stdout).toContain("Nodes:");
     });
 
     it("onto inspect --json outputs parseable JSON", () => {
       const result = runCli(tmpDir, ["inspect", "--json"]);
       expect(result.status).toBe(0);
       expect(() => JSON.parse(result.stdout)).not.toThrow();
+      const parsed = JSON.parse(result.stdout);
+      expect(parsed).toHaveProperty("nodeCount");
+      expect(parsed).toHaveProperty("eventCount");
     });
 
     it("onto node list works after init", () => {
@@ -80,7 +86,8 @@ describe("CLI Observability", () => {
     it("onto events tail works after init", () => {
       const result = runCli(tmpDir, ["events", "tail"]);
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain("Not implemented: events tail");
+      expect(result.stdout).toContain("Sequence");
+      expect(result.stdout).toContain("system_init");
     });
 
     it("onto events tail --json outputs parseable JSON", () => {
@@ -89,6 +96,7 @@ describe("CLI Observability", () => {
       expect(() => JSON.parse(result.stdout)).not.toThrow();
       const parsed = JSON.parse(result.stdout);
       expect(parsed.module).toBe("events tail");
+      expect(Array.isArray(parsed.events)).toBe(true);
     });
   });
 });
