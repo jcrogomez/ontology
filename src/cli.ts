@@ -1,9 +1,3 @@
-#!/usr/bin/env node
-
-import { createCliProgram } from './cli/program.js';
-import { resolveCliVersion } from './core/version.js';
-
-const version = await resolveCliVersion();
-const program = createCliProgram({ version });
-
-await program.parseAsync(process.argv);
+// Temporary CLI file for Bootstrap 0.1 Part 1
+// No commands implemented yet.
+console.log("Ontology Network Kernel - Bootstrap 0.1 Part 1 loaded.");
