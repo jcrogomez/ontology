@@ -1,0 +1,12 @@
+{
+  "models": [
+    {
+      "id": "mock_default",
+      "provider": "mock",
+      "name": "deterministic-mock-model",
+      "temperature": 0,
+      "multimodal": false,
+      "notes": "Default placeholder model for Network Kernel bootstrap."
+    }
+  ]
+}

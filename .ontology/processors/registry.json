@@ -1,0 +1,22 @@
+{
+  "processors": [
+    {
+      "id": "assemble_context",
+      "phase": "pre",
+      "description": "Assembles minimal context from graph contracts.",
+      "enabled": true
+    },
+    {
+      "id": "validate_json_schema",
+      "phase": "post",
+      "description": "Validates structured outputs against declared schemas.",
+      "enabled": true
+    },
+    {
+      "id": "generate_provenance_headers",
+      "phase": "post",
+      "description": "Adds source node metadata to generated artifacts.",
+      "enabled": true
+    }
+  ]
+}
