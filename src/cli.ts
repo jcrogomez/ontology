@@ -4,6 +4,7 @@ import { Command } from "commander";
 import { initCommand } from "./commands/init.js";
 import { validateCommand } from "./commands/validate.js";
 import { inspectCommand } from "./commands/inspect.js";
+import { createNodeCommand } from "./commands/node/create.js";
 
 const program = new Command();
 
@@ -46,6 +47,21 @@ program
       console.error(`✖ Error during inspection: ${(err as Error).message}`);
       process.exit(1);
     }
+  });
+
+const node = program
+  .command("node")
+  .description("Manage Ontology nodes.");
+
+node
+  .command("create")
+  .description("Creates a new node in the intention network.")
+  .requiredOption("--level <level>", "Abstraction level for the node.")
+  .requiredOption("--kind <kind>", "Semantic kind for the node.")
+  .requiredOption("--prompt <prompt>", "Raw intention prompt for the node.")
+  .option("--label <label>", "Optional label for the node.")
+  .action(async (options) => {
+    await createNodeCommand(options);
   });
 
 program.parse(process.argv);
