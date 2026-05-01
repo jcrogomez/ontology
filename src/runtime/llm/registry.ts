@@ -1,3 +1,10 @@
+import { LlmTask, LlmRoutingTier } from "./types.js";
+
+export type OllamaRoutingEntry = {
+  tier: LlmRoutingTier;
+  preferred: readonly string[];
+};
+
 export const DefaultOllamaRouting = {
   semantic_parse: {
     tier: "fast",
@@ -27,11 +34,9 @@ export const DefaultOllamaRouting = {
     tier: "fast",
     preferred: ["llama3.1:8b", "qwen2.5:7b"]
   }
-} as const;
+} as const satisfies Record<LlmTask, OllamaRoutingEntry>;
 
-export type RoutingTask = keyof typeof DefaultOllamaRouting;
-
-export function getDefaultRoutingForTask(task: RoutingTask) {
+export function getDefaultRoutingForTask(task: LlmTask): OllamaRoutingEntry {
   const routing = DefaultOllamaRouting[task];
   if (!routing) {
     throw new Error(`Unknown routing task: ${String(task)}`);
