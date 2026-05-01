@@ -160,6 +160,21 @@ describe('Bootstrap 0.1 Smoke Tests', () => {
     expect(output).toContain("missing 'mock_default' model");
   });
 
+  it('inspect before init fails with friendly message', () => {
+    const result = runCli(tempDir, ['inspect']);
+    expect(result.status).toBe(1);
+    const output = result.stdout + result.stderr;
+    expect(output).toContain("✖ .ontology directory not found. Run 'onto init' first.");
+  });
+
+  it('inspect with missing state fails with friendly message', () => {
+    fs.mkdirSync(path.join(tempDir, '.ontology'));
+    const result = runCli(tempDir, ['inspect']);
+    expect(result.status).toBe(1);
+    const output = result.stdout + result.stderr;
+    expect(output).toContain("✖ Ontology state not found. Run 'onto init' first.");
+  });
+
   it('Test 4: inspect prints expected output', () => {
     runCli(tempDir, ['init']);
     const result = runCli(tempDir, ['inspect']);
