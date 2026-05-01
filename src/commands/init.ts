@@ -1,0 +1,235 @@
+import * as fs from "node:fs";
+import { randomBytes } from "node:crypto";
+import { getOntologyPaths } from "../core/project/paths.js";
+import { ensureDir, writeJson, appendJsonl } from "../core/fs/json.js";
+import {
+  OntologyEventSchema,
+  OntologySchemaVersion,
+  OntologyNodeSchema,
+  OntologyModelSchema,
+  OntologyProcessorSchema,
+  OntologyStateSchema,
+  type OntologyNode,
+} from "../schemas/ontology.js";
+import { hashObject } from "../core/integrity/hash.js";
+
+// Bootstrap 0.1 creates the smallest trustworthy Ontology universe.
+//
+// It does not parse prompts.
+// It does not execute models.
+// It does not compile code.
+//
+// It creates a frozen mathematical canon, a temporal genesis event,
+// empty typed-edge storage, model/processor registries, and a state file.
+// This is enough for Ontology to verify its own memory before learning to edit it.
+
+export async function initCommand(): Promise<void> {
+  const paths = getOntologyPaths();
+
+  if (fs.existsSync(paths.ontologyDir)) {
+    console.log("✖ Ontology project already initialized.");
+    return;
+  }
+
+  // Create full directory structure
+  ensureDir(paths.ontologyDir);
+  ensureDir(paths.nodesDir);
+  ensureDir(paths.imagesDir);
+  ensureDir(paths.audioDir);
+  ensureDir(paths.videoDir);
+  ensureDir(paths.filesDir);
+  ensureDir(paths.datasetsDir);
+  ensureDir(paths.modelsDir);
+  ensureDir(paths.processorsDir);
+  ensureDir(paths.presetsDir);
+  ensureDir(paths.contextSnapshotsDir);
+  ensureDir(paths.generatedArtifactsDir);
+  ensureDir(paths.buildsDir);
+  ensureDir(paths.validationReportsDir);
+  ensureDir(paths.compilationReportsDir);
+
+  // Genesis event comes first: time precedes semantic state.
+  const genesisEventId = "evt_" + randomBytes(4).toString("hex");
+  const genesisEvent = OntologyEventSchema.parse({
+    eventId: genesisEventId,
+    sequence: 0,
+    timestamp: new Date().toISOString(),
+    eventType: "system_init",
+    branch: "main",
+    previousEventId: null,
+    payload: {
+      action: "bootstrap_network_kernel",
+      schemaVersion: OntologySchemaVersion,
+    },
+  });
+  appendJsonl(paths.eventsPath, genesisEvent);
+
+  // Create empty edges file
+  fs.writeFileSync(paths.edgesPath, "");
+
+  // The mathematical canon is stored as data, not only documentation. This makes the formal model part of the network itself.
+  const canonRules = [
+    "1. Ontology is a typed, temporal, directed graph enriched with a partial order of abstraction.",
+    "2. Prompts act as rewrite rules that expand subgraphs.",
+    "3. Context is assigned locally as a presheaf over graph neighborhoods.",
+    "4. Compilation is a structure-preserving functor from the category of intention to the category of executable artifacts.",
+    "5. Code is not the source of truth.",
+    "6. Code is the compiled shadow of a valid semantic network.",
+    "7. Lower-level nodes may refine higher-level nodes, but may not mutate them.",
+    "8. Contradictions must become explicit as validation failures, superseding relations, or branches.",
+    "9. Every generated artifact must be traceable to source nodes, edges, events, and hashes.",
+  ];
+
+  const mathematicalCanonText = `Establish Ontology as a typed temporal semantic graph with prompt rewriting, context presheaves, and functorial compilation.\n\n${canonRules.join("\n")}`;
+
+  const nodeWithoutHash = {
+    id: "node_0000_canon",
+    label: "Ontology Mathematical Canon",
+    kind: "canon",
+    status: "frozen",
+    coordinates: {
+      abstraction: "canon",
+      time: 0,
+      branch: "main",
+      plane: "semantic",
+      manifestation: "intent",
+    },
+    inputs: [
+      {
+        type: "text",
+        value: mathematicalCanonText,
+        role: "mathematical_canon",
+      },
+    ],
+    prompt: {
+      raw: "Establish Ontology as a typed temporal semantic graph with prompt rewriting, context presheaves, and functorial compilation.",
+      language: "en",
+      variables: {},
+    },
+    model: {
+      ref: "mock_default",
+    },
+    processors: {
+      pre: [],
+      post: [],
+    },
+    context: {
+      provides: [
+        {
+          key: "MathematicalCanon",
+          nodeType: "canon",
+        },
+        {
+          key: "CanonRules",
+          nodeType: "canon",
+        },
+      ],
+      requires: [],
+      forbids: [],
+      optional: [],
+    },
+    rules: canonRules,
+    technical: {},
+    outputs: {
+      files: [],
+    },
+    validation: {
+      errors: [],
+      warnings: [],
+    },
+    graph: {
+      parentId: null,
+      orbitOf: null,
+    },
+    integrity: {
+      frozen: true,
+      schemaVersion: OntologySchemaVersion,
+    }
+  };
+
+  const nodeHash = hashObject(nodeWithoutHash);
+
+  const canonNode = OntologyNodeSchema.parse({
+    ...nodeWithoutHash,
+    integrity: {
+      ...nodeWithoutHash.integrity,
+      hash: nodeHash,
+    },
+  });
+
+  writeJson(`${paths.nodesDir}/node_0000_canon.json`, canonNode);
+
+  // Create models/registry.json
+  const modelsRegistry = {
+    models: [
+      OntologyModelSchema.parse({
+        id: "mock_default",
+        provider: "mock",
+        name: "deterministic-mock-model",
+        temperature: 0,
+        multimodal: false,
+        notes: "Default placeholder model for Network Kernel bootstrap.",
+      }),
+    ],
+  };
+  writeJson(paths.modelsRegistryPath, modelsRegistry);
+
+  // Create processors/registry.json
+  const processorsRegistry = {
+    processors: [
+      OntologyProcessorSchema.parse({
+        id: "assemble_context",
+        phase: "pre",
+        description: "Assembles minimal context from graph contracts.",
+        enabled: true,
+      }),
+      OntologyProcessorSchema.parse({
+        id: "validate_json_schema",
+        phase: "post",
+        description: "Validates structured outputs against declared schemas.",
+        enabled: true,
+      }),
+      OntologyProcessorSchema.parse({
+        id: "generate_provenance_headers",
+        phase: "post",
+        description: "Adds source node metadata to generated artifacts.",
+        enabled: true,
+      }),
+    ],
+  };
+  writeJson(paths.processorsRegistryPath, processorsRegistry);
+
+  // Create state.json
+  const now = new Date().toISOString();
+  const state = OntologyStateSchema.parse({
+    initialized: true,
+    schemaVersion: OntologySchemaVersion,
+    projectName: "ontology-project",
+    rootNodeId: "node_0000_canon",
+    activeBranch: "main",
+    nodeCount: 1,
+    edgeCount: 0,
+    eventCount: 1,
+    lastEventId: genesisEventId,
+    createdAt: now,
+    updatedAt: now,
+  });
+  writeJson(paths.statePath, state);
+
+  console.log(`=== ONTOLOGY NETWORK KERNEL BOOTSTRAPPED ===
+
+Axiom:
+  Ontology is a typed, temporal, directed graph enriched with a partial order of abstraction.
+
+Created:
+  .ontology/
+  .ontology/nodes/node_0000_canon.json
+  .ontology/events.jsonl
+  .ontology/edges.jsonl
+  .ontology/models/registry.json
+  .ontology/processors/registry.json
+
+Next:
+  onto validate
+  onto inspect`);
+}
