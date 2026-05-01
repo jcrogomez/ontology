@@ -1,6 +1,6 @@
 {
   "name": "ontology",
-  "version": "0.1.0",
+  "version": "0.2.0-alpha.1",
   "description": "Ontology semantic compiler for operational interfaces.",
   "type": "module",
   "bin": {
@@ -14,7 +14,7 @@
   },
   "scripts": {
     "dev": "tsx src/cli.ts",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "check": "tsc --noEmit",
     "start": "node dist/cli.js",
     "test": "vitest",
@@ -23,6 +23,7 @@
   "dependencies": {
     "commander": "^13.1.0",
     "fast-json-stable-stringify": "^2.1.0",
+    "ollama": "^0.6.3",
     "zod": "^3.24.2"
   },
   "devDependencies": {

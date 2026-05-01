@@ -69,6 +69,97 @@ describe('Bootstrap 0.1 Smoke Tests', () => {
     expect(output).toContain('Hash mismatch');
   });
 
+  it('fails when previousEventId does not point to the prior event', () => {
+    runCli(tempDir, ['init']);
+    runCli(tempDir, [
+      'node', 'create',
+      '--level', 'domain',
+      '--kind', 'entity',
+      '--prompt', 'Harvest has status.'
+    ]);
+
+    const eventsPath = path.join(tempDir, '.ontology', 'events.jsonl');
+    const lines = fs.readFileSync(eventsPath, 'utf-8').trim().split('\n');
+    const second = JSON.parse(lines[1]);
+    second.previousEventId = 'evt_broken';
+    lines[1] = JSON.stringify(second);
+    fs.writeFileSync(eventsPath, lines.join('\n') + '\n', 'utf-8');
+
+    const result = runCli(tempDir, ['validate']);
+    const output = result.stdout + result.stderr;
+
+    expect(result.status).not.toBe(0);
+    expect(output).toContain('previousEventId');
+  });
+
+  it('fails when event sequence is corrupted', () => {
+    runCli(tempDir, ['init']);
+    runCli(tempDir, [
+      'node', 'create',
+      '--level', 'domain',
+      '--kind', 'entity',
+      '--prompt', 'Harvest has status.'
+    ]);
+
+    const eventsPath = path.join(tempDir, '.ontology', 'events.jsonl');
+    const lines = fs.readFileSync(eventsPath, 'utf-8').trim().split('\n');
+    const second = JSON.parse(lines[1]);
+    second.sequence = 99; // Corrupt sequence
+    lines[1] = JSON.stringify(second);
+    fs.writeFileSync(eventsPath, lines.join('\n') + '\n', 'utf-8');
+
+    const result = runCli(tempDir, ['validate']);
+    const output = result.stdout + result.stderr;
+
+    expect(result.status).not.toBe(0);
+    expect(output).toContain('sequence');
+  });
+
+  it('fails when state.lastEventId does not match the actual last event', () => {
+    runCli(tempDir, ['init']);
+    runCli(tempDir, [
+      'node', 'create',
+      '--level', 'domain',
+      '--kind', 'entity',
+      '--prompt', 'Harvest has status.'
+    ]);
+
+    const statePath = path.join(tempDir, '.ontology', 'state.json');
+    const stateContent = fs.readFileSync(statePath, 'utf-8');
+    const stateData = JSON.parse(stateContent);
+    stateData.lastEventId = 'evt_fake';
+    fs.writeFileSync(statePath, JSON.stringify(stateData, null, 2), 'utf-8');
+
+    const result = runCli(tempDir, ['validate']);
+    const output = result.stdout + result.stderr;
+
+    expect(result.status).not.toBe(0);
+    expect(output).toContain('state declares evt_fake');
+  });
+
+  it('fails when a model reference is invalid', () => {
+    runCli(tempDir, ['init']);
+    runCli(tempDir, [
+      'node', 'create',
+      '--level', 'domain',
+      '--kind', 'entity',
+      '--prompt', 'Harvest has status.'
+    ]);
+
+    const registryPath = path.join(tempDir, '.ontology', 'models', 'registry.json');
+    const content = fs.readFileSync(registryPath, 'utf-8');
+    const registry = JSON.parse(content);
+    // Corrupt registry by clearing it
+    registry.models = [];
+    fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2), 'utf-8');
+
+    const result = runCli(tempDir, ['validate']);
+    const output = result.stdout + result.stderr;
+
+    expect(result.status).not.toBe(0);
+    expect(output).toContain("missing 'mock_default' model");
+  });
+
   it('Test 4: inspect prints expected output', () => {
     runCli(tempDir, ['init']);
     const result = runCli(tempDir, ['inspect']);

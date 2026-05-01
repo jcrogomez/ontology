@@ -29,13 +29,17 @@ export async function inspectCommand(): Promise<void> {
   const modelsRegistry = readJson<{ models: OntologyModel[] }>(paths.modelsRegistryPath);
   const processorsRegistry = readJson<{ processors: OntologyProcessor[] }>(paths.processorsRegistryPath);
 
-  const canonText = rootNode.inputs
-    .filter((i) => i.type === "text" && i.role === "mathematical_canon")
-    .map((i) => (i as { type: "text", value: string }).value)
-    .join("\n") || "Canon input not found.";
-
-  // Grab the first line of the canon text to show in the display (or a summarized axiom)
-  const canonDisplay = canonText.split('\n').find(line => line.trim().length > 0) || "";
+  // Use the first rule of the canon for a clearer summary, fallback to input text if needed.
+  let canonDisplay = "Canon rule not found.";
+  if (rootNode.rules && rootNode.rules.length > 0) {
+    canonDisplay = rootNode.rules[0];
+  } else {
+    const canonText = rootNode.inputs
+      .filter((i) => i.type === "text" && i.role === "mathematical_canon")
+      .map((i) => (i as { type: "text", value: string }).value)
+      .join("\n");
+    canonDisplay = canonText.split('\n').find(line => line.trim().length > 0) || canonDisplay;
+  }
 
   console.log(`=== ONTOLOGY PROJECT INSPECT ===
 

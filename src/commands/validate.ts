@@ -226,6 +226,30 @@ export async function validateCommand(): Promise<void> {
         }
       }
     }
+
+    for (let i = 0; i < validEvents.length; i++) {
+      const current = validEvents[i];
+      if (current.sequence !== i) {
+        reportError(`Event sequence mismatch at ${current.eventId}: expected ${i}, found ${current.sequence}`);
+      }
+
+      if (i === 0) {
+        if (current.previousEventId !== null) {
+          reportError(`Genesis event must have previousEventId=null`);
+        }
+      } else {
+        const prev = validEvents[i - 1];
+        if (current.previousEventId !== prev.eventId) {
+          reportError(
+            `Event chain broken at ${current.eventId}: expected previousEventId=${prev.eventId}, found ${current.previousEventId}`
+          );
+        }
+      }
+
+      if (current.branch !== state.activeBranch) {
+        reportError(`Event ${current.eventId} branch mismatch: expected ${state.activeBranch}, found ${current.branch}`);
+      }
+    }
   } else if (state.eventCount > 0) {
     reportError(`State declares events but events.jsonl is empty.`);
   }
