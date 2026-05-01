@@ -5,6 +5,8 @@ import { initCommand } from "./commands/init.js";
 import { validateCommand } from "./commands/validate.js";
 import { inspectCommand } from "./commands/inspect.js";
 import { createNodeCommand } from "./commands/node/create.js";
+import { nodeListCommand } from "./commands/node/list.js";
+import { nodeShowCommand } from "./commands/node/show.js";
 
 const program = new Command();
 
@@ -26,6 +28,20 @@ program
   });
 
 program
+  .command("doctor")
+  .description("Diagnose the Ontology environment and project.")
+  .option("--json", "Output results in JSON format")
+  .action(async (options) => {
+    if (options.json) {
+      console.log(JSON.stringify({ status: "NotImplemented", module: "doctor" }));
+      process.exit(0);
+    } else {
+      console.log("Not implemented: doctor");
+      process.exit(0);
+    }
+  });
+
+program
   .command("validate")
   .description("Validates the integrity and schema of the network.")
   .action(async () => {
@@ -40,7 +56,12 @@ program
 program
   .command("inspect")
   .description("Observes the current topological state of the network without mutating it.")
-  .action(async () => {
+  .option("--json", "Output results in JSON format")
+  .action(async (options) => {
+    if (options.json) {
+      console.log(JSON.stringify({ status: "pending_json_implementation", message: "JSON output for inspect is under construction" }));
+      process.exit(0);
+    }
     try {
       await inspectCommand();
     } catch (err: unknown) {
@@ -62,6 +83,51 @@ node
   .option("--label <label>", "Optional label for the node.")
   .action(async (options) => {
     await createNodeCommand(options);
+  });
+
+node
+  .command("list")
+  .description("Lists all nodes in the intention network.")
+  .option("--json", "Output results in JSON format")
+  .action(async (options) => {
+    try {
+      await nodeListCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error listing nodes: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+node
+  .command("show <id>")
+  .description("Shows details of a specific node.")
+  .option("--json", "Output results in JSON format")
+  .action(async (id, options) => {
+    try {
+      await nodeShowCommand(id, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error showing node: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+const events = program
+  .command("events")
+  .description("Manage Ontology events.");
+
+events
+  .command("tail")
+  .description("Tail the events log.")
+  .option("--json", "Output results in JSON format")
+  .option("--limit <number>", "Number of events to tail")
+  .action(async (options) => {
+    if (options.json) {
+      console.log(JSON.stringify({ status: "NotImplemented", module: "events tail" }));
+      process.exit(0);
+    } else {
+      console.log("Not implemented: events tail");
+      process.exit(0);
+    }
   });
 
 program.parse(process.argv);
