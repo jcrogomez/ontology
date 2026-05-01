@@ -1,19 +1,64 @@
-export type TaskType = 'semantic_parse' | 'codegen' | 'evaluation' | 'embedding';
+export type LlmProvider = "mock" | "ollama" | "openai" | "anthropic" | "local";
 
-export interface ModelRunProvenance {
-  taskType: TaskType;
-  selectedModel: string;
-  fallbackDepth: number;
-  cacheHit: boolean;
-  totalDurationMs: number;
-  loadDurationMs?: number;
-  promptEvalCount?: number;
+export type LlmTask =
+  | "semantic_parse"
+  | "node_expand"
+  | "node_critique"
+  | "context_assemble"
+  | "code_sketch"
+  | "test_generate"
+  | "documentation";
+
+export type LlmRoutingTier =
+  | "tiny"
+  | "fast"
+  | "balanced"
+  | "deep"
+  | "critic"
+  | "multimodal";
+
+export interface LlmModelHandle {
+  id: string;
+  provider: LlmProvider;
+  name: string;
+  tier: LlmRoutingTier;
+  contextWindow?: number;
+  multimodal: boolean;
+  temperatureDefault: number;
+  notes?: string;
+}
+
+export interface LlmRequest {
+  task: LlmTask;
+  model?: string;
+  prompt: string;
+  system?: string;
+  temperature?: number;
+  json?: boolean;
+  schemaName?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface LlmUsage {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
   evalCount?: number;
-  schemaValidated: boolean;
-  schemaFailure?: string;
-  toolCallsCount: number;
-  queueWaitMs: number;
-  resultHash: string;
-  sourceNodeIds: string[];
-  eventId: string;
+  evalDurationMs?: number;
+}
+
+export interface LlmResponse {
+  text: string;
+  json?: unknown;
+  model: string;
+  provider: LlmProvider;
+  usage?: LlmUsage;
+  raw?: unknown;
+}
+
+export interface LlmAdapter {
+  provider: LlmProvider;
+  generate(request: LlmRequest): Promise<LlmResponse>;
+  listModels?(): Promise<LlmModelHandle[]>;
+  health?(): Promise<{ ok: boolean; message?: string }>;
 }
