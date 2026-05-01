@@ -1,0 +1,11 @@
+--- src/commands/inspect.ts
++++ src/commands/inspect.ts
+@@ -49,6 +49,8 @@
+     canonDisplay = canonText.split('\n').find((line: string) => line.trim().length > 0) || canonDisplay;
+   }
+
++  canonDisplay = canonDisplay.replace(/^\d+\.\s*/, "");
++
+   if (options.json) {
+     console.log(JSON.stringify({
+       projectName: state.projectName,

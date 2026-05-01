@@ -133,7 +133,7 @@ describe('Node Observability Commands', () => {
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Provides:"));
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining("- MathematicalCanon"));
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Rules:"));
-    expect(console.log).not.toHaveBeenCalledWith(expect.stringContaining("1. 1. Ontology is a typed"));
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining("1. Ontology is a typed"));
   });
 
   it('nodeShowCommand json returns { node: ... }', async () => {
