@@ -21,6 +21,27 @@ export async function inspectCommand(): Promise<void> {
     process.exit(1);
   }
 
+  if (!fs.existsSync(paths.statePath)) {
+    console.error("✖ Ontology state not found. Run 'onto init' first.");
+    process.exit(1);
+  }
+
+  const requiredPaths = [
+    { path: paths.eventsPath, display: ".ontology/events.jsonl", isDir: false },
+    { path: paths.edgesPath, display: ".ontology/edges.jsonl", isDir: false },
+    { path: paths.nodesDir, display: ".ontology/nodes/", isDir: true },
+    { path: paths.modelsRegistryPath, display: ".ontology/models/registry.json", isDir: false },
+    { path: paths.processorsRegistryPath, display: ".ontology/processors/registry.json", isDir: false }
+  ];
+
+  for (const req of requiredPaths) {
+    if (!fs.existsSync(req.path)) {
+      const type = req.isDir ? "directory" : "file";
+      console.error(`✖ Missing required ${type}: ${req.display}`);
+      process.exit(1);
+    }
+  }
+
   const state = readJson<OntologyState>(paths.statePath);
   const rootNode = readJson<OntologyNode>(path.join(paths.nodesDir, `${state.rootNodeId}.json`));
   const events = readJsonl<OntologyEvent>(paths.eventsPath);
