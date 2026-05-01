@@ -2,11 +2,13 @@
 
 import { Command } from "commander";
 import { initCommand } from "./commands/init.js";
+import { doctorCommand } from "./commands/doctor.js";
 import { validateCommand } from "./commands/validate.js";
 import { inspectCommand } from "./commands/inspect.js";
 import { createNodeCommand } from "./commands/node/create.js";
 import { nodeListCommand } from "./commands/node/list.js";
 import { nodeShowCommand } from "./commands/node/show.js";
+import { eventsTailCommand } from "./commands/events/tail.js";
 
 const program = new Command();
 
@@ -32,12 +34,11 @@ program
   .description("Diagnose the Ontology environment and project.")
   .option("--json", "Output results in JSON format")
   .action(async (options) => {
-    if (options.json) {
-      console.log(JSON.stringify({ status: "NotImplemented", module: "doctor" }));
-      process.exit(0);
-    } else {
-      console.log("Not implemented: doctor");
-      process.exit(0);
+    try {
+      await doctorCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during doctor: ${(err as Error).message}`);
+      process.exit(1);
     }
   });
 
@@ -58,12 +59,8 @@ program
   .description("Observes the current topological state of the network without mutating it.")
   .option("--json", "Output results in JSON format")
   .action(async (options) => {
-    if (options.json) {
-      console.log(JSON.stringify({ status: "pending_json_implementation", message: "JSON output for inspect is under construction" }));
-      process.exit(0);
-    }
     try {
-      await inspectCommand();
+      await inspectCommand(options);
     } catch (err: unknown) {
       console.error(`✖ Error during inspection: ${(err as Error).message}`);
       process.exit(1);
@@ -121,12 +118,11 @@ events
   .option("--json", "Output results in JSON format")
   .option("--limit <number>", "Number of events to tail")
   .action(async (options) => {
-    if (options.json) {
-      console.log(JSON.stringify({ status: "NotImplemented", module: "events tail" }));
-      process.exit(0);
-    } else {
-      console.log("Not implemented: events tail");
-      process.exit(0);
+    try {
+      await eventsTailCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error tailing events: ${(err as Error).message}`);
+      process.exit(1);
     }
   });
 
