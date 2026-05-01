@@ -16,16 +16,19 @@
     "dev": "tsx src/cli.ts",
     "build": "tsc",
     "check": "tsc --noEmit",
-    "start": "node dist/cli.js"
+    "start": "node dist/cli.js",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "commander": "^13.1.0",
-    "zod": "^3.24.2",
-    "fast-json-stable-stringify": "^2.1.0"
+    "fast-json-stable-stringify": "^2.1.0",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
-    "typescript": "^5.8.2",
+    "@types/node": "^22.13.10",
     "tsx": "^4.19.3",
-    "@types/node": "^22.13.10"
+    "typescript": "^5.8.2",
+    "vitest": "^4.1.5"
   }
 }
