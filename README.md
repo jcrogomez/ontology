@@ -8,6 +8,8 @@ Ontology is a terminal-first editor for a typed, temporal, multidimensional sema
 
 ## Current Status: Bootstrap 0.2 (Node Editor)
 
+Current maturity: Bootstrap 0.2 alpha over a hardened 0.1 kernel.
+
 Bootstrap 0.2 introduces the ability to grow the network through controlled CLI mutations (specifically, creating semantic nodes).
 
 **Note: Ontology still does not parse prompts into ASTs, execute models, create typed edges, or compile code in Bootstrap 0.2.**

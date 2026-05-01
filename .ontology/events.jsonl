@@ -1,1 +1,0 @@
-{"eventId":"evt_7fc7914b","sequence":0,"timestamp":"2026-05-01T03:17:09.239Z","eventType":"system_init","branch":"main","previousEventId":null,"payload":{"action":"bootstrap_network_kernel","schemaVersion":"0.1.0"}}

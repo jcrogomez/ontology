@@ -5,3 +5,12 @@ coverage/
 .DS_Store
 .ontology/
 .generated/
+
+# Environment and secrets
+.env
+.env.*
+
+# Runtime artifacts
+.ontology/cache/
+.ontology/reports/model-runs/
+.ontology/work/

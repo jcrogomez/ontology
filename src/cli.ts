@@ -11,7 +11,7 @@ const program = new Command();
 program
   .name("onto")
   .description("Ontology CLI: terminal-first multidimensional intention network editor.")
-  .version("0.1.0");
+  .version("0.2.0-alpha.1");
 
 program
   .command("init")
