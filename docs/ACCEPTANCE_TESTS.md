@@ -1,14 +1,15 @@
 # Acceptance Tests
 
-This document outlines the manual and structural tests to verify the integrity and behavior of Ontology Bootstrap 0.1.
+This document outlines the manual and structural tests to verify the integrity and behavior of Ontology Bootstrap phases.
 
-## Manual Smoke Test
+## Bootstrap 0.1 Smoke Test
 
 **Steps:**
 
 ```bash
 npm install
 npm run check
+rm -rf .ontology
 npm run dev -- init
 npm run dev -- validate
 npm run dev -- inspect
@@ -19,14 +20,39 @@ npm run dev -- inspect
 - `validate` should complete without throwing hash mismatches or schema validation errors.
 - `inspect` should successfully read the initialized project and output the current state summary.
 
-## Corruption Test
+## Bootstrap 0.2 Node Create Test
 
 **Steps:**
 
-1. Manually edit `.ontology/nodes/node_0000_canon.json`.
-2. Change a single letter in `rules` or `inputs`.
+```bash
+rm -rf .ontology
+npm run dev -- init
+npm run dev -- node create --level domain --kind entity --prompt "Harvest has seededQuantity, harvestedQuantity and status."
+npm run dev -- validate
+npm run dev -- inspect
+```
+
+**Expected Results:**
+- `.ontology/nodes/node_0001.json` exists.
+- `state.nodeCount` is 2.
+- `state.eventCount` is 2.
+- `state.edgeCount` is 0.
+- Latest event in `events.jsonl` is `node_created`.
+- `validate` passes.
+
+## Corruption and Failure Tests
+
+**Steps:**
+
+1. Manually edit `.ontology/nodes/node_0000_canon.json` or `.ontology/nodes/node_0001.json`.
+2. Change a single letter in `rules`, `inputs`, or any other content.
 3. Run `npm run dev -- validate`.
 4. The command **must fail** with a hash mismatch error, proving the integrity checks are working.
+
+**Bootstrap 0.2 Specific Failures:**
+- `node create` with invalid level (e.g., `--level invalidLevel`) should fail.
+- `node create` with invalid kind (e.g., `--kind unknownKind`) should fail.
+- `node create` missing the `--prompt` flag should fail.
 
 ## Structural Failure Tests
 
@@ -48,4 +74,6 @@ When integrating Vitest, the following suites should be covered:
 - `inspect` reads initialized project
 - event count matches state
 - node count matches state
+- edge count matches state
 - root canon contains mathematical axiom
+- `node create` correctly mutates graph and temporal states
