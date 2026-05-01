@@ -1,14 +1,14 @@
-import type { TaskType } from './types.js';
+import type { LlmTask } from './types.js';
 
-export function resolveModelForTask(task: TaskType): string {
+export function resolveModelForTask(task: LlmTask): string {
   switch (task) {
     case 'semantic_parse':
       return 'qwen3:8b';
-    case 'codegen':
+    case 'code_sketch':
       return 'qwen3-coder:30b';
-    case 'evaluation':
+    case 'node_critique':
       return 'deepseek-r1:8b';
-    case 'embedding':
+    case 'context_assemble':
       return 'qwen3-embedding:4b';
     default:
       return 'qwen3:8b';
