@@ -62,8 +62,6 @@ export async function inspectCommand(options: { json?: boolean } = {}): Promise<
     canonDisplay = canonText.split('\n').find((line: string) => line.trim().length > 0) || canonDisplay;
   }
 
-  canonDisplay = canonDisplay.replace(/^\d+\.\s*/, "");
-
   if (options.json) {
     console.log(JSON.stringify({
       projectName: state.projectName,

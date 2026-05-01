@@ -1,0 +1,13 @@
+--- src/commands/node/show.ts
++++ src/commands/node/show.ts
+@@ -48,7 +48,8 @@
+   if (node.rules.length === 0) {
+     console.log("  none");
+   } else {
+     node.rules.forEach((rule, idx) => {
+-      console.log(`  ${idx + 1}. ${rule}`);
++      const cleanRule = rule.replace(/^\d+\.\s*/, "");
++      console.log(`  ${idx + 1}. ${cleanRule}`);
+     });
+   }
+ }

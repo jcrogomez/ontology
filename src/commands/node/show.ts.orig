@@ -56,8 +56,7 @@ export async function nodeShowCommand(id: string, options: { json?: boolean } = 
     console.log("  none");
   } else {
     node.rules.forEach((rule, idx) => {
-      const cleanRule = rule.replace(/^\d+\.\s*/, "");
-      console.log(`  ${idx + 1}. ${cleanRule}`);
+      console.log(`  ${idx + 1}. ${rule}`);
     });
   }
 }

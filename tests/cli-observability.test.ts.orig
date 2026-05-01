@@ -24,8 +24,8 @@ describe("CLI Observability", () => {
     expect(result.status).toBe(0);
     expect(() => JSON.parse(result.stdout)).not.toThrow();
     const parsed = JSON.parse(result.stdout);
-    expect(parsed.network.nodes).toBe(0);
-    expect(parsed.project.statePath).toBe("missing");
+    expect(parsed.module).toBe("doctor");
+    expect(parsed.checks.network.nodes).toBe(0);
   });
 
   describe("after init", () => {
@@ -48,15 +48,6 @@ describe("CLI Observability", () => {
       const parsed = JSON.parse(result.stdout);
       expect(parsed).toHaveProperty("nodeCount");
       expect(parsed).toHaveProperty("eventCount");
-      // JSON output should not have a numeric prefix for the canon
-      expect(parsed.canon).not.toMatch(/^\d+\.\s*/);
-    });
-
-    it("onto inspect outputs canon without numeric prefix", () => {
-      const result = runCli(tmpDir, ["inspect"]);
-      expect(result.status).toBe(0);
-      expect(result.stdout).toContain("Canon:");
-      expect(result.stdout).not.toMatch(/Canon:\n\s*\d+\.\s/);
     });
 
     it("onto node list works after init", () => {
@@ -81,8 +72,6 @@ describe("CLI Observability", () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("ID:");
       expect(result.stdout).toContain("node_0000_canon");
-      // Human readable rules output should not contain double prefix '1. 1. '
-      expect(result.stdout).not.toMatch(/1\. 1\./);
     });
 
     it("onto node show node_0000_canon --json outputs parseable JSON", () => {

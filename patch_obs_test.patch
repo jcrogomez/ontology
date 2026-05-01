@@ -1,0 +1,11 @@
+--- tests/observability-system.test.ts
++++ tests/observability-system.test.ts
+@@ -22,7 +22,7 @@
+     const doctorBeforeJson = runCli(tmpDir, ["doctor", "--json"]);
+     expect(doctorBeforeJson.status).toBe(0);
+     const parsedDoctorBefore = JSON.parse(doctorBeforeJson.stdout);
+-    expect(parsedDoctorBefore.checks.network.nodes).toBe(0);
++    expect(parsedDoctorBefore.network.nodes).toBe(0);
+   });
+
+   it("completes inspect and validate phase", () => {
