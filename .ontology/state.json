@@ -1,0 +1,13 @@
+{
+  "initialized": true,
+  "schemaVersion": "0.1.0",
+  "projectName": "ontology-project",
+  "rootNodeId": "node_0000_canon",
+  "activeBranch": "main",
+  "nodeCount": 1,
+  "edgeCount": 0,
+  "eventCount": 1,
+  "lastEventId": "evt_7fc7914b",
+  "createdAt": "2026-05-01T03:17:09.246Z",
+  "updatedAt": "2026-05-01T03:17:09.246Z"
+}

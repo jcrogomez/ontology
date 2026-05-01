@@ -1,0 +1,75 @@
+{
+  "id": "node_0000_canon",
+  "label": "Ontology Mathematical Canon",
+  "kind": "canon",
+  "status": "frozen",
+  "coordinates": {
+    "abstraction": "canon",
+    "time": 0,
+    "branch": "main",
+    "plane": "semantic",
+    "manifestation": "intent"
+  },
+  "inputs": [
+    {
+      "type": "text",
+      "value": "Establish Ontology as a typed temporal semantic graph with prompt rewriting, context presheaves, and functorial compilation.\n\n1. Ontology is a typed, temporal, directed graph enriched with a partial order of abstraction.\n2. Prompts act as rewrite rules that expand subgraphs.\n3. Context is assigned locally as a presheaf over graph neighborhoods.\n4. Compilation is a structure-preserving functor from the category of intention to the category of executable artifacts.\n5. Code is not the source of truth.\n6. Code is the compiled shadow of a valid semantic network.\n7. Lower-level nodes may refine higher-level nodes, but may not mutate them.\n8. Contradictions must become explicit as validation failures, superseding relations, or branches.\n9. Every generated artifact must be traceable to source nodes, edges, events, and hashes.",
+      "role": "mathematical_canon"
+    }
+  ],
+  "prompt": {
+    "raw": "Establish Ontology as a typed temporal semantic graph with prompt rewriting, context presheaves, and functorial compilation.",
+    "variables": {},
+    "language": "en"
+  },
+  "model": {
+    "ref": "mock_default"
+  },
+  "processors": {
+    "pre": [],
+    "post": []
+  },
+  "context": {
+    "requires": [],
+    "provides": [
+      {
+        "key": "MathematicalCanon",
+        "nodeType": "canon"
+      },
+      {
+        "key": "CanonRules",
+        "nodeType": "canon"
+      }
+    ],
+    "forbids": [],
+    "optional": []
+  },
+  "graph": {
+    "parentId": null,
+    "orbitOf": null
+  },
+  "rules": [
+    "1. Ontology is a typed, temporal, directed graph enriched with a partial order of abstraction.",
+    "2. Prompts act as rewrite rules that expand subgraphs.",
+    "3. Context is assigned locally as a presheaf over graph neighborhoods.",
+    "4. Compilation is a structure-preserving functor from the category of intention to the category of executable artifacts.",
+    "5. Code is not the source of truth.",
+    "6. Code is the compiled shadow of a valid semantic network.",
+    "7. Lower-level nodes may refine higher-level nodes, but may not mutate them.",
+    "8. Contradictions must become explicit as validation failures, superseding relations, or branches.",
+    "9. Every generated artifact must be traceable to source nodes, edges, events, and hashes."
+  ],
+  "technical": {},
+  "outputs": {
+    "files": []
+  },
+  "validation": {
+    "errors": [],
+    "warnings": []
+  },
+  "integrity": {
+    "frozen": true,
+    "hash": "ad1652afa7c7405d0cc9911c28df09f5e4b8d97185cfac7b36133eb3da736e3f",
+    "schemaVersion": "0.1.0"
+  }
+}
