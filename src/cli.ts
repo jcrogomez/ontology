@@ -10,6 +10,7 @@ import { nodeListCommand } from "./commands/node/list.js";
 import { nodeShowCommand } from "./commands/node/show.js";
 import { eventsTailCommand } from "./commands/events/tail.js";
 import { contextAssembleCommand } from "./commands/context/assemble.js";
+import { runPromptCommand } from "./commands/run/prompt.js";
 
 const program = new Command();
 
@@ -143,6 +144,26 @@ contextCmd
       await contextAssembleCommand(id, options);
     } catch (err: unknown) {
       console.error(`✖ Error assembling context: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+const run = program
+  .command("run")
+  .description("Run actions like prompts.");
+
+run
+  .command("prompt")
+  .description("Run an LLM task directly.")
+  .requiredOption("--task <task>", "Task to run")
+  .requiredOption("--prompt <prompt>", "Prompt to send")
+  .option("--provider <provider>", "LLM provider to use")
+  .option("--json", "Output results in JSON format")
+  .action(async (options) => {
+    try {
+      await runPromptCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error running prompt: ${(err as Error).message}`);
       process.exit(1);
     }
   });
