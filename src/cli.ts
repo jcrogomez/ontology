@@ -9,6 +9,7 @@ import { createNodeCommand } from "./commands/node/create.js";
 import { nodeListCommand } from "./commands/node/list.js";
 import { nodeShowCommand } from "./commands/node/show.js";
 import { eventsTailCommand } from "./commands/events/tail.js";
+import { contextAssembleCommand } from "./commands/context/assemble.js";
 
 const program = new Command();
 
@@ -122,6 +123,26 @@ events
       await eventsTailCommand(options);
     } catch (err: unknown) {
       console.error(`✖ Error tailing events: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+const contextCmd = program
+  .command("context")
+  .description("Manage Ontology context assembly.");
+
+contextCmd
+  .command("assemble <id>")
+  .description("Assemble the context for a given node.")
+  .option("--json", "Output results in JSON format")
+  .option("--branch <branch>", "Branch to assemble context for")
+  .option("--time <time>", "Time to assemble context for")
+  .option("--mode <mode>", "Mode for context assembly (only 'strict' is supported)")
+  .action(async (id, options) => {
+    try {
+      await contextAssembleCommand(id, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error assembling context: ${(err as Error).message}`);
       process.exit(1);
     }
   });
