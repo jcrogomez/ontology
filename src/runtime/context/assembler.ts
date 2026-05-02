@@ -1,5 +1,5 @@
 import { OntologyNode } from "../../schemas/ontology.js";
-import { loadNodeById } from "../../core/project/load.js";
+import { loadNodeById, loadState } from "../../core/project/load.js";
 import { ContextAssemblyInput, ContextAssemblyOutput } from "./types.js";
 
 function cleanPrefix(text: string): string {
@@ -7,6 +7,10 @@ function cleanPrefix(text: string): string {
 }
 
 export function assembleContext(input: ContextAssemblyInput, cwd = process.cwd()): ContextAssemblyOutput {
+  // Future extension: temporal slicing will filter visible nodes by logical time.
+  // const time = input.time;
+
+  const state = loadState(cwd);
   const mode = input.mode || "strict";
 
   if (mode !== "strict") {
@@ -20,7 +24,7 @@ export function assembleContext(input: ContextAssemblyInput, cwd = process.cwd()
     throw new Error(`Target node not found: ${targetNodeId}`);
   }
 
-  const branch = input.branch || targetNode.coordinates.branch || "main";
+  const branch = input.branch || state.activeBranch || "main";
 
   if (targetNode.coordinates.branch && targetNode.coordinates.branch !== branch) {
     throw new Error(`Branch mismatch for node ${targetNodeId}: expected ${branch}, received ${targetNode.coordinates.branch}`);
@@ -43,6 +47,10 @@ export function assembleContext(input: ContextAssemblyInput, cwd = process.cwd()
 
     nodes.push(parentNode);
     currentNode = parentNode;
+  }
+
+  if (currentNode.id !== state.rootNodeId) {
+    throw new Error(`Context path does not terminate at root node: expected ${state.rootNodeId}, received ${currentNode.id}`);
   }
 
   // Reverse to get topological order: canon -> ...ancestors -> target
@@ -90,8 +98,7 @@ export function assembleContext(input: ContextAssemblyInput, cwd = process.cwd()
     promptBuilder.push(`- ${node.id} :: ${node.label}`);
   }
   promptBuilder.push(``);
-  promptBuilder.push(`Target Prompt:`);
-  promptBuilder.push(targetNode.prompt.raw || "");
+  promptBuilder.push(`Target Prompt:\n${targetNode.prompt.raw || ""}`);
 
   return {
     mode: "strict",
