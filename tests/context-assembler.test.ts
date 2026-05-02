@@ -18,12 +18,14 @@ describe("Context Assembler", () => {
       initialized: true,
       schemaVersion: "1.0",
       projectName: "Test Project",
-      rootNodeId: "node_0000",
+      rootNodeId: "node_0000_canon",
       activeBranch: "main",
       nodeCount: 3,
       edgeCount: 0,
       eventCount: 0,
-      lastEventId: "evt_0000"
+      lastEventId: "evt_0000",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
     fs.writeFileSync(path.join(cwd, ".ontology", "state.json"), JSON.stringify(state));
     fs.writeFileSync(path.join(cwd, ".ontology", "events.jsonl"), "");
@@ -126,6 +128,17 @@ describe("Context Assembler", () => {
     expect(result.prompt).toContain("- node_0000_canon :: Ontology Mathematical Canon");
   });
 
+  it("assembles context for canon node using fallback mathematical_canon input when rules are empty", () => {
+    const canonPath = path.join(cwd, ".ontology", "nodes", "node_0000_canon.json");
+    const canonNode = JSON.parse(fs.readFileSync(canonPath, "utf-8"));
+    canonNode.rules = [];
+    fs.writeFileSync(canonPath, JSON.stringify(canonNode, null, 2));
+
+    const result = assembleContext({ targetNodeId: "node_0000_canon", mode: "strict" }, cwd);
+    expect(result.canon).toBe("Root mathematical canon");
+    expect(result.prompt).toContain("Canon:\nRoot mathematical canon");
+  });
+
   it("assembles context for child node", () => {
     const result = assembleContext({ targetNodeId: "node_0002_target", mode: "strict" }, cwd);
     expect(result.mode).toBe("strict");
@@ -174,6 +187,18 @@ describe("Context Assembler", () => {
     expect(() => {
       assembleContext({ targetNodeId: "node_0000_canon", mode: "compare" }, cwd);
     }).toThrow("Unsupported context assembly mode: compare");
+  });
+
+  it("fails when context path does not terminate at root node", () => {
+    // Make ancestor point to null but not be the root canon node
+    const ancestorPath = path.join(cwd, ".ontology", "nodes", "node_0001_ancestor.json");
+    const ancestorNode = JSON.parse(fs.readFileSync(ancestorPath, "utf-8"));
+    ancestorNode.graph.parentId = null;
+    fs.writeFileSync(ancestorPath, JSON.stringify(ancestorNode, null, 2));
+
+    expect(() => {
+      assembleContext({ targetNodeId: "node_0002_target", mode: "strict" }, cwd);
+    }).toThrow("Context path does not terminate at root node: expected node_0000_canon, received node_0001_ancestor");
   });
 
   it("does not mutate .ontology", () => {
