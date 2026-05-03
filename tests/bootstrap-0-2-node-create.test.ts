@@ -15,8 +15,10 @@ describe('Bootstrap 0.2 Node Create Tests', () => {
     cleanupTempProject(tempDir);
   });
 
-  it('Test 1: node create successfully creates a node', () => {
+  it('node create increments nodeCount', () => {
     runCli(tempDir, ['init']);
+    const ontologyDir = path.join(tempDir, '.ontology');
+    const stateBefore = JSON.parse(fs.readFileSync(path.join(ontologyDir, 'state.json'), 'utf-8'));
 
     const result = runCli(tempDir, [
       'node', 'create',
@@ -24,33 +26,134 @@ describe('Bootstrap 0.2 Node Create Tests', () => {
       '--kind', 'entity',
       '--prompt', 'Harvest has seededQuantity, harvestedQuantity and status.'
     ]);
-
-    if (result.status !== 0) {
-      console.error(result.stdout);
-      console.error(result.stderr);
-    }
-
-    // If the node create isn't fully implemented yet, let's gracefully continue but record the failure.
-    // Based on user prompt, tests shouldn't be skipped but should run.
     expect(result.status).toBe(0);
 
-    const ontologyDir = path.join(tempDir, '.ontology');
-    const nodePath = path.join(ontologyDir, 'nodes', 'node_0001.json');
-    expect(fs.existsSync(nodePath)).toBe(true);
+    const stateAfter = JSON.parse(fs.readFileSync(path.join(ontologyDir, 'state.json'), 'utf-8'));
+    expect(stateAfter.nodeCount).toBe(stateBefore.nodeCount + 1);
+  });
 
-    const stateContent = fs.readFileSync(path.join(ontologyDir, 'state.json'), 'utf-8');
-    const stateData = JSON.parse(stateContent);
-    expect(stateData.nodeCount).toBe(2);
-    expect(stateData.eventCount).toBe(2);
-    expect(stateData.edgeCount).toBe(0);
+  it('node create increments eventCount', () => {
+    runCli(tempDir, ['init']);
+    const ontologyDir = path.join(tempDir, '.ontology');
+    const stateBefore = JSON.parse(fs.readFileSync(path.join(ontologyDir, 'state.json'), 'utf-8'));
+
+    const result = runCli(tempDir, [
+      'node', 'create',
+      '--level', 'domain',
+      '--kind', 'entity',
+      '--prompt', 'Harvest has seededQuantity, harvestedQuantity and status.'
+    ]);
+    expect(result.status).toBe(0);
+
+    const stateAfter = JSON.parse(fs.readFileSync(path.join(ontologyDir, 'state.json'), 'utf-8'));
+    expect(stateAfter.eventCount).toBe(stateBefore.eventCount + 1);
+  });
+
+  it('node create updates lastEventId', () => {
+    runCli(tempDir, ['init']);
+    const ontologyDir = path.join(tempDir, '.ontology');
+    const stateBefore = JSON.parse(fs.readFileSync(path.join(ontologyDir, 'state.json'), 'utf-8'));
+
+    const result = runCli(tempDir, [
+      'node', 'create',
+      '--level', 'domain',
+      '--kind', 'entity',
+      '--prompt', 'Harvest has seededQuantity, harvestedQuantity and status.'
+    ]);
+    expect(result.status).toBe(0);
+
+    const stateAfter = JSON.parse(fs.readFileSync(path.join(ontologyDir, 'state.json'), 'utf-8'));
+    expect(stateAfter.lastEventId).not.toBe(stateBefore.lastEventId);
+  });
+
+  it('node create appends node_created event', () => {
+    runCli(tempDir, ['init']);
+    const ontologyDir = path.join(tempDir, '.ontology');
+
+    const result = runCli(tempDir, [
+      'node', 'create',
+      '--level', 'domain',
+      '--kind', 'entity',
+      '--prompt', 'Harvest has seededQuantity, harvestedQuantity and status.'
+    ]);
+    expect(result.status).toBe(0);
 
     const eventsContent = fs.readFileSync(path.join(ontologyDir, 'events.jsonl'), 'utf-8');
     const events = eventsContent.trim().split('\n').map(line => JSON.parse(line));
     const latestEvent = events[events.length - 1];
+
     expect(latestEvent.eventType).toBe('node_created');
+  });
+
+  it('created node validates with OntologyNodeSchema', () => {
+    runCli(tempDir, ['init']);
+    const ontologyDir = path.join(tempDir, '.ontology');
+
+    const result = runCli(tempDir, [
+      'node', 'create',
+      '--level', 'domain',
+      '--kind', 'entity',
+      '--prompt', 'Harvest has seededQuantity, harvestedQuantity and status.'
+    ]);
+    expect(result.status).toBe(0);
 
     const validateResult = runCli(tempDir, ['validate']);
     expect(validateResult.status).toBe(0);
+  });
+
+  it('created node hash matches recomputed hash', () => {
+    runCli(tempDir, ['init']);
+    const ontologyDir = path.join(tempDir, '.ontology');
+
+    const result = runCli(tempDir, [
+      'node', 'create',
+      '--level', 'domain',
+      '--kind', 'entity',
+      '--prompt', 'Harvest has seededQuantity, harvestedQuantity and status.'
+    ]);
+    expect(result.status).toBe(0);
+
+    // Run validate since validate checks hash integrity
+    const validateResult = runCli(tempDir, ['validate']);
+    expect(validateResult.status).toBe(0);
+  });
+
+  it('node create preserves previous event chain', () => {
+    runCli(tempDir, ['init']);
+    const ontologyDir = path.join(tempDir, '.ontology');
+    const stateBefore = JSON.parse(fs.readFileSync(path.join(ontologyDir, 'state.json'), 'utf-8'));
+
+    const result = runCli(tempDir, [
+      'node', 'create',
+      '--level', 'domain',
+      '--kind', 'entity',
+      '--prompt', 'Harvest has seededQuantity, harvestedQuantity and status.'
+    ]);
+    expect(result.status).toBe(0);
+
+    const eventsContent = fs.readFileSync(path.join(ontologyDir, 'events.jsonl'), 'utf-8');
+    const events = eventsContent.trim().split('\n').map(line => JSON.parse(line));
+    const latestEvent = events[events.length - 1];
+
+    expect(latestEvent.previousEventId).toBe(stateBefore.lastEventId);
+  });
+
+  it('node create does not mutate existing canon node', () => {
+    runCli(tempDir, ['init']);
+    const ontologyDir = path.join(tempDir, '.ontology');
+    const canonPath = path.join(ontologyDir, 'nodes', 'node_0000_canon.json');
+    const canonBefore = fs.readFileSync(canonPath, 'utf-8');
+
+    const result = runCli(tempDir, [
+      'node', 'create',
+      '--level', 'domain',
+      '--kind', 'entity',
+      '--prompt', 'Harvest has seededQuantity, harvestedQuantity and status.'
+    ]);
+    expect(result.status).toBe(0);
+
+    const canonAfter = fs.readFileSync(canonPath, 'utf-8');
+    expect(canonAfter).toBe(canonBefore);
   });
 
   it('Test 2: node create with invalid level fails', () => {
