@@ -54,13 +54,19 @@ The Context Assembler is strictly an observational and mapping utility. It speci
 
 ## Future CLI Surface
 
-*Planned / Not yet implemented*
+*Implemented: strict mode*
 
 ```bash
-onto context assemble <nodeId> --mode strict
-onto context assemble <nodeId> --mode compare
-onto context assemble <nodeId> --mode propose
+onto context assemble <nodeId>
+onto context assemble <nodeId> --json
 ```
+
+*Planned:*
+- `compare`
+- `propose`
+- `neighborhood slicing`
+- `edge-aware assembly`
+- `presheaf/gluing validation`
 
 ## Future Extensions
 

@@ -6,9 +6,9 @@ Ontology is a typed, temporal, directed graph enriched with a partial order of a
 
 Ontology is a terminal-first editor for a typed, temporal, multidimensional semantic network. The network is the absolute source of truth. Code is the compiled shadow of a valid semantic network.
 
-## Current Status: Bootstrap 0.2 (Node Editor)
+## Current Status: Bootstrap 0.2.x / Context + Mock Runtime Preparation
 
-Current maturity: Bootstrap 0.2 alpha over a hardened 0.1 kernel.
+Current maturity: Bootstrap 0.2.x / Context + Mock Runtime Preparation alpha over a hardened 0.1 kernel.
 
 Bootstrap 0.2 introduces the ability to grow the network through controlled CLI mutations (specifically, creating semantic nodes).
 

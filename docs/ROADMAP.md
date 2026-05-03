@@ -1,8 +1,19 @@
 # Ontology Roadmap
 
-## Current State: Bootstrap 0.2 (Node Editor)
+## Current State: Bootstrap 0.2.x / Context + Mock Runtime Preparation
 
-Ontology is currently in the **Bootstrap 0.2** phase. This phase introduces the foundational capabilities to grow the intention network through controlled CLI mutations—specifically, generating semantic nodes.
+Ontology is currently in the **Bootstrap 0.2.x / Context + Mock Runtime Preparation** phase. This phase introduces the foundational capabilities to grow the intention network through controlled CLI mutations—specifically, generating semantic nodes.
+
+## Near-term tactical roadmap
+
+1. run prompt mock
+2. run context mock
+3. presheaf/gluing
+4. intent validator
+5. SemanticLinker
+6. Ollama adapter
+7. PromptAST
+8. Compiler skeleton
 
 At this stage, Ontology is a verified network kernel and a node editor. The network is strictly modeled as a typed, temporal directed graph, and all mutations are tracked via an append-only event log.
 
