@@ -9,14 +9,6 @@ export interface RunPromptOptions {
 }
 
 export async function runPromptCommand(options: RunPromptOptions): Promise<void> {
-  if (!options.task) {
-    throw new Error("error: required option '--task <task>' not specified");
-  }
-
-  if (!options.prompt) {
-    throw new Error("error: required option '--prompt <prompt>' not specified");
-  }
-
   const provider = (options.provider ?? "mock") as LlmProvider;
 
   if (provider !== "mock") {
@@ -31,7 +23,7 @@ export async function runPromptCommand(options: RunPromptOptions): Promise<void>
   const response = await dispatchLlmRequest(
     {
       task,
-      prompt: options.prompt,
+      prompt: options.prompt!,
     },
     { provider }
   );
