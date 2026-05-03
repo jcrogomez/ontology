@@ -9,6 +9,11 @@ This document outlines the available CLI commands across current Bootstrap phase
 
 ## Bootstrap 0.1 Commands
 
+### `doctor`
+
+- **Purpose:** Analyzes the physical structure of the `.ontology` folder and returns a health report.
+- **Example:** `npm run dev -- doctor` (or `npm run dev -- doctor --json`)
+
 ### `init`
 
 - **Purpose:** Initializes the minimal `.ontology` network. Creates the kernel boundaries, mathematical canon node, temporal event log, structural edge log, and overall state tracking.
@@ -30,7 +35,7 @@ This document outlines the available CLI commands across current Bootstrap phase
 ### `inspect`
 
 - **Purpose:** Summarizes the current topological state, detailing nodes, events, and edge counts.
-- **Example:** `npm run dev -- inspect`
+- **Example:** `npm run dev -- inspect` (or `npm run dev -- inspect --json`)
 - **Files Touched:** Reads `.ontology/state.json`.
 - **What it does not do:** It does not list granular details of the nodes, only an aggregate summary.
 
@@ -45,3 +50,31 @@ This document outlines the available CLI commands across current Bootstrap phase
   - `.ontology/events.jsonl` (Appends a `node_created` event)
   - `.ontology/state.json` (Updates summary counters and timestamp)
 - **What it does not do:** It does not create typed edges between nodes. It does not parse the prompt into PromptAST. It does not execute models or processors to generate subgraphs or code.
+
+### `node list`
+
+- **Purpose:** Lists all nodes in the network.
+- **Example:** `npm run dev -- node list` (or `npm run dev -- node list --json`)
+
+### `node show`
+
+- **Purpose:** Displays detailed information for a specific node.
+- **Example:** `npm run dev -- node show <id>` (or `npm run dev -- node show <id> --json`)
+
+### `events tail`
+
+- **Purpose:** Streams or lists the most recent events from the event log.
+- **Example:** `npm run dev -- events tail` (or `npm run dev -- events tail --json`)
+
+### `context assemble`
+
+- **Purpose:** Deterministically computes the local context for a specific node.
+- **Example:** `npm run dev -- context assemble <nodeId>` (or `npm run dev -- context assemble <nodeId> --json`)
+
+## Planned Commands
+
+The following commands are *Planned / Not yet implemented*:
+- `run prompt`
+- `run context`
+- `model doctor`
+- `model list`
