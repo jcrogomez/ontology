@@ -155,11 +155,20 @@ const run = program
 run
   .command("prompt")
   .description("Run an LLM task directly.")
-  .requiredOption("--task <task>", "Task to run")
-  .requiredOption("--prompt <prompt>", "Prompt to send")
+  .option("--task <task>", "Task to run")
+  .option("--prompt <prompt>", "Prompt to send")
   .option("--provider <provider>", "LLM provider to use")
   .option("--json", "Output results in JSON format")
   .action(async (options) => {
+    if (!options.task) {
+      console.error("✖ Missing required option: --task");
+      process.exit(1);
+    }
+    if (!options.prompt) {
+      console.error("✖ Missing required option: --prompt");
+      process.exit(1);
+    }
+
     try {
       await runPromptCommand(options);
     } catch (err: unknown) {

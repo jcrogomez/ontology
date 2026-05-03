@@ -83,13 +83,13 @@ describe("onto run prompt", () => {
     const result = runCli(["run", "prompt", "--prompt", "Hello"]);
 
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("error: required option '--task <task>' not specified");
+    expect(result.stderr).toContain("✖ Missing required option: --task");
   });
 
   it("onto run prompt requires prompt", () => {
     const result = runCli(["run", "prompt", "--task", "semantic_parse"]);
 
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("error: required option '--prompt <prompt>' not specified");
+    expect(result.stderr).toContain("✖ Missing required option: --prompt");
   });
 });
