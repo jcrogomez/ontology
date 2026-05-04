@@ -81,6 +81,11 @@ This document outlines the available CLI commands across current Bootstrap phase
 - **Purpose:** Runs an LLM task against an assembled context for a given node.
 - **Example:** `npm run dev -- run context <nodeId> --provider mock` (or `npm run dev -- run context <nodeId> --provider mock --json`)
 
+### `run context --validate`
+
+- **Purpose:** Runs an LLM task against an assembled context and strictly validates the response via the intentional validation pipeline.
+- **Example:** `npm run dev -- run context <nodeId> --provider mock --validate`
+
 ## Planned Commands
 
 The following commands are *Planned / Not yet implemented*:

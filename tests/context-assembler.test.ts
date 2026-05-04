@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
 import { assembleContext } from "../src/runtime/context/assembler.js";
-import { OntologyNode } from "../src/schemas/ontology.js";
+import { OntologyNode, OntologyEdge } from "../src/schemas/ontology.js";
 
 describe("Context Assembler", () => {
   let cwd: string;
@@ -105,13 +105,151 @@ describe("Context Assembler", () => {
       integrity: { hash: "hash", schemaVersion: "1.0" }
     };
 
+    const neighborNode1: OntologyNode = {
+      id: "node_0003_neighbor_valid",
+      label: "Neighbor Valid",
+      kind: "component",
+      status: "valid",
+      coordinates: {
+        abstraction: "unit",
+        time: 3,
+        branch: "main",
+        plane: "semantic",
+        manifestation: "intent"
+      },
+      inputs: [],
+      prompt: { raw: "Neighbor prompt", variables: {}, language: "en" },
+      model: { ref: "mock" },
+      processors: { pre: [], post: [] },
+      context: { requires: [], forbids: [], optional: [] },
+      graph: { parentId: "node_0000_canon", orbitOf: null },
+      rules: ["Neighbor valid rule"],
+      technical: {},
+      outputs: {},
+      integrity: { hash: "hash", schemaVersion: "1.0" }
+    };
+
+    const neighborNode2: OntologyNode = {
+      id: "node_0004_neighbor_mismatch",
+      label: "Neighbor Mismatch",
+      kind: "component",
+      status: "valid",
+      coordinates: {
+        abstraction: "unit",
+        time: 4,
+        branch: "dev",
+        plane: "semantic",
+        manifestation: "intent"
+      },
+      inputs: [],
+      prompt: { raw: "Neighbor mismatch prompt", variables: {}, language: "en" },
+      model: { ref: "mock" },
+      processors: { pre: [], post: [] },
+      context: { requires: [], forbids: [], optional: [] },
+      graph: { parentId: "node_0000_canon", orbitOf: null },
+      rules: ["Neighbor mismatch rule"],
+      technical: {},
+      outputs: {},
+      integrity: { hash: "hash", schemaVersion: "1.0" }
+    };
+
+    const edge1: OntologyEdge = {
+      edgeId: "edge_0001",
+      from: "node_0002_target",
+      to: "node_0003_neighbor_valid",
+      type: "depends_on",
+      branch: "main",
+      createdAt: new Date().toISOString(),
+      createdByEventId: "evt_0000",
+      integrity: { hash: "hash", schemaVersion: "1.0" }
+    };
+
+    const edge2: OntologyEdge = {
+      edgeId: "edge_0002",
+      from: "node_0001_ancestor",
+      to: "node_0004_neighbor_mismatch",
+      type: "validates_against",
+      branch: "main",
+      createdAt: new Date().toISOString(),
+      createdByEventId: "evt_0000",
+      integrity: { hash: "hash", schemaVersion: "1.0" }
+    };
+
+    const edge3: OntologyEdge = {
+      edgeId: "edge_0003",
+      from: "node_0002_target",
+      to: "node_0003_neighbor_valid",
+      type: "inherits_from", // Not in default allowed edges
+      branch: "main",
+      createdAt: new Date().toISOString(),
+      createdByEventId: "evt_0000",
+      integrity: { hash: "hash", schemaVersion: "1.0" }
+    };
+
     fs.writeFileSync(path.join(cwd, ".ontology", "nodes", "node_0000_canon.json"), JSON.stringify(canonNode, null, 2));
     fs.writeFileSync(path.join(cwd, ".ontology", "nodes", "node_0001_ancestor.json"), JSON.stringify(ancestorNode, null, 2));
     fs.writeFileSync(path.join(cwd, ".ontology", "nodes", "node_0002_target.json"), JSON.stringify(targetNode, null, 2));
+    fs.writeFileSync(path.join(cwd, ".ontology", "nodes", "node_0003_neighbor_valid.json"), JSON.stringify(neighborNode1, null, 2));
+    fs.writeFileSync(path.join(cwd, ".ontology", "nodes", "node_0004_neighbor_mismatch.json"), JSON.stringify(neighborNode2, null, 2));
+    fs.writeFileSync(path.join(cwd, ".ontology", "edges.jsonl"), [edge1, edge2, edge3].map(e => JSON.stringify(e)).join("\n"));
   });
 
   afterEach(() => {
     cleanupTempProject(cwd);
+  });
+
+  it("default assembler remains parent-path only", () => {
+    const result = assembleContext({ targetNodeId: "node_0002_target", mode: "strict" }, cwd);
+    expect(result.edgeContext).toBeUndefined();
+    expect(result.warnings).toBeUndefined();
+    expect(result.nodes).toHaveLength(3); // canon, ancestor, target
+  });
+
+  it("includeEdges includes allowed neighbor nodes", () => {
+    const result = assembleContext({ targetNodeId: "node_0002_target", mode: "strict", includeEdges: true }, cwd);
+    expect(result.edgeContext).toBeDefined();
+    expect(result.edgeContext?.nodeIds).toContain("node_0003_neighbor_valid");
+    expect(result.nodes.map(n => n.id)).toContain("node_0003_neighbor_valid");
+    expect(result.constraints).toContain("Neighbor valid rule");
+    expect(result.edgeContext?.edges.map(e => e.edgeId)).toContain("edge_0001");
+  });
+
+  it("includeEdges respects edgeTypes filter", () => {
+    const result = assembleContext({
+      targetNodeId: "node_0002_target",
+      mode: "strict",
+      includeEdges: true,
+      edgeTypes: ["inherits_from"]
+    }, cwd);
+
+    expect(result.edgeContext?.edges.map(e => e.edgeId)).toContain("edge_0003");
+    expect(result.edgeContext?.nodeIds).toContain("node_0003_neighbor_valid");
+    expect(result.nodes.map(n => n.id)).toContain("node_0003_neighbor_valid");
+  });
+
+  it("includeEdges does not duplicate nodes", () => {
+    // Modify edge1 to connect ancestor and target (both already in context)
+    const edgePath = path.join(cwd, ".ontology", "edges.jsonl");
+    const edges = fs.readFileSync(edgePath, "utf-8").split("\n").map(l => JSON.parse(l));
+    edges[0].from = "node_0001_ancestor";
+    edges[0].to = "node_0002_target";
+    fs.writeFileSync(edgePath, edges.map(e => JSON.stringify(e)).join("\n"));
+
+    const result = assembleContext({ targetNodeId: "node_0002_target", mode: "strict", includeEdges: true }, cwd);
+
+    const nodeIds = result.nodes.map(n => n.id);
+    const uniqueNodeIds = new Set(nodeIds);
+    expect(nodeIds.length).toBe(uniqueNodeIds.size);
+    // Even though the edge connects nodes in context, it shouldn't duplicate them in the nodes array
+  });
+
+  it("includeEdges ignores branch-mismatched neighbors with warning", () => {
+    const result = assembleContext({ targetNodeId: "node_0002_target", mode: "strict", includeEdges: true }, cwd);
+
+    expect(result.warnings).toContain("Ignored neighbor node node_0004_neighbor_mismatch due to branch mismatch");
+    expect(result.edgeContext?.nodeIds).not.toContain("node_0004_neighbor_mismatch");
+    expect(result.nodes.map(n => n.id)).not.toContain("node_0004_neighbor_mismatch");
+    expect(result.edgeContext?.edges.map(e => e.edgeId)).not.toContain("edge_0002");
   });
 
   it("assembles context for canon node", () => {
@@ -201,16 +339,19 @@ describe("Context Assembler", () => {
     }).toThrow("Context path does not terminate at root node: expected node_0000_canon, received node_0001_ancestor");
   });
 
-  it("does not mutate .ontology", () => {
+  it("includeEdges does not mutate .ontology", () => {
     const preNodes = fs.readdirSync(path.join(cwd, ".ontology", "nodes"));
     const preState = fs.readFileSync(path.join(cwd, ".ontology", "state.json"), "utf-8");
+    const preEdges = fs.readFileSync(path.join(cwd, ".ontology", "edges.jsonl"), "utf-8");
 
-    assembleContext({ targetNodeId: "node_0002_target", mode: "strict" }, cwd);
+    assembleContext({ targetNodeId: "node_0002_target", mode: "strict", includeEdges: true }, cwd);
 
     const postNodes = fs.readdirSync(path.join(cwd, ".ontology", "nodes"));
     const postState = fs.readFileSync(path.join(cwd, ".ontology", "state.json"), "utf-8");
+    const postEdges = fs.readFileSync(path.join(cwd, ".ontology", "edges.jsonl"), "utf-8");
 
     expect(preNodes).toEqual(postNodes);
     expect(preState).toEqual(postState);
+    expect(preEdges).toEqual(postEdges);
   });
 });
