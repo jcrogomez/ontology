@@ -74,7 +74,7 @@ export function assembleContext(input: ContextAssemblyInput, cwd = process.cwd()
 
     const edges = loadEdges(cwd);
     const contextNodeIds = new Set(nodes.map(n => n.id));
-    const matchingEdges = edges.filter(e => allowedEdgeTypes.includes(e.type));
+    const matchingEdges = edges.filter((e: OntologyEdge) => allowedEdgeTypes.includes(e.type));
 
     const neighborIds = new Set<string>();
     const validEdges: OntologyEdge[] = [];
@@ -110,7 +110,7 @@ export function assembleContext(input: ContextAssemblyInput, cwd = process.cwd()
     // However, if an edge connects to a neighbor we rejected due to branch mismatch, should we include the edge?
     // Let's filter edges to those where both ends are in the final node set.
     const finalNodeIds = new Set(nodes.map(n => n.id));
-    edgeContext.edges = validEdges.filter(e => finalNodeIds.has(e.from) && finalNodeIds.has(e.to));
+    edgeContext.edges = validEdges.filter((e: OntologyEdge) => finalNodeIds.has(e.from) && finalNodeIds.has(e.to));
   }
 
   const rootCanon = nodes[0];
