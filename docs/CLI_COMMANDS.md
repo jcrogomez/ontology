@@ -89,5 +89,15 @@ This document outlines the available CLI commands across current Bootstrap phase
 ## Planned Commands
 
 The following commands are *Planned / Not yet implemented*:
-- `model doctor`
-- `model list`
+
+### Model Observability
+- `onto model doctor`
+- `onto model doctor --json`
+- `onto model list`
+- `onto model list --json`
+- `onto model list --provider mock`
+- `onto model list --provider ollama`
+
+### Execution with Providers
+- `onto run prompt --provider ollama`
+- `onto run context <nodeId> --provider ollama`
