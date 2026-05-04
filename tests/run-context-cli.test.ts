@@ -95,3 +95,36 @@ test("onto run context does not mutate .ontology", () => {
   const afterHash = hashDirectory(ontologyDir);
   expect(beforeHash).toBe(afterHash);
 });
+
+test("onto run context --validate returns validation block", () => {
+  const result = runCli(["run", "context", "node_0000_canon", "--provider", "mock", "--validate"]);
+  expect(result.status).toBe(0);
+  expect(result.stdout).toContain("Validation:");
+  expect(result.stdout).toContain("OK:       true");
+  expect(result.stdout).toContain("Score:    1");
+  expect(result.stdout).toContain("Warnings: 0");
+  expect(result.stdout).toContain("Violations: 0");
+});
+
+test("onto run context --validate --json outputs parseable validation", () => {
+  const result = runCli(["run", "context", "node_0000_canon", "--provider", "mock", "--validate", "--json"]);
+  expect(result.status).toBe(0);
+  expect(() => JSON.parse(result.stdout)).not.toThrow();
+  const parsed = JSON.parse(result.stdout);
+  expect(parsed.validation).toBeDefined();
+  expect(parsed.validation.ok).toBe(true);
+  expect(parsed.validation.score).toBe(1);
+  expect(parsed.validation.violations).toEqual([]);
+  expect(parsed.validation.warnings).toEqual([]);
+});
+
+test("onto run context --validate does not mutate .ontology", () => {
+  const ontologyDir = path.join(tempDir, ".ontology");
+  const beforeHash = hashDirectory(ontologyDir);
+
+  const result = runCli(["run", "context", "node_0000_canon", "--provider", "mock", "--validate"]);
+  expect(result.status).toBe(0);
+
+  const afterHash = hashDirectory(ontologyDir);
+  expect(beforeHash).toBe(afterHash);
+});

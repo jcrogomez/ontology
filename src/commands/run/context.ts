@@ -1,5 +1,8 @@
 import { assembleContext } from "../../runtime/context/assembler.js";
 import { dispatchLlmRequest } from "../../runtime/llm/dispatcher.js";
+import { buildFragment } from "../../runtime/context/presheaf.js";
+import { glueFragments } from "../../runtime/context/gluing.js";
+import { validateIntent, type IntentValidationResult } from "../../runtime/context/intent-validator.js";
 import type { LlmTask, LlmProvider } from "../../runtime/llm/types.js";
 
 export interface RunContextOptions {
@@ -9,6 +12,7 @@ export interface RunContextOptions {
   time?: string;
   mode?: string;
   json?: boolean;
+  validate?: boolean;
 }
 
 export async function runContextCommand(id: string, options: RunContextOptions) {
@@ -18,6 +22,7 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
   const branch = options.branch;
   const time = options.time ? parseInt(options.time, 10) : undefined;
   const isJson = !!options.json;
+  const isValidate = !!options.validate;
 
   if (provider !== "mock") {
     throw new Error(`Unsupported LLM provider: ${provider}`);
@@ -39,8 +44,23 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
     { provider: provider as LlmProvider }
   );
 
+  let validationResult: IntentValidationResult | undefined;
+  if (isValidate) {
+    const fragments = contextOutput.nodes.map(buildFragment);
+    const glued = glueFragments(fragments);
+    validationResult = validateIntent({
+      assembled: contextOutput,
+      glued,
+      candidate: {
+        text: llmResponse.text,
+        provider: llmResponse.provider,
+        model: llmResponse.model,
+      },
+    });
+  }
+
   if (isJson) {
-    const output = {
+    const output: any = {
       context: contextOutput,
       response: {
         text: llmResponse.text,
@@ -48,6 +68,16 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
         provider: llmResponse.provider,
       },
     };
+
+    if (isValidate && validationResult) {
+      output.validation = {
+        ok: validationResult.ok,
+        score: validationResult.score,
+        violations: validationResult.violations,
+        warnings: validationResult.warnings,
+      };
+    }
+
     console.log(JSON.stringify(output, null, 2));
   } else {
     let truncatedText = llmResponse.text;
@@ -67,5 +97,14 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
     console.log(`  Nodes:   ${contextOutput.nodes.length}`);
     console.log(``);
     console.log(`Response:\n${truncatedText}`);
+
+    if (isValidate && validationResult) {
+      console.log(``);
+      console.log(`Validation:`);
+      console.log(`  OK:       ${validationResult.ok}`);
+      console.log(`  Score:    ${validationResult.score}`);
+      console.log(`  Warnings: ${validationResult.warnings.length}`);
+      console.log(`  Violations: ${validationResult.violations.length}`);
+    }
   }
 }

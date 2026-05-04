@@ -161,6 +161,7 @@ run
   .option("--branch <branch>", "Branch to use for context")
   .option("--time <time>", "Time to use for context")
   .option("--mode <mode>", "Mode for context assembly")
+  .option("--validate", "Run deterministic intent validation")
   .option("--json", "Output results in JSON format")
   .action(async (id, options) => {
     try {
