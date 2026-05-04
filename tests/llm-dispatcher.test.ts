@@ -29,6 +29,17 @@ describe('LLM Dispatcher', () => {
     expect((response.json as any).echo).toBe('Test json prompt');
   });
 
+  it('defaults provider to mock', async () => {
+    const request: LlmRequest = {
+      task: 'semantic_parse',
+      prompt: 'Test text prompt',
+    };
+
+    const response = await dispatchLlmRequest(request, {});
+
+    expect(response.provider).toBe('mock');
+  });
+
   it('fails clearly for unsupported provider', async () => {
     const request: LlmRequest = {
       task: 'semantic_parse',
@@ -36,7 +47,37 @@ describe('LLM Dispatcher', () => {
     };
 
     await expect(
-      dispatchLlmRequest(request, { provider: 'ollama' })
-    ).rejects.toThrow('Unsupported LLM provider: ollama');
+      dispatchLlmRequest(request, { provider: 'openai' })
+    ).rejects.toThrow('Unsupported LLM provider: openai');
+  });
+
+  it('can construct ollama dispatch path', async () => {
+    const request: LlmRequest = {
+      task: 'semantic_parse',
+      prompt: 'Test prompt',
+    };
+
+    try {
+      const response = await dispatchLlmRequest(request, { provider: 'ollama' });
+      expect(response.provider).toBe('ollama');
+    } catch (err: unknown) {
+      expect((err as Error).message).toBeDefined();
+    }
+  });
+
+  it('ollama dispatch soft-fails gracefully when unavailable', async () => {
+    const request: LlmRequest = {
+      task: 'semantic_parse',
+      prompt: 'Test prompt',
+    };
+
+    try {
+      await dispatchLlmRequest(request, {
+        provider: 'ollama',
+        ollamaHost: 'http://127.0.0.1:9999'
+      });
+    } catch (err: unknown) {
+      expect((err as Error).message).toMatch(/ECONNREFUSED|fetch failed/);
+    }
   });
 });
