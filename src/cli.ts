@@ -12,6 +12,8 @@ import { eventsTailCommand } from "./commands/events/tail.js";
 import { contextAssembleCommand } from "./commands/context/assemble.js";
 import { runPromptCommand } from "./commands/run/prompt.js";
 import { runContextCommand } from "./commands/run/context.js";
+import { modelDoctorCommand } from "./commands/model/doctor.js";
+import { modelListCommand } from "./commands/model/list.js";
 
 const program = new Command();
 
@@ -107,6 +109,37 @@ node
       await nodeShowCommand(id, options);
     } catch (err: unknown) {
       console.error(`✖ Error showing node: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+const modelCmd = program
+  .command("model")
+  .description("Manage Ontology LLM models.");
+
+modelCmd
+  .command("doctor")
+  .description("Diagnose the model runtime.")
+  .option("--json", "Output results in JSON format")
+  .action(async (options) => {
+    try {
+      await modelDoctorCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during model doctor: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+modelCmd
+  .command("list")
+  .description("Lists all available models.")
+  .option("--provider <provider>", "Filter models by provider")
+  .option("--json", "Output results in JSON format")
+  .action(async (options) => {
+    try {
+      await modelListCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error listing models: ${(err as Error).message}`);
       process.exit(1);
     }
   });
