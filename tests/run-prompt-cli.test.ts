@@ -72,11 +72,85 @@ describe("onto run prompt", () => {
       "--prompt",
       "Hello",
       "--provider",
-      "ollama",
+      "openai",
     ]);
 
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("Unsupported LLM provider: ollama");
+    expect(result.stderr).toContain("Unsupported LLM provider: openai");
+  });
+
+  it("onto run prompt --provider ollama soft-fails or returns response", () => {
+    const result = runCli([
+      "run",
+      "prompt",
+      "--task",
+      "semantic_parse",
+      "--prompt",
+      "Hello",
+      "--provider",
+      "ollama",
+    ]);
+
+    if (result.status === 0) {
+      expect(result.stdout).toContain("=== ONTOLOGY RUN PROMPT ===");
+      expect(result.stdout).toContain("Provider:  ollama");
+    } else {
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("✖ Ollama unavailable:");
+    }
+  });
+
+  it("onto run prompt --provider ollama --json soft-fails or returns parseable JSON", () => {
+    const result = runCli([
+      "run",
+      "prompt",
+      "--task",
+      "semantic_parse",
+      "--prompt",
+      "Hello",
+      "--provider",
+      "ollama",
+      "--json",
+    ]);
+
+    if (result.status === 0) {
+      const parsed = JSON.parse(result.stdout.trim());
+      expect(parsed.response.provider).toBe("ollama");
+    } else {
+      expect(result.status).toBe(1);
+      const parsed = JSON.parse(result.stdout.trim());
+      expect(parsed).toEqual({
+        ok: false,
+        provider: "ollama",
+        error: expect.any(String),
+      });
+    }
+  });
+
+  it("onto run prompt passes --model to dispatcher", () => {
+    const result = runCli([
+      "run",
+      "prompt",
+      "--task",
+      "semantic_parse",
+      "--prompt",
+      "Hello",
+      "--provider",
+      "ollama",
+      "--model",
+      "llama3:8b",
+      "--json"
+    ]);
+
+    if (result.status === 0) {
+      const parsed = JSON.parse(result.stdout.trim());
+      expect(parsed.response.model).toBe("llama3:8b");
+    } else {
+      expect(result.status).toBe(1);
+      const parsed = JSON.parse(result.stdout.trim());
+      expect(parsed.ok).toBe(false);
+      expect(parsed.provider).toBe("ollama");
+    }
   });
 
   it("onto run prompt requires task", () => {
