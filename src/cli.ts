@@ -11,6 +11,7 @@ import { nodeShowCommand } from "./commands/node/show.js";
 import { eventsTailCommand } from "./commands/events/tail.js";
 import { contextAssembleCommand } from "./commands/context/assemble.js";
 import { runPromptCommand } from "./commands/run/prompt.js";
+import { runContextCommand } from "./commands/run/context.js";
 
 const program = new Command();
 
@@ -151,6 +152,24 @@ contextCmd
 const run = program
   .command("run")
   .description("Run actions like prompts.");
+
+run
+  .command("context <id>")
+  .description("Run an LLM task against an assembled context.")
+  .option("--provider <provider>", "LLM provider to use")
+  .option("--task <task>", "Task to run")
+  .option("--branch <branch>", "Branch to use for context")
+  .option("--time <time>", "Time to use for context")
+  .option("--mode <mode>", "Mode for context assembly")
+  .option("--json", "Output results in JSON format")
+  .action(async (id, options) => {
+    try {
+      await runContextCommand(id, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error running context: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
 
 run
   .command("prompt")
