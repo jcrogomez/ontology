@@ -6,6 +6,8 @@ Ontology is currently in the **Bootstrap 0.2.x / Context + Mock Runtime Preparat
 
 ## Near-term tactical roadmap
 
+Current Operational Loop: `graph → context → mock LLM → deterministic validation`
+
 1. run prompt mock (completed)
 2. run context mock (completed)
 3. intent validator deterministic (completed)
@@ -17,7 +19,12 @@ Ontology is currently in the **Bootstrap 0.2.x / Context + Mock Runtime Preparat
 
 At this stage, Ontology is a verified network kernel and a node editor. The network is strictly modeled as a typed, temporal directed graph, and all mutations are tracked via an append-only event log.
 
-**Important Note:** The current kernel only supports structural growth. It **does not** yet parse prompts into abstract syntax trees (ASTs), execute external models, create typed edges between nodes, or compile code.
+**Known limitations:**
+- no Ollama real in CLI yet
+- no compiler
+- no PromptAST
+- no advanced SemanticLinker graph reasoning
+- no edge create/node link yet
 
 ## Next Phases
 
