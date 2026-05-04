@@ -1,6 +1,5 @@
 import { OntologyNode, OntologyEdge } from "../../schemas/ontology.js";
-import { loadNodeById, loadState } from "../../core/project/load.js";
-import { loadEdges } from "../graph/edges.js";
+import { loadNodeById, loadState, loadEdges } from "../../core/project/load.js";
 import { ContextAssemblyInput, ContextAssemblyOutput } from "./types.js";
 
 function cleanPrefix(text: string): string {
@@ -74,7 +73,7 @@ export function assembleContext(input: ContextAssemblyInput, cwd = process.cwd()
 
     const edges = loadEdges(cwd);
     const contextNodeIds = new Set(nodes.map(n => n.id));
-    const matchingEdges = edges.filter(e => allowedEdgeTypes.includes(e.type));
+    const matchingEdges = edges.filter((e: OntologyEdge) => allowedEdgeTypes.includes(e.type));
 
     const neighborIds = new Set<string>();
     const validEdges: OntologyEdge[] = [];
