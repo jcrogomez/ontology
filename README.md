@@ -14,9 +14,11 @@ Current maturity: Bootstrap 0.2.x / Context + Mock Runtime Preparation alpha ove
 
 ```bash
 onto init
+onto validate
 onto context assemble node_0000_canon
 onto run prompt --task semantic_parse --prompt "Hello" --provider mock
 onto run context node_0000_canon --provider mock
+onto run context node_0000_canon --provider mock --validate
 ```
 
 Bootstrap 0.2 introduces the ability to grow the network through controlled CLI mutations (specifically, creating semantic nodes).
