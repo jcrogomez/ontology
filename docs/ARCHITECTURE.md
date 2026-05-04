@@ -22,7 +22,7 @@ Observability in Ontology is strictly functional, terminal-first, and built into
 The LLM runtime handles the interface with external models.
 - **Isolation**: Housed strictly under `src/runtime/llm/`. It is entirely decoupled from the core structural graph commands (e.g., node creation).
 - **Safety**: Direct parsing of LLM outputs enforces robustness. All external model outputs are wrapped in `try/catch` blocks, re-throwing formatted errors that include raw content to assist with debugging.
-- **Current State**: While the runtime infrastructure exists to wrap and process external inputs safely, **real external model integration (like a functioning Ollama bridge) is Planned / Not yet implemented.**
+- **Current State**: The loop `graph → context → mock LLM → response` is complete and operational. Note that this loop currently operates strictly read-only and does not mutate the network or invoke real models yet. **Real external model integration (like a functioning Ollama bridge) is Planned / Not yet implemented.**
 
 ### 4. Context Assembler
 The Context Assembler is responsible for organizing the local graph state that bounds the constraints of a node.
