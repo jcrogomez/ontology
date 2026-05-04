@@ -71,10 +71,18 @@ This document outlines the available CLI commands across current Bootstrap phase
 - **Purpose:** Deterministically computes the local context for a specific node.
 - **Example:** `npm run dev -- context assemble <nodeId>` (or `npm run dev -- context assemble <nodeId> --json`)
 
+### `run prompt`
+
+- **Purpose:** Runs an LLM task directly with a given prompt.
+- **Example:** `npm run dev -- run prompt --task <task> --prompt <text> --provider mock` (or `npm run dev -- run prompt --task <task> --prompt <text> --provider mock --json`)
+
+### `run context`
+
+- **Purpose:** Runs an LLM task against an assembled context for a given node.
+- **Example:** `npm run dev -- run context <nodeId> --provider mock` (or `npm run dev -- run context <nodeId> --provider mock --json`)
+
 ## Planned Commands
 
 The following commands are *Planned / Not yet implemented*:
-- `run prompt`
-- `run context`
 - `model doctor`
 - `model list`

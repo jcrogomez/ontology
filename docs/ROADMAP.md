@@ -6,8 +6,8 @@ Ontology is currently in the **Bootstrap 0.2.x / Context + Mock Runtime Preparat
 
 ## Near-term tactical roadmap
 
-1. run prompt mock
-2. run context mock
+1. run prompt mock (completed)
+2. run context mock (completed)
 3. presheaf/gluing
 4. intent validator
 5. SemanticLinker
