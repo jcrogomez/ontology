@@ -2,6 +2,9 @@
 
 ## Phase: Alpha
 
+### Loop State
+`graph → context → mock LLM → deterministic validation`
+
 ### Progress
 
 - Kernel + observability
@@ -18,9 +21,8 @@
 
 ### Known limitations
 
-- no Ollama real yet
+- no Ollama real in CLI yet
 - no compiler
 - no PromptAST
-- no SemanticLinker advanced graph reasoning
+- no advanced SemanticLinker graph reasoning
 - no edge create/node link yet
-- context still mostly path-based unless edge-aware work has landed

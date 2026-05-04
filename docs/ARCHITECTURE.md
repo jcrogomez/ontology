@@ -24,6 +24,13 @@ The LLM runtime handles the interface with external models.
 - **Safety**: Direct parsing of LLM outputs enforces robustness. All external model outputs are wrapped in `try/catch` blocks, re-throwing formatted errors that include raw content to assist with debugging.
 - **Current State**: The loop `graph → context → mock LLM → deterministic validation` is complete and operational. Note that this loop currently operates strictly read-only and does not mutate the network or invoke real models yet. The deterministic validation includes the intent validator and presheaf/gluing pipeline as a minimal implementation. **Real external model integration (like a functioning Ollama bridge) is Planned / Not yet implemented.**
 
+**Known limitations:**
+- no Ollama real in CLI yet
+- no compiler
+- no PromptAST
+- no advanced SemanticLinker graph reasoning
+- no edge create/node link yet
+
 ### 4. Context Assembler
 The Context Assembler is responsible for organizing the local graph state that bounds the constraints of a node.
 - **Mechanism**: In Ontology, context is defined locally as a presheaf over graph neighborhoods. The assembler calculates "requires", "provides", "forbids", and "optional" relationships based on a node's topological position.

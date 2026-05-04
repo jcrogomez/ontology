@@ -1,4 +1,4 @@
-import { OntologyNode, OntologyEdge } from "../../schemas/ontology.js";
+import type { OntologyNode, OntologyEdge } from "../../schemas/ontology.js";
 import { loadNodeById, loadState, loadEdges } from "../../core/project/load.js";
 import { ContextAssemblyInput, ContextAssemblyOutput } from "./types.js";
 
