@@ -1,10 +1,12 @@
-import { OntologyNode } from "../../schemas/ontology.js";
+import { OntologyEdge, OntologyNode } from "../../schemas/ontology.js";
 
 export interface ContextAssemblyInput {
   targetNodeId: string;
   branch?: string;
   time?: number;
   mode?: "strict" | "compare" | "propose";
+  includeEdges?: boolean;
+  edgeTypes?: OntologyEdge["type"][];
 }
 
 export interface ContextAssemblyOutput {
@@ -15,4 +17,9 @@ export interface ContextAssemblyOutput {
   canon: string;
   constraints: string[];
   prompt: string;
+  warnings?: string[];
+  edgeContext?: {
+    edges: OntologyEdge[];
+    nodeIds: string[];
+  };
 }
