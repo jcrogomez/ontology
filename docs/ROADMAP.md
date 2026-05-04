@@ -8,8 +8,8 @@ Ontology is currently in the **Bootstrap 0.2.x / Context + Mock Runtime Preparat
 
 1. run prompt mock (completed)
 2. run context mock (completed)
-3. presheaf/gluing
-4. intent validator
+3. intent validator deterministic (completed)
+4. presheaf/gluing minimum (completed)
 5. SemanticLinker
 6. Ollama adapter
 7. PromptAST
