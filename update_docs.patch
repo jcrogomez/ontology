@@ -1,0 +1,22 @@
+--- docs/MODEL_RUNTIME.md
++++ docs/MODEL_RUNTIME.md
+@@ -10,6 +10,19 @@
+
+ The `LlmAdapter` is the fundamental interface for model execution. All model providers must implement this strict boundary. Adapters are responsible for taking an assembled context prompt and returning a deterministic response format containing the text output and optionally parsed JSON. Adapters must never mutate the `.ontology` graph; their sole responsibility is execution and transformation of the response.
+
++## Dispatcher Support (Multi-Provider)
++
++Currently, the `dispatchLlmRequest` router supports only the `mock` provider.
++Multi-provider support (specifically for `ollama`) is **Planned / Not yet implemented**. If a provider other than `mock` is requested, the dispatcher will throw an error: `Unsupported LLM provider: <provider>`.
++
++As a result, commands like `run prompt --provider ollama` and `run context --provider ollama` remain **Planned / Not yet implemented**.
++
++When implemented, the multi-provider dispatcher will support:
++- **mock**: deterministic and CI-safe (Implemented).
++- **ollama**: local model execution. Since Ollama is local and may not be available, failures must be handled explicitly and loudly (Planned).
++
++Regardless of the provider used, **provider execution must never mutate `.ontology`**. All execution is isolated from the semantic state.
++
+ ### Provider: mock
+
+ The `mock` provider is a crucial component of the Bootstrap runtime. It acts as a strictly deterministic, pure-function adapter that simulates model execution without external dependencies. It is heavily utilized during CI and deterministic validations. The mock provider never performs network calls and returns hardcoded, structurally valid outputs depending on the inputs provided.
