@@ -101,6 +101,53 @@ describe('Node Observability Commands', () => {
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining("canon"));
   });
 
+  it('nodeListCommand prevents column concatenation for long values', async () => {
+    // Create a node with long values that might concatenate
+    const ontologyDir = path.join(tmpDir, '.ontology');
+    const nodesDir = path.join(ontologyDir, 'nodes');
+
+    const mockLongNode: OntologyNode = {
+      id: "node_0001_long_id",
+      label: "Long Node Label",
+      kind: "definition",
+      status: "draft",
+      coordinates: {
+        abstraction: "domain",
+        time: 1,
+        branch: "main",
+        plane: "semantic",
+        manifestation: "intent"
+      },
+      inputs: [],
+      prompt: { variables: {}, language: "es" },
+      model: { ref: "mock_default" },
+      processors: { pre: [], post: [] },
+      context: { provides: [], requires: [], forbids: [], optional: [] },
+      graph: { parentId: "node_0000_canon", orbitOf: null },
+      rules: [],
+      technical: {},
+      outputs: { files: [] },
+      validation: { errors: [], warnings: [] },
+      integrity: {
+        frozen: false,
+        hash: "mock_hash_456",
+        schemaVersion: "0.1.0"
+      }
+    };
+
+    fs.writeFileSync(path.join(nodesDir, 'node_0001_long_id.json'), JSON.stringify(mockLongNode, null, 2));
+
+    await nodeListCommand();
+
+    const logCalls = vi.mocked(console.log).mock.calls;
+    const outputString = logCalls.map(args => args.join(' ')).join('\n');
+
+    // Test that 'definition' and 'draft' are not glued together
+    expect(outputString).toMatch(/definition\s+draft/);
+    // Test that 'draft' and 'domain' are not glued together
+    expect(outputString).toMatch(/draft\s+domain/);
+  });
+
   it('nodeListCommand json returns { nodes: [...] }', async () => {
     await nodeListCommand({ json: true });
 
