@@ -17,20 +17,22 @@ Current Operational Loop: `graph → context → mock LLM → deterministic vali
 7. PromptAST
 8. Compiler skeleton
 
-Completed:
+Implemented:
+- mock run prompt
+- dispatcher multi-provider
+
+Partially completed:
 - isolated Ollama adapter
 - model doctor/list
-- model observability
 
-Still planned:
-- dispatcher multi-provider
+Planned:
 - run prompt --provider ollama
 - run context --provider ollama
 
 At this stage, Ontology is a verified network kernel and a node editor. The network is strictly modeled as a typed, temporal directed graph, and all mutations are tracked via an append-only event log.
 
 **Known limitations:**
-- dispatcher multi-provider (Planned / Not yet implemented)
+- dispatcher multi-provider (Implemented)
 - run prompt --provider ollama (Planned / Not yet implemented)
 - run context --provider ollama (Planned / Not yet implemented)
 - no compiler

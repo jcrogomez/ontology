@@ -76,6 +76,20 @@ This document outlines the available CLI commands across current Bootstrap phase
 - **Purpose:** Runs an LLM task directly with a given prompt.
 - **Example:** `npm run dev -- run prompt --task <task> --prompt <text> --provider mock` (or `npm run dev -- run prompt --task <task> --prompt <text> --provider mock --json`)
 
+### Planned provider extension: Ollama
+*Planned / Not yet implemented*:
+```bash
+onto run prompt --task semantic_parse --prompt "Hello" --provider ollama --model llama3.1:8b
+onto run prompt --task semantic_parse --prompt "Hello" --provider ollama --ollama-host http://127.0.0.1:11434
+```
+**Notes:**
+- Ollama is local.
+- It may be unavailable.
+- It must fail gracefully without stack traces.
+- `--model` selects the local model.
+- `--ollama-host` selects the host.
+- `run prompt` must not read or mutate `.ontology`.
+
 ### `run context`
 
 - **Purpose:** Runs an LLM task against an assembled context for a given node.
