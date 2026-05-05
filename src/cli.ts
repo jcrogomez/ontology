@@ -18,6 +18,7 @@ import { runsShowCommand } from "./commands/runs/show.js";
 import { runsVerifyCommand } from "./commands/runs/verify.js";
 import { walkCommand } from "./commands/walk.js";
 import { proposeNodeCommand } from "./commands/proposal/propose-node.js";
+import { proposeLinkCommand } from "./commands/proposal/propose-link.js";
 import { proposalListCommand } from "./commands/proposal/list.js";
 import { proposalShowCommand } from "./commands/proposal/show.js";
 import { proposalRejectCommand } from "./commands/proposal/reject.js";
@@ -356,6 +357,28 @@ propose
   .action(async (options) => {
     try {
       await proposeNodeCommand(options);
+    } catch (err: unknown) {
+      if (options.json) {
+        console.log(JSON.stringify({ ok: false, error: errorMessage(err) }));
+      } else {
+        console.error(`✖ Error creating proposal: ${errorMessage(err)}`);
+      }
+      process.exit(1);
+    }
+  });
+
+propose
+  .command("link")
+  .description("Propose a typed semantic edge between two nodes. Writes a proposal record but does not mutate the graph.")
+  .requiredOption("--from <nodeId>", "Source node id")
+  .requiredOption("--to <nodeId>", "Target node id")
+  .requiredOption("--type <edgeType>", "Edge type (validated against EdgeTypeSchema)")
+  .option("--branch <branch>", "Optional branch (defaults to the active branch at apply time)")
+  .option("--rationale <text>", "Optional human-authored explanation of why")
+  .option("--json", "Output results in JSON format")
+  .action(async (options) => {
+    try {
+      await proposeLinkCommand(options);
     } catch (err: unknown) {
       if (options.json) {
         console.log(JSON.stringify({ ok: false, error: errorMessage(err) }));

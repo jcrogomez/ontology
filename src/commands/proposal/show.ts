@@ -31,6 +31,15 @@ export async function proposalShowCommand(id: string, options: ProposalShowOptio
     console.log(`  Label:        ${p.label ?? "(unset)"}`);
     console.log(`  Prompt:       ${p.prompt}`);
     console.log(`  Parent hash:  ${proposal.mutation.parentHash}`);
+  } else if (proposal.mutation.kind === "edge_create") {
+    const p = proposal.mutation.payload;
+    console.log(`Mutation (edge_create):`);
+    console.log(`  From:         ${p.from}`);
+    console.log(`  To:           ${p.to}`);
+    console.log(`  Type:         ${p.type}`);
+    console.log(`  Branch:       ${p.branch ?? "(active)"}`);
+    console.log(`  From hash:    ${proposal.mutation.fromHash}`);
+    console.log(`  To hash:      ${proposal.mutation.toHash}`);
   }
 
   console.log("");

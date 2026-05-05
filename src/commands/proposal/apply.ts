@@ -75,7 +75,11 @@ export async function proposalApplyCommand(id: string, options: ProposalApplyOpt
   console.log(`Proposal:      ${result.proposal.id}`);
   console.log(`Status:        ${result.proposal.status}`);
   console.log(`New hash:      ${result.proposal.hash}`);
-  console.log(`Created node:  ${result.createdEntityId}`);
+  // Label the created entity by mutation kind so an edge proposal does not
+  // claim "Created node: edge_xxxx" and confuse the human reader.
+  const createdLabel =
+    result.proposal.mutation.kind === "edge_create" ? "Created edge:" : "Created node:";
+  console.log(`${createdLabel}  ${result.createdEntityId}`);
   if (result.mutationEvent) {
     console.log(`Mutation evt:  ${result.mutationEvent.eventId}`);
   }

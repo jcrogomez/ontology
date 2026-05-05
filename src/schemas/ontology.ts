@@ -379,14 +379,24 @@ export const ProposalSourceSchema = z.object({
   model: z.string(),
 });
 
-// PR #92 (this bootstrap) supports only node_create. Edge_create and the
-// rest follow in subsequent PRs of the proposal system milestone.
+// node_create: propose adding a new node as a child of an existing parent.
+// parentHash pins the proposal to the parent's state at creation time.
 export const ProposalNodeCreatePayloadSchema = z.object({
   level: AbstractionLevelSchema,
   kind: NodeKindSchema,
   prompt: z.string(),
   label: z.string().nullable().default(null),
   parentNodeId: z.string().startsWith("node_"),
+});
+
+// edge_create: propose adding a typed edge between two existing nodes.
+// Both fromHash and toHash pin the proposal to both endpoints' state at
+// creation time, since a divergence in either invalidates the proposal.
+export const ProposalEdgeCreatePayloadSchema = z.object({
+  from: z.string().startsWith("node_"),
+  to: z.string().startsWith("node_"),
+  type: EdgeTypeSchema,
+  branch: z.string().nullable().default(null),
 });
 
 export const ProposalMutationSchema = z.discriminatedUnion("kind", [
@@ -397,6 +407,14 @@ export const ProposalMutationSchema = z.discriminatedUnion("kind", [
     // the proposal is applied so an out-of-band mutation invalidates the
     // proposal (staled state) instead of silently acting on stale assumptions.
     parentHash: z.string(),
+  }),
+  z.object({
+    kind: z.literal("edge_create"),
+    payload: ProposalEdgeCreatePayloadSchema,
+    // Both endpoints' hashes are captured at proposal time. Apply re-loads
+    // both nodes and stales the proposal if either has diverged.
+    fromHash: z.string(),
+    toHash: z.string(),
   }),
 ]);
 
@@ -434,6 +452,7 @@ export type Proposal = z.infer<typeof ProposalSchema>;
 export type ProposalSource = z.infer<typeof ProposalSourceSchema>;
 export type ProposalMutation = z.infer<typeof ProposalMutationSchema>;
 export type ProposalNodeCreatePayload = z.infer<typeof ProposalNodeCreatePayloadSchema>;
+export type ProposalEdgeCreatePayload = z.infer<typeof ProposalEdgeCreatePayloadSchema>;
 export type ProposalValidationSnapshot = z.infer<typeof ProposalValidationSnapshotSchema>;
 export type ProposalProvenance = z.infer<typeof ProposalProvenanceSchema>;
 export type ProposalStatus = z.infer<typeof ProposalStatusSchema>;

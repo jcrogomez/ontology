@@ -1,6 +1,6 @@
 # RFC: Proposal System
 
-**Status:** Bootstrap 0.5 complete — PR #92 + #93 + #94 + #95 shipped. Schema, storage, full lifecycle (`propose`, `list/show/reject`, `apply` with `parentHash` re-validation and stale detection), four lifecycle events (`proposal_created`, `proposal_rejected`, `proposal_applied`, `proposal_staled`), and run-driven proposals via `run prompt --as-proposal` / `run context --as-proposal`.
+**Status:** Bootstrap 0.5 complete + PR #96 (edge proposals). Schema (with both `node_create` and `edge_create` mutation variants), storage, full lifecycle (`propose node`, `propose link`, `list/show/reject`, `apply` with endpoint-hash re-validation and stale detection), four lifecycle events (`proposal_created`, `proposal_rejected`, `proposal_applied`, `proposal_staled`), and run-driven node proposals via `run prompt --as-proposal` / `run context --as-proposal`.
 **Bootstrap target:** 0.5
 **Depends on:** `docs/RUN_PERSISTENCE.md`
 **Date:** 2026-05-05
