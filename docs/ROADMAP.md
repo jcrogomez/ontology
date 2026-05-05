@@ -30,6 +30,10 @@ Implemented:
 
 Planned:
 - run context --include-edges (project edge context into LLM run)
+- Walker v0 (read-only focal-cell terminal interface, see `docs/WALKER_INTERFACE.md`)
+- Poset enforcement (validate edge directions against the abstraction order)
+- Run persistence (`.ontology/runs/`, content-addressed)
+- Proposal system (see `docs/PROPOSAL_SYSTEM.md`)
 - edge-aware SemanticLinker
 - PromptAST
 - compiler
@@ -57,14 +61,24 @@ The roadmap outlines a progressive build-up towards a fully functioning semantic
 ### Bootstrap 0.5: Presets and Stack Nodes
 - Introduce predefined stack configurations and standard node presets to bootstrap projects faster.
 
-### Bootstrap 0.6: Map and Slice
-- Implement advanced topology mapping and neighborhood slicing tools.
+### Bootstrap 0.4: Walker v0 + Poset Enforcement
+- Walker v0: focal-cell terminal interface, color by abstraction level, cross-node concept underlining, arrow + TAB/T/B/M navigation. Read-only. See `docs/WALKER_INTERFACE.md`.
+- Poset enforcement: validator rejects edges whose direction violates the partial order.
+
+### Bootstrap 0.5: Run Persistence + Proposal System
+- Run persistence: `.ontology/runs/run_<id>.json` with content-addressed hashes for prompt, context, and output.
+- Proposal system: typed candidate mutations derived from runs, applied explicitly, with optimistic concurrency via `parentHash`. See `docs/PROPOSAL_SYSTEM.md`.
+
+### Bootstrap 0.6: Map and Slice + Walker v1
+- Graph query CLI (`graph neighbors`, `graph path`, `graph subgraph`).
+- Walker v1: edit mode, `:propose`, `:run`, `:compile --plan`.
 
 ### Bootstrap 0.7: PromptAST
 - Parse natural language prompts into structural Abstract Syntax Trees (AST) as formal rewrite rules.
 
-### Bootstrap 0.8: Minimal Compiler
-- Introduce the first foundational compilation passes from intention to executable artifacts.
+### Bootstrap 0.8: Minimal Compiler + Walker v2
+- Compiler skeleton: topology-driven traversal, structure-preserving functor over `inherits_from`/`depends_on`/`refines`/`implements`/`uses_token`.
+- Walker v2: full pipeline cockpit, proposal review pane, `:compile`.
 
 ---
 
