@@ -171,6 +171,17 @@ This document outlines the available CLI commands across current Bootstrap phase
 - **Example:** `npm run dev -- proposal reject proposal_0001 --reason "duplicate of existing node"` (or `... --json`).
 - **Constraints:** Refuses unless the current status is `pending`. The proposal directory and event log together preserve the full lifecycle history; the events log is the source of truth for transitions.
 
+### `run prompt --as-proposal` and `run context --as-proposal` *(Bootstrap 0.5, PR #95)*
+
+- **Purpose:** Wrap the model's response into a typed candidate node mutation. Auto-implies `--persist` so the proposal can pin itself to a `runId` for full audit provenance.
+- **Run prompt example:** `npm run dev -- run prompt --task semantic_parse --prompt "Design a harvest entity" --provider mock --as-proposal --proposal-level domain --proposal-kind entity`
+- **Run context example:** `npm run dev -- run context node_0001 --provider mock --as-proposal --proposal-level workflow --proposal-kind action --validate`
+- **Required with `--as-proposal`:** `--proposal-level <level>`, `--proposal-kind <kind>`.
+- **Optional:** `--proposal-parent <nodeId>` (defaults: root canon for `run prompt`, focal node for `run context`), `--proposal-label <label>`, `--proposal-rationale <text>`.
+- **What lands on disk:** the persisted run record (`.ontology/runs/run_<id>.json`), the proposal record (`.ontology/proposals/proposal_<id>.json` with `source.runId` populated), and two events (`run_persisted`, `proposal_created`).
+- **What does not land:** no graph mutation. The proposal lives in `pending` status. To realize it, run `onto proposal apply <id>` — that produces a `node_created` event whose `payload.sourceProposalId` and `payload.sourceRunId` (via the proposal record) trace the new node back to the model run that generated it.
+- **Validation:** when `--validate` is set on `run context --as-proposal`, the validation snapshot is stored inside the proposal record so an audit can read the validation result that was current at proposal time, even if the kernel changes later.
+
 ### `proposal apply <id>` *(Bootstrap 0.5, PR #94)*
 
 - **Purpose:** Translate a pending proposal into a real graph mutation. Re-validates `parentHash` against the parent node's current integrity hash; if they diverge, the proposal is transitioned to `staled` and refused (no graph mutation occurs). Otherwise the underlying mutation (e.g. `node_create`) is dispatched, the proposal is transitioned to `applied`, and both `node_created` and `proposal_applied` events are appended to the temporal log.
@@ -196,9 +207,9 @@ This document outlines the available CLI commands across current Bootstrap phase
 
 The following commands are *Planned / Not yet implemented*:
 
-### Proposal System (next PRs)
+### Proposal System (next steps, beyond Bootstrap 0.5)
 - `onto propose link` (typed candidate edge mutation)
-- `--as-proposal` integration with `run prompt` / `run context` (PR #95)
+- Edge-aware SemanticLinker (consume the proposal's edges in compilation)
 
 ### Walker v1
 - `onto walk` edit mode, `:run`, `:propose`, `:compile --plan`

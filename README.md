@@ -52,7 +52,9 @@ That separation buys three things:
 | `onto context assemble` | Compute the local context for a node (parent path; optionally edge-aware with `--include-edges`). |
 | `onto run prompt` | Send a free-form prompt to a model (mock or local Ollama). |
 | `onto run context` | Send the assembled context for a node to a model. Optionally `--validate` and `--persist`. |
+| `onto run prompt --as-proposal` / `onto run context --as-proposal` | Same as above, but wrap the model's response into a typed candidate node mutation (a proposal). |
 | `onto runs list / show / verify` | Inspect persisted run records (content-addressed, audit-friendly). |
+| `onto propose node`, `onto proposal list / show / apply / reject` | The proposal lifecycle: typed candidate mutations applied or rejected explicitly. Models speak; the user commits. |
 | `onto walk <id>` | **Open the Walker**: an interactive focal-cell terminal interface. Read-only in v0. |
 | `onto inspect`, `onto validate`, `onto events tail`, `onto model doctor`, ... | Observability primitives. |
 
@@ -82,8 +84,16 @@ If you want to **contribute or extend**:
 
 ## Status
 
-**Bootstrap 0.2.x → 0.4 in progress.** Version `0.2.0-alpha.1`. The kernel is hardened; node creation, edges, edge-aware context, mock + Ollama runtimes, deterministic validation, content-addressed run persistence, and the read-only Walker v0 are all implemented and tested.
+**Bootstrap 0.5 complete.** Version `0.2.0-alpha.1`. The kernel is hardened; node creation, edges, edge-aware context, mock + Ollama runtimes, deterministic validation, content-addressed run persistence, the read-only Walker v0, poset enforcement, and the full Proposal System (propose → list/show/reject → apply with parentHash re-validation, plus `run prompt --as-proposal` / `run context --as-proposal` for run-driven proposals) are all implemented and tested.
 
-Next on the runway: `run context --include-edges` (project edge context into the LLM run), the Proposal System (typed candidate mutations applied explicitly), and Walker v1 (edit mode, `:propose`, `:run`, `:compile --plan`).
+The canonical loop now runs end-to-end:
+
+```
+graph state + typed context + model → run_persisted → proposal_created → user reviews → proposal_applied → node_created
+```
+
+Every step is in the append-only events log; every node can be traced back to the model run that proposed it.
+
+Next on the runway: Walker v1 (edit mode, `:propose`, `:run`, `:compile --plan`), `onto propose link` (edge_create proposals), and the edge-aware SemanticLinker.
 
 Ontology is alpha-quality. The append-only log is single-writer (CLI single-shot); concurrent writes from multiple processes are not yet protected. Everything else is meant to fail loudly and exit `1` rather than silently corrupt.

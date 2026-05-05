@@ -233,6 +233,12 @@ run
   .option("--include-edges", "Include edge-aware context in the assembled prompt")
   .option("--edge-types <types>", "Comma-separated edge types to include (requires --include-edges)")
   .option("--persist", "Persist this run as a content-addressed record under .ontology/runs/")
+  .option("--as-proposal", "Wrap the model's response into a typed candidate proposal (auto-implies --persist)")
+  .option("--proposal-level <level>", "Required with --as-proposal: abstraction level for the proposed node")
+  .option("--proposal-kind <kind>", "Required with --as-proposal: semantic kind for the proposed node")
+  .option("--proposal-parent <nodeId>", "Optional with --as-proposal: parent node id (defaults to the focal node)")
+  .option("--proposal-label <label>", "Optional with --as-proposal: human label for the proposed node")
+  .option("--proposal-rationale <text>", "Optional with --as-proposal: rationale recorded in the proposal's provenance")
   .option("--json", "Output results in JSON format")
   .action(async (id, options) => {
     try {
@@ -252,6 +258,12 @@ run
   .option("--model <model>", "Model to use for the selected LLM provider")
   .option("--ollama-host <host>", "Host for Ollama provider")
   .option("--persist", "Persist this run as a content-addressed record under .ontology/runs/")
+  .option("--as-proposal", "Wrap the model's response into a typed candidate proposal (auto-implies --persist)")
+  .option("--proposal-level <level>", "Required with --as-proposal: abstraction level for the proposed node")
+  .option("--proposal-kind <kind>", "Required with --as-proposal: semantic kind for the proposed node")
+  .option("--proposal-parent <nodeId>", "Optional with --as-proposal: parent node id (defaults to root canon)")
+  .option("--proposal-label <label>", "Optional with --as-proposal: human label for the proposed node")
+  .option("--proposal-rationale <text>", "Optional with --as-proposal: rationale recorded in the proposal's provenance")
   .option("--json", "Output results in JSON format")
   .action(async (options) => {
     if (!options.task) {
