@@ -1,6 +1,6 @@
 # RFC: Proposal System
 
-**Status:** PR #92 + PR #93 shipped — schema, storage, `onto propose node`, `onto proposal list/show/reject`, and the `proposal_created` / `proposal_rejected` events. Apply (PR #94) and run-driven proposals (PR #95) still pending.
+**Status:** PR #92 + #93 + #94 shipped — schema, storage, the full lifecycle (`propose`, `list/show/reject`, `apply` with `parentHash` re-validation and stale detection), and four lifecycle events (`proposal_created`, `proposal_rejected`, `proposal_applied`, `proposal_staled`). Run-driven proposals (PR #95) still pending.
 **Bootstrap target:** 0.5
 **Depends on:** `docs/RUN_PERSISTENCE.md`
 **Date:** 2026-05-05

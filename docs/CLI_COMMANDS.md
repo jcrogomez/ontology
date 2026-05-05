@@ -171,6 +171,19 @@ This document outlines the available CLI commands across current Bootstrap phase
 - **Example:** `npm run dev -- proposal reject proposal_0001 --reason "duplicate of existing node"` (or `... --json`).
 - **Constraints:** Refuses unless the current status is `pending`. The proposal directory and event log together preserve the full lifecycle history; the events log is the source of truth for transitions.
 
+### `proposal apply <id>` *(Bootstrap 0.5, PR #94)*
+
+- **Purpose:** Translate a pending proposal into a real graph mutation. Re-validates `parentHash` against the parent node's current integrity hash; if they diverge, the proposal is transitioned to `staled` and refused (no graph mutation occurs). Otherwise the underlying mutation (e.g. `node_create`) is dispatched, the proposal is transitioned to `applied`, and both `node_created` and `proposal_applied` events are appended to the temporal log.
+- **Example:** `npm run dev -- proposal apply proposal_0001` (or `... --json`).
+- **Dry run:** `npm run dev -- proposal apply proposal_0001 --dry-run` — validates without writing anything; reports whether the proposal would apply, would stale, or would fail.
+- **Failure modes (each exits 1 and reports `kind` in JSON):**
+  - `not_found` — the id is unknown
+  - `not_pending` — the proposal is already applied / rejected / staled
+  - `missing_parent` — the parent node referenced by the proposal disappeared
+  - `stale` — parent hash diverged; the proposal is now `staled` (real run) or `pending` still (dry-run)
+  - `mutation_failed` — the underlying graph mutation threw
+- **Audit chain:** the resulting `node_created` event carries `sourceProposalId` in its payload; the `proposal_applied` event carries `resultingNodeId`, `resultingEventId`, `oldHash`, and `newHash`. An audit can trace any node back to the proposal that produced it (and the model run that generated the proposal, once PR #95 lands).
+
 ### Model Observability
 - `onto model doctor`
 - `onto model doctor --json`
@@ -185,7 +198,6 @@ The following commands are *Planned / Not yet implemented*:
 
 ### Proposal System (next PRs)
 - `onto propose link` (typed candidate edge mutation)
-- `onto proposal apply` with `parentHash` re-validation (PR #94)
 - `--as-proposal` integration with `run prompt` / `run context` (PR #95)
 
 ### Walker v1

@@ -34,10 +34,10 @@ Implemented:
 - poset enforcement on refinement-family edges (`refines`, `inherits_from`, `implements`, `belongs_to`) at link time and retroactively in `onto validate`
 - proposal system: schema + storage + `onto propose node` + `proposal_created` event (Bootstrap 0.5, PR #92)
 - proposal system: `onto proposal list / show / reject` + `proposal_rejected` event (Bootstrap 0.5, PR #93)
+- proposal system: `onto proposal apply` (with `--dry-run`) + parentHash re-validation + stale detection + `proposal_applied` / `proposal_staled` events (Bootstrap 0.5, PR #94)
 - semantic linker skeleton
 
 Planned (Proposal System milestone):
-- `onto proposal apply` with `parentHash` re-validation (PR #94)
 - run-driven proposals: `run prompt --as-proposal` / `run context --as-proposal` (PR #95)
 - `onto propose link` (edge_create proposals)
 
@@ -80,7 +80,7 @@ In progress, shipped as a chain of small PRs:
 
 - **PR #92** ✓ — Schema, storage, `onto propose node`, `proposal_created` event. Pending status only.
 - **PR #93** ✓ — `onto proposal list / show / reject` + `proposal_rejected` event with old/new hash audit chain.
-- **PR #94** — `onto proposal apply` with `parentHash` re-validation. Translates a pending proposal into a real `node_create` mutation iff the parent has not changed.
+- **PR #94** ✓ — `onto proposal apply` (with `--dry-run`), `parentHash` re-validation, stale detection, `proposal_applied` / `proposal_staled` events. The proposal lifecycle is now total and replayable end to end.
 - **PR #95** — Integration with `run prompt` / `run context`: an `--as-proposal` flag that turns a model run into a proposal in one step.
 
 See `docs/PROPOSAL_SYSTEM.md` for the full design.

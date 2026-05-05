@@ -31,6 +31,7 @@
 - Poset enforcement on refinement-family edges (link-time + retroactive in `onto validate`)
 - Proposal system Bootstrap 0.5 PR #92: `onto propose node`, schema, storage, `proposal_created` event
 - Proposal system Bootstrap 0.5 PR #93: `onto proposal list / show / reject`, `proposal_rejected` event with old/new hash audit chain
+- Proposal system Bootstrap 0.5 PR #94: `onto proposal apply` (with `--dry-run`), `parentHash` re-validation, stale detection, `proposal_applied` and `proposal_staled` events. Apply translates a pending proposal into a real `node_create` mutation iff the parent has not changed; otherwise the proposal transitions to `staled`. The resulting `node_created` event carries `sourceProposalId` so any node can be traced back to the proposal that produced it.
 
 ### Known limitations
 

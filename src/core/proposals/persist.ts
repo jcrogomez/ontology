@@ -16,18 +16,20 @@ import { hashObject } from "../integrity/hash.js";
 import { getOntologyPaths } from "../project/paths.js";
 import { appendJsonl, ensureDir, writeJson } from "../fs/json.js";
 import { readState, writeState } from "../state/state-store.js";
+import { loadNodeById } from "../project/load.js";
+import { createNode } from "../nodes/create-node.js";
 
 // Proposal persistence module.
 //
 // PR #92 — schema + storage + onto propose node + proposal_created event.
-// PR #93 (this) — list / show / reject helpers + proposal_rejected event.
+// PR #93 — list / show / reject helpers + proposal_rejected event.
+// PR #94 (this) — apply lifecycle: parentHash re-validation, stale detection,
+//                 atomic translation into a real graph mutation, and the
+//                 proposal_applied / proposal_staled events.
 //
 // The proposal file represents *current* status. When a transition fires,
 // the file is rewritten with a new body hash and the event log carries
 // both the old hash and the new hash so the audit chain stays intact.
-//
-// Apply (pending → applied) and stale (pending → staled) lifecycle
-// transitions land in PR #94.
 
 export interface CreateProposalOptions {
   mutation: ProposalMutation;
@@ -221,6 +223,228 @@ export function rejectProposal(
       reason: options.reason ?? null,
       oldHash,
       newHash,
+    },
+  });
+  appendJsonl(paths.eventsPath, event);
+
+  state.eventCount += 1;
+  state.lastEventId = eventId;
+  state.updatedAt = new Date().toISOString();
+  writeState(state);
+
+  return { proposal: updated, event };
+}
+
+// ----- apply (pending → applied) and stale (pending → staled) -----
+
+export interface ApplyProposalOptions {
+  cwd?: string;
+  // Dry-run: validate everything (parent exists, hash matches, mutation is
+  // dispatchable) but do not write anything to disk.
+  dryRun?: boolean;
+}
+
+export type ApplyProposalResult =
+  | {
+      ok: true;
+      proposal: Proposal;
+      proposalEvent: OntologyEvent;
+      // The graph mutation event triggered by the apply (e.g. node_created).
+      // Absent in dry-run.
+      mutationEvent: OntologyEvent | null;
+      // The id of the entity created by the mutation (e.g. the new node id).
+      // Absent in dry-run.
+      createdEntityId: string | null;
+      cached?: never;
+      dryRun: boolean;
+    }
+  | {
+      ok: false;
+      // Why the apply could not proceed. The kernel transitions the proposal
+      // to "staled" iff `kind === "stale"`; other failures leave the proposal
+      // pending so the user can fix the dependency and retry.
+      kind: "not_found" | "not_pending" | "missing_parent" | "stale" | "mutation_failed";
+      message: string;
+      // Populated when kind === "stale": the proposal record AFTER its
+      // status was rewritten to "staled".
+      proposal?: Proposal;
+      proposalEvent?: OntologyEvent;
+    };
+
+// Apply translates a pending proposal into a real graph mutation. The four
+// failure modes are total and explicit:
+//
+//   not_found       — the proposal id does not exist
+//   not_pending     — the proposal is already applied / rejected / staled
+//   missing_parent  — the parent node referenced by the proposal disappeared
+//   stale           — the parent node exists but its integrity hash no longer
+//                     matches the parentHash captured at proposal creation;
+//                     the proposal is transitioned to "staled" and the event
+//                     log records the divergence
+//   mutation_failed — the underlying graph mutation (createNode) threw
+//
+// Only the happy path actually mutates the graph. The kernel never calls
+// createNode without first proving the dependency snapshot is still valid.
+export function applyProposal(
+  id: string,
+  options: ApplyProposalOptions = {},
+): ApplyProposalResult {
+  const cwd = options.cwd ?? process.cwd();
+  const paths = getOntologyPaths(cwd);
+  const dryRun = !!options.dryRun;
+
+  const current = loadProposal(id, cwd);
+  if (!current) {
+    return { ok: false, kind: "not_found", message: `Proposal not found: ${id}` };
+  }
+  if (current.status !== "pending") {
+    return {
+      ok: false,
+      kind: "not_pending",
+      message: `Proposal ${id} cannot be applied: status is "${current.status}". Only pending proposals can be applied.`,
+    };
+  }
+
+  // Re-load the parent node and compare its current hash against the
+  // parentHash captured when the proposal was created. If they diverge,
+  // the dependency mutated out-of-band and we transition to staled.
+  if (current.mutation.kind !== "node_create") {
+    return {
+      ok: false,
+      kind: "mutation_failed",
+      message: `Unsupported proposal mutation kind: ${(current.mutation as { kind: string }).kind}`,
+    };
+  }
+
+  const parentNodeId = current.mutation.payload.parentNodeId;
+  const parentNode = loadNodeById(parentNodeId, cwd);
+  if (!parentNode) {
+    return {
+      ok: false,
+      kind: "missing_parent",
+      message: `Parent node referenced by proposal no longer exists: ${parentNodeId}`,
+    };
+  }
+
+  if (parentNode.integrity.hash !== current.mutation.parentHash) {
+    if (dryRun) {
+      return {
+        ok: false,
+        kind: "stale",
+        message:
+          `Proposal ${id} is stale: parent ${parentNodeId} hash changed since proposal creation ` +
+          `(expected ${current.mutation.parentHash}, found ${parentNode.integrity.hash}).`,
+      };
+    }
+    // Non-dry: transition to staled and emit proposal_staled.
+    const result = transitionProposal(id, current, "staled", {
+      reason: "parent_hash_diverged",
+      parentNodeId,
+      expectedParentHash: current.mutation.parentHash,
+      actualParentHash: parentNode.integrity.hash,
+    }, cwd, "proposal_staled");
+    return {
+      ok: false,
+      kind: "stale",
+      message:
+        `Proposal ${id} marked staled: parent ${parentNodeId} hash diverged ` +
+        `(expected ${current.mutation.parentHash}, found ${parentNode.integrity.hash}).`,
+      proposal: result.proposal,
+      proposalEvent: result.event,
+    };
+  }
+
+  // Hashes agree. The proposal can be applied.
+  if (dryRun) {
+    return {
+      ok: true,
+      proposal: current,
+      proposalEvent: null as unknown as OntologyEvent, // not used in dry-run
+      mutationEvent: null,
+      createdEntityId: null,
+      dryRun: true,
+    };
+  }
+
+  // Translate the proposal into a real mutation. The kernel back-references
+  // the source proposal so the resulting node_created event carries provenance.
+  let nodeResult;
+  try {
+    nodeResult = createNode({
+      level: current.mutation.payload.level,
+      kind: current.mutation.payload.kind,
+      prompt: current.mutation.payload.prompt,
+      label: current.mutation.payload.label ?? undefined,
+      parentNodeId: current.mutation.payload.parentNodeId,
+      eventMetadata: { sourceProposalId: id },
+    });
+  } catch (err: unknown) {
+    return {
+      ok: false,
+      kind: "mutation_failed",
+      message: `Mutation failed during apply: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  // Mark the proposal applied. The proposal_applied event carries old/new
+  // hash AND the resulting node id + event id, so an audit can trace any
+  // node back to the proposal that produced it.
+  const result = transitionProposal(id, current, "applied", {
+    resultingNodeId: nodeResult.node.id,
+    resultingEventId: nodeResult.event.eventId,
+  }, cwd, "proposal_applied");
+
+  return {
+    ok: true,
+    proposal: result.proposal,
+    proposalEvent: result.event,
+    mutationEvent: nodeResult.event,
+    createdEntityId: nodeResult.node.id,
+    dryRun: false,
+  };
+}
+
+// Internal helper used by apply (and re-usable by future transitions). Rewrites
+// the proposal file with a new status + new hash, and appends a single event
+// to events.jsonl that carries both old and new hashes plus extra context.
+function transitionProposal(
+  id: string,
+  current: Proposal,
+  to: Proposal["status"],
+  extraPayload: Record<string, unknown>,
+  cwd: string,
+  eventType: "proposal_applied" | "proposal_staled",
+): { proposal: Proposal; event: OntologyEvent } {
+  const paths = getOntologyPaths(cwd);
+
+  const oldHash = current.hash;
+  const recordWithoutHash: Omit<Proposal, "hash"> = {
+    id: current.id,
+    createdAt: current.createdAt,
+    status: to,
+    source: current.source,
+    mutation: current.mutation,
+    validation: current.validation,
+    provenance: current.provenance,
+  };
+  const newHash = computeProposalHash(recordWithoutHash);
+  const updated = ProposalSchema.parse({ ...recordWithoutHash, hash: newHash });
+  writeJson(proposalPath(id, cwd), updated);
+
+  const state = readState();
+  const eventId = "evt_" + randomBytes(4).toString("hex");
+  const event = OntologyEventSchema.parse({
+    eventId,
+    sequence: state.eventCount,
+    timestamp: new Date().toISOString(),
+    eventType,
+    branch: state.activeBranch,
+    previousEventId: state.lastEventId,
+    payload: {
+      proposalId: id,
+      oldHash,
+      newHash,
+      ...extraPayload,
     },
   });
   appendJsonl(paths.eventsPath, event);
