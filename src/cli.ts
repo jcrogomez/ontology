@@ -8,6 +8,7 @@ import { inspectCommand } from "./commands/inspect.js";
 import { createNodeCommand } from "./commands/node/create.js";
 import { nodeListCommand } from "./commands/node/list.js";
 import { nodeShowCommand } from "./commands/node/show.js";
+import { nodeLinkCommand } from "./commands/node/link.js";
 import { eventsTailCommand } from "./commands/events/tail.js";
 import { contextAssembleCommand } from "./commands/context/assemble.js";
 import { runPromptCommand } from "./commands/run/prompt.js";
@@ -113,6 +114,26 @@ node
     }
   });
 
+
+node
+  .command("link")
+  .description("Create a typed semantic edge between two nodes.")
+  .requiredOption("--from <nodeId>", "Source node ID")
+  .requiredOption("--to <nodeId>", "Target node ID")
+  .requiredOption("--type <edgeType>", "Type of the semantic edge")
+  .option("--json", "Output results in JSON format")
+  .action(async (options) => {
+    try {
+      await nodeLinkCommand(options);
+    } catch (err: unknown) {
+      if (options.json) {
+        console.log(JSON.stringify({ ok: false, error: (err as Error).message }));
+      } else {
+        console.error(`✖ Error linking nodes: ${(err as Error).message}`);
+      }
+      process.exit(1);
+    }
+  });
 const modelCmd = program
   .command("model")
   .description("Manage Ontology LLM models.");
