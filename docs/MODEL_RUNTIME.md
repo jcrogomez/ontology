@@ -27,7 +27,14 @@ The `mock` provider is a crucial component of the Bootstrap runtime. It acts as 
 
 ### Provider: ollama (Isolated Adapter)
 
-The `ollama` provider acts as the bridge to local Ollama deployments. Currently implemented as an isolated adapter, it communicates with the local Ollama API to execute prompts. If the local Ollama service is unavailable, the adapter fails loud and throws an exception rather than silently falling back.
+The `ollama` provider acts as the bridge to local Ollama deployments. Currently implemented as an isolated adapter, it communicates with the local Ollama API to execute prompts.
+
+**Key constraints and planned capabilities for Ollama execution:**
+- **Local Availability:** Ollama is local and may be unavailable.
+- **Graceful Failure:** The command must fail gracefully if Ollama is not running.
+- **Model Selection:** The `--model` flag permits selecting a specific local model.
+- **Host Selection:** The `--ollama-host` flag allows selecting a specific host for the Ollama connection.
+- **Read-Only / No Mutation:** Executing `run prompt` with Ollama must not read from or mutate `.ontology`. All executions remain purely read-only and side-effect free concerning the semantic state.
 
 ### dispatchLlmRequest
 
