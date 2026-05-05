@@ -21,6 +21,7 @@ import { proposeNodeCommand } from "./commands/proposal/propose-node.js";
 import { proposalListCommand } from "./commands/proposal/list.js";
 import { proposalShowCommand } from "./commands/proposal/show.js";
 import { proposalRejectCommand } from "./commands/proposal/reject.js";
+import { proposalApplyCommand } from "./commands/proposal/apply.js";
 import { modelDoctorCommand } from "./commands/model/doctor.js";
 import { modelListCommand } from "./commands/model/list.js";
 import { errorMessage } from "./core/errors.js";
@@ -397,6 +398,24 @@ proposal
         console.log(JSON.stringify({ ok: false, error: errorMessage(err) }));
       } else {
         console.error(`✖ Error rejecting proposal: ${errorMessage(err)}`);
+      }
+      process.exit(1);
+    }
+  });
+
+proposal
+  .command("apply <id>")
+  .description("Translate a pending proposal into a real graph mutation, after re-validating its parentHash. Stale proposals (parent changed since creation) are transitioned to staled and refused.")
+  .option("--dry-run", "Validate the proposal without writing anything")
+  .option("--json", "Output results in JSON format")
+  .action(async (id, options) => {
+    try {
+      await proposalApplyCommand(id, options);
+    } catch (err: unknown) {
+      if (options.json) {
+        console.log(JSON.stringify({ ok: false, error: errorMessage(err) }));
+      } else {
+        console.error(`✖ Error applying proposal: ${errorMessage(err)}`);
       }
       process.exit(1);
     }

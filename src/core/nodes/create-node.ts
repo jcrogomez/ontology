@@ -20,6 +20,15 @@ export interface CreateNodeOptions {
   kind: z.infer<typeof NodeKindSchema>;
   prompt: string;
   label?: string;
+  // Optional explicit parent. Defaults to the project root canon, which is what
+  // `onto node create` uses today. Proposal apply (Bootstrap 0.5 PR #94) passes
+  // the parent recorded in the proposal so the resulting node lands where the
+  // proposal said it would.
+  parentNodeId?: string;
+  // Optional event metadata. Proposal apply records the source proposalId here
+  // so the temporal log carries the back-reference from the resulting
+  // node_created event to the proposal that triggered it.
+  eventMetadata?: Record<string, unknown>;
 }
 
 export function createNode(options: CreateNodeOptions): { node: OntologyNode; event: OntologyEvent } {
@@ -30,6 +39,7 @@ export function createNode(options: CreateNodeOptions): { node: OntologyNode; ev
   const eventId = "evt_" + randomBytes(4).toString("hex");
 
   const computedLabel = options.label || options.prompt.trim().slice(0, 64);
+  const parentId = options.parentNodeId ?? state.rootNodeId;
 
   const nodeWithoutHash = {
     id: nodeId,
@@ -69,7 +79,7 @@ export function createNode(options: CreateNodeOptions): { node: OntologyNode; ev
       optional: []
     },
     graph: {
-      parentId: state.rootNodeId,
+      parentId,
       orbitOf: null
     },
     rules: [],
@@ -108,7 +118,8 @@ export function createNode(options: CreateNodeOptions): { node: OntologyNode; ev
       nodeId,
       level: options.level,
       kind: options.kind,
-      prompt: options.prompt
+      prompt: options.prompt,
+      ...(options.eventMetadata ?? {})
     }
   });
 
