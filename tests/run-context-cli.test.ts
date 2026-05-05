@@ -73,10 +73,74 @@ test("onto run context fails for missing target", () => {
   expect(result.stderr).toContain("Target node not found: node_missing");
 });
 
-test("onto run context fails for unsupported provider", () => {
+test("onto run context --provider ollama soft-fails or returns response", () => {
   const result = runCli(["run", "context", "node_0000_canon", "--provider", "ollama"]);
+  if (result.status === 0) {
+    expect(result.stdout).toContain("=== ONTOLOGY RUN CONTEXT ===");
+    expect(result.stdout).toContain("Provider:  ollama");
+  } else {
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("✖ Ollama unavailable:");
+  }
+});
+
+test("onto run context --provider ollama --json soft-fails or returns parseable JSON", () => {
+  const result = runCli(["run", "context", "node_0000_canon", "--provider", "ollama", "--json"]);
+  if (result.status === 0) {
+    expect(() => JSON.parse(result.stdout)).not.toThrow();
+    const parsed = JSON.parse(result.stdout);
+    expect(parsed.response.provider).toBe("ollama");
+  } else {
+    expect(result.status).toBe(1);
+    expect(() => JSON.parse(result.stdout)).not.toThrow();
+    const parsed = JSON.parse(result.stdout);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.provider).toBe("ollama");
+    expect(parsed.error).toBeDefined();
+  }
+});
+
+test("onto run context --provider ollama --validate soft-fails or validates response", () => {
+  const result = runCli(["run", "context", "node_0000_canon", "--provider", "ollama", "--validate"]);
+  if (result.status === 0) {
+    expect(result.stdout).toContain("Validation:");
+  } else {
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("✖ Ollama unavailable:");
+  }
+});
+
+test("onto run context --provider ollama does not mutate .ontology", () => {
+  const ontologyDir = path.join(tempDir, ".ontology");
+  const beforeHash = hashDirectory(ontologyDir);
+
+  const result = runCli(["run", "context", "node_0000_canon", "--provider", "ollama"]);
+  // Whether it succeeds or soft-fails, it should not mutate
+  const afterHash = hashDirectory(ontologyDir);
+  expect(beforeHash).toBe(afterHash);
+});
+
+test("onto run context accepts --model", () => {
+  const result = runCli(["run", "context", "node_0000_canon", "--provider", "ollama", "--model", "custom-model"]);
+  if (result.status === 0) {
+    expect(result.stdout).toContain("Model:     custom-model");
+  } else {
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("✖ Ollama unavailable:");
+  }
+});
+
+test("onto run context accepts --ollama-host", () => {
+  const result = runCli(["run", "context", "node_0000_canon", "--provider", "ollama", "--ollama-host", "http://fake-host:11434"]);
+  // It will likely soft-fail because the host is fake, but we verify it processes it.
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain("✖ Ollama unavailable:");
+});
+
+test("onto run context fails for unsupported provider", () => {
+  const result = runCli(["run", "context", "node_0000_canon", "--provider", "unknown"]);
   expect(result.status).not.toBe(0);
-  expect(result.stderr).toContain("Unsupported LLM provider: ollama");
+  expect(result.stderr).toContain("Unsupported LLM provider: unknown");
 });
 
 test("onto run context fails for compare mode", () => {

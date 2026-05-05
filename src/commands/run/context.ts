@@ -13,6 +13,8 @@ export interface RunContextOptions {
   mode?: string;
   json?: boolean;
   validate?: boolean;
+  model?: string;
+  ollamaHost?: string;
 }
 
 export async function runContextCommand(id: string, options: RunContextOptions) {
@@ -24,7 +26,7 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
   const isJson = !!options.json;
   const isValidate = !!options.validate;
 
-  if (provider !== "mock") {
+  if (provider !== "mock" && provider !== "ollama") {
     throw new Error(`Unsupported LLM provider: ${provider}`);
   }
 
@@ -35,14 +37,33 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
     mode,
   });
 
-  const llmResponse = await dispatchLlmRequest(
-    {
-      task,
-      prompt: contextOutput.prompt,
-      json: isJson,
-    },
-    { provider: provider as LlmProvider }
-  );
+  let llmResponse;
+  try {
+    llmResponse = await dispatchLlmRequest(
+      {
+        task,
+        prompt: contextOutput.prompt,
+        json: isJson,
+      },
+      {
+        provider: provider as LlmProvider,
+        defaultModel: options.model,
+        ollamaHost: options.ollamaHost,
+      }
+    );
+  } catch (err: unknown) {
+    if (provider === "ollama") {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      if (isJson) {
+        console.log(JSON.stringify({ ok: false, provider: "ollama", error: errorMessage }, null, 2));
+      } else {
+        console.error(`✖ Ollama unavailable: ${errorMessage}`);
+      }
+      process.exit(1);
+    } else {
+      throw err;
+    }
+  }
 
   let validationResult: IntentValidationResult | undefined;
   if (isValidate) {
