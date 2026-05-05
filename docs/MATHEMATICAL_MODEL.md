@@ -18,9 +18,10 @@
 ## 3. Abstraction Poset
 
 - Nodes live in a partially ordered abstraction space.
-- Canon, project, target, stack, architecture, domain, workflow, interface, unit, token and artifact are abstraction coordinates.
+- Canon, project, target, stack, architecture, domain, workflow, interface, unit, token and artifact are abstraction coordinates, totally ordered top → bottom.
 - Higher abstraction nodes constrain lower abstraction nodes.
 - Lower nodes may refine but not mutate higher nodes.
+- The four refinement-family edges (`refines`, `inherits_from`, `implements`, `belongs_to`) carry direction semantics consistent with this axiom: they must climb toward more abstraction (source level ≤ target level in concreteness, i.e. source is at or below target in the poset). Inversions are rejected at link time and detected retroactively by `onto validate`. Other edge types remain direction-agnostic.
 
 ## 4. Prompt Rewriting
 

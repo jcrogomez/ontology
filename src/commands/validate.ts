@@ -4,6 +4,7 @@ import { getOntologyPaths } from "../core/project/paths.js";
 import { readJson, readJsonl } from "../core/fs/json.js";
 import { hashObject, removeIntegrityHash } from "../core/integrity/hash.js";
 import { errorMessage } from "../core/errors.js";
+import { validateEdgeDirection } from "../runtime/graph/poset.js";
 import {
   OntologyStateSchema,
   OntologyNodeSchema,
@@ -259,6 +260,10 @@ export async function validateCommand(): Promise<void> {
   const validEdges: OntologyEdge[] = [];
   const corruptEdgeLines: CorruptLine[] = [];
 
+  // Build a node-id → abstraction-level lookup so the poset check below can
+  // run without re-loading nodes from disk.
+  const nodeAbstractionById = new Map(validNodes.map(n => [n.id, n.coordinates.abstraction]));
+
   if (fs.existsSync(paths.edgesPath)) {
     const content = fs.readFileSync(paths.edgesPath, "utf-8");
     const lines = content.split("\n");
@@ -281,6 +286,23 @@ export async function validateCommand(): Promise<void> {
         const computedHash = hashObject(edgeWithoutHash);
         if (computedHash !== edge.integrity.hash) {
            reportError(`Hash mismatch in edge ${edge.edgeId}`);
+        }
+
+        // Poset enforcement: a refinement-family edge that was hand-edited or
+        // imported from a malformed source can violate axiom 3 even if its
+        // hash and references look valid. Re-run the same check that
+        // `node link` enforces preventively.
+        const sourceLevel = nodeAbstractionById.get(edge.from);
+        const targetLevel = nodeAbstractionById.get(edge.to);
+        if (sourceLevel && targetLevel) {
+          const direction = validateEdgeDirection({
+            sourceLevel,
+            targetLevel,
+            edgeType: edge.type,
+          });
+          if (!direction.ok) {
+            reportError(`Edge ${edge.edgeId} violates abstraction poset: ${direction.reason}`);
+          }
         }
 
         validEdges.push(edge);

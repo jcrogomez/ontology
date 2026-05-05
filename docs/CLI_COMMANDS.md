@@ -69,7 +69,10 @@ This document outlines the available CLI commands across current Bootstrap phase
   - `.ontology/edges.jsonl` (Appends the typed edge)
   - `.ontology/events.jsonl` (Appends an `edge_created` event)
   - `.ontology/state.json` (Updates summary counters and timestamp)
-- **What it does not do:** It does not project edges into assembled context yet (`context assemble --include-edges` is planned). It does not delete or modify existing edges.
+- **Validation at link time:**
+  - Self-loops (`from === to`) are rejected.
+  - The four refinement-family edges (`refines`, `inherits_from`, `implements`, `belongs_to`) must climb the abstraction poset; an inversion (e.g. `canon refines domain`) is rejected with `✖ Edge type ... points against the abstraction poset`. Other edge types are direction-agnostic.
+- **What it does not do:** It does not delete or modify existing edges.
 
 ### `events tail`
 

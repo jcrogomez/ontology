@@ -2,8 +2,9 @@ import * as crypto from "node:crypto";
 import { loadNodeById, loadState, loadEdges, assertOntologyProject } from "../../core/project/load.js";
 import { getOntologyPaths } from "../../core/project/paths.js";
 import { appendJsonl, writeJson } from "../../core/fs/json.js";
-import { hashObject, removeIntegrityHash } from "../../core/integrity/hash.js";
+import { hashObject } from "../../core/integrity/hash.js";
 import { EdgeTypeSchema, OntologyEdgeSchema, OntologyEventSchema, OntologyStateSchema, OntologySchemaVersion } from "../../schemas/ontology.js";
+import { validateEdgeDirection } from "../../runtime/graph/poset.js";
 import { z } from "zod";
 
 export interface NodeLinkCommandOptions {
@@ -63,6 +64,20 @@ export async function nodeLinkCommand(options: NodeLinkCommandOptions): Promise<
   } catch (error) {
     handleError(`Invalid edge type: "${options.type}". Expected one of: ${EdgeTypeSchema.options.join(", ")}`);
     return;
+  }
+
+  // Reject inversions of the abstraction poset for refinement-family edges.
+  // The check is preventive here; `onto validate` re-runs it across all
+  // edges so existing graphs cannot drift into an invalid state silently.
+  // fromNode and toNode are guaranteed defined past their handleError checks
+  // because handleError process.exit(1)s before falling through.
+  const directionResult = validateEdgeDirection({
+    sourceLevel: fromNode!.coordinates.abstraction,
+    targetLevel: toNode!.coordinates.abstraction,
+    edgeType,
+  });
+  if (!directionResult.ok) {
+    handleError(directionResult.reason);
   }
 
   // Check for duplicates

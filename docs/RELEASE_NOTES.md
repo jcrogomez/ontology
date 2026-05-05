@@ -23,7 +23,7 @@
 - run prompt --persist / run context --persist (content-addressed run records, cache by deterministic id)
 - runs list / runs show / runs verify (audit primitives over `.ontology/runs/`)
 - model doctor / model list
-- node create / node list / node show / node link (with self-loop rejection and unique-edge dedup)
+- node create / node list / node show / node link (with self-loop rejection, unique-edge dedup, and poset direction enforcement on refinement-family edges)
 - context assemble --include-edges (edge-aware context, with --edge-types filter)
 - Walker v0 (read-only focal-cell terminal interface, color by abstraction, presheaf-overlap underlining)
 - Cycle detection in parent-pointer walks (assembler + walker)
@@ -33,7 +33,7 @@
 
 - run context --include-edges does not yet support persistence-of-cached behavior across edge-types filter changes (works correctly; just noting the cache key includes the filter)
 - SemanticLinker is a skeleton (no edge-aware graph reasoning yet)
-- Poset enforcement on edge directions is not yet implemented
+- Poset enforcement covers refinement-family edges (`refines`, `inherits_from`, `implements`, `belongs_to`); other edges remain direction-agnostic
 - no PromptAST
 - no compiler
 - no Visual DAG Studio
