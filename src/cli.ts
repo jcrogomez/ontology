@@ -13,6 +13,9 @@ import { eventsTailCommand } from "./commands/events/tail.js";
 import { contextAssembleCommand } from "./commands/context/assemble.js";
 import { runPromptCommand } from "./commands/run/prompt.js";
 import { runContextCommand } from "./commands/run/context.js";
+import { runsListCommand } from "./commands/runs/list.js";
+import { runsShowCommand } from "./commands/runs/show.js";
+import { runsVerifyCommand } from "./commands/runs/verify.js";
 import { modelDoctorCommand } from "./commands/model/doctor.js";
 import { modelListCommand } from "./commands/model/list.js";
 
@@ -220,6 +223,7 @@ run
   .option("--validate", "Run deterministic intent validation")
   .option("--model <model>", "Model to use for the selected LLM provider")
   .option("--ollama-host <host>", "Host for Ollama provider")
+  .option("--persist", "Persist this run as a content-addressed record under .ontology/runs/")
   .option("--json", "Output results in JSON format")
   .action(async (id, options) => {
     try {
@@ -238,6 +242,7 @@ run
   .option("--provider <provider>", "LLM provider to use")
   .option("--model <model>", "Model to use for the selected LLM provider")
   .option("--ollama-host <host>", "Host for Ollama provider")
+  .option("--persist", "Persist this run as a content-addressed record under .ontology/runs/")
   .option("--json", "Output results in JSON format")
   .action(async (options) => {
     if (!options.task) {
@@ -253,6 +258,50 @@ run
       await runPromptCommand(options);
     } catch (err: unknown) {
       console.error(`✖ Error running prompt: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+const runs = program
+  .command("runs")
+  .description("Inspect persisted run records (.ontology/runs/).");
+
+runs
+  .command("list")
+  .description("List persisted runs.")
+  .option("--kind <kind>", "Filter by kind: prompt or context")
+  .option("--json", "Output results in JSON format")
+  .action(async (options) => {
+    try {
+      await runsListCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error listing runs: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+runs
+  .command("show <id>")
+  .description("Show a persisted run record.")
+  .option("--json", "Output results in JSON format")
+  .action(async (id, options) => {
+    try {
+      await runsShowCommand(id, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error showing run: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+runs
+  .command("verify <id>")
+  .description("Recompute the deterministic id and body hash of a persisted run and report any divergence.")
+  .option("--json", "Output results in JSON format")
+  .action(async (id, options) => {
+    try {
+      await runsVerifyCommand(id, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error verifying run: ${(err as Error).message}`);
       process.exit(1);
     }
   });

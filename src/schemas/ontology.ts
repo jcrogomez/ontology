@@ -245,6 +245,7 @@ export const OntologyEventSchema = z.object({
     "preset_applied",
     "validation_run",
     "compilation_run",
+    "run_persisted",
   ]),
   branch: z.string().default("main"),
   previousEventId: z.string().nullable().default(null),
@@ -298,6 +299,66 @@ export const OntologyProcessorSchema = z.object({
 });
 
 export type OntologyProcessor = z.infer<typeof OntologyProcessorSchema>;
+
+// LLM provider enum, kept aligned with `src/runtime/llm/types.ts` LlmProvider union.
+// Schemas use this when a provider is part of an auditable record.
+export const LlmProviderSchema = z.enum([
+  "mock",
+  "ollama",
+  "openai",
+  "anthropic",
+  "local",
+]);
+
+// Persisted run records live under `.ontology/runs/run_<id>.json`.
+// Two structurally identical runs share the same id (content-addressed).
+// See docs/RUN_PERSISTENCE.md for the full RFC.
+export const PersistedRunInputSchema = z.object({
+  promptHash: z.string().startsWith("prompt:hash:"),
+  contextHash: z.string().startsWith("ctx:hash:").nullable().default(null),
+  targetNodeId: z.string().nullable().default(null),
+  branch: z.string().nullable().default(null),
+  time: z.number().int().min(0).nullable().default(null),
+  task: z.string(),
+  includeEdges: z.boolean().default(false),
+  edgeTypes: z.array(EdgeTypeSchema).nullable().default(null),
+});
+
+export const PersistedRunModelSchema = z.object({
+  provider: LlmProviderSchema,
+  model: z.string(),
+  host: z.string().nullable().default(null),
+});
+
+export const PersistedRunOutputSchema = z.object({
+  text: z.string(),
+  parsed: z.unknown().nullable().default(null),
+});
+
+export const PersistedRunValidationSchema = z.object({
+  ok: z.boolean(),
+  score: z.number(),
+  violations: z.array(z.string()).default([]),
+  warnings: z.array(z.string()).default([]),
+});
+
+export const PersistedRunSchema = z.object({
+  id: z.string().startsWith("run_"),
+  createdAt: z.number().int().min(0),
+  kind: z.enum(["prompt", "context"]),
+  input: PersistedRunInputSchema,
+  model: PersistedRunModelSchema,
+  output: PersistedRunOutputSchema,
+  validation: PersistedRunValidationSchema.nullable().default(null),
+  duration_ms: z.number().int().min(0),
+  hash: z.string().startsWith("run:hash:"),
+});
+
+export type PersistedRun = z.infer<typeof PersistedRunSchema>;
+export type PersistedRunInput = z.infer<typeof PersistedRunInputSchema>;
+export type PersistedRunModel = z.infer<typeof PersistedRunModelSchema>;
+export type PersistedRunOutput = z.infer<typeof PersistedRunOutputSchema>;
+export type PersistedRunValidation = z.infer<typeof PersistedRunValidationSchema>;
 
 // Bootstrap boundary:
 // State provides high-level metrics for quick inspection without graph traversal.

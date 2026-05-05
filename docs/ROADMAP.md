@@ -26,13 +26,13 @@ Implemented:
 - model doctor/list
 - node link (typed semantic edge creation)
 - context assemble --include-edges (edge-aware context, with --edge-types filter)
+- run persistence (`.ontology/runs/`, content-addressed; `--persist`, `runs list/show/verify`)
 - semantic linker skeleton
 
 Planned:
 - run context --include-edges (project edge context into LLM run)
 - Walker v0 (read-only focal-cell terminal interface, see `docs/WALKER_INTERFACE.md`)
 - Poset enforcement (validate edge directions against the abstraction order)
-- Run persistence (`.ontology/runs/`, content-addressed)
 - Proposal system (see `docs/PROPOSAL_SYSTEM.md`)
 - edge-aware SemanticLinker
 - PromptAST
@@ -65,9 +65,10 @@ The roadmap outlines a progressive build-up towards a fully functioning semantic
 - Walker v0: focal-cell terminal interface, color by abstraction level, cross-node concept underlining, arrow + TAB/T/B/M navigation. Read-only. See `docs/WALKER_INTERFACE.md`.
 - Poset enforcement: validator rejects edges whose direction violates the partial order.
 
-### Bootstrap 0.5: Run Persistence + Proposal System
-- Run persistence: `.ontology/runs/run_<id>.json` with content-addressed hashes for prompt, context, and output. See `docs/RUN_PERSISTENCE.md`.
-- Proposal system: typed candidate mutations derived from runs, applied explicitly, with optimistic concurrency via `parentHash`. See `docs/PROPOSAL_SYSTEM.md`.
+### Bootstrap 0.5: Proposal System
+- Proposal system: typed candidate mutations derived from persisted runs, applied explicitly, with optimistic concurrency via `parentHash`. See `docs/PROPOSAL_SYSTEM.md`.
+
+(Run persistence shipped early as part of Bootstrap 0.4 because it is a small, low-risk prerequisite that unblocks both proposal provenance and the walker's `:run` mode.)
 
 ### Bootstrap 0.6: Map and Slice + Walker v1
 - Graph query CLI (`graph neighbors`, `graph path`, `graph subgraph`).

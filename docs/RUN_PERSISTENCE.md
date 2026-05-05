@@ -1,7 +1,7 @@
 # RFC: Run Persistence
 
-**Status:** Draft (RFC, not yet implemented)
-**Bootstrap target:** 0.5 (alongside Proposal System)
+**Status:** Implemented (Bootstrap 0.4)
+**Bootstrap target:** 0.4 (shipped early as prerequisite for Proposal System)
 **Required by:** Proposal System (RFC), Walker `:run` mode (RFC)
 **Date:** 2026-05-05
 
