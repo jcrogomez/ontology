@@ -105,6 +105,32 @@ This document outlines the available CLI commands across current Bootstrap phase
 - **Purpose:** Runs an LLM task against an assembled context and strictly validates the response via the intentional validation pipeline.
 - **Example:** `npm run dev -- run context <nodeId> --provider mock --validate`
 
+### `run prompt --persist` and `run context --persist`
+
+- **Purpose:** Persist the run as a content-addressed record under `.ontology/runs/`. Two structurally identical runs share the same id; the second invocation reads the cached record and reports `(cached)` instead of re-dispatching.
+- **Example:** `npm run dev -- run prompt --task semantic_parse --prompt "Hello" --provider mock --persist`
+- **Example:** `npm run dev -- run context <nodeId> --provider mock --persist --validate`
+- **Files Touched:**
+  - `.ontology/runs/run_<id>.json` (Creates the persisted run record)
+  - `.ontology/events.jsonl` (Appends a `run_persisted` event)
+  - `.ontology/state.json` (Updates summary counters)
+- **Notes:** Without `--persist`, runs remain ephemeral. See `docs/RUN_PERSISTENCE.md`.
+
+### `runs list`
+
+- **Purpose:** List persisted run records.
+- **Example:** `npm run dev -- runs list` (or `... --json`, `... --kind prompt`, `... --kind context`)
+
+### `runs show <runId>`
+
+- **Purpose:** Display a single persisted run record.
+- **Example:** `npm run dev -- runs show run_ef9dd6aa` (or `... --json`)
+
+### `runs verify <runId>`
+
+- **Purpose:** Recompute the deterministic id and body hash of a persisted run and report any divergence. Read-only audit primitive.
+- **Example:** `npm run dev -- runs verify run_ef9dd6aa` (or `... --json`). Exits non-zero on mismatch.
+
 ### Model Observability
 - `onto model doctor`
 - `onto model doctor --json`

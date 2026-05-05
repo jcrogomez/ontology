@@ -4,6 +4,9 @@ import { buildFragment } from "../../runtime/context/presheaf.js";
 import { glueFragments } from "../../runtime/context/gluing.js";
 import { validateIntent, type IntentValidationResult } from "../../runtime/context/intent-validator.js";
 import type { LlmTask, LlmProvider } from "../../runtime/llm/types.js";
+import { hashPrompt, hashContext } from "../../core/integrity/hash.js";
+import { createPersistedRun, computeRunId, loadPersistedRun } from "../../core/runs/persist.js";
+import type { PersistedRunInput, PersistedRunModel } from "../../schemas/ontology.js";
 
 export interface RunContextOptions {
   provider?: string;
@@ -15,6 +18,7 @@ export interface RunContextOptions {
   validate?: boolean;
   model?: string;
   ollamaHost?: string;
+  persist?: boolean;
 }
 
 export async function runContextCommand(id: string, options: RunContextOptions) {
@@ -25,6 +29,7 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
   const time = options.time ? parseInt(options.time, 10) : undefined;
   const isJson = !!options.json;
   const isValidate = !!options.validate;
+  const isPersist = !!options.persist;
 
   if (provider !== "mock" && provider !== "ollama") {
     throw new Error(`Unsupported LLM provider: ${provider}`);
@@ -37,8 +42,47 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
     mode,
   });
 
+  // Build deterministic envelopes up front so we can detect cache hits before dispatch
+  // when --persist is on.
+  const runInput: PersistedRunInput = {
+    promptHash: hashPrompt(contextOutput.prompt),
+    contextHash: hashContext(contextOutput),
+    targetNodeId: id,
+    branch: contextOutput.branch,
+    time: time ?? null,
+    task: task as string,
+    includeEdges: false,
+    edgeTypes: null,
+  };
+  const runModel: PersistedRunModel = {
+    provider: provider as LlmProvider,
+    model: options.model ?? (provider === "mock" ? "mock_default" : "unknown"),
+    host: options.ollamaHost ?? null,
+  };
+
+  if (isPersist) {
+    const expectedId = computeRunId(runInput, runModel);
+    const cached = loadPersistedRun(expectedId);
+    if (cached) {
+      emitRunContextOutput({
+        contextOutput,
+        responseText: cached.output.text,
+        responseModel: cached.model.model,
+        responseProvider: cached.model.provider,
+        task,
+        provider,
+        validation: cached.validation ?? undefined,
+        isJson,
+        isValidate,
+        persisted: { runId: cached.id, cached: true },
+      });
+      return;
+    }
+  }
+
   let llmResponse;
   try {
+    const start = Date.now();
     llmResponse = await dispatchLlmRequest(
       {
         task,
@@ -51,6 +95,7 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
         ollamaHost: options.ollamaHost,
       }
     );
+    (llmResponse as any).__durationMs = Date.now() - start;
   } catch (err: unknown) {
     if (provider === "ollama") {
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -80,52 +125,124 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
     });
   }
 
+  let persistedInfo: { runId: string; cached: boolean } | undefined;
+  if (isPersist) {
+    const finalModel: PersistedRunModel = { ...runModel, model: llmResponse.model };
+    const durationMs = (llmResponse as any).__durationMs ?? 0;
+    const { run, cached } = createPersistedRun({
+      kind: "context",
+      input: runInput,
+      model: finalModel,
+      output: { text: llmResponse.text, parsed: null },
+      validation: validationResult
+        ? {
+            ok: validationResult.ok,
+            score: validationResult.score,
+            violations: validationResult.violations,
+            warnings: validationResult.warnings,
+          }
+        : null,
+      durationMs,
+    });
+    persistedInfo = { runId: run.id, cached };
+  }
+
+  emitRunContextOutput({
+    contextOutput,
+    responseText: llmResponse.text,
+    responseModel: llmResponse.model,
+    responseProvider: llmResponse.provider,
+    task,
+    provider,
+    validation: validationResult,
+    isJson,
+    isValidate,
+    persisted: persistedInfo,
+  });
+}
+
+interface EmitRunContextOutputOptions {
+  contextOutput: ReturnType<typeof assembleContext>;
+  responseText: string;
+  responseModel: string;
+  responseProvider: LlmProvider;
+  task: LlmTask;
+  provider: string;
+  validation: IntentValidationResult | { ok: boolean; score: number; violations: string[]; warnings: string[] } | undefined;
+  isJson: boolean;
+  isValidate: boolean;
+  persisted: { runId: string; cached: boolean } | undefined;
+}
+
+function emitRunContextOutput(opts: EmitRunContextOutputOptions): void {
+  const {
+    contextOutput,
+    responseText,
+    responseModel,
+    responseProvider,
+    task,
+    provider,
+    validation,
+    isJson,
+    isValidate,
+    persisted,
+  } = opts;
+
   if (isJson) {
-    const output: any = {
+    const output: Record<string, unknown> = {
       context: contextOutput,
       response: {
-        text: llmResponse.text,
-        model: llmResponse.model,
-        provider: llmResponse.provider,
+        text: responseText,
+        model: responseModel,
+        provider: responseProvider,
       },
     };
 
-    if (isValidate && validationResult) {
+    if (isValidate && validation) {
       output.validation = {
-        ok: validationResult.ok,
-        score: validationResult.score,
-        violations: validationResult.violations,
-        warnings: validationResult.warnings,
+        ok: validation.ok,
+        score: validation.score,
+        violations: validation.violations,
+        warnings: validation.warnings,
       };
     }
 
+    if (persisted) {
+      output.persisted = { runId: persisted.runId, cached: persisted.cached };
+    }
+
     console.log(JSON.stringify(output, null, 2));
-  } else {
-    let truncatedText = llmResponse.text;
-    if (truncatedText.length > 500) {
-      truncatedText = truncatedText.substring(0, 500) + "...";
-    }
+    return;
+  }
 
-    console.log(`=== ONTOLOGY RUN CONTEXT ===`);
-    console.log(`Target:    ${contextOutput.targetNodeId}`);
-    console.log(`Task:      ${task}`);
-    console.log(`Provider:  ${provider}`);
-    console.log(`Model:     ${llmResponse.model}`);
-    console.log(``);
-    console.log(`Context:`);
-    console.log(`  Mode:    ${contextOutput.mode}`);
-    console.log(`  Branch:  ${contextOutput.branch}`);
-    console.log(`  Nodes:   ${contextOutput.nodes.length}`);
-    console.log(``);
-    console.log(`Response:\n${truncatedText}`);
+  let truncatedText = responseText;
+  if (truncatedText.length > 500) {
+    truncatedText = truncatedText.substring(0, 500) + "...";
+  }
 
-    if (isValidate && validationResult) {
-      console.log(``);
-      console.log(`Validation:`);
-      console.log(`  OK:       ${validationResult.ok}`);
-      console.log(`  Score:    ${validationResult.score}`);
-      console.log(`  Warnings: ${validationResult.warnings.length}`);
-      console.log(`  Violations: ${validationResult.violations.length}`);
-    }
+  console.log(`=== ONTOLOGY RUN CONTEXT ===`);
+  console.log(`Target:    ${contextOutput.targetNodeId}`);
+  console.log(`Task:      ${task}`);
+  console.log(`Provider:  ${provider}`);
+  console.log(`Model:     ${responseModel}`);
+  if (persisted) {
+    const tag = persisted.cached ? " (cached)" : "";
+    console.log(`Run:       ${persisted.runId}${tag}`);
+  }
+  console.log(``);
+  console.log(`Context:`);
+  console.log(`  Mode:    ${contextOutput.mode}`);
+  console.log(`  Branch:  ${contextOutput.branch}`);
+  console.log(`  Nodes:   ${contextOutput.nodes.length}`);
+  console.log(``);
+  console.log(`Response:\n${truncatedText}`);
+
+  if (isValidate && validation) {
+    console.log(``);
+    console.log(`Validation:`);
+    console.log(`  OK:       ${validation.ok}`);
+    console.log(`  Score:    ${validation.score}`);
+    console.log(`  Warnings: ${validation.warnings.length}`);
+    console.log(`  Violations: ${validation.violations.length}`);
   }
 }
