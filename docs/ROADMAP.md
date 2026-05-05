@@ -38,11 +38,11 @@ Implemented:
   - PR #94 — `onto proposal apply` (with `--dry-run`) + parentHash re-validation + stale detection + `proposal_applied` / `proposal_staled` events.
   - PR #95 — `run prompt --as-proposal` and `run context --as-proposal`: model runs become typed candidate proposals with full provenance back to the persisted run.
 - proposal system (post-0.5): `onto propose link` for edge_create proposals (PR #96). Mutation schema is now a discriminated union with both `node_create` and `edge_create` variants; both are applicable, both stale on endpoint divergence.
-- semantic linker skeleton
+- semantic linker (post-0.5, PR #97): edge-aware. Accepts `includeEdges` and `edgeTypes` so the gluing pool now includes neighbor nodes brought in via typed edges. A focal `requires` can be satisfied by an edge neighbor's `provides`; an edge neighbor's `provides` can trigger a focal `forbids`. The provider field is now Zod-parsed instead of any-cast.
 
 Planned (post-Bootstrap 0.5):
-- edge-aware SemanticLinker
-- run-driven edge proposals (`run prompt --as-proposal --proposal-mutation edge_create` or similar)
+- run-driven edge proposals (`run prompt --as-proposal` with edge target)
+- CLI surface for the semantic linker (`onto link <nodeId>` or similar)
 
 Planned (later):
 - Walker v1 (edit mode, :propose, :run, :compile --plan)

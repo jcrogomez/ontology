@@ -30,17 +30,20 @@ The LLM runtime handles the interface with external models.
 - dispatcher multi-provider
 - run prompt --provider ollama
 - run context --provider ollama
+- run context --include-edges (with --edge-types filter)
+- run context --persist (content-addressed run records)
+- run prompt / run context --as-proposal (model runs become typed candidate proposals)
 - model doctor/list
 - model observability
-- node link (typed semantic edge creation)
+- node link (typed semantic edge creation, with self-loop rejection and poset enforcement)
 - context assemble --include-edges (edge-aware context, with --edge-types filter)
-- semantic linker skeleton
+- semantic linker (edge-aware: passes includeEdges/edgeTypes through to the assembler so neighbor nodes contribute to the gluing pool)
+- proposal system (full lifecycle: propose node / propose link / list / show / apply with parentHash + endpoint hash re-validation / reject / staled)
 
 **Known limitations:**
-- run context --include-edges (Planned / Not yet implemented)
 - no compiler
 - no PromptAST
-- no edge-aware SemanticLinker graph reasoning (skeleton only)
+- semantic linker is exposed only as a programmatic API; no CLI surface yet
 
 ### 4. Context Assembler
 The Context Assembler is responsible for organizing the local graph state that bounds the constraints of a node.
@@ -63,8 +66,8 @@ The Context Assembler is responsible for organizing the local graph state that b
 
 To maintain absolute clarity on the current state of the architecture, the following modules are **Planned / Not yet implemented**:
 
-- **Edge-aware Execution**: `context assemble --include-edges` is implemented and projects typed edges into an `edgeContext` block. The next planned step is wiring the same projection into `run context --include-edges` so LLM runs can consume the edge-aware context.
-- **SemanticLinker**: Skeleton implemented, edge-aware advanced features planned to automatically bind context and dependencies across the network.
+- **Edge-aware Execution**: `context assemble --include-edges`, `run context --include-edges`, and `semanticLink({ includeEdges: true })` all project typed edges into an `edgeContext` block consumed by the gluing and validation pipelines.
+- **SemanticLinker**: edge-aware. The programmatic linker now walks the focal node's local neighborhood (parent path + edge neighbors filtered by `edgeTypes`), glues the presheaf fragments, and validates a candidate response. A focal `requires` can be satisfied by an edge neighbor's `provides`; a forbidden token introduced by an edge neighbor triggers a `forbidden_match`. CLI exposure of the linker is future work.
 - **PromptAST**: Planned. Prompts are still stored as raw intention text and are not parsed into rewrite rules.
 - **Compiler**: Planned to transform the `.ontology` graph into executable code artifacts. Currently, Ontology does not generate code.
 - **Visual DAG Studio**: Planned web-based UI.
