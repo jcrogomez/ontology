@@ -143,6 +143,18 @@ This document outlines the available CLI commands across current Bootstrap phase
 - **v0 keys:** `↑` parent · `↓` child · `←/→` siblings · `:q` / `q` quit · `:help` flash help.
 - **Notes:** Requires an interactive TTY. Future versions will add edit mode, `:run`, `:propose`, and `:compile`. See `docs/WALKER_INTERFACE.md`.
 
+### `propose link` *(post-Bootstrap 0.5, PR #96)*
+
+- **Purpose:** Create a typed candidate **edge** mutation — a proposal — without touching the graph. Mirrors the contract of `node link` (rejects self-loops, unknown nodes, invalid edge types, refinement-family poset inversions) but defers the actual edge creation to `proposal apply`.
+- **Example:** `npm run dev -- propose link --from node_0001 --to node_0000_canon --type refines --rationale "domain refines canon"` (or `... --json`).
+- **Required:** `--from <nodeId>`, `--to <nodeId>`, `--type <edgeType>`.
+- **Optional:** `--branch <branch>` (defaults to the active branch at apply time), `--rationale <text>`.
+- **Files Touched:**
+  - `.ontology/proposals/proposal_<id>.json` (Creates the proposal record with `mutation.kind = "edge_create"`, `mutation.fromHash`, `mutation.toHash`)
+  - `.ontology/events.jsonl` (Appends a `proposal_created` event)
+  - `.ontology/state.json` (Updates summary counters and timestamp)
+- **What it does not do:** It does not create the edge. The proposal lives in `pending` status. `onto proposal apply` translates it into a real `edge_created` mutation iff **both** endpoint hashes still match. If either node mutated since the proposal was created, the proposal transitions to `staled`.
+
 ### `propose node` *(Bootstrap 0.5, PR #92)*
 
 - **Purpose:** Create a typed candidate node mutation — a *proposal* — without touching the graph. Writes a record under `.ontology/proposals/proposal_<id>.json` and appends a `proposal_created` event to the temporal log.
@@ -184,7 +196,11 @@ This document outlines the available CLI commands across current Bootstrap phase
 
 ### `proposal apply <id>` *(Bootstrap 0.5, PR #94)*
 
-- **Purpose:** Translate a pending proposal into a real graph mutation. Re-validates `parentHash` against the parent node's current integrity hash; if they diverge, the proposal is transitioned to `staled` and refused (no graph mutation occurs). Otherwise the underlying mutation (e.g. `node_create`) is dispatched, the proposal is transitioned to `applied`, and both `node_created` and `proposal_applied` events are appended to the temporal log.
+- **Purpose:** Translate a pending proposal into a real graph mutation. Re-validates the dependency snapshot captured at proposal time:
+  - For `node_create`: compares `parentHash` against the parent node's current integrity hash.
+  - For `edge_create`: compares `fromHash` and `toHash` against both endpoint nodes' current integrity hashes.
+
+  If the snapshot has diverged, the proposal is transitioned to `staled` and refused (no graph mutation occurs). Otherwise the underlying mutation is dispatched (`node_created` or `edge_created`), the proposal is transitioned to `applied`, and both the mutation event and `proposal_applied` are appended to the temporal log.
 - **Example:** `npm run dev -- proposal apply proposal_0001` (or `... --json`).
 - **Dry run:** `npm run dev -- proposal apply proposal_0001 --dry-run` — validates without writing anything; reports whether the proposal would apply, would stale, or would fail.
 - **Failure modes (each exits 1 and reports `kind` in JSON):**
@@ -193,7 +209,7 @@ This document outlines the available CLI commands across current Bootstrap phase
   - `missing_parent` — the parent node referenced by the proposal disappeared
   - `stale` — parent hash diverged; the proposal is now `staled` (real run) or `pending` still (dry-run)
   - `mutation_failed` — the underlying graph mutation threw
-- **Audit chain:** the resulting `node_created` event carries `sourceProposalId` in its payload; the `proposal_applied` event carries `resultingNodeId`, `resultingEventId`, `oldHash`, and `newHash`. An audit can trace any node back to the proposal that produced it (and the model run that generated the proposal, once PR #95 lands).
+- **Audit chain:** the resulting mutation event (`node_created` or `edge_created`) carries `sourceProposalId` in its payload; the `proposal_applied` event carries `resultingNodeId` (or `resultingEdgeId`), `resultingEventId`, `oldHash`, and `newHash`. An audit can trace any node or edge back to the proposal that produced it, and to the model run that generated the proposal.
 
 ### Model Observability
 - `onto model doctor`
@@ -208,8 +224,8 @@ This document outlines the available CLI commands across current Bootstrap phase
 The following commands are *Planned / Not yet implemented*:
 
 ### Proposal System (next steps, beyond Bootstrap 0.5)
-- `onto propose link` (typed candidate edge mutation)
 - Edge-aware SemanticLinker (consume the proposal's edges in compilation)
+- `run prompt --as-proposal` for `edge_create` proposals (today only `node_create` is supported via run-driven proposals)
 
 ### Walker v1
 - `onto walk` edit mode, `:run`, `:propose`, `:compile --plan`

@@ -37,11 +37,12 @@ Implemented:
   - PR #93 — `onto proposal list / show / reject` + `proposal_rejected` event.
   - PR #94 — `onto proposal apply` (with `--dry-run`) + parentHash re-validation + stale detection + `proposal_applied` / `proposal_staled` events.
   - PR #95 — `run prompt --as-proposal` and `run context --as-proposal`: model runs become typed candidate proposals with full provenance back to the persisted run.
+- proposal system (post-0.5): `onto propose link` for edge_create proposals (PR #96). Mutation schema is now a discriminated union with both `node_create` and `edge_create` variants; both are applicable, both stale on endpoint divergence.
 - semantic linker skeleton
 
 Planned (post-Bootstrap 0.5):
-- `onto propose link` (edge_create proposals)
 - edge-aware SemanticLinker
+- run-driven edge proposals (`run prompt --as-proposal --proposal-mutation edge_create` or similar)
 
 Planned (later):
 - Walker v1 (edit mode, :propose, :run, :compile --plan)

@@ -18,6 +18,7 @@ import { appendJsonl, ensureDir, writeJson } from "../fs/json.js";
 import { readState, writeState } from "../state/state-store.js";
 import { loadNodeById } from "../project/load.js";
 import { createNode } from "../nodes/create-node.js";
+import { createEdge } from "../edges/create-edge.js";
 
 // Proposal persistence module.
 //
@@ -305,17 +306,35 @@ export function applyProposal(
     };
   }
 
-  // Re-load the parent node and compare its current hash against the
-  // parentHash captured when the proposal was created. If they diverge,
-  // the dependency mutated out-of-band and we transition to staled.
-  if (current.mutation.kind !== "node_create") {
-    return {
-      ok: false,
-      kind: "mutation_failed",
-      message: `Unsupported proposal mutation kind: ${(current.mutation as { kind: string }).kind}`,
-    };
+  // Branch on mutation kind. Each branch re-validates the dependency snapshot
+  // captured at proposal creation time, then dispatches the matching kernel
+  // helper. Both branches share the same staled / dry-run / error paths.
+  if (current.mutation.kind === "node_create") {
+    return applyNodeCreate(id, current, dryRun, cwd);
+  }
+  if (current.mutation.kind === "edge_create") {
+    return applyEdgeCreate(id, current, dryRun, cwd);
   }
 
+  return {
+    ok: false,
+    kind: "mutation_failed",
+    message: `Unsupported proposal mutation kind: ${(current.mutation as { kind: string }).kind}`,
+  };
+}
+
+// node_create: compare parent.integrity.hash vs proposal.mutation.parentHash;
+// dispatch via createNode if they agree.
+function applyNodeCreate(
+  id: string,
+  current: Proposal,
+  dryRun: boolean,
+  cwd: string,
+): ApplyProposalResult {
+  if (current.mutation.kind !== "node_create") {
+    // Type narrow — caller already checked, but TS needs the assertion here.
+    throw new Error("internal: applyNodeCreate called with non-node_create mutation");
+  }
   const parentNodeId = current.mutation.payload.parentNodeId;
   const parentNode = loadNodeById(parentNodeId, cwd);
   if (!parentNode) {
@@ -336,7 +355,6 @@ export function applyProposal(
           `(expected ${current.mutation.parentHash}, found ${parentNode.integrity.hash}).`,
       };
     }
-    // Non-dry: transition to staled and emit proposal_staled.
     const result = transitionProposal(id, current, "staled", {
       reason: "parent_hash_diverged",
       parentNodeId,
@@ -354,20 +372,17 @@ export function applyProposal(
     };
   }
 
-  // Hashes agree. The proposal can be applied.
   if (dryRun) {
     return {
       ok: true,
       proposal: current,
-      proposalEvent: null as unknown as OntologyEvent, // not used in dry-run
+      proposalEvent: null as unknown as OntologyEvent,
       mutationEvent: null,
       createdEntityId: null,
       dryRun: true,
     };
   }
 
-  // Translate the proposal into a real mutation. The kernel back-references
-  // the source proposal so the resulting node_created event carries provenance.
   let nodeResult;
   try {
     nodeResult = createNode({
@@ -386,9 +401,6 @@ export function applyProposal(
     };
   }
 
-  // Mark the proposal applied. The proposal_applied event carries old/new
-  // hash AND the resulting node id + event id, so an audit can trace any
-  // node back to the proposal that produced it.
   const result = transitionProposal(id, current, "applied", {
     resultingNodeId: nodeResult.node.id,
     resultingEventId: nodeResult.event.eventId,
@@ -400,6 +412,121 @@ export function applyProposal(
     proposalEvent: result.event,
     mutationEvent: nodeResult.event,
     createdEntityId: nodeResult.node.id,
+    dryRun: false,
+  };
+}
+
+// edge_create: compare BOTH endpoints' integrity hashes against the
+// fromHash / toHash captured at proposal creation. Dispatch via createEdge
+// only when both agree. The kernel preserves poset enforcement and dedup
+// since createEdge is the same code path used by `onto node link`.
+function applyEdgeCreate(
+  id: string,
+  current: Proposal,
+  dryRun: boolean,
+  cwd: string,
+): ApplyProposalResult {
+  if (current.mutation.kind !== "edge_create") {
+    throw new Error("internal: applyEdgeCreate called with non-edge_create mutation");
+  }
+
+  const fromId = current.mutation.payload.from;
+  const toId = current.mutation.payload.to;
+  const fromNode = loadNodeById(fromId, cwd);
+  const toNode = loadNodeById(toId, cwd);
+  if (!fromNode) {
+    return {
+      ok: false,
+      kind: "missing_parent",
+      message: `Source node referenced by proposal no longer exists: ${fromId}`,
+    };
+  }
+  if (!toNode) {
+    return {
+      ok: false,
+      kind: "missing_parent",
+      message: `Target node referenced by proposal no longer exists: ${toId}`,
+    };
+  }
+
+  // Either endpoint divergence is enough to invalidate the proposal. Report
+  // the specific divergence so the user can diagnose which dependency moved.
+  const fromDiverged = fromNode.integrity.hash !== current.mutation.fromHash;
+  const toDiverged = toNode.integrity.hash !== current.mutation.toHash;
+  if (fromDiverged || toDiverged) {
+    const detail = fromDiverged && toDiverged
+      ? `both ${fromId} and ${toId} hashes diverged`
+      : fromDiverged
+      ? `${fromId} hash diverged (expected ${current.mutation.fromHash}, found ${fromNode.integrity.hash})`
+      : `${toId} hash diverged (expected ${current.mutation.toHash}, found ${toNode.integrity.hash})`;
+    if (dryRun) {
+      return {
+        ok: false,
+        kind: "stale",
+        message: `Proposal ${id} is stale: ${detail}.`,
+      };
+    }
+    const result = transitionProposal(id, current, "staled", {
+      reason: "endpoint_hash_diverged",
+      fromNodeId: fromId,
+      toNodeId: toId,
+      expectedFromHash: current.mutation.fromHash,
+      actualFromHash: fromNode.integrity.hash,
+      expectedToHash: current.mutation.toHash,
+      actualToHash: toNode.integrity.hash,
+    }, cwd, "proposal_staled");
+    return {
+      ok: false,
+      kind: "stale",
+      message: `Proposal ${id} marked staled: ${detail}.`,
+      proposal: result.proposal,
+      proposalEvent: result.event,
+    };
+  }
+
+  if (dryRun) {
+    return {
+      ok: true,
+      proposal: current,
+      proposalEvent: null as unknown as OntologyEvent,
+      mutationEvent: null,
+      createdEntityId: null,
+      dryRun: true,
+    };
+  }
+
+  // Dispatch to createEdge (same kernel path as onto node link). createEdge
+  // returns ok:false on duplicate; surface that as mutation_failed since the
+  // proposal cannot be applied if its target edge already exists.
+  const edgeResult = createEdge({
+    from: fromId,
+    to: toId,
+    type: current.mutation.payload.type,
+    branch: current.mutation.payload.branch ?? undefined,
+    eventMetadata: { sourceProposalId: id },
+  });
+  if (!edgeResult.ok) {
+    return {
+      ok: false,
+      kind: "mutation_failed",
+      message:
+        edgeResult.reason === "duplicate"
+          ? `Edge already exists between ${fromId} and ${toId} (existing: ${edgeResult.existingEdgeId})`
+          : `Mutation failed during apply`,
+    };
+  }
+
+  const result = transitionProposal(id, current, "applied", {
+    resultingEdgeId: edgeResult.edge.edgeId,
+    resultingEventId: edgeResult.event.eventId,
+  }, cwd, "proposal_applied");
+
+  return {
+    ok: true,
+    proposal: result.proposal,
+    proposalEvent: result.event,
+    mutationEvent: edgeResult.event,
+    createdEntityId: edgeResult.edge.edgeId,
     dryRun: false,
   };
 }
