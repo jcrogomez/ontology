@@ -18,6 +18,9 @@ import { runsShowCommand } from "./commands/runs/show.js";
 import { runsVerifyCommand } from "./commands/runs/verify.js";
 import { walkCommand } from "./commands/walk.js";
 import { proposeNodeCommand } from "./commands/proposal/propose-node.js";
+import { proposalListCommand } from "./commands/proposal/list.js";
+import { proposalShowCommand } from "./commands/proposal/show.js";
+import { proposalRejectCommand } from "./commands/proposal/reject.js";
 import { modelDoctorCommand } from "./commands/model/doctor.js";
 import { modelListCommand } from "./commands/model/list.js";
 import { errorMessage } from "./core/errors.js";
@@ -345,6 +348,55 @@ propose
         console.log(JSON.stringify({ ok: false, error: errorMessage(err) }));
       } else {
         console.error(`✖ Error creating proposal: ${errorMessage(err)}`);
+      }
+      process.exit(1);
+    }
+  });
+
+const proposal = program
+  .command("proposal")
+  .description("Inspect and manage existing proposals.");
+
+proposal
+  .command("list")
+  .description("List proposals.")
+  .option("--status <status>", "Filter by status: pending, applied, rejected, staled")
+  .option("--json", "Output results in JSON format")
+  .action(async (options) => {
+    try {
+      await proposalListCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error listing proposals: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+proposal
+  .command("show <id>")
+  .description("Show a proposal record.")
+  .option("--json", "Output results in JSON format")
+  .action(async (id, options) => {
+    try {
+      await proposalShowCommand(id, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error showing proposal: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+proposal
+  .command("reject <id>")
+  .description("Reject a pending proposal. Updates status, recomputes hash, appends a proposal_rejected event.")
+  .option("--reason <text>", "Optional explanation recorded in the event payload")
+  .option("--json", "Output results in JSON format")
+  .action(async (id, options) => {
+    try {
+      await proposalRejectCommand(id, options);
+    } catch (err: unknown) {
+      if (options.json) {
+        console.log(JSON.stringify({ ok: false, error: errorMessage(err) }));
+      } else {
+        console.error(`✖ Error rejecting proposal: ${errorMessage(err)}`);
       }
       process.exit(1);
     }

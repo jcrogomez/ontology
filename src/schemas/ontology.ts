@@ -247,6 +247,7 @@ export const OntologyEventSchema = z.object({
     "compilation_run",
     "run_persisted",
     "proposal_created",
+    "proposal_rejected",
   ]),
   branch: z.string().default("main"),
   previousEventId: z.string().nullable().default(null),

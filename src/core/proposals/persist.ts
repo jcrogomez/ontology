@@ -19,12 +19,15 @@ import { readState, writeState } from "../state/state-store.js";
 
 // Proposal persistence module.
 //
-// PR #92 of the proposal system milestone:
-//   - Stores proposals under .ontology/proposals/proposal_<n>.json.
-//   - Appends proposal_created to events.jsonl.
-//   - Updates state counters atomically.
+// PR #92 — schema + storage + onto propose node + proposal_created event.
+// PR #93 (this) — list / show / reject helpers + proposal_rejected event.
 //
-// Apply / reject / stale lifecycle transitions land in subsequent PRs.
+// The proposal file represents *current* status. When a transition fires,
+// the file is rewritten with a new body hash and the event log carries
+// both the old hash and the new hash so the audit chain stays intact.
+//
+// Apply (pending → applied) and stale (pending → staled) lifecycle
+// transitions land in PR #94.
 
 export interface CreateProposalOptions {
   mutation: ProposalMutation;
@@ -155,4 +158,77 @@ export function createProposal(options: CreateProposalOptions): {
   writeState(state);
 
   return { proposal, event };
+}
+
+export interface RejectProposalOptions {
+  reason: string | null;
+  cwd?: string;
+}
+
+// Lifecycle transition: pending → rejected.
+// The proposal file is rewritten with status="rejected" and a new body hash.
+// The proposal_rejected event records both the old and new hashes so the
+// audit chain in events.jsonl can reconstruct the full transition.
+//
+// This function refuses to act on any non-pending proposal. Re-rejecting an
+// already-rejected proposal is not a no-op; it is a contract violation that
+// the caller surfaces to the user.
+export function rejectProposal(
+  id: string,
+  options: RejectProposalOptions,
+): { proposal: Proposal; event: OntologyEvent } {
+  const cwd = options.cwd ?? process.cwd();
+  const paths = getOntologyPaths(cwd);
+
+  const current = loadProposal(id, cwd);
+  if (!current) {
+    throw new Error(`Proposal not found: ${id}`);
+  }
+  if (current.status !== "pending") {
+    throw new Error(
+      `Proposal ${id} cannot be rejected: status is "${current.status}". Only pending proposals can be rejected.`,
+    );
+  }
+
+  const oldHash = current.hash;
+
+  // Build the rejected record with the same body, new status, and a fresh hash.
+  const recordWithoutHash: Omit<Proposal, "hash"> = {
+    id: current.id,
+    createdAt: current.createdAt,
+    status: "rejected",
+    source: current.source,
+    mutation: current.mutation,
+    validation: current.validation,
+    provenance: current.provenance,
+  };
+  const newHash = computeProposalHash(recordWithoutHash);
+  const updated = ProposalSchema.parse({ ...recordWithoutHash, hash: newHash });
+
+  writeJson(proposalPath(id, cwd), updated);
+
+  const state = readState();
+  const eventId = "evt_" + randomBytes(4).toString("hex");
+  const event = OntologyEventSchema.parse({
+    eventId,
+    sequence: state.eventCount,
+    timestamp: new Date().toISOString(),
+    eventType: "proposal_rejected",
+    branch: state.activeBranch,
+    previousEventId: state.lastEventId,
+    payload: {
+      proposalId: id,
+      reason: options.reason ?? null,
+      oldHash,
+      newHash,
+    },
+  });
+  appendJsonl(paths.eventsPath, event);
+
+  state.eventCount += 1;
+  state.lastEventId = eventId;
+  state.updatedAt = new Date().toISOString();
+  writeState(state);
+
+  return { proposal: updated, event };
 }

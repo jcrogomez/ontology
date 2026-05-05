@@ -154,6 +154,23 @@ This document outlines the available CLI commands across current Bootstrap phase
   - `.ontology/state.json` (Updates summary counters and timestamp)
 - **What it does not do (yet):** It does not create the node. The proposal lives in `pending` status. `onto proposal apply` (planned, PR #94) will translate it into a real `node_create`. See `docs/PROPOSAL_SYSTEM.md`.
 
+### `proposal list` *(Bootstrap 0.5, PR #93)*
+
+- **Purpose:** List proposals.
+- **Example:** `npm run dev -- proposal list` (or `... --json`, `... --status pending`, `... --status rejected`).
+- **Filters:** `--status pending|applied|rejected|staled`.
+
+### `proposal show <id>` *(Bootstrap 0.5, PR #93)*
+
+- **Purpose:** Display a single proposal record. Mirrors the layout of `node show` and `runs show`, including the mutation payload, parent hash, source provenance (or `(manual proposal — no model run)`), validation snapshot, and current body hash.
+- **Example:** `npm run dev -- proposal show proposal_0001` (or `... --json`).
+
+### `proposal reject <id>` *(Bootstrap 0.5, PR #93)*
+
+- **Purpose:** Lifecycle transition `pending → rejected`. Updates the proposal file with `status: "rejected"` and a freshly recomputed body hash, then appends a `proposal_rejected` event to the temporal log carrying both the old and new hashes.
+- **Example:** `npm run dev -- proposal reject proposal_0001 --reason "duplicate of existing node"` (or `... --json`).
+- **Constraints:** Refuses unless the current status is `pending`. The proposal directory and event log together preserve the full lifecycle history; the events log is the source of truth for transitions.
+
 ### Model Observability
 - `onto model doctor`
 - `onto model doctor --json`
@@ -168,7 +185,6 @@ The following commands are *Planned / Not yet implemented*:
 
 ### Proposal System (next PRs)
 - `onto propose link` (typed candidate edge mutation)
-- `onto proposal list` / `onto proposal show` / `onto proposal reject` (PR #93)
 - `onto proposal apply` with `parentHash` re-validation (PR #94)
 - `--as-proposal` integration with `run prompt` / `run context` (PR #95)
 
