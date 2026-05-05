@@ -30,6 +30,7 @@
 - Centralized error message helper across all CLI catches
 - Poset enforcement on refinement-family edges (link-time + retroactive in `onto validate`)
 - Proposal system Bootstrap 0.5 PR #92: `onto propose node`, schema, storage, `proposal_created` event
+- Proposal system Bootstrap 0.5 PR #93: `onto proposal list / show / reject`, `proposal_rejected` event with old/new hash audit chain
 
 ### Known limitations
 
