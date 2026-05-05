@@ -31,10 +31,10 @@ Implemented:
 - Walker v0 (read-only focal-cell terminal interface, color by abstraction level, presheaf-overlap underlining, see `docs/WALKER_INTERFACE.md`)
 - cycle detection in parent walks (assembler, walker)
 - centralized error message helper
+- poset enforcement on refinement-family edges (`refines`, `inherits_from`, `implements`, `belongs_to`) at link time and retroactively in `onto validate`
 - semantic linker skeleton
 
 Planned:
-- Poset enforcement (validate edge directions against the abstraction order)
 - Proposal system (see `docs/PROPOSAL_SYSTEM.md`)
 - Walker v1 (edit mode, :propose, :run, :compile --plan)
 - edge-aware SemanticLinker
