@@ -21,11 +21,11 @@ export async function nodeListCommand(options: { json?: boolean } = {}): Promise
   }
 
   // ID                 Kind       Status     Abstraction   Plane       Label
-  const idPad = 18;
-  const kindPad = 10;
-  const statusPad = 10;
-  const abstractionPad = 13;
-  const planePad = 11;
+  const idPad = 22;
+  const kindPad = 16;
+  const statusPad = 12;
+  const abstractionPad = 16;
+  const planePad = 14;
 
   console.log(
     "ID".padEnd(idPad) +
