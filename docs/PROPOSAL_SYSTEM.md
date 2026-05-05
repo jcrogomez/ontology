@@ -1,8 +1,8 @@
 # RFC: Proposal System
 
 **Status:** Draft (RFC, not yet implemented)
-**Bootstrap target:** 0.5+
-**Depends on:** Run Persistence (RFC, separate)
+**Bootstrap target:** 0.5
+**Depends on:** `docs/RUN_PERSISTENCE.md`
 **Date:** 2026-05-05
 
 ## 1. Motivation
@@ -130,12 +130,9 @@ There are no locks, no retries, no transactions. Append-only events plus content
 
 ## 7. Run persistence (prerequisite)
 
-Proposals reference `runId`, `contextHash`, `promptHash`. These require a **run persistence** layer not yet implemented:
+Proposals reference `runId`, `contextHash`, `promptHash`. These are populated from a **run persistence** layer specified in `docs/RUN_PERSISTENCE.md` (RFC). Run persistence is opt-in via `--persist` and stores `.ontology/runs/run_<id>.json` records with content-addressed hashes.
 
-- `.ontology/runs/run_<id>.json` — full run record (prompt, response, model, duration, validation snapshot).
-- Hashes are content-addressed over normalized payloads.
-
-This RFC depends on a separate, smaller RFC for run persistence to land first. Without persisted runs, proposal provenance cannot be audited.
+A proposal created from a non-persisted run carries the hashes inline but cannot be fully audited via `onto runs verify`. The current RFC allows that combination with a warning; a future revision may forbid it.
 
 ## 8. Out of scope
 

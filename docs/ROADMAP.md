@@ -66,7 +66,7 @@ The roadmap outlines a progressive build-up towards a fully functioning semantic
 - Poset enforcement: validator rejects edges whose direction violates the partial order.
 
 ### Bootstrap 0.5: Run Persistence + Proposal System
-- Run persistence: `.ontology/runs/run_<id>.json` with content-addressed hashes for prompt, context, and output.
+- Run persistence: `.ontology/runs/run_<id>.json` with content-addressed hashes for prompt, context, and output. See `docs/RUN_PERSISTENCE.md`.
 - Proposal system: typed candidate mutations derived from runs, applied explicitly, with optimistic concurrency via `parentHash`. See `docs/PROPOSAL_SYSTEM.md`.
 
 ### Bootstrap 0.6: Map and Slice + Walker v1
