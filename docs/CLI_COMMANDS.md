@@ -131,6 +131,13 @@ This document outlines the available CLI commands across current Bootstrap phase
 - **Purpose:** Recompute the deterministic id and body hash of a persisted run and report any divergence. Read-only audit primitive.
 - **Example:** `npm run dev -- runs verify run_ef9dd6aa` (or `... --json`). Exits non-zero on mismatch.
 
+### `walk <nodeId>` *(v0, read-only)*
+
+- **Purpose:** Open the Walker, an interactive focal-cell terminal interface for the intention graph. Color encodes the abstraction level, tokens shared across the local neighborhood are underlined (presheaf overlap), and the path bar renders a colored breadcrumb from canon to focal.
+- **Example:** `npm run dev -- walk node_0000_canon`
+- **v0 keys:** `↑` parent · `↓` child · `←/→` siblings · `:q` / `q` quit · `:help` flash help.
+- **Notes:** Requires an interactive TTY. Future versions will add edit mode, `:run`, `:propose`, and `:compile`. See `docs/WALKER_INTERFACE.md`.
+
 ### Model Observability
 - `onto model doctor`
 - `onto model doctor --json`
