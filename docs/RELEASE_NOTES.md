@@ -28,6 +28,8 @@
 - Walker v0 (read-only focal-cell terminal interface, color by abstraction, presheaf-overlap underlining)
 - Cycle detection in parent-pointer walks (assembler + walker)
 - Centralized error message helper across all CLI catches
+- Poset enforcement on refinement-family edges (link-time + retroactive in `onto validate`)
+- Proposal system Bootstrap 0.5 PR #92: `onto propose node`, schema, storage, `proposal_created` event
 
 ### Known limitations
 

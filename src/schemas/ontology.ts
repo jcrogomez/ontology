@@ -246,6 +246,7 @@ export const OntologyEventSchema = z.object({
     "validation_run",
     "compilation_run",
     "run_persisted",
+    "proposal_created",
   ]),
   branch: z.string().default("main"),
   previousEventId: z.string().nullable().default(null),
@@ -359,6 +360,80 @@ export type PersistedRunInput = z.infer<typeof PersistedRunInputSchema>;
 export type PersistedRunModel = z.infer<typeof PersistedRunModelSchema>;
 export type PersistedRunOutput = z.infer<typeof PersistedRunOutputSchema>;
 export type PersistedRunValidation = z.infer<typeof PersistedRunValidationSchema>;
+
+// Proposal records live under `.ontology/proposals/proposal_<id>.json`.
+// A proposal is a typed candidate mutation that has not yet been applied to
+// the graph. Models may produce proposals; only an explicit `proposal apply`
+// command may translate one into a real graph mutation. See docs/PROPOSAL_SYSTEM.md.
+
+// Source pins a proposal to the model run that generated it. For manually
+// authored proposals (no LLM in the loop), source is null.
+export const ProposalSourceSchema = z.object({
+  runId: z.string().startsWith("run_"),
+  contextHash: z.string().startsWith("ctx:hash:").nullable(),
+  promptHash: z.string().startsWith("prompt:hash:"),
+  provider: LlmProviderSchema,
+  model: z.string(),
+});
+
+// PR #92 (this bootstrap) supports only node_create. Edge_create and the
+// rest follow in subsequent PRs of the proposal system milestone.
+export const ProposalNodeCreatePayloadSchema = z.object({
+  level: AbstractionLevelSchema,
+  kind: NodeKindSchema,
+  prompt: z.string(),
+  label: z.string().nullable().default(null),
+  parentNodeId: z.string().startsWith("node_"),
+});
+
+export const ProposalMutationSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("node_create"),
+    payload: ProposalNodeCreatePayloadSchema,
+    // Hash of the parent node at proposal creation time. Re-validated when
+    // the proposal is applied so an out-of-band mutation invalidates the
+    // proposal (staled state) instead of silently acting on stale assumptions.
+    parentHash: z.string(),
+  }),
+]);
+
+export const ProposalValidationSnapshotSchema = z.object({
+  ok: z.boolean(),
+  score: z.number(),
+  violations: z.array(z.string()).default([]),
+  warnings: z.array(z.string()).default([]),
+});
+
+export const ProposalProvenanceSchema = z.object({
+  derivedFrom: z.array(z.string().startsWith("node_")).default([]),
+  rationale: z.string().nullable().default(null),
+});
+
+export const ProposalStatusSchema = z.enum([
+  "pending",
+  "applied",
+  "rejected",
+  "staled",
+]);
+
+export const ProposalSchema = z.object({
+  id: z.string().startsWith("proposal_"),
+  createdAt: z.number().int().min(0),
+  status: ProposalStatusSchema,
+  source: ProposalSourceSchema.nullable(),
+  mutation: ProposalMutationSchema,
+  validation: ProposalValidationSnapshotSchema.nullable(),
+  provenance: ProposalProvenanceSchema,
+  hash: z.string().startsWith("proposal:hash:"),
+});
+
+export type Proposal = z.infer<typeof ProposalSchema>;
+export type ProposalSource = z.infer<typeof ProposalSourceSchema>;
+export type ProposalMutation = z.infer<typeof ProposalMutationSchema>;
+export type ProposalNodeCreatePayload = z.infer<typeof ProposalNodeCreatePayloadSchema>;
+export type ProposalValidationSnapshot = z.infer<typeof ProposalValidationSnapshotSchema>;
+export type ProposalProvenance = z.infer<typeof ProposalProvenanceSchema>;
+export type ProposalStatus = z.infer<typeof ProposalStatusSchema>;
 
 // Bootstrap boundary:
 // State provides high-level metrics for quick inspection without graph traversal.

@@ -17,6 +17,7 @@ import { runsListCommand } from "./commands/runs/list.js";
 import { runsShowCommand } from "./commands/runs/show.js";
 import { runsVerifyCommand } from "./commands/runs/verify.js";
 import { walkCommand } from "./commands/walk.js";
+import { proposeNodeCommand } from "./commands/proposal/propose-node.js";
 import { modelDoctorCommand } from "./commands/model/doctor.js";
 import { modelListCommand } from "./commands/model/list.js";
 import { errorMessage } from "./core/errors.js";
@@ -318,6 +319,33 @@ program
       await walkCommand(id);
     } catch (err: unknown) {
       console.error(`✖ Error opening walker: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+const propose = program
+  .command("propose")
+  .description("Create typed candidate mutations (proposals) without touching the graph.");
+
+propose
+  .command("node")
+  .description("Propose a node creation. Writes a proposal record but does not mutate the graph.")
+  .requiredOption("--level <level>", "Abstraction level for the proposed node")
+  .requiredOption("--kind <kind>", "Semantic kind for the proposed node")
+  .requiredOption("--prompt <prompt>", "Raw intention prompt for the proposed node")
+  .option("--label <label>", "Optional human label")
+  .option("--parent <nodeId>", "Parent node id (defaults to the project root canon)")
+  .option("--rationale <text>", "Optional human-authored explanation of why")
+  .option("--json", "Output results in JSON format")
+  .action(async (options) => {
+    try {
+      await proposeNodeCommand(options);
+    } catch (err: unknown) {
+      if (options.json) {
+        console.log(JSON.stringify({ ok: false, error: errorMessage(err) }));
+      } else {
+        console.error(`✖ Error creating proposal: ${errorMessage(err)}`);
+      }
       process.exit(1);
     }
   });
