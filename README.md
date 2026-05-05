@@ -27,6 +27,8 @@ Bootstrap 0.2 introduces the ability to grow the network through controlled CLI 
 
 We are building a node editor over a verified network kernel, not a code generator yet.
 
+Models may speak. Only explicit graph commands may mutate `.ontology`.
+
 ## Available Commands
 
 For local development, commands are run via `npm run dev -- <command>`.

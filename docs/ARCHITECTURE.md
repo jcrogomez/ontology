@@ -27,13 +27,15 @@ The LLM runtime handles the interface with external models.
 **Implemented:**
 - mock adapter
 - isolated Ollama adapter
+- dispatcher multi-provider
+- run prompt --provider ollama
 - model doctor/list
 - model observability
+- semantic linker skeleton
 
 **Known limitations:**
-- dispatcher multi-provider (Planned / Not yet implemented)
-- run prompt --provider ollama (Planned / Not yet implemented)
 - run context --provider ollama (Planned / Not yet implemented)
+- context assemble --include-edges in CLI (Planned / Not yet implemented)
 - no compiler
 - no PromptAST
 - no advanced SemanticLinker graph reasoning
@@ -60,7 +62,7 @@ The Context Assembler is responsible for organizing the local graph state that b
 
 To maintain absolute clarity on the current state of the architecture, the following modules are **Planned / Not yet implemented**:
 
-- **SemanticLinker**: Planned to automatically bind context and dependencies across the network.
+- **SemanticLinker**: Skeleton implemented, advanced features planned to automatically bind context and dependencies across the network.
 - **Compiler**: Planned to transform the `.ontology` graph into executable code artifacts. Currently, Ontology does not generate code.
 - **Visual DAG Studio**: Planned web-based UI.
-- **Real Ollama Execution**: The pure runtime wrappers exist, but live model execution and PromptAST parsing do not yet exist.
+- **Real Ollama Execution**: Live model execution via `run prompt` is implemented. However, `run context` execution and PromptAST parsing do not yet exist.
