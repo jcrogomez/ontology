@@ -16,6 +16,7 @@ import { runContextCommand } from "./commands/run/context.js";
 import { runsListCommand } from "./commands/runs/list.js";
 import { runsShowCommand } from "./commands/runs/show.js";
 import { runsVerifyCommand } from "./commands/runs/verify.js";
+import { walkCommand } from "./commands/walk.js";
 import { modelDoctorCommand } from "./commands/model/doctor.js";
 import { modelListCommand } from "./commands/model/list.js";
 
@@ -302,6 +303,18 @@ runs
       await runsVerifyCommand(id, options);
     } catch (err: unknown) {
       console.error(`✖ Error verifying run: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("walk <id>")
+  .description("Open the Walker, an interactive focal-cell terminal view of a node. Read-only in v0.")
+  .action(async (id) => {
+    try {
+      await walkCommand(id);
+    } catch (err: unknown) {
+      console.error(`✖ Error opening walker: ${(err as Error).message}`);
       process.exit(1);
     }
   });

@@ -27,13 +27,14 @@ Implemented:
 - node link (typed semantic edge creation)
 - context assemble --include-edges (edge-aware context, with --edge-types filter)
 - run persistence (`.ontology/runs/`, content-addressed; `--persist`, `runs list/show/verify`)
+- Walker v0 (read-only focal-cell terminal interface, color by abstraction level, presheaf-overlap underlining, see `docs/WALKER_INTERFACE.md`)
 - semantic linker skeleton
 
 Planned:
 - run context --include-edges (project edge context into LLM run)
-- Walker v0 (read-only focal-cell terminal interface, see `docs/WALKER_INTERFACE.md`)
 - Poset enforcement (validate edge directions against the abstraction order)
 - Proposal system (see `docs/PROPOSAL_SYSTEM.md`)
+- Walker v1 (edit mode, :propose, :run, :compile --plan)
 - edge-aware SemanticLinker
 - PromptAST
 - compiler

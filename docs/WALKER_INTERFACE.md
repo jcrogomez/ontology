@@ -1,6 +1,6 @@
 # RFC: Walker Interface
 
-**Status:** Draft (RFC, not yet implemented)
+**Status:** v0 Implemented (Bootstrap 0.4) — read-only focal cell, arrow nav, color by poset, cross-token underline. v1 / v2 still planned.
 **Bootstrap target:** 0.4 (v0 read-only) → 0.6 (full pipeline cockpit)
 **Related:** Proposal System (RFC), Run Persistence (RFC)
 **Date:** 2026-05-05
