@@ -195,6 +195,8 @@ run
   .option("--time <time>", "Time to use for context")
   .option("--mode <mode>", "Mode for context assembly")
   .option("--validate", "Run deterministic intent validation")
+  .option("--model <model>", "Model to use for the selected LLM provider")
+  .option("--ollama-host <host>", "Host for Ollama provider")
   .option("--json", "Output results in JSON format")
   .action(async (id, options) => {
     try {
