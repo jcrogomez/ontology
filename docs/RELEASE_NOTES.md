@@ -32,6 +32,7 @@
 - Proposal system Bootstrap 0.5 PR #92: `onto propose node`, schema, storage, `proposal_created` event
 - Proposal system Bootstrap 0.5 PR #93: `onto proposal list / show / reject`, `proposal_rejected` event with old/new hash audit chain
 - Proposal system Bootstrap 0.5 PR #94: `onto proposal apply` (with `--dry-run`), `parentHash` re-validation, stale detection, `proposal_applied` and `proposal_staled` events. Apply translates a pending proposal into a real `node_create` mutation iff the parent has not changed; otherwise the proposal transitions to `staled`. The resulting `node_created` event carries `sourceProposalId` so any node can be traced back to the proposal that produced it.
+- Proposal system Bootstrap 0.5 PR #95: `run prompt --as-proposal` and `run context --as-proposal`. Model runs become typed candidate proposals in one CLI invocation, with `source.runId`, `source.contextHash`, and `source.promptHash` populated from the persisted run record. The full audit chain `run_persisted → proposal_created → node_created → proposal_applied` is replayable from the events log alone.
 
 ### Known limitations
 

@@ -1,6 +1,6 @@
 # RFC: Proposal System
 
-**Status:** PR #92 + #93 + #94 shipped — schema, storage, the full lifecycle (`propose`, `list/show/reject`, `apply` with `parentHash` re-validation and stale detection), and four lifecycle events (`proposal_created`, `proposal_rejected`, `proposal_applied`, `proposal_staled`). Run-driven proposals (PR #95) still pending.
+**Status:** Bootstrap 0.5 complete — PR #92 + #93 + #94 + #95 shipped. Schema, storage, full lifecycle (`propose`, `list/show/reject`, `apply` with `parentHash` re-validation and stale detection), four lifecycle events (`proposal_created`, `proposal_rejected`, `proposal_applied`, `proposal_staled`), and run-driven proposals via `run prompt --as-proposal` / `run context --as-proposal`.
 **Bootstrap target:** 0.5
 **Depends on:** `docs/RUN_PERSISTENCE.md`
 **Date:** 2026-05-05

@@ -6,8 +6,16 @@ import { validateIntent, type IntentValidationResult } from "../../runtime/conte
 import type { LlmTask, LlmProvider } from "../../runtime/llm/types.js";
 import { hashPrompt, hashContext } from "../../core/integrity/hash.js";
 import { createPersistedRun, computeRunId, loadPersistedRun } from "../../core/runs/persist.js";
-import type { PersistedRunInput, PersistedRunModel, OntologyEdge } from "../../schemas/ontology.js";
+import {
+  AbstractionLevelSchema,
+  NodeKindSchema,
+  type PersistedRunInput,
+  type PersistedRunModel,
+  type OntologyEdge,
+  type Proposal,
+} from "../../schemas/ontology.js";
 import { EdgeTypeSchema } from "../../schemas/ontology.js";
+import { buildProposalFromRun } from "./prompt.js";
 
 export interface RunContextOptions {
   provider?: string;
@@ -22,6 +30,16 @@ export interface RunContextOptions {
   persist?: boolean;
   includeEdges?: boolean;
   edgeTypes?: string;
+  // --as-proposal turns the model's response into a typed candidate node mutation.
+  // Auto-implies --persist. Default proposal parent is the focal node id (the one
+  // the context was assembled against), since a child of the focal node is the
+  // common case for "expand this idea".
+  asProposal?: boolean;
+  proposalLevel?: string;
+  proposalKind?: string;
+  proposalParent?: string;
+  proposalLabel?: string;
+  proposalRationale?: string;
 }
 
 export async function runContextCommand(id: string, options: RunContextOptions) {
@@ -32,10 +50,39 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
   const time = options.time ? parseInt(options.time, 10) : undefined;
   const isJson = !!options.json;
   const isValidate = !!options.validate;
-  const isPersist = !!options.persist;
+  const isAsProposal = !!options.asProposal;
+  // --as-proposal forces persistence because the proposal pins itself to the runId.
+  const isPersist = !!options.persist || isAsProposal;
 
   if (provider !== "mock" && provider !== "ollama") {
     throw new Error(`Unsupported LLM provider: ${provider}`);
+  }
+
+  // Validate --as-proposal flags up front so a malformed level/kind aborts
+  // before any LLM dispatch.
+  let proposalLevel: ReturnType<typeof AbstractionLevelSchema.parse> | null = null;
+  let proposalKind: ReturnType<typeof NodeKindSchema.parse> | null = null;
+  if (isAsProposal) {
+    if (!options.proposalLevel) {
+      console.error(`✖ --as-proposal requires --proposal-level`);
+      process.exit(1);
+    }
+    if (!options.proposalKind) {
+      console.error(`✖ --as-proposal requires --proposal-kind`);
+      process.exit(1);
+    }
+    const lvl = AbstractionLevelSchema.safeParse(options.proposalLevel);
+    if (!lvl.success) {
+      console.error(`✖ Invalid --proposal-level: "${options.proposalLevel}". Expected one of: ${AbstractionLevelSchema.options.join(", ")}`);
+      process.exit(1);
+    }
+    proposalLevel = lvl.data;
+    const knd = NodeKindSchema.safeParse(options.proposalKind);
+    if (!knd.success) {
+      console.error(`✖ Invalid --proposal-kind: "${options.proposalKind}". Expected one of: ${NodeKindSchema.options.join(", ")}`);
+      process.exit(1);
+    }
+    proposalKind = knd.data;
   }
 
   // Parse and validate --edge-types up front so a typo fails before any LLM dispatch.
@@ -87,6 +134,28 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
     const expectedId = computeRunId(runInput, runModel);
     const cached = loadPersistedRun(expectedId);
     if (cached) {
+      // When --as-proposal is on we still create a fresh proposal even on cache
+      // hit. The cache is on the run; the proposal is the user's deliberate
+      // staging act, which deserves a new record per invocation.
+      let proposalInfo: { id: string; status: string } | undefined;
+      if (isAsProposal) {
+        const proposal = buildProposalFromRun({
+          runId: cached.id,
+          promptHash: cached.input.promptHash,
+          contextHash: cached.input.contextHash,
+          provider: cached.model.provider,
+          model: cached.model.model,
+          responseText: cached.output.text,
+          proposalLevel: proposalLevel!,
+          proposalKind: proposalKind!,
+          proposalLabel: options.proposalLabel,
+          proposalRationale: options.proposalRationale,
+          // Default proposal parent = focal node id (the one we ran context against).
+          proposalParent: options.proposalParent ?? id,
+          validationSnapshot: cached.validation ?? null,
+        });
+        proposalInfo = { id: proposal.id, status: proposal.status };
+      }
       emitRunContextOutput({
         contextOutput,
         responseText: cached.output.text,
@@ -98,6 +167,7 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
         isJson,
         isValidate,
         persisted: { runId: cached.id, cached: true },
+        proposal: proposalInfo,
       });
       return;
     }
@@ -173,6 +243,34 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
     persistedInfo = { runId: run.id, cached };
   }
 
+  let proposalInfo: { id: string; status: string } | undefined;
+  if (isAsProposal && persistedInfo) {
+    const validationSnapshot = validationResult
+      ? {
+          ok: validationResult.ok,
+          score: validationResult.score,
+          violations: validationResult.violations,
+          warnings: validationResult.warnings,
+        }
+      : null;
+    const proposal = buildProposalFromRun({
+      runId: persistedInfo.runId,
+      promptHash: runInput.promptHash,
+      contextHash: runInput.contextHash,
+      provider: llmResponse.provider,
+      model: llmResponse.model,
+      responseText: llmResponse.text,
+      proposalLevel: proposalLevel!,
+      proposalKind: proposalKind!,
+      proposalLabel: options.proposalLabel,
+      proposalRationale: options.proposalRationale,
+      // Default proposal parent = focal node id.
+      proposalParent: options.proposalParent ?? id,
+      validationSnapshot,
+    });
+    proposalInfo = { id: proposal.id, status: proposal.status };
+  }
+
   emitRunContextOutput({
     contextOutput,
     responseText: llmResponse.text,
@@ -184,6 +282,7 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
     isJson,
     isValidate,
     persisted: persistedInfo,
+    proposal: proposalInfo,
   });
 }
 
@@ -198,6 +297,7 @@ interface EmitRunContextOutputOptions {
   isJson: boolean;
   isValidate: boolean;
   persisted: { runId: string; cached: boolean } | undefined;
+  proposal: { id: string; status: string } | undefined;
 }
 
 function emitRunContextOutput(opts: EmitRunContextOutputOptions): void {
@@ -212,6 +312,7 @@ function emitRunContextOutput(opts: EmitRunContextOutputOptions): void {
     isJson,
     isValidate,
     persisted,
+    proposal,
   } = opts;
 
   if (isJson) {
@@ -236,6 +337,9 @@ function emitRunContextOutput(opts: EmitRunContextOutputOptions): void {
     if (persisted) {
       output.persisted = { runId: persisted.runId, cached: persisted.cached };
     }
+    if (proposal) {
+      output.proposal = { id: proposal.id, status: proposal.status };
+    }
 
     console.log(JSON.stringify(output, null, 2));
     return;
@@ -254,6 +358,9 @@ function emitRunContextOutput(opts: EmitRunContextOutputOptions): void {
   if (persisted) {
     const tag = persisted.cached ? " (cached)" : "";
     console.log(`Run:       ${persisted.runId}${tag}`);
+  }
+  if (proposal) {
+    console.log(`Proposal:  ${proposal.id} (${proposal.status})`);
   }
   console.log(``);
   console.log(`Context:`);
