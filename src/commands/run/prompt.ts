@@ -3,6 +3,7 @@ import type { LlmTask, LlmProvider } from "../../runtime/llm/types.js";
 import { hashPrompt } from "../../core/integrity/hash.js";
 import { createPersistedRun, computeRunId, loadPersistedRun } from "../../core/runs/persist.js";
 import type { PersistedRunInput, PersistedRunModel } from "../../schemas/ontology.js";
+import { errorMessage } from "../../core/errors.js";
 
 export interface RunPromptOptions {
   task?: string;
@@ -98,14 +99,14 @@ export async function runPromptCommand(options: RunPromptOptions): Promise<void>
             {
               ok: false,
               provider: "ollama",
-              error: (err as Error).message,
+              error: errorMessage(err),
             },
             null,
             2
           )
         );
       } else {
-        console.error(`✖ Ollama unavailable: ${(err as Error).message}`);
+        console.error(`✖ Ollama unavailable: ${errorMessage(err)}`);
       }
       process.exit(1);
     }

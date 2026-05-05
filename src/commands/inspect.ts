@@ -1,8 +1,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { getOntologyPaths } from "../core/project/paths.js";
-import { readJson, readJsonl } from "../core/fs/json.js";
-import { loadState, loadNodes, loadEvents, loadEdges, loadModelsRegistry, loadProcessorsRegistry } from "../core/project/load.js";
+import { loadState, loadNodeById, loadEvents, loadEdges, loadModelsRegistry, loadProcessorsRegistry } from "../core/project/load.js";
+import type { OntologyNode } from "../schemas/ontology.js";
 
 // Inspect is observational only. It must never mutate the network.
 
@@ -37,11 +37,13 @@ export async function inspectCommand(options: { json?: boolean } = {}): Promise<
 
   const state = loadState();
   const rootNodePath = path.join(paths.nodesDir, `${state.rootNodeId}.json`);
-  let rootNode: any = null;
-  if (fs.existsSync(rootNodePath)) {
-    rootNode = readJson(rootNodePath);
-  } else {
+  if (!fs.existsSync(rootNodePath)) {
     console.error(`✖ Missing required file: .ontology/nodes/${state.rootNodeId}.json`);
+    process.exit(1);
+  }
+  const rootNode: OntologyNode | null = loadNodeById(state.rootNodeId);
+  if (!rootNode) {
+    console.error(`✖ Failed to load root node: ${state.rootNodeId}`);
     process.exit(1);
   }
 
@@ -50,16 +52,16 @@ export async function inspectCommand(options: { json?: boolean } = {}): Promise<
   const modelsRegistry = loadModelsRegistry();
   const processorsRegistry = loadProcessorsRegistry();
 
-  // Use the first rule of the canon for a clearer summary, fallback to input text if needed.
+  // Prefer the first canonical rule for the summary line. Fall back to a non-empty
+  // line of the canon text input only if no rule is present.
   let canonDisplay = "Canon rule not found.";
-  if (rootNode.rules && rootNode.rules.length > 0) {
+  if (rootNode.rules.length > 0) {
     canonDisplay = rootNode.rules[0];
   } else {
     const canonText = rootNode.inputs
-      .filter((i: any) => i.type === "text" && (i.role === "mathematical_canon" || i.role === "source_prompt"))
-      .map((i: any) => i.value)
+      .flatMap(i => i.type === "text" && (i.role === "mathematical_canon" || i.role === "source_prompt") ? [i.value] : [])
       .join("\n");
-    canonDisplay = canonText.split('\n').find((line: string) => line.trim().length > 0) || canonDisplay;
+    canonDisplay = canonText.split("\n").find(line => line.trim().length > 0) || canonDisplay;
   }
 
   canonDisplay = canonDisplay.replace(/^\d+\.\s*/, "");

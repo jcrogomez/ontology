@@ -30,11 +30,18 @@ export function assembleContext(input: ContextAssemblyInput, cwd = process.cwd()
     throw new Error(`Branch mismatch for node ${targetNodeId}: expected ${branch}, received ${targetNode.coordinates.branch}`);
   }
 
+  // Walk parentId pointers up to the canon. The seen set guards against malformed
+  // graphs where someone introduced a cycle (which is itself a separate invariant
+  // violation, but we refuse to loop forever waiting for it to be fixed).
   const nodes: OntologyNode[] = [targetNode];
+  const seen = new Set<string>([targetNode.id]);
   let currentNode = targetNode;
 
   while (currentNode.graph.parentId !== null) {
     const parentId = currentNode.graph.parentId;
+    if (seen.has(parentId)) {
+      throw new Error(`Parent cycle detected at node ${parentId} while assembling context for ${targetNodeId}`);
+    }
     const parentNode = loadNodeById(parentId, cwd);
 
     if (!parentNode) {
@@ -45,6 +52,7 @@ export function assembleContext(input: ContextAssemblyInput, cwd = process.cwd()
       throw new Error(`Branch mismatch for node ${parentNode.id}: expected ${branch}, received ${parentNode.coordinates.branch}`);
     }
 
+    seen.add(parentNode.id);
     nodes.push(parentNode);
     currentNode = parentNode;
   }

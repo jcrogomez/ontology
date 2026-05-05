@@ -19,6 +19,7 @@ import { runsVerifyCommand } from "./commands/runs/verify.js";
 import { walkCommand } from "./commands/walk.js";
 import { modelDoctorCommand } from "./commands/model/doctor.js";
 import { modelListCommand } from "./commands/model/list.js";
+import { errorMessage } from "./core/errors.js";
 
 const program = new Command();
 
@@ -34,7 +35,7 @@ program
     try {
       await initCommand();
     } catch (err: unknown) {
-      console.error(`✖ Error during init: ${(err as Error).message}`);
+      console.error(`✖ Error during init: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
@@ -47,7 +48,7 @@ program
     try {
       await doctorCommand(options);
     } catch (err: unknown) {
-      console.error(`✖ Error during doctor: ${(err as Error).message}`);
+      console.error(`✖ Error during doctor: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
@@ -59,7 +60,7 @@ program
     try {
       await validateCommand();
     } catch (err: unknown) {
-      console.error(`✖ Error during validation: ${(err as Error).message}`);
+      console.error(`✖ Error during validation: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
@@ -72,7 +73,7 @@ program
     try {
       await inspectCommand(options);
     } catch (err: unknown) {
-      console.error(`✖ Error during inspection: ${(err as Error).message}`);
+      console.error(`✖ Error during inspection: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
@@ -100,7 +101,7 @@ node
     try {
       await nodeListCommand(options);
     } catch (err: unknown) {
-      console.error(`✖ Error listing nodes: ${(err as Error).message}`);
+      console.error(`✖ Error listing nodes: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
@@ -113,7 +114,7 @@ node
     try {
       await nodeShowCommand(id, options);
     } catch (err: unknown) {
-      console.error(`✖ Error showing node: ${(err as Error).message}`);
+      console.error(`✖ Error showing node: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
@@ -131,9 +132,9 @@ node
       await nodeLinkCommand(options);
     } catch (err: unknown) {
       if (options.json) {
-        console.log(JSON.stringify({ ok: false, error: (err as Error).message }));
+        console.log(JSON.stringify({ ok: false, error: errorMessage(err) }));
       } else {
-        console.error(`✖ Error linking nodes: ${(err as Error).message}`);
+        console.error(`✖ Error linking nodes: ${errorMessage(err)}`);
       }
       process.exit(1);
     }
@@ -150,7 +151,7 @@ modelCmd
     try {
       await modelDoctorCommand(options);
     } catch (err: unknown) {
-      console.error(`✖ Error during model doctor: ${(err as Error).message}`);
+      console.error(`✖ Error during model doctor: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
@@ -164,7 +165,7 @@ modelCmd
     try {
       await modelListCommand(options);
     } catch (err: unknown) {
-      console.error(`✖ Error listing models: ${(err as Error).message}`);
+      console.error(`✖ Error listing models: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
@@ -182,7 +183,7 @@ events
     try {
       await eventsTailCommand(options);
     } catch (err: unknown) {
-      console.error(`✖ Error tailing events: ${(err as Error).message}`);
+      console.error(`✖ Error tailing events: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
@@ -204,7 +205,7 @@ contextCmd
     try {
       await contextAssembleCommand(id, options);
     } catch (err: unknown) {
-      console.error(`✖ Error assembling context: ${(err as Error).message}`);
+      console.error(`✖ Error assembling context: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
@@ -224,13 +225,15 @@ run
   .option("--validate", "Run deterministic intent validation")
   .option("--model <model>", "Model to use for the selected LLM provider")
   .option("--ollama-host <host>", "Host for Ollama provider")
+  .option("--include-edges", "Include edge-aware context in the assembled prompt")
+  .option("--edge-types <types>", "Comma-separated edge types to include (requires --include-edges)")
   .option("--persist", "Persist this run as a content-addressed record under .ontology/runs/")
   .option("--json", "Output results in JSON format")
   .action(async (id, options) => {
     try {
       await runContextCommand(id, options);
     } catch (err: unknown) {
-      console.error(`✖ Error running context: ${(err as Error).message}`);
+      console.error(`✖ Error running context: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
@@ -258,7 +261,7 @@ run
     try {
       await runPromptCommand(options);
     } catch (err: unknown) {
-      console.error(`✖ Error running prompt: ${(err as Error).message}`);
+      console.error(`✖ Error running prompt: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
@@ -276,7 +279,7 @@ runs
     try {
       await runsListCommand(options);
     } catch (err: unknown) {
-      console.error(`✖ Error listing runs: ${(err as Error).message}`);
+      console.error(`✖ Error listing runs: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
@@ -289,7 +292,7 @@ runs
     try {
       await runsShowCommand(id, options);
     } catch (err: unknown) {
-      console.error(`✖ Error showing run: ${(err as Error).message}`);
+      console.error(`✖ Error showing run: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
@@ -302,7 +305,7 @@ runs
     try {
       await runsVerifyCommand(id, options);
     } catch (err: unknown) {
-      console.error(`✖ Error verifying run: ${(err as Error).message}`);
+      console.error(`✖ Error verifying run: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
@@ -314,7 +317,7 @@ program
     try {
       await walkCommand(id);
     } catch (err: unknown) {
-      console.error(`✖ Error opening walker: ${(err as Error).message}`);
+      console.error(`✖ Error opening walker: ${errorMessage(err)}`);
       process.exit(1);
     }
   });

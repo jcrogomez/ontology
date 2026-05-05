@@ -40,6 +40,13 @@ export async function nodeLinkCommand(options: NodeLinkCommandOptions): Promise<
     process.exit(1);
   };
 
+  // Reject self-loops up front. The current edge type vocabulary has no
+  // semantically valid self-edge; a node should not "depend_on" or "refine"
+  // itself, and downstream traversal would have to special-case the loop.
+  if (options.from === options.to) {
+    handleError(`Self-loops are not allowed: ${options.from} cannot link to itself`);
+  }
+
   const fromNode = loadNodeById(options.from, cwd);
   if (!fromNode) {
     handleError(`Source node not found: ${options.from}`);
@@ -74,8 +81,9 @@ export async function nodeLinkCommand(options: NodeLinkCommandOptions): Promise<
   const eventId = `evt_${crypto.randomBytes(4).toString("hex")}`;
   const now = new Date().toISOString();
 
-  // Create edge object
-  const newEdge: any = {
+  // Build the edge without integrity.hash, hash the body, then re-parse the full record.
+  // This mirrors the discipline in create-node.ts and avoids any-typed scaffolding.
+  const edgeWithoutHash = {
     edgeId,
     from: options.from,
     to: options.to,
@@ -85,41 +93,41 @@ export async function nodeLinkCommand(options: NodeLinkCommandOptions): Promise<
     createdByEventId: eventId,
     integrity: {
       schemaVersion: OntologySchemaVersion,
-      hash: ""
-    }
+    },
   };
-
-  const edgeHash = hashObject(removeIntegrityHash(newEdge));
-  newEdge.integrity.hash = edgeHash;
+  const edgeHash = hashObject(edgeWithoutHash);
 
   let validatedEdge;
   try {
-    validatedEdge = OntologyEdgeSchema.parse(newEdge);
+    validatedEdge = OntologyEdgeSchema.parse({
+      ...edgeWithoutHash,
+      integrity: {
+        ...edgeWithoutHash.integrity,
+        hash: edgeHash,
+      },
+    });
   } catch (err: unknown) {
     handleError(`Failed to validate new edge: ${err instanceof Error ? err.message : String(err)}`);
     return;
   }
 
-  // Create event object
-  const newEvent: any = {
-    eventId,
-    sequence: state.eventCount,
-    timestamp: now,
-    eventType: "edge_created",
-    branch: state.activeBranch,
-    previousEventId: state.lastEventId,
-    payload: {
-      action: "edge_created",
-      edgeId: edgeId,
-      from: options.from,
-      to: options.to,
-      type: edgeType
-    }
-  };
-
   let validatedEvent;
   try {
-    validatedEvent = OntologyEventSchema.parse(newEvent);
+    validatedEvent = OntologyEventSchema.parse({
+      eventId,
+      sequence: state.eventCount,
+      timestamp: now,
+      eventType: "edge_created",
+      branch: state.activeBranch,
+      previousEventId: state.lastEventId,
+      payload: {
+        action: "edge_created",
+        edgeId: edgeId,
+        from: options.from,
+        to: options.to,
+        type: edgeType,
+      },
+    });
   } catch (err: unknown) {
     handleError(`Failed to validate new event: ${err instanceof Error ? err.message : String(err)}`);
     return;

@@ -27,6 +27,7 @@ export async function nodeListCommand(options: { json?: boolean } = {}): Promise
   const abstractionPad = 16;
   const planePad = 14;
 
+  console.log("=== ONTOLOGY NODES ===");
   console.log(
     "ID".padEnd(idPad) +
     "Kind".padEnd(kindPad) +

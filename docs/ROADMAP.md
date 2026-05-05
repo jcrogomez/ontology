@@ -24,14 +24,16 @@ Implemented:
 - run prompt --provider ollama
 - run context --provider ollama
 - model doctor/list
-- node link (typed semantic edge creation)
+- node link (typed semantic edge creation, with self-loop rejection)
 - context assemble --include-edges (edge-aware context, with --edge-types filter)
+- run context --include-edges / --edge-types (edge-aware run with the same filter)
 - run persistence (`.ontology/runs/`, content-addressed; `--persist`, `runs list/show/verify`)
 - Walker v0 (read-only focal-cell terminal interface, color by abstraction level, presheaf-overlap underlining, see `docs/WALKER_INTERFACE.md`)
+- cycle detection in parent walks (assembler, walker)
+- centralized error message helper
 - semantic linker skeleton
 
 Planned:
-- run context --include-edges (project edge context into LLM run)
 - Poset enforcement (validate edge directions against the abstraction order)
 - Proposal system (see `docs/PROPOSAL_SYSTEM.md`)
 - Walker v1 (edit mode, :propose, :run, :compile --plan)

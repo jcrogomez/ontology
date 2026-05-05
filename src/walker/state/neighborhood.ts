@@ -27,12 +27,17 @@ export function loadFocalNeighborhood(focalId: string, cwd: string = process.cwd
   const allNodes = loadNodes(cwd);
   const nodeById = new Map(allNodes.map(n => [n.id, n]));
 
-  // Path to canon: walk parentId pointers. Stops on a null parent or a missing reference.
+  // Path to canon: walk parentId pointers. Stops on a null parent, a missing reference,
+  // or a detected cycle (the seen set protects the interactive walker from spinning
+  // forever if someone introduces a malformed parent loop).
   const pathReversed: OntologyNode[] = [focal];
+  const seen = new Set<string>([focal.id]);
   let cursor: OntologyNode | null = focal;
   while (cursor.graph.parentId) {
+    if (seen.has(cursor.graph.parentId)) break;
     const next = nodeById.get(cursor.graph.parentId);
     if (!next) break;
+    seen.add(next.id);
     pathReversed.push(next);
     cursor = next;
   }
