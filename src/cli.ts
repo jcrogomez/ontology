@@ -194,6 +194,8 @@ contextCmd
   .option("--branch <branch>", "Branch to assemble context for")
   .option("--time <time>", "Time to assemble context for")
   .option("--mode <mode>", "Mode for context assembly (only 'strict' is supported)")
+  .option("--include-edges", "Include edge-aware context")
+  .option("--edge-types <types>", "Comma-separated list of edge types to include")
   .action(async (id, options) => {
     try {
       await contextAssembleCommand(id, options);

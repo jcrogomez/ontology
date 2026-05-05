@@ -19,6 +19,76 @@ describe("Context Assembler CLI", () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
+  function createTestNodeAndEdge(dir: string): string {
+    const createRes = spawnSync("npx", ["tsx", CLI_PATH, "node", "create", "--level", "domain", "--kind", "definition", "--prompt", "Example"], { cwd: dir, encoding: "utf8" });
+    const nodeIdMatch = createRes.stdout.match(/Node:\s+(node_[a-f0-9]+)/);
+    const nodeId = nodeIdMatch ? nodeIdMatch[1] : "node_fail";
+    spawnSync("npx", ["tsx", CLI_PATH, "node", "link", "--from", "node_0000_canon", "--to", nodeId, "--type", "documents"], { cwd: dir, encoding: "utf8" });
+    return nodeId;
+  }
+
+  function getDirState(dir: string): string {
+    const nodes = fs.readdirSync(path.join(dir, ".ontology/nodes")).sort().map(f => fs.readFileSync(path.join(dir, ".ontology/nodes", f), "utf8")).join("");
+    const state = fs.readFileSync(path.join(dir, ".ontology/state.json"), "utf8");
+    const edges = fs.readFileSync(path.join(dir, ".ontology/edges.jsonl"), "utf8");
+    const events = fs.readFileSync(path.join(dir, ".ontology/events.jsonl"), "utf8");
+    return nodes + state + edges + events;
+  }
+
+  it("context assemble default remains parent-path only", () => {
+    const nodeId = createTestNodeAndEdge(tempDir);
+    const result = spawnSync("npx", ["tsx", CLI_PATH, "context", "assemble", nodeId], { cwd: tempDir, encoding: "utf8" });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).not.toContain("Edge Context:");
+  });
+
+  it("context assemble --include-edges includes edge context", () => {
+    const nodeId = createTestNodeAndEdge(tempDir);
+    const result = spawnSync("npx", ["tsx", CLI_PATH, "context", "assemble", nodeId, "--include-edges"], { cwd: tempDir, encoding: "utf8" });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Edge Context:");
+    expect(result.stdout).toContain("Enabled: true");
+    expect(result.stdout).toContain("Edges:   1");
+  });
+
+  it("context assemble --include-edges --json outputs parseable edgeContext", () => {
+    const nodeId = createTestNodeAndEdge(tempDir);
+    const result = spawnSync("npx", ["tsx", CLI_PATH, "context", "assemble", nodeId, "--include-edges", "--json"], { cwd: tempDir, encoding: "utf8" });
+
+    expect(result.status).toBe(0);
+    const parsed = JSON.parse(result.stdout);
+    expect(parsed.context.edgeContext).toBeDefined();
+    expect(parsed.context.edgeContext.edges.length).toBe(1);
+  });
+
+  it("context assemble --edge-types filters edge types", () => {
+    const nodeId = createTestNodeAndEdge(tempDir);
+    const result = spawnSync("npx", ["tsx", CLI_PATH, "context", "assemble", nodeId, "--include-edges", "--edge-types", "tests"], { cwd: tempDir, encoding: "utf8" });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Edges:   0");
+  });
+
+  it("context assemble rejects invalid edge type", () => {
+    const nodeId = createTestNodeAndEdge(tempDir);
+    const result = spawnSync("npx", ["tsx", CLI_PATH, "context", "assemble", nodeId, "--include-edges", "--edge-types", "fake_type"], { cwd: tempDir, encoding: "utf8" });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("✖ Invalid edge type: fake_type");
+  });
+
+  it("context assemble --include-edges does not mutate .ontology", () => {
+    const nodeId = createTestNodeAndEdge(tempDir);
+    const beforeState = getDirState(tempDir);
+
+    spawnSync("npx", ["tsx", CLI_PATH, "context", "assemble", nodeId, "--include-edges"], { cwd: tempDir, encoding: "utf8" });
+
+    const afterState = getDirState(tempDir);
+    expect(beforeState).toStrictEqual(afterState);
+  });
+
   it("onto context assemble node_0000_canon works", () => {
     const result = spawnSync("npx", ["tsx", CLI_PATH, "context", "assemble", "node_0000_canon"], { cwd: tempDir, encoding: "utf8" });
 

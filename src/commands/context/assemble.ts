@@ -1,16 +1,38 @@
 import { assembleContext } from "../../runtime/context/assembler.js";
+import { EdgeTypeSchema } from "../../schemas/ontology.js";
 
 export async function contextAssembleCommand(
   nodeId: string,
-  options: { json?: boolean; branch?: string; time?: string; mode?: string }
+  options: {
+    json?: boolean;
+    branch?: string;
+    time?: string;
+    mode?: string;
+    includeEdges?: boolean;
+    edgeTypes?: string;
+  }
 ): Promise<void> {
   const cwd = process.cwd();
+
+  let parsedEdgeTypes: string[] | undefined;
+  if (options.edgeTypes) {
+    parsedEdgeTypes = options.edgeTypes.split(",").map((s) => s.trim());
+    for (const type of parsedEdgeTypes) {
+      const parseResult = EdgeTypeSchema.safeParse(type);
+      if (!parseResult.success) {
+        console.error(`✖ Invalid edge type: ${type}`);
+        process.exit(1);
+      }
+    }
+  }
 
   const result = assembleContext({
     targetNodeId: nodeId,
     branch: options.branch,
     time: options.time ? parseInt(options.time, 10) : undefined,
-    mode: options.mode as any
+    mode: options.mode as any,
+    includeEdges: options.includeEdges,
+    edgeTypes: parsedEdgeTypes as any
   }, cwd);
 
   if (options.json) {
@@ -38,6 +60,16 @@ export async function contextAssembleCommand(
     console.log(`  ${i + 1}. ${c}`);
   });
   console.log(``);
+
+  if (result.edgeContext) {
+    console.log(` Edge Context:`);
+    console.log(`  Enabled: true`);
+    console.log(`  Edges:   ${result.edgeContext.edges.length}`);
+    console.log(`  Nodes:   ${result.edgeContext.nodeIds.length}`);
+    console.log(``);
+  }
+
+  const targetNode = nodes.find(n => n.id === nodeId) || nodes[0];
   console.log(` Target Prompt:`);
-  console.log(`  ${nodes[nodes.length - 1].prompt.raw}`);
+  console.log(`  ${targetNode.prompt.raw}`);
 }
