@@ -211,6 +211,8 @@ run
   .option("--task <task>", "Task to run")
   .option("--prompt <prompt>", "Prompt to send")
   .option("--provider <provider>", "LLM provider to use")
+  .option("--model <model>", "Model to use for the selected LLM provider")
+  .option("--ollama-host <host>", "Host for Ollama provider")
   .option("--json", "Output results in JSON format")
   .action(async (options) => {
     if (!options.task) {
