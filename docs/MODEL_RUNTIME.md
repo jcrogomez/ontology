@@ -10,14 +10,14 @@ The `LlmAdapter` is the fundamental interface for model execution. All model pro
 
 ## Dispatcher Support (Multi-Provider)
 
-Currently, the `dispatchLlmRequest` router supports only the `mock` provider.
-Multi-provider support (specifically for `ollama`) is **Planned / Not yet implemented**. If a provider other than `mock` is requested, the dispatcher will throw an error: `Unsupported LLM provider: <provider>`.
+Currently, the `dispatchLlmRequest` router supports both the `mock` and `ollama` providers.
+If an unsupported provider is requested, the dispatcher will throw an error: `Unsupported LLM provider: <provider>`.
 
-As a result, commands like `run prompt --provider ollama` and `run context --provider ollama` remain **Planned / Not yet implemented**.
+As a result, commands like `run prompt --provider ollama` are **Implemented**. However, `run context --provider ollama` remains **Planned / Not yet implemented** (not yet connected).
 
-When implemented, the multi-provider dispatcher will support:
+The multi-provider dispatcher supports:
 - **mock**: deterministic and CI-safe (Implemented).
-- **ollama**: local model execution. Since Ollama is local and may not be available, failures must be handled explicitly and loudly (Planned).
+- **ollama**: local model execution. Since Ollama is local and may not be available, failures are handled explicitly and loudly (Implemented).
 
 Regardless of the provider used, **provider execution must never mutate `.ontology`**. All execution is isolated from the semantic state.
 
@@ -44,7 +44,7 @@ The `dispatchLlmRequest` function acts as the central router for model execution
 
 ### Why run remains read-only
 
-Run commands may execute models, but they must not mutate `.ontology`. Mutation requires explicit graph commands/events. This keeps model output separate from semantic truth until validated. The deterministic graph is isolated from probabilistic text generation. Model execution remains a distinct phase from semantic state mutation.
+Models may speak. Only explicit graph commands may mutate `.ontology`. Mutation requires explicit graph commands/events. This keeps model output separate from semantic truth until validated. The deterministic graph is isolated from probabilistic text generation. Model execution remains a distinct phase from semantic state mutation.
 
 ### Why model doctor/list comes before run --provider ollama
 

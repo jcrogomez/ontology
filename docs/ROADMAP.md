@@ -20,21 +20,23 @@ Current Operational Loop: `graph → context → mock LLM → deterministic vali
 Implemented:
 - mock run prompt
 - dispatcher multi-provider
-
-Partially completed:
 - isolated Ollama adapter
+- run prompt --provider ollama
 - model doctor/list
+- semantic linker skeleton
 
 Planned:
-- run prompt --provider ollama
 - run context --provider ollama
+- edge create / node link
+- context assemble --include-edges
+- PromptAST
+- compiler
 
 At this stage, Ontology is a verified network kernel and a node editor. The network is strictly modeled as a typed, temporal directed graph, and all mutations are tracked via an append-only event log.
 
 **Known limitations:**
-- dispatcher multi-provider (Implemented)
-- run prompt --provider ollama (Planned / Not yet implemented)
 - run context --provider ollama (Planned / Not yet implemented)
+- context assemble --include-edges in CLI (Planned / Not yet implemented)
 - no compiler
 - no PromptAST
 - no advanced SemanticLinker graph reasoning
@@ -71,7 +73,7 @@ The roadmap outlines a progressive build-up towards a fully functioning semantic
 The following components are strictly **planned** and **do not yet exist** in the current architecture. They represent the long-term vision of Ontology as a complete ecosystem.
 
 ### SemanticLinker
-*(Planned / Not yet implemented)*
+*(Skeleton Implemented / Advanced features Planned)*
 A dynamic linking system designed to automatically resolve and bind context, dependencies, and interfaces across the semantic network during the compilation functor process.
 
 ### Compiler

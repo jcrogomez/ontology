@@ -75,20 +75,10 @@ This document outlines the available CLI commands across current Bootstrap phase
 
 - **Purpose:** Runs an LLM task directly with a given prompt.
 - **Example:** `npm run dev -- run prompt --task <task> --prompt <text> --provider mock` (or `npm run dev -- run prompt --task <task> --prompt <text> --provider mock --json`)
+- **Example (Ollama):** `npm run dev -- run prompt --task <task> --prompt <text> --provider ollama --model llama3.1:8b`
+- **Notes:** Models may speak. Only explicit graph commands may mutate `.ontology`. Ollama execution is local and will fail gracefully if unavailable.
 
-### Planned provider extension: Ollama
-*Planned / Not yet implemented*:
-```bash
-onto run prompt --task semantic_parse --prompt "Hello" --provider ollama --model llama3.1:8b
-onto run prompt --task semantic_parse --prompt "Hello" --provider ollama --ollama-host http://127.0.0.1:11434
-```
-**Notes:**
-- Ollama is local.
-- It may be unavailable.
-- It must fail gracefully without stack traces.
-- `--model` selects the local model.
-- `--ollama-host` selects the host.
-- `run prompt` must not read or mutate `.ontology`.
+
 
 ### `run context`
 
@@ -100,10 +90,6 @@ onto run prompt --task semantic_parse --prompt "Hello" --provider ollama --ollam
 - **Purpose:** Runs an LLM task against an assembled context and strictly validates the response via the intentional validation pipeline.
 - **Example:** `npm run dev -- run context <nodeId> --provider mock --validate`
 
-## Planned Commands
-
-The following commands are *Planned / Not yet implemented*:
-
 ### Model Observability
 - `onto model doctor`
 - `onto model doctor --json`
@@ -112,6 +98,9 @@ The following commands are *Planned / Not yet implemented*:
 - `onto model list --provider mock`
 - `onto model list --provider ollama`
 
+## Planned Commands
+
+The following commands are *Planned / Not yet implemented*:
+
 ### Execution with Providers
-- `onto run prompt --provider ollama`
 - `onto run context <nodeId> --provider ollama`
