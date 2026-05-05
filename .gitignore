@@ -5,6 +5,12 @@ coverage/
 .DS_Store
 .ontology/
 .generated/
+src/generated/
+
+# Patch and conflict residue
+*.orig
+*.rej
+*.patch
 
 # Environment and secrets
 .env

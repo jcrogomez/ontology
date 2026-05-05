@@ -22,25 +22,25 @@ Implemented:
 - dispatcher multi-provider
 - isolated Ollama adapter
 - run prompt --provider ollama
+- run context --provider ollama
 - model doctor/list
+- node link (typed semantic edge creation)
+- context assemble --include-edges (edge-aware context, with --edge-types filter)
 - semantic linker skeleton
 
 Planned:
-- run context --provider ollama
-- edge create / node link
-- context assemble --include-edges
+- run context --include-edges (project edge context into LLM run)
+- edge-aware SemanticLinker
 - PromptAST
 - compiler
 
 At this stage, Ontology is a verified network kernel and a node editor. The network is strictly modeled as a typed, temporal directed graph, and all mutations are tracked via an append-only event log.
 
 **Known limitations:**
-- run context --provider ollama (Planned / Not yet implemented)
-- context assemble --include-edges in CLI (Planned / Not yet implemented)
+- run context --include-edges (Planned / Not yet implemented)
 - no compiler
 - no PromptAST
-- no advanced SemanticLinker graph reasoning
-- no edge create/node link yet
+- no edge-aware SemanticLinker graph reasoning (skeleton only)
 
 ## Next Phases
 

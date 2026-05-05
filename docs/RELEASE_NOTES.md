@@ -11,18 +11,23 @@
 - Context Assembler strict
 - Context CLI
 - Mock LLM adapter
-- Dispatcher mock-only
+- Ollama LLM adapter (isolated)
+- Multi-provider dispatcher (mock + ollama)
 - Runtime errors
 - Presheaf/gluing
 - Intent Validator
-- run prompt
-- run context
+- run prompt (mock + ollama)
+- run context (mock + ollama)
 - run context --validate
+- model doctor / model list
+- node create / node list / node show / node link
+- context assemble --include-edges (edge-aware context, with --edge-types filter)
+- Semantic Linker (skeleton)
 
 ### Known limitations
 
-- no Ollama real in CLI yet
-- no compiler
+- run context --include-edges not yet exposed
+- SemanticLinker is a skeleton (no edge-aware graph reasoning yet)
 - no PromptAST
-- no advanced SemanticLinker graph reasoning
-- no edge create/node link yet
+- no compiler
+- no Visual DAG Studio

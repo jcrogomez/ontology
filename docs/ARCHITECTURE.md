@@ -22,24 +22,25 @@ Observability in Ontology is strictly functional, terminal-first, and built into
 The LLM runtime handles the interface with external models.
 - **Isolation**: Housed strictly under `src/runtime/llm/`. It is entirely decoupled from the core structural graph commands (e.g., node creation).
 - **Safety**: Direct parsing of LLM outputs enforces robustness. All external model outputs are wrapped in `try/catch` blocks, re-throwing formatted errors that include raw content to assist with debugging.
-- **Current State**: The loop `graph → context → mock LLM → deterministic validation` is complete and operational. Note that this loop currently operates strictly read-only and does not mutate the network or invoke real models yet. The deterministic validation includes the intent validator and presheaf/gluing pipeline as a minimal implementation. **Real external model integration (like a functioning Ollama bridge) is Planned / Not yet implemented.**
+- **Current State**: The loop `graph → context → LLM (mock | ollama) → deterministic validation` is complete and operational. The loop runs strictly read-only over `.ontology` and does not mutate the network. The deterministic validation includes the intent validator and presheaf/gluing pipeline as a minimal implementation. The Ollama bridge is wired through both `run prompt` and `run context`; failures are surfaced loudly when Ollama is not reachable.
 
 **Implemented:**
 - mock adapter
 - isolated Ollama adapter
 - dispatcher multi-provider
 - run prompt --provider ollama
+- run context --provider ollama
 - model doctor/list
 - model observability
+- node link (typed semantic edge creation)
+- context assemble --include-edges (edge-aware context, with --edge-types filter)
 - semantic linker skeleton
 
 **Known limitations:**
-- run context --provider ollama (Planned / Not yet implemented)
-- context assemble --include-edges in CLI (Planned / Not yet implemented)
+- run context --include-edges (Planned / Not yet implemented)
 - no compiler
 - no PromptAST
-- no advanced SemanticLinker graph reasoning
-- no edge create/node link yet
+- no edge-aware SemanticLinker graph reasoning (skeleton only)
 
 ### 4. Context Assembler
 The Context Assembler is responsible for organizing the local graph state that bounds the constraints of a node.
@@ -62,7 +63,8 @@ The Context Assembler is responsible for organizing the local graph state that b
 
 To maintain absolute clarity on the current state of the architecture, the following modules are **Planned / Not yet implemented**:
 
-- **SemanticLinker**: Skeleton implemented, advanced features planned to automatically bind context and dependencies across the network.
+- **Edge-aware Execution**: `context assemble --include-edges` is implemented and projects typed edges into an `edgeContext` block. The next planned step is wiring the same projection into `run context --include-edges` so LLM runs can consume the edge-aware context.
+- **SemanticLinker**: Skeleton implemented, edge-aware advanced features planned to automatically bind context and dependencies across the network.
+- **PromptAST**: Planned. Prompts are still stored as raw intention text and are not parsed into rewrite rules.
 - **Compiler**: Planned to transform the `.ontology` graph into executable code artifacts. Currently, Ontology does not generate code.
 - **Visual DAG Studio**: Planned web-based UI.
-- **Real Ollama Execution**: Live model execution via `run prompt` is implemented. However, `run context` execution and PromptAST parsing do not yet exist.

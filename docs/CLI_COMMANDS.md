@@ -61,6 +61,16 @@ This document outlines the available CLI commands across current Bootstrap phase
 - **Purpose:** Displays detailed information for a specific node.
 - **Example:** `npm run dev -- node show <id>` (or `npm run dev -- node show <id> --json`)
 
+### `node link`
+
+- **Purpose:** Creates a typed semantic edge between two existing nodes and appends an `edge_created` event to the temporal log.
+- **Example:** `npm run dev -- node link --from node_0000_canon --to node_0001 --type documents` (or with `--json`)
+- **Files Touched:**
+  - `.ontology/edges.jsonl` (Appends the typed edge)
+  - `.ontology/events.jsonl` (Appends an `edge_created` event)
+  - `.ontology/state.json` (Updates summary counters and timestamp)
+- **What it does not do:** It does not project edges into assembled context yet (`context assemble --include-edges` is planned). It does not delete or modify existing edges.
+
 ### `events tail`
 
 - **Purpose:** Streams or lists the most recent events from the event log.
@@ -70,6 +80,9 @@ This document outlines the available CLI commands across current Bootstrap phase
 
 - **Purpose:** Deterministically computes the local context for a specific node.
 - **Example:** `npm run dev -- context assemble <nodeId>` (or `npm run dev -- context assemble <nodeId> --json`)
+- **Edge-aware Example:** `npm run dev -- context assemble <nodeId> --include-edges`
+- **Filtered Edge Example:** `npm run dev -- context assemble <nodeId> --include-edges --edge-types documents,validates_against`
+- **Notes:** Without `--include-edges`, the assembler returns the parent path only. With it, the assembler projects typed edges incident to the node into an `edgeContext` block. Edge type values are validated against `EdgeTypeSchema`; an invalid type fails loudly with `✖ Invalid edge type: <type>`. The command never mutates `.ontology`.
 
 ### `run prompt`
 
@@ -84,6 +97,8 @@ This document outlines the available CLI commands across current Bootstrap phase
 
 - **Purpose:** Runs an LLM task against an assembled context for a given node.
 - **Example:** `npm run dev -- run context <nodeId> --provider mock` (or `npm run dev -- run context <nodeId> --provider mock --json`)
+- **Example (Ollama):** `npm run dev -- run context <nodeId> --provider ollama --model llama3.1:8b`
+- **Notes:** Reads the assembled context but never writes back. Ollama execution is local and will fail loudly if unavailable.
 
 ### `run context --validate`
 
@@ -102,5 +117,5 @@ This document outlines the available CLI commands across current Bootstrap phase
 
 The following commands are *Planned / Not yet implemented*:
 
-### Execution with Providers
-- `onto run context <nodeId> --provider ollama`
+### Edge-aware Execution
+- `onto run context <nodeId> --include-edges` (project edge context into LLM run)

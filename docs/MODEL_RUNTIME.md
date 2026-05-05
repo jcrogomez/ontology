@@ -13,7 +13,7 @@ The `LlmAdapter` is the fundamental interface for model execution. All model pro
 Currently, the `dispatchLlmRequest` router supports both the `mock` and `ollama` providers.
 If an unsupported provider is requested, the dispatcher will throw an error: `Unsupported LLM provider: <provider>`.
 
-As a result, commands like `run prompt --provider ollama` are **Implemented**. However, `run context --provider ollama` remains **Planned / Not yet implemented** (not yet connected).
+Both `run prompt --provider ollama` and `run context --provider ollama` are **Implemented**.
 
 The multi-provider dispatcher supports:
 - **mock**: deterministic and CI-safe (Implemented).
@@ -34,7 +34,7 @@ The `ollama` provider acts as the bridge to local Ollama deployments. Currently 
 - **Graceful Failure:** The command must fail gracefully if Ollama is not running.
 - **Model Selection:** The `--model` flag permits selecting a specific local model.
 - **Host Selection:** The `--ollama-host` flag allows selecting a specific host for the Ollama connection.
-- **Read-Only / No Mutation:** Executing `run prompt` with Ollama must not read from or mutate `.ontology`. All executions remain purely read-only and side-effect free concerning the semantic state.
+- **Read-Only / No Mutation:** Executing `run prompt` or `run context` with Ollama must not mutate `.ontology`. `run context` reads the assembled context for a node but never writes back; all executions remain side-effect free concerning the semantic state.
 
 ### dispatchLlmRequest
 
