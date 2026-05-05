@@ -12,6 +12,7 @@ export function getOntologyPaths(cwd = process.cwd()) {
   const artifactsDir = path.join(ontologyDir, "artifacts");
   const reportsDir = path.join(ontologyDir, "reports");
   const runsDir = path.join(ontologyDir, "runs");
+  const proposalsDir = path.join(ontologyDir, "proposals");
 
   return {
     cwd,
@@ -20,6 +21,7 @@ export function getOntologyPaths(cwd = process.cwd()) {
     eventsPath: path.join(ontologyDir, "events.jsonl"),
     edgesPath: path.join(ontologyDir, "edges.jsonl"),
     runsDir,
+    proposalsDir,
     nodesDir,
     assetsDir,
     imagesDir: path.join(assetsDir, "images"),

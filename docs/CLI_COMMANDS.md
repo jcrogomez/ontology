@@ -143,6 +143,17 @@ This document outlines the available CLI commands across current Bootstrap phase
 - **v0 keys:** `↑` parent · `↓` child · `←/→` siblings · `:q` / `q` quit · `:help` flash help.
 - **Notes:** Requires an interactive TTY. Future versions will add edit mode, `:run`, `:propose`, and `:compile`. See `docs/WALKER_INTERFACE.md`.
 
+### `propose node` *(Bootstrap 0.5, PR #92)*
+
+- **Purpose:** Create a typed candidate node mutation — a *proposal* — without touching the graph. Writes a record under `.ontology/proposals/proposal_<id>.json` and appends a `proposal_created` event to the temporal log.
+- **Example:** `npm run dev -- propose node --level domain --kind entity --prompt "Harvest entity"`
+- **Optional flags:** `--label`, `--parent <nodeId>` (defaults to root canon), `--rationale <text>`, `--json`.
+- **Files Touched:**
+  - `.ontology/proposals/proposal_<id>.json` (Creates the proposal record)
+  - `.ontology/events.jsonl` (Appends a `proposal_created` event)
+  - `.ontology/state.json` (Updates summary counters and timestamp)
+- **What it does not do (yet):** It does not create the node. The proposal lives in `pending` status. `onto proposal apply` (planned, PR #94) will translate it into a real `node_create`. See `docs/PROPOSAL_SYSTEM.md`.
+
 ### Model Observability
 - `onto model doctor`
 - `onto model doctor --json`
@@ -155,10 +166,11 @@ This document outlines the available CLI commands across current Bootstrap phase
 
 The following commands are *Planned / Not yet implemented*:
 
-### Proposal System
-- `onto propose node` (typed candidate node mutation derived from a model run)
+### Proposal System (next PRs)
 - `onto propose link` (typed candidate edge mutation)
-- `onto proposal list` / `onto proposal show` / `onto proposal apply` / `onto proposal reject`
+- `onto proposal list` / `onto proposal show` / `onto proposal reject` (PR #93)
+- `onto proposal apply` with `parentHash` re-validation (PR #94)
+- `--as-proposal` integration with `run prompt` / `run context` (PR #95)
 
 ### Walker v1
 - `onto walk` edit mode, `:run`, `:propose`, `:compile --plan`

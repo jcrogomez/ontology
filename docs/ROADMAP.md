@@ -32,10 +32,16 @@ Implemented:
 - cycle detection in parent walks (assembler, walker)
 - centralized error message helper
 - poset enforcement on refinement-family edges (`refines`, `inherits_from`, `implements`, `belongs_to`) at link time and retroactively in `onto validate`
+- proposal system: schema + storage + `onto propose node` + `proposal_created` event (Bootstrap 0.5, PR #92)
 - semantic linker skeleton
 
-Planned:
-- Proposal system (see `docs/PROPOSAL_SYSTEM.md`)
+Planned (Proposal System milestone):
+- `onto proposal list / show / reject` (PR #93)
+- `onto proposal apply` with `parentHash` re-validation (PR #94)
+- run-driven proposals: `run prompt --as-proposal` / `run context --as-proposal` (PR #95)
+- `onto propose link` (edge_create proposals)
+
+Planned (later):
 - Walker v1 (edit mode, :propose, :run, :compile --plan)
 - edge-aware SemanticLinker
 - PromptAST
@@ -69,7 +75,15 @@ The roadmap outlines a progressive build-up towards a fully functioning semantic
 - Poset enforcement: validator rejects edges whose direction violates the partial order.
 
 ### Bootstrap 0.5: Proposal System
-- Proposal system: typed candidate mutations derived from persisted runs, applied explicitly, with optimistic concurrency via `parentHash`. See `docs/PROPOSAL_SYSTEM.md`.
+
+In progress, shipped as a chain of small PRs:
+
+- **PR #92** (this) — Schema, storage, `onto propose node`, `proposal_created` event. Pending status only; no apply yet.
+- **PR #93** — `onto proposal list / show / reject`. Read-only ops on the proposals directory.
+- **PR #94** — `onto proposal apply` with `parentHash` re-validation. Translates a pending proposal into a real `node_create` mutation iff the parent has not changed.
+- **PR #95** — Integration with `run prompt` / `run context`: an `--as-proposal` flag that turns a model run into a proposal in one step.
+
+See `docs/PROPOSAL_SYSTEM.md` for the full design.
 
 (Run persistence shipped early as part of Bootstrap 0.4 because it is a small, low-risk prerequisite that unblocks both proposal provenance and the walker's `:run` mode.)
 
