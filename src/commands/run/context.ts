@@ -6,7 +6,8 @@ import { validateIntent, type IntentValidationResult } from "../../runtime/conte
 import type { LlmTask, LlmProvider } from "../../runtime/llm/types.js";
 import { hashPrompt, hashContext } from "../../core/integrity/hash.js";
 import { createPersistedRun, computeRunId, loadPersistedRun } from "../../core/runs/persist.js";
-import type { PersistedRunInput, PersistedRunModel } from "../../schemas/ontology.js";
+import type { PersistedRunInput, PersistedRunModel, OntologyEdge } from "../../schemas/ontology.js";
+import { EdgeTypeSchema } from "../../schemas/ontology.js";
 
 export interface RunContextOptions {
   provider?: string;
@@ -19,6 +20,8 @@ export interface RunContextOptions {
   model?: string;
   ollamaHost?: string;
   persist?: boolean;
+  includeEdges?: boolean;
+  edgeTypes?: string;
 }
 
 export async function runContextCommand(id: string, options: RunContextOptions) {
@@ -35,15 +38,35 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
     throw new Error(`Unsupported LLM provider: ${provider}`);
   }
 
+  // Parse and validate --edge-types up front so a typo fails before any LLM dispatch.
+  // The kernel rejects unknown edge types with the same brutalist message that
+  // `context assemble` uses, keeping the contract uniform across both commands.
+  const isIncludeEdges = !!options.includeEdges;
+  let parsedEdgeTypes: OntologyEdge["type"][] | null = null;
+  if (options.edgeTypes) {
+    const list = options.edgeTypes.split(",").map(s => s.trim()).filter(Boolean);
+    for (const t of list) {
+      const r = EdgeTypeSchema.safeParse(t);
+      if (!r.success) {
+        console.error(`✖ Invalid edge type: ${t}`);
+        process.exit(1);
+      }
+    }
+    parsedEdgeTypes = list as OntologyEdge["type"][];
+  }
+
   const contextOutput = assembleContext({
     targetNodeId: id,
     branch,
     time,
     mode,
+    includeEdges: isIncludeEdges,
+    edgeTypes: parsedEdgeTypes ?? undefined,
   });
 
   // Build deterministic envelopes up front so we can detect cache hits before dispatch
-  // when --persist is on.
+  // when --persist is on. Edge configuration is part of the cache key: a run with
+  // --include-edges produces a different id than one without, even on the same node.
   const runInput: PersistedRunInput = {
     promptHash: hashPrompt(contextOutput.prompt),
     contextHash: hashContext(contextOutput),
@@ -51,8 +74,8 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
     branch: contextOutput.branch,
     time: time ?? null,
     task: task as string,
-    includeEdges: false,
-    edgeTypes: null,
+    includeEdges: isIncludeEdges,
+    edgeTypes: parsedEdgeTypes,
   };
   const runModel: PersistedRunModel = {
     provider: provider as LlmProvider,
@@ -80,7 +103,11 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
     }
   }
 
-  let llmResponse;
+  // Track wall-clock duration locally instead of monkey-patching the LlmResponse.
+  // The adapter's own `usage.evalDurationMs` (when available) reports model-side time;
+  // this number captures the full dispatch round-trip, which is what the run record stores.
+  let durationMs = 0;
+  let llmResponse: Awaited<ReturnType<typeof dispatchLlmRequest>>;
   try {
     const start = Date.now();
     llmResponse = await dispatchLlmRequest(
@@ -95,7 +122,7 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
         ollamaHost: options.ollamaHost,
       }
     );
-    (llmResponse as any).__durationMs = Date.now() - start;
+    durationMs = Date.now() - start;
   } catch (err: unknown) {
     if (provider === "ollama") {
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -128,7 +155,6 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
   let persistedInfo: { runId: string; cached: boolean } | undefined;
   if (isPersist) {
     const finalModel: PersistedRunModel = { ...runModel, model: llmResponse.model };
-    const durationMs = (llmResponse as any).__durationMs ?? 0;
     const { run, cached } = createPersistedRun({
       kind: "context",
       input: runInput,
@@ -234,6 +260,10 @@ function emitRunContextOutput(opts: EmitRunContextOutputOptions): void {
   console.log(`  Mode:    ${contextOutput.mode}`);
   console.log(`  Branch:  ${contextOutput.branch}`);
   console.log(`  Nodes:   ${contextOutput.nodes.length}`);
+  if (contextOutput.edgeContext) {
+    console.log(`  Edges:   ${contextOutput.edgeContext.edges.length}`);
+    console.log(`  Edge nodes: ${contextOutput.edgeContext.nodeIds.length}`);
+  }
   console.log(``);
   console.log(`Response:\n${truncatedText}`);
 

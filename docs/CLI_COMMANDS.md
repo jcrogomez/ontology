@@ -98,7 +98,9 @@ This document outlines the available CLI commands across current Bootstrap phase
 - **Purpose:** Runs an LLM task against an assembled context for a given node.
 - **Example:** `npm run dev -- run context <nodeId> --provider mock` (or `npm run dev -- run context <nodeId> --provider mock --json`)
 - **Example (Ollama):** `npm run dev -- run context <nodeId> --provider ollama --model llama3.1:8b`
-- **Notes:** Reads the assembled context but never writes back. Ollama execution is local and will fail loudly if unavailable.
+- **Edge-aware Example:** `npm run dev -- run context <nodeId> --provider mock --include-edges`
+- **Filtered Edge Example:** `npm run dev -- run context <nodeId> --provider mock --include-edges --edge-types depends_on,validates_against`
+- **Notes:** Reads the assembled context but never writes back. With `--include-edges`, the run consumes the same edge context that `context assemble --include-edges` produces. Edge type values are validated against `EdgeTypeSchema`; an invalid type fails loudly with `✖ Invalid edge type: <type>`. When combined with `--persist`, the cache key incorporates the edge configuration: an edge-aware run produces a different `runId` than a plain run on the same node.
 
 ### `run context --validate`
 
@@ -150,5 +152,10 @@ This document outlines the available CLI commands across current Bootstrap phase
 
 The following commands are *Planned / Not yet implemented*:
 
-### Edge-aware Execution
-- `onto run context <nodeId> --include-edges` (project edge context into LLM run)
+### Proposal System
+- `onto propose node` (typed candidate node mutation derived from a model run)
+- `onto propose link` (typed candidate edge mutation)
+- `onto proposal list` / `onto proposal show` / `onto proposal apply` / `onto proposal reject`
+
+### Walker v1
+- `onto walk` edit mode, `:run`, `:propose`, `:compile --plan`

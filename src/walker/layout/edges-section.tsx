@@ -18,12 +18,14 @@ export function EdgesSection({ edgesOut, edgesIn, edgeNeighbors }: EdgesSectionP
     <Box flexDirection="column" marginTop={1}>
       <Text bold>Edges</Text>
       {edgesOut.map(e => (
-        <Text key={e.edgeId}>
+        // Prefix the React key by direction so out/in lists never collide on the same edgeId
+        // (e.g. if a self-link were ever permitted by a future bootstrap; today it is rejected).
+        <Text key={`out:${e.edgeId}`}>
           {`  → ${e.type.padEnd(20)} ${e.to.padEnd(18)} ${labelById.get(e.to) ?? ""}`}
         </Text>
       ))}
       {edgesIn.map(e => (
-        <Text key={e.edgeId}>
+        <Text key={`in:${e.edgeId}`}>
           {`  ← ${e.type.padEnd(20)} ${e.from.padEnd(18)} ${labelById.get(e.from) ?? ""}`}
         </Text>
       ))}

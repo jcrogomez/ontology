@@ -1,5 +1,6 @@
 import { createNode } from "../../core/nodes/create-node.js";
 import { AbstractionLevelSchema, NodeKindSchema } from "../../schemas/ontology.js";
+import { errorMessage } from "../../core/errors.js";
 import { z } from "zod";
 
 export interface NodeCreateCommandOptions {
@@ -50,7 +51,7 @@ Next:
   onto node show ${node.id}
   onto validate`);
   } catch (err: unknown) {
-    console.error(`✖ Error during node creation: ${(err as Error).message}`);
+    console.error(`✖ Error during node creation: ${errorMessage(err)}`);
     process.exit(1);
   }
 }

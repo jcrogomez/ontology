@@ -27,6 +27,7 @@ export async function eventsTailCommand(options: { json?: boolean, limit?: strin
   const typePad = 22;
   const branchPad = 9;
 
+  console.log("=== ONTOLOGY EVENTS ===");
   console.log(
     "Sequence".padEnd(seqPad) +
     "Event ID".padEnd(idPad) +

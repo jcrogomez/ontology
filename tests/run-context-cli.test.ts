@@ -192,3 +192,86 @@ test("onto run context --validate does not mutate .ontology", () => {
   const afterHash = hashDirectory(ontologyDir);
   expect(beforeHash).toBe(afterHash);
 });
+
+test("onto run context default does not surface an Edges line", () => {
+  const result = runCli(["run", "context", "node_0000_canon", "--provider", "mock"]);
+  expect(result.status).toBe(0);
+  expect(result.stdout).not.toContain("Edges:");
+});
+
+test("onto run context --include-edges surfaces an Edges line and edgeContext in JSON", () => {
+  // Create a child node and link it to canon so there is an edge to project.
+  const c = runCli(["node", "create", "--level", "domain", "--kind", "entity", "--prompt", "Harvest entity"]);
+  expect(c.status).toBe(0);
+  const link = runCli(["node", "link", "--from", "node_0000_canon", "--to", "node_0001", "--type", "documents"]);
+  expect(link.status).toBe(0);
+
+  const human = runCli(["run", "context", "node_0000_canon", "--provider", "mock", "--include-edges"]);
+  expect(human.status).toBe(0);
+  expect(human.stdout).toContain("Edges:");
+
+  const json = runCli(["run", "context", "node_0000_canon", "--provider", "mock", "--include-edges", "--json"]);
+  expect(json.status).toBe(0);
+  const parsed = JSON.parse(json.stdout);
+  expect(parsed.context.edgeContext).toBeDefined();
+  expect(parsed.context.edgeContext.edges.length).toBeGreaterThan(0);
+});
+
+test("onto run context --edge-types filters by edge type", () => {
+  runCli(["node", "create", "--level", "domain", "--kind", "entity", "--prompt", "Harvest entity"]);
+  runCli(["node", "link", "--from", "node_0000_canon", "--to", "node_0001", "--type", "documents"]);
+
+  // Filter for a different edge type than the one created. Edge context should be empty.
+  const result = runCli([
+    "run", "context", "node_0000_canon",
+    "--provider", "mock",
+    "--include-edges",
+    "--edge-types", "depends_on",
+    "--json",
+  ]);
+  expect(result.status).toBe(0);
+  const parsed = JSON.parse(result.stdout);
+  expect(parsed.context.edgeContext).toBeDefined();
+  expect(parsed.context.edgeContext.edges.length).toBe(0);
+});
+
+test("onto run context --edge-types rejects an invalid edge type", () => {
+  const result = runCli([
+    "run", "context", "node_0000_canon",
+    "--provider", "mock",
+    "--include-edges",
+    "--edge-types", "fake_type",
+  ]);
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain("Invalid edge type: fake_type");
+});
+
+test("onto run context --include-edges does not mutate .ontology", () => {
+  // Create the edge so include-edges has something to project.
+  runCli(["node", "create", "--level", "domain", "--kind", "entity", "--prompt", "Harvest entity"]);
+  runCli(["node", "link", "--from", "node_0000_canon", "--to", "node_0001", "--type", "documents"]);
+
+  const ontologyDir = path.join(tempDir, ".ontology");
+  const beforeHash = hashDirectory(ontologyDir);
+
+  const result = runCli(["run", "context", "node_0000_canon", "--provider", "mock", "--include-edges"]);
+  expect(result.status).toBe(0);
+
+  const afterHash = hashDirectory(ontologyDir);
+  expect(beforeHash).toBe(afterHash);
+});
+
+test("onto run context --include-edges --persist produces a different runId than without --include-edges", () => {
+  runCli(["node", "create", "--level", "domain", "--kind", "entity", "--prompt", "Harvest entity"]);
+  runCli(["node", "link", "--from", "node_0000_canon", "--to", "node_0001", "--type", "documents"]);
+
+  const without = runCli(["run", "context", "node_0000_canon", "--provider", "mock", "--persist", "--json"]);
+  expect(without.status).toBe(0);
+  const idWithout = JSON.parse(without.stdout).persisted.runId;
+
+  const withEdges = runCli(["run", "context", "node_0000_canon", "--provider", "mock", "--include-edges", "--persist", "--json"]);
+  expect(withEdges.status).toBe(0);
+  const idWith = JSON.parse(withEdges.stdout).persisted.runId;
+
+  expect(idWith).not.toBe(idWithout);
+});

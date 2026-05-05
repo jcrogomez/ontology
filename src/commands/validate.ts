@@ -3,6 +3,7 @@ import * as path from "node:path";
 import { getOntologyPaths } from "../core/project/paths.js";
 import { readJson, readJsonl } from "../core/fs/json.js";
 import { hashObject, removeIntegrityHash } from "../core/integrity/hash.js";
+import { errorMessage } from "../core/errors.js";
 import {
   OntologyStateSchema,
   OntologyNodeSchema,
@@ -82,7 +83,7 @@ export async function validateCommand(): Promise<void> {
     const rawState = readJson(paths.statePath);
     state = OntologyStateSchema.parse(rawState);
   } catch (err: unknown) {
-    reportError(`Failed to parse state.json: ${(err as Error).message}`);
+    reportError(`Failed to parse state.json: ${errorMessage(err)}`);
     console.error("✖ VALIDATION FAILED. State file is corrupted.");
     process.exit(1);
   }
@@ -315,7 +316,7 @@ export async function validateCommand(): Promise<void> {
       }
     }
   } catch (err: unknown) {
-    reportError(`Failed to parse models registry: ${(err as Error).message}`);
+    reportError(`Failed to parse models registry: ${errorMessage(err)}`);
   }
 
   try {
@@ -336,7 +337,7 @@ export async function validateCommand(): Promise<void> {
       }
     }
   } catch (err: unknown) {
-    reportError(`Failed to parse processors registry: ${(err as Error).message}`);
+    reportError(`Failed to parse processors registry: ${errorMessage(err)}`);
   }
 
   if (failures > 0) {
