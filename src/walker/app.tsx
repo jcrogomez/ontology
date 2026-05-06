@@ -25,10 +25,12 @@ import { HintBar } from "./layout/hint-bar.js";
 import { DraftEditor } from "./layout/draft-editor.js";
 import { RunResultPanel, type RunResultPanelProps } from "./layout/run-result-panel.js";
 import { CompilePlanPanel, type CompilePlanPanelProps } from "./layout/compile-plan-panel.js";
+import { CompileResultPanel, type CompileResultPanelProps } from "./layout/compile-result-panel.js";
 import { loadDraft, saveDraft, clearDraft } from "../core/drafts/persist.js";
 import { proposeFromDraft } from "./actions/propose-from-draft.js";
 import { runFromWalker } from "./actions/run-from-walker.js";
 import { planFromWalker } from "./actions/plan-from-walker.js";
+import { compileFromWalker } from "./actions/compile-from-walker.js";
 import type { LlmProvider } from "../runtime/llm/types.js";
 
 export interface AppProps {
@@ -74,6 +76,12 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
   // pure topological sort over edges, no I/O beyond loadEdges), so unlike
   // :run there is no pending sentinel.
   const [planState, setPlanState] = useState<CompilePlanPanelProps["state"]>({ kind: "idle" });
+
+  // Compile-run state. Like :run, this is async (dispatches the model for
+  // each step in the plan). We use the same two-stage pattern: render
+  // "running" synchronously, then carry out the dispatches in a useEffect.
+  const [compileState, setCompileState] = useState<CompileResultPanelProps["state"]>({ kind: "idle" });
+  const [pendingCompile, setPendingCompile] = useState<{ provider: LlmProvider } | null>(null);
 
   const neighborhood = useMemo<FocalNeighborhood | { error: string }>(() => {
     try {
@@ -142,6 +150,27 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingRun]);
+
+  // Async dispatcher for `:compile`. Mirrors the :run pattern.
+  useEffect(() => {
+    if (!pendingCompile) return;
+    if ("error" in neighborhood) {
+      setCompileState({ kind: "result", run: { ok: false, focalId, reason: "missing_node", message: "focal node failed to load" } });
+      setPendingCompile(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const run = await compileFromWalker({ focalId, provider: pendingCompile.provider, cwd });
+      if (cancelled) return;
+      setCompileState({ kind: "result", run });
+      setPendingCompile(null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingCompile]);
 
   // Helper: persist the current edit-mode buffer and exit edit mode.
   function commitDraftAndExit(): void {
@@ -276,7 +305,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       return;
     }
     if (cmd === "help") {
-      setMessage("v1: i edit · :propose · :run [ollama] · :plan · :clearrun · :clearplan · :cleardraft · :q");
+      setMessage("i edit · :propose · :run [ollama] · :plan · :compile [ollama] · :clear{run,plan,compile,draft} · :q");
       return;
     }
     if (cmd === "propose") {
@@ -342,6 +371,29 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       setMessage("plan dismissed");
       return;
     }
+    // :compile [provider] — run the topological plan and write artifacts.
+    // Synchronously renders "running"; the dispatch chain lands in a
+    // useEffect on pendingCompile.
+    if (cmd === "compile" || cmd.startsWith("compile ")) {
+      if ("error" in neighborhood) {
+        setMessage("cannot compile: focal node failed to load");
+        return;
+      }
+      const parts = cmd.split(/\s+/);
+      const providerArg = parts[1] ?? "mock";
+      if (providerArg !== "mock" && providerArg !== "ollama") {
+        setMessage(`unsupported provider: ${providerArg} (try mock or ollama)`);
+        return;
+      }
+      setCompileState({ kind: "running", provider: providerArg });
+      setPendingCompile({ provider: providerArg });
+      return;
+    }
+    if (cmd === "clearcompile") {
+      setCompileState({ kind: "idle" });
+      setMessage("compile result dismissed");
+      return;
+    }
     setMessage(`unknown command: :${cmd}`);
   }
 
@@ -381,6 +433,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       )}
       <RunResultPanel state={runState} />
       <CompilePlanPanel state={planState} />
+      <CompileResultPanel state={compileState} />
       <HintBar mode={mode === "edit" ? "view" : mode} command={command} message={message} />
     </Box>
   );

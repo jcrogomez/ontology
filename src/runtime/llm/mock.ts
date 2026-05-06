@@ -39,6 +39,21 @@ export function createMockLlmAdapter(): LlmAdapter {
         };
       }
 
+      // For task=code_sketch the mock acts as the IDENTITY functor: it returns
+      // the prompt verbatim, no [mock:...] prefix. This makes the mock provider
+      // a degenerate-but-valid case of axiom 6 (compiler functor): one-node
+      // compilation where the prompt IS the artifact. Real Ollama (or any
+      // other provider) performs a non-identity transformation. Both are
+      // mathematically valid functors. See examples/hello-world/ for the
+      // canonical demo using this contract.
+      if (request.task === "code_sketch") {
+        return {
+          text: request.prompt,
+          model,
+          provider: "mock",
+        };
+      }
+
       return {
         text: `[mock:${request.task}] ${request.prompt}`,
         model,

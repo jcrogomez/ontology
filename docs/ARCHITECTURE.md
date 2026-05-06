@@ -25,7 +25,7 @@ The LLM runtime handles the interface with external models.
 - **Current State**: The loop `graph → context → LLM (mock | ollama) → deterministic validation` is complete and operational. The loop runs strictly read-only over `.ontology` and does not mutate the network. The deterministic validation includes the intent validator and presheaf/gluing pipeline as a minimal implementation. The Ollama bridge is wired through both `run prompt` and `run context`; failures are surfaced loudly when Ollama is not reachable.
 
 **Implemented:**
-- mock adapter
+- mock adapter (acts as identity functor for task=code_sketch)
 - isolated Ollama adapter
 - dispatcher multi-provider
 - run prompt --provider ollama
@@ -39,10 +39,14 @@ The LLM runtime handles the interface with external models.
 - context assemble --include-edges (edge-aware context, with --edge-types filter)
 - semantic linker (edge-aware: passes includeEdges/edgeTypes through to the assembler so neighbor nodes contribute to the gluing pool)
 - proposal system (full lifecycle: propose node / propose link / list / show / apply with parentHash + endpoint hash re-validation / reject / staled)
+- graph query CLI (onto graph neighbors / path / subgraph)
+- Walker v0 + v1 (focal-cell TUI with edit / :propose / :run / :plan / :compile)
+- compiler (onto compile run / plan; topological plan-runner + manifestation-mapped artifact writer + compilation_run events)
 
 **Known limitations:**
-- no compiler
-- no PromptAST
+- no PromptAST (axiom 4: prompts are stored verbatim today)
+- compiler v0 does not thread upstream-step outputs into downstream prompts; the compileNode contract receives an `upstreamArtifacts` map but ignores it
+- compiler v0 does not enforce contradicts / supersedes edge semantics in plan ordering
 - semantic linker is exposed only as a programmatic API; no CLI surface yet
 
 ### 4. Context Assembler
@@ -68,6 +72,6 @@ To maintain absolute clarity on the current state of the architecture, the follo
 
 - **Edge-aware Execution**: `context assemble --include-edges`, `run context --include-edges`, and `semanticLink({ includeEdges: true })` all project typed edges into an `edgeContext` block consumed by the gluing and validation pipelines.
 - **SemanticLinker**: edge-aware. The programmatic linker now walks the focal node's local neighborhood (parent path + edge neighbors filtered by `edgeTypes`), glues the presheaf fragments, and validates a candidate response. A focal `requires` can be satisfied by an edge neighbor's `provides`; a forbidden token introduced by an edge neighbor triggers a `forbidden_match`. CLI exposure of the linker is future work.
-- **PromptAST**: Planned. Prompts are still stored as raw intention text and are not parsed into rewrite rules.
-- **Compiler**: Planned to transform the `.ontology` graph into executable code artifacts. Currently, Ontology does not generate code.
+- **PromptAST**: Planned. Prompts are still stored as raw intention text and are not parsed into rewrite rules. The compiler today sends `prompt.raw` directly to the model.
+- **Compiler hardening**: the v0 compiler ships in Bootstrap 0.8 and produces real artifacts (see `docs/COMPILER.md`). Future work threads upstream outputs into downstream contexts, enforces `contradicts` / `supersedes` semantics in plan order, and runs `validateIntent` between steps.
 - **Visual DAG Studio**: Planned web-based UI.

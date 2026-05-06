@@ -160,12 +160,26 @@ This document outlines the available CLI commands across current Bootstrap phase
 
 ### `compile plan <nodeId>` *(post-Bootstrap 0.5, PR #101)*
 
-- **Purpose:** Print the topological compile plan rooted at the focal node, in dependency order. Read-only preview — no artifact is written, no event is emitted. The actual compiler ships in Bootstrap 0.8; this command exposes the order it would use so users can validate topology first.
+- **Purpose:** Print the topological compile plan rooted at the focal node, in dependency order. Read-only preview — no artifact is written, no event is emitted.
 - **Example:** `npm run dev -- compile plan node_0042` (or `... --json`).
 - **Output (human):** numbered list of node ids in dependency order, with the focal marked `*` and a `depends on N edge(s)` annotation per step.
 - **Output (JSON):** `{ ok: true, focal, steps: [{ nodeId, dependsOn: [edgeId,...] }], closure: [...] }` on success; `{ ok: false, reason: "cycle", focal, partialSteps, unresolved }` on a dependency cycle (exit 1).
 - **Edges considered:** `depends_on`, `inherits_from`, `refines`, `implements`, `uses_token`. Direction-agnostic edges (`documents`, `tests`, `validates_against`, runtime relations, etc.) do not affect plan order.
 - **Notes:** Same kernel helper backs `:plan` in the walker.
+
+### `compile run <nodeId>` *(Bootstrap 0.8)*
+
+- **Purpose:** Walk the topological compile plan rooted at the focal and produce artifacts on disk. The structure-preserving functor of axiom 6 made concrete.
+- **Example:** `npm run dev -- compile run node_0005 --provider mock`
+- **Flags:** `--provider mock|ollama` (default `mock`), `--model <name>`, `--ollama-host <host>`, `--json`.
+- **Files Touched:**
+  - `.ontology/runs/run_<id>.json` (one per step, content-addressed)
+  - `.ontology/events.jsonl` (one `run_persisted` and one `compilation_run` per step)
+  - `.ontology/artifacts/generated/<nodeId>.<ext>` (per step; extension from `manifestation` + `technical.language`)
+  - `.ontology/state.json` (counters)
+- **Audit:** every artifact's `compilation_run` event payload carries `nodeId`, `runId`, `cached`, `artifactRelativePath`, `bytes`. Trace via: `onto events tail | grep compilation_run` → `onto runs show <runId>` → `onto runs verify <runId>`.
+- **Cache:** re-running the same compile against the same graph state and provider hits the per-step run cache. Each cached step still emits its own `compilation_run` event, so the artifact path is logged again and the audit trail stays linear.
+- **Notes:** See `docs/COMPILER.md` for the implementation. The mock provider acts as the identity functor for `task: code_sketch`, so a leaf node whose `prompt.raw` is literal source compiles to that exact source on disk. Real Ollama is a non-identity functor; the same plan, the same audit chain.
 
 ### `walk <nodeId>` *(v0 + v1 complete)*
 

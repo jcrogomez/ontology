@@ -23,6 +23,7 @@ import { graphSubgraphCommand } from "./commands/graph/subgraph.js";
 import { proposeNodeCommand } from "./commands/proposal/propose-node.js";
 import { proposeLinkCommand } from "./commands/proposal/propose-link.js";
 import { compilePlanCommand } from "./commands/compile/plan.js";
+import { compileRunCommand } from "./commands/compile/run.js";
 import { proposalListCommand } from "./commands/proposal/list.js";
 import { proposalShowCommand } from "./commands/proposal/show.js";
 import { proposalRejectCommand } from "./commands/proposal/reject.js";
@@ -99,6 +100,8 @@ node
   .requiredOption("--kind <kind>", "Semantic kind for the node.")
   .requiredOption("--prompt <prompt>", "Raw intention prompt for the node.")
   .option("--label <label>", "Optional label for the node.")
+  .option("--manifestation <m>", "Manifestation: intent / ast / osl / code / test / build (default intent).")
+  .option("--language <lang>", "Optional language tag (e.g., python, typescript) used by the compiler to pick the artifact extension.")
   .action(async (options) => {
     await createNodeCommand(options);
   });
@@ -511,7 +514,7 @@ proposal
 
 const compile = program
   .command("compile")
-  .description("Compile-related commands. v0 exposes only --plan (preview); the actual compiler ships in Bootstrap 0.8.");
+  .description("Compile a node and its dependency closure into artifacts. Use `compile plan` for a read-only preview of the order.");
 
 compile
   .command("plan <id>")
@@ -522,6 +525,22 @@ compile
       await compilePlanCommand(id, options);
     } catch (err: unknown) {
       console.error(`✖ Error computing compile plan: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+compile
+  .command("run <id>")
+  .description("Compile the focal node and its dependency closure, writing artifacts to .ontology/artifacts/generated/. The structure-preserving functor of the canon, made concrete.")
+  .option("--provider <provider>", "LLM provider to use (mock or ollama)", "mock")
+  .option("--model <model>", "Model to use for the selected LLM provider")
+  .option("--ollama-host <host>", "Host for Ollama provider")
+  .option("--json", "Output results in JSON format")
+  .action(async (id, options) => {
+    try {
+      await compileRunCommand(id, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during compile: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
