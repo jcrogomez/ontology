@@ -39,10 +39,12 @@ Implemented:
   - PR #95 — `run prompt --as-proposal` and `run context --as-proposal`: model runs become typed candidate proposals with full provenance back to the persisted run.
 - proposal system (post-0.5): `onto propose link` for edge_create proposals (PR #96). Mutation schema is now a discriminated union with both `node_create` and `edge_create` variants; both are applicable, both stale on endpoint divergence.
 - semantic linker (post-0.5, PR #97): edge-aware. Accepts `includeEdges` and `edgeTypes` so the gluing pool now includes neighbor nodes brought in via typed edges. A focal `requires` can be satisfied by an edge neighbor's `provides`; an edge neighbor's `provides` can trigger a focal `forbids`. The provider field is now Zod-parsed instead of any-cast.
+- graph query CLI (post-0.5, PR #98): `onto graph neighbors / path / subgraph`. Read-only traversal primitives: list incident edges with direction, BFS shortest path between two nodes, depth-bounded undirected k-hop neighborhood. Pure helpers in `src/runtime/graph/traversal.ts` are reusable by Walker v1 and any future MCP / API surface.
 
 Planned (post-Bootstrap 0.5):
 - run-driven edge proposals (`run prompt --as-proposal` with edge target)
 - CLI surface for the semantic linker (`onto link <nodeId>` or similar)
+- Walker v1 (edit mode, `:propose`, `:run`, `:compile --plan`)
 
 Planned (later):
 - Walker v1 (edit mode, :propose, :run, :compile --plan)

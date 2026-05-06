@@ -17,6 +17,9 @@ import { runsListCommand } from "./commands/runs/list.js";
 import { runsShowCommand } from "./commands/runs/show.js";
 import { runsVerifyCommand } from "./commands/runs/verify.js";
 import { walkCommand } from "./commands/walk.js";
+import { graphNeighborsCommand } from "./commands/graph/neighbors.js";
+import { graphPathCommand } from "./commands/graph/path.js";
+import { graphSubgraphCommand } from "./commands/graph/subgraph.js";
 import { proposeNodeCommand } from "./commands/proposal/propose-node.js";
 import { proposeLinkCommand } from "./commands/proposal/propose-link.js";
 import { proposalListCommand } from "./commands/proposal/list.js";
@@ -336,6 +339,55 @@ program
       await walkCommand(id);
     } catch (err: unknown) {
       console.error(`✖ Error opening walker: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+const graph = program
+  .command("graph")
+  .description("Read-only traversal queries over the typed graph (neighbors, path, subgraph).");
+
+graph
+  .command("neighbors <id>")
+  .description("List direct neighbors of a node along incident edges.")
+  .option("--type <types>", "Comma-separated edge types to include")
+  .option("--direction <direction>", "Direction relative to the focal node: in, out, or both", "both")
+  .option("--json", "Output results in JSON format")
+  .action(async (id, options) => {
+    try {
+      await graphNeighborsCommand(id, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error listing neighbors: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+graph
+  .command("path <from> <to>")
+  .description("Find the shortest directed path between two nodes (BFS over outgoing edges).")
+  .option("--type <types>", "Comma-separated edge types to traverse")
+  .option("--max-depth <n>", "Maximum path length to consider", "10")
+  .option("--json", "Output results in JSON format")
+  .action(async (from, to, options) => {
+    try {
+      await graphPathCommand(from, to, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error finding path: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+graph
+  .command("subgraph <id>")
+  .description("Extract the undirected k-hop neighborhood rooted at a node.")
+  .option("--depth <n>", "Hops to expand from the focal node", "2")
+  .option("--type <types>", "Comma-separated edge types to include")
+  .option("--json", "Output results in JSON format")
+  .action(async (id, options) => {
+    try {
+      await graphSubgraphCommand(id, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error extracting subgraph: ${errorMessage(err)}`);
       process.exit(1);
     }
   });

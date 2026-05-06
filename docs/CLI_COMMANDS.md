@@ -136,6 +136,28 @@ This document outlines the available CLI commands across current Bootstrap phase
 - **Purpose:** Recompute the deterministic id and body hash of a persisted run and report any divergence. Read-only audit primitive.
 - **Example:** `npm run dev -- runs verify run_ef9dd6aa` (or `... --json`). Exits non-zero on mismatch.
 
+### `graph neighbors <nodeId>` *(read-only graph query)*
+
+- **Purpose:** List direct neighbors of a node along incident edges. Each entry surfaces the edge type and direction.
+- **Example:** `npm run dev -- graph neighbors node_0001`
+- **Flags:** `--type <a,b,c>` (filter by edge type), `--direction in|out|both` (default `both`), `--json`.
+- **Output:** for each neighbor, an arrow (`→` outgoing, `←` incoming), the edge type, and the neighbor node id. The CLI does not load the neighbor's full record — it surfaces id only.
+
+### `graph path <fromId> <toId>` *(read-only graph query)*
+
+- **Purpose:** Find the shortest directed path between two nodes via BFS over outgoing edges.
+- **Example:** `npm run dev -- graph path node_0002 node_0000_canon`
+- **Flags:** `--type <a,b,c>` (only traverse these edge types), `--max-depth <n>` (default `10`), `--json`.
+- **Edge orientation:** edges are walked from → to only. Reverse traversal is not implicit; if a graph requires it, expose the inverse explicitly via `node link`.
+- **Output:** the chain of edges connecting `from` to `to`, or `(no path found within N hops)` when disconnected.
+
+### `graph subgraph <nodeId>` *(read-only graph query)*
+
+- **Purpose:** Extract the undirected k-hop neighborhood rooted at a node. Used for "what is this node's local universe?" queries and as the data source for future Walker v1 expand views.
+- **Example:** `npm run dev -- graph subgraph node_0001 --depth 2`
+- **Flags:** `--depth <n>` (default `2`), `--type <a,b,c>` (filter edges), `--json`.
+- **Output:** the focal node (marked `*`) plus all nodes reachable within `depth` hops, and only the edges where both endpoints fall inside the slice. Boundary edges are excluded.
+
 ### `walk <nodeId>` *(v0, read-only)*
 
 - **Purpose:** Open the Walker, an interactive focal-cell terminal interface for the intention graph. Color encodes the abstraction level, tokens shared across the local neighborhood are underlined (presheaf overlap), and the path bar renders a colored breadcrumb from canon to focal.
