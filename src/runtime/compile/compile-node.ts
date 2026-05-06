@@ -7,6 +7,7 @@ import { hashPrompt } from "../../core/integrity/hash.js";
 import { createPersistedRun, computeRunId, loadPersistedRun } from "../../core/runs/persist.js";
 import { writeArtifact, type WriteArtifactResult } from "./artifact-writer.js";
 import { extractCodeFence } from "./post/extract-code-fence.js";
+import { validateLanguage } from "./post/validate-language.js";
 import { getOntologyPaths } from "../../core/project/paths.js";
 import { appendJsonl } from "../../core/fs/json.js";
 import { readState, writeState } from "../../core/state/state-store.js";
@@ -53,7 +54,7 @@ export type CompileNodeResult =
       event: OntologyEvent;
       response: { text: string; provider: LlmProvider; model: string };
     }
-  | { ok: false; reason: "dispatch_failed" | "persist_failed" | "write_failed"; message: string };
+  | { ok: false; reason: "dispatch_failed" | "persist_failed" | "write_failed" | "validate_failed"; message: string };
 
 const COMPILE_TASK: LlmTask = "code_sketch";
 
@@ -175,6 +176,28 @@ export async function compileNode(options: CompileNodeOptions): Promise<CompileN
       reason: "write_failed",
       message: err instanceof Error ? err.message : String(err),
     };
+  }
+
+  // Parse-check the artifact against its declared language. Axiom 8: a model
+  // emitting non-parseable code where the node declares one is a contradiction
+  // and must surface as an explicit validation failure. If the language has
+  // no registered validator, or the validator binary is not on PATH, the step
+  // is skipped (no false positives in CI environments without the toolchain).
+  // The compilation_run event is intentionally NOT emitted on failure: the
+  // artifact stays on disk for inspection, but the audit chain does not record
+  // it as a successful compilation.
+  if (options.node.coordinates.manifestation === "code" && options.node.technical.language) {
+    const check = validateLanguage({
+      absolutePath: artifact.absolutePath,
+      language: options.node.technical.language,
+    });
+    if (check.status === "failed") {
+      return {
+        ok: false,
+        reason: "validate_failed",
+        message: `${options.node.technical.language} parse failed for ${artifact.relativePath}: ${check.message}`,
+      };
+    }
   }
 
   // Emit compilation_run event. The event ties the artifact back to its run
