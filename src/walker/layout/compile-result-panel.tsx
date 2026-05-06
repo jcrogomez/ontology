@@ -5,7 +5,7 @@ import type { CompilePlanRunResult } from "../../runtime/compile/compile-plan-ru
 export interface CompileResultPanelProps {
   state:
     | { kind: "idle" }
-    | { kind: "running"; provider: string }
+    | { kind: "running"; provider: string; model?: string }
     | { kind: "result"; run: CompilePlanRunResult };
 }
 
@@ -16,9 +16,10 @@ export function CompileResultPanel({ state }: CompileResultPanelProps): React.Re
   if (state.kind === "idle") return null;
 
   if (state.kind === "running") {
+    const target = state.model ? `${state.provider}/${state.model}` : state.provider;
     return (
       <Box flexDirection="column" marginTop={1} borderStyle="single" borderColor="magenta" paddingX={1}>
-        <Text bold color="magenta">COMPILE — running ({state.provider}) ...</Text>
+        <Text bold color="magenta">COMPILE — running ({target}) ...</Text>
         <Text dimColor>walking the topological plan; the walker stays interactive</Text>
       </Box>
     );

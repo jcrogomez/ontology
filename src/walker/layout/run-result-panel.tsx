@@ -4,7 +4,7 @@ import { Box, Text } from "ink";
 export interface RunResultPanelProps {
   state:
     | { kind: "idle" }
-    | { kind: "running"; provider: string }
+    | { kind: "running"; provider: string; model?: string }
     | { kind: "result"; runId: string; cached: boolean; provider: string; model: string; responseText: string; durationMs: number }
     | { kind: "error"; message: string };
 }
@@ -17,9 +17,10 @@ export function RunResultPanel({ state }: RunResultPanelProps): React.ReactEleme
   if (state.kind === "idle") return null;
 
   if (state.kind === "running") {
+    const target = state.model ? `${state.provider}/${state.model}` : state.provider;
     return (
       <Box flexDirection="column" marginTop={1} borderStyle="single" borderColor="cyan" paddingX={1}>
-        <Text bold color="cyan">RUN — dispatching to {state.provider} ...</Text>
+        <Text bold color="cyan">RUN — dispatching to {target} ...</Text>
         <Text dimColor>(walker stays interactive; the dispatch is async)</Text>
       </Box>
     );
