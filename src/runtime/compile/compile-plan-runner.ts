@@ -1,9 +1,10 @@
-import type { OntologyNode } from "../../schemas/ontology.js";
+import type { OntologyNode, OntologyEdge } from "../../schemas/ontology.js";
 import type { LlmProvider } from "../llm/types.js";
 import { loadEdges, loadNodeById } from "../../core/project/load.js";
 import { computeCompilePlan, type CompilePlan } from "../graph/compile-plan.js";
 import { compileNode, type CompileNodeResult } from "./compile-node.js";
 import type { WriteArtifactResult } from "./artifact-writer.js";
+import type { UpstreamContextItem } from "./upstream-context.js";
 
 // Plan runner: walks the topological compile plan computed by
 // computeCompilePlan and dispatches compileNode for each step in order.
@@ -77,8 +78,17 @@ export async function runCompilePlan(options: CompilePlanRunOptions): Promise<Co
 
   // Walk the plan. Stop on the first step failure; the artifacts already on
   // disk from previous steps stay (they are real, persisted, audit-traceable).
+  //
+  // For each step we thread the DIRECT refinement parents' compiled response
+  // text into compileNode (axiom 7 inductive: each compile sees its lineage
+  // one hop up; transitivity is preserved because each parent was already
+  // compiled with ITS parents in system). Other edge types (depends_on,
+  // inherits_from, ...) are NOT threaded into system today — they participate
+  // in topological order but not in the per-node refinement context. The
+  // full closure remains traceable via events.jsonl + run records.
   const steps: CompilePlanStepResult[] = [];
-  const upstreamArtifacts: Record<string, string> = {};
+  const compiledResponses: Map<string, string> = new Map();
+  const refinementParents = buildRefinementParentsIndex(edges);
   let focalArtifact: WriteArtifactResult | undefined;
 
   for (const step of plan.steps) {
@@ -94,13 +104,15 @@ export async function runCompilePlan(options: CompilePlanRunOptions): Promise<Co
       };
     }
 
+    const upstream = collectUpstream(step.nodeId, refinementParents, compiledResponses, cwd);
+
     const stepResult: CompileNodeResult = await compileNode({
       node,
       provider: options.provider,
       model: options.model,
       ollamaHost: options.ollamaHost,
       cwd,
-      upstreamArtifacts,
+      upstream,
     });
 
     if (!stepResult.ok) {
@@ -126,7 +138,7 @@ export async function runCompilePlan(options: CompilePlanRunOptions): Promise<Co
       runId: stepResult.runId,
       cached: stepResult.cached,
     });
-    upstreamArtifacts[step.nodeId] = stepResult.response.text;
+    compiledResponses.set(step.nodeId, stepResult.response.text);
     if (step.nodeId === options.focalId) {
       focalArtifact = stepResult.artifact;
     }
@@ -151,4 +163,45 @@ export async function runCompilePlan(options: CompilePlanRunOptions): Promise<Co
     steps,
     focalArtifact,
   };
+}
+
+// childId -> sorted list of direct refinement parent ids. Order is by id so
+// the upstream context (and therefore contextHash, runId) is stable across
+// runs regardless of edges.jsonl ordering on disk.
+function buildRefinementParentsIndex(edges: OntologyEdge[]): Map<string, string[]> {
+  const index = new Map<string, string[]>();
+  for (const e of edges) {
+    if (e.type !== "refines") continue;
+    if (!index.has(e.from)) index.set(e.from, []);
+    index.get(e.from)!.push(e.to);
+  }
+  for (const [k, parents] of index) {
+    index.set(k, [...parents].sort());
+  }
+  return index;
+}
+
+// Build the upstream context for a step from its refinement parents'
+// compiled responses. Skips parents that have not been compiled in this run
+// (defensive: shouldn't happen because the plan emits parents before
+// children, but a missing entry shouldn't crash the compile).
+function collectUpstream(
+  nodeId: string,
+  refinementParents: Map<string, string[]>,
+  compiledResponses: Map<string, string>,
+  cwd: string,
+): UpstreamContextItem[] {
+  const parents = refinementParents.get(nodeId) ?? [];
+  const items: UpstreamContextItem[] = [];
+  for (const parentId of parents) {
+    const text = compiledResponses.get(parentId);
+    if (text === undefined) continue;
+    const parent = loadNodeById(parentId, cwd);
+    items.push({
+      nodeId: parentId,
+      level: parent?.coordinates.abstraction,
+      text,
+    });
+  }
+  return items;
 }
