@@ -40,11 +40,13 @@ Implemented:
 - proposal system (post-0.5): `onto propose link` for edge_create proposals (PR #96). Mutation schema is now a discriminated union with both `node_create` and `edge_create` variants; both are applicable, both stale on endpoint divergence.
 - semantic linker (post-0.5, PR #97): edge-aware. Accepts `includeEdges` and `edgeTypes` so the gluing pool now includes neighbor nodes brought in via typed edges. A focal `requires` can be satisfied by an edge neighbor's `provides`; an edge neighbor's `provides` can trigger a focal `forbids`. The provider field is now Zod-parsed instead of any-cast.
 - graph query CLI (post-0.5, PR #98): `onto graph neighbors / path / subgraph`. Read-only traversal primitives: list incident edges with direction, BFS shortest path between two nodes, depth-bounded undirected k-hop neighborhood. Pure helpers in `src/runtime/graph/traversal.ts` are reusable by Walker v1 and any future MCP / API surface.
+- Walker v1 PR-A (post-0.5, PR #99): edit mode + drafts + `:propose`. The walker can now author candidate children of any focal node and promote them to real proposals without leaving the TUI. Drafts live under `.ontology/work/drafts/` and are cleared on successful proposal. The full chain `walker → draft → proposal → apply → node` runs end-to-end inside the terminal.
 
 Planned (post-Bootstrap 0.5):
 - run-driven edge proposals (`run prompt --as-proposal` with edge target)
 - CLI surface for the semantic linker (`onto link <nodeId>` or similar)
-- Walker v1 (edit mode, `:propose`, `:run`, `:compile --plan`)
+- Walker v1 PR-B: `:run` integration (dispatch a model run from the focal node)
+- Walker v1 PR-C: `:compile --plan` (read-only topological plan inspection)
 
 Planned (later):
 - Walker v1 (edit mode, :propose, :run, :compile --plan)

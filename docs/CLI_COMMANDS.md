@@ -158,12 +158,18 @@ This document outlines the available CLI commands across current Bootstrap phase
 - **Flags:** `--depth <n>` (default `2`), `--type <a,b,c>` (filter edges), `--json`.
 - **Output:** the focal node (marked `*`) plus all nodes reachable within `depth` hops, and only the edges where both endpoints fall inside the slice. Boundary edges are excluded.
 
-### `walk <nodeId>` *(v0, read-only)*
+### `walk <nodeId>` *(v0 + v1 PR-A)*
 
 - **Purpose:** Open the Walker, an interactive focal-cell terminal interface for the intention graph. Color encodes the abstraction level, tokens shared across the local neighborhood are underlined (presheaf overlap), and the path bar renders a colored breadcrumb from canon to focal.
 - **Example:** `npm run dev -- walk node_0000_canon`
 - **v0 keys:** `↑` parent · `↓` child · `←/→` siblings · `:q` / `q` quit · `:help` flash help.
-- **Notes:** Requires an interactive TTY. Future versions will add edit mode, `:run`, `:propose`, and `:compile`. See `docs/WALKER_INTERFACE.md`.
+- **v1 PR-A additions:**
+  - `i` enters edit mode. The user composes the prompt for a *candidate child* of the focal (the focal node itself is never edited — only explicit graph commands may mutate the network).
+  - `Esc` exits edit mode and saves the buffer as a draft to `.ontology/work/drafts/<focalId>.draft.json`. Re-entering edit mode resumes from the saved draft.
+  - The identity bar shows `(draft pending)` when a draft exists for the focal.
+  - `:propose` creates a `node_create` proposal from the saved draft (level + kind inherited from focal; the proposal is a child refinement). The draft is cleared on success. The resulting proposal lives in `pending` status; apply it via `onto proposal apply <id>`.
+  - `:cleardraft` removes the saved draft for the focal without creating a proposal.
+- **Notes:** Requires an interactive TTY. PR-B will add `:run`, PR-C will add `:compile --plan`. See `docs/WALKER_INTERFACE.md`.
 
 ### `propose link` *(post-Bootstrap 0.5, PR #96)*
 

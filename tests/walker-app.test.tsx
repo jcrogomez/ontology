@@ -4,6 +4,7 @@ import { render } from "ink-testing-library";
 import { App } from "../src/walker/app.js";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
 import { runCli } from "./helpers/run-cli.js";
+import { saveDraft } from "../src/core/drafts/persist.js";
 
 // Render-mounting tests for the walker App.
 //
@@ -62,6 +63,19 @@ describe("walker App (read-only v0)", () => {
     const { lastFrame } = render(<App initialNodeId="node_doesnt_exist" cwd={tempDir} />);
     const frame = lastFrame() ?? "";
     expect(frame).toContain("Node not found");
+  });
+
+  it("does NOT show the draft indicator when no draft exists for the focal", () => {
+    const { lastFrame } = render(<App initialNodeId="node_0000_canon" cwd={tempDir} />);
+    const frame = lastFrame() ?? "";
+    expect(frame).not.toContain("(draft pending)");
+  });
+
+  it("renders the (draft pending) indicator when a draft exists for the focal", () => {
+    saveDraft({ focalNodeId: "node_0000_canon", draftPrompt: "in progress", cwd: tempDir });
+    const { lastFrame } = render(<App initialNodeId="node_0000_canon" cwd={tempDir} />);
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("(draft pending)");
   });
 
   it("renders a child node correctly when its parent is canon", () => {

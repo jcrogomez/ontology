@@ -137,7 +137,7 @@ export function createProposal(options: CreateProposalOptions): {
 
   // Temporal log entry. The kernel relies on this rather than directory
   // listings for replay and audit.
-  const state = readState();
+  const state = readState(cwd);
   const eventId = "evt_" + randomBytes(4).toString("hex");
   const event = OntologyEventSchema.parse({
     eventId,
@@ -158,7 +158,7 @@ export function createProposal(options: CreateProposalOptions): {
   state.eventCount += 1;
   state.lastEventId = eventId;
   state.updatedAt = new Date().toISOString();
-  writeState(state);
+  writeState(state, cwd);
 
   return { proposal, event };
 }
@@ -210,7 +210,7 @@ export function rejectProposal(
 
   writeJson(proposalPath(id, cwd), updated);
 
-  const state = readState();
+  const state = readState(cwd);
   const eventId = "evt_" + randomBytes(4).toString("hex");
   const event = OntologyEventSchema.parse({
     eventId,
@@ -231,7 +231,7 @@ export function rejectProposal(
   state.eventCount += 1;
   state.lastEventId = eventId;
   state.updatedAt = new Date().toISOString();
-  writeState(state);
+  writeState(state, cwd);
 
   return { proposal: updated, event };
 }
@@ -558,7 +558,7 @@ function transitionProposal(
   const updated = ProposalSchema.parse({ ...recordWithoutHash, hash: newHash });
   writeJson(proposalPath(id, cwd), updated);
 
-  const state = readState();
+  const state = readState(cwd);
   const eventId = "evt_" + randomBytes(4).toString("hex");
   const event = OntologyEventSchema.parse({
     eventId,
@@ -579,7 +579,7 @@ function transitionProposal(
   state.eventCount += 1;
   state.lastEventId = eventId;
   state.updatedAt = new Date().toISOString();
-  writeState(state);
+  writeState(state, cwd);
 
   return { proposal: updated, event };
 }
