@@ -158,7 +158,16 @@ This document outlines the available CLI commands across current Bootstrap phase
 - **Flags:** `--depth <n>` (default `2`), `--type <a,b,c>` (filter edges), `--json`.
 - **Output:** the focal node (marked `*`) plus all nodes reachable within `depth` hops, and only the edges where both endpoints fall inside the slice. Boundary edges are excluded.
 
-### `walk <nodeId>` *(v0 + v1 PR-A + v1 PR-B)*
+### `compile plan <nodeId>` *(post-Bootstrap 0.5, PR #101)*
+
+- **Purpose:** Print the topological compile plan rooted at the focal node, in dependency order. Read-only preview — no artifact is written, no event is emitted. The actual compiler ships in Bootstrap 0.8; this command exposes the order it would use so users can validate topology first.
+- **Example:** `npm run dev -- compile plan node_0042` (or `... --json`).
+- **Output (human):** numbered list of node ids in dependency order, with the focal marked `*` and a `depends on N edge(s)` annotation per step.
+- **Output (JSON):** `{ ok: true, focal, steps: [{ nodeId, dependsOn: [edgeId,...] }], closure: [...] }` on success; `{ ok: false, reason: "cycle", focal, partialSteps, unresolved }` on a dependency cycle (exit 1).
+- **Edges considered:** `depends_on`, `inherits_from`, `refines`, `implements`, `uses_token`. Direction-agnostic edges (`documents`, `tests`, `validates_against`, runtime relations, etc.) do not affect plan order.
+- **Notes:** Same kernel helper backs `:plan` in the walker.
+
+### `walk <nodeId>` *(v0 + v1 complete)*
 
 - **Purpose:** Open the Walker, an interactive focal-cell terminal interface for the intention graph. Color encodes the abstraction level, tokens shared across the local neighborhood are underlined (presheaf overlap), and the path bar renders a colored breadcrumb from canon to focal.
 - **Example:** `npm run dev -- walk node_0000_canon`
@@ -175,7 +184,11 @@ This document outlines the available CLI commands across current Bootstrap phase
   - The walker stays interactive while the dispatch is in flight: a "running" panel renders synchronously, then the result panel replaces it on resolve.
   - Each `:run` is automatically persisted under `.ontology/runs/run_<id>.json` and emits a `run_persisted` event. Re-running with identical inputs is a cache hit (the panel surfaces `(cached)` and no second dispatch fires).
   - `:clearrun` dismisses the result panel without affecting the persisted record.
-- **Notes:** Requires an interactive TTY. PR-C will add `:compile --plan`. See `docs/WALKER_INTERFACE.md`.
+- **v1 PR-C — compile-plan preview:**
+  - `:plan` (alias `:compile-plan`) computes the topological compile plan rooted at the focal and renders it in a green panel below the focal cell. Each step lists the node id and the count of dependency edges it resolves; the focal is marked `*`. A cycle in the closure renders the panel in red with the unresolved set.
+  - `:clearplan` dismisses the panel.
+  - Read-only: no artifact written, no event emitted. The actual compiler ships in Bootstrap 0.8.
+- **Notes:** Requires an interactive TTY. See `docs/WALKER_INTERFACE.md`.
 
 ### `propose link` *(post-Bootstrap 0.5, PR #96)*
 

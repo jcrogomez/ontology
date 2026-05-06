@@ -42,15 +42,18 @@ Implemented:
 - graph query CLI (post-0.5, PR #98): `onto graph neighbors / path / subgraph`. Read-only traversal primitives: list incident edges with direction, BFS shortest path between two nodes, depth-bounded undirected k-hop neighborhood. Pure helpers in `src/runtime/graph/traversal.ts` are reusable by Walker v1 and any future MCP / API surface.
 - Walker v1 PR-A (post-0.5, PR #99): edit mode + drafts + `:propose`. The walker can now author candidate children of any focal node and promote them to real proposals without leaving the TUI. Drafts live under `.ontology/work/drafts/` and are cleared on successful proposal. The full chain `walker → draft → proposal → apply → node` runs end-to-end inside the terminal.
 - Walker v1 PR-B (post-0.5, PR #100): `:run` integration. Dispatches a model run against the focal's assembled context, persists the result by default, and renders it in a `:clearrun`-able panel below the focal cell. The walker stays interactive during dispatch; cache hits surface as `(cached)` with no second LLM call.
+- Walker v1 PR-C (post-0.5, PR #101): `:plan` topological compile-plan preview + `onto compile plan <nodeId>` CLI surface. Pure helper `computeCompilePlan` runs Kahn's algorithm over the hard-dependency edge family, detects cycles, returns deterministic ordering. **Walker v1 milestone complete.**
+
+Roadmap to Bootstrap 0.8 (Compiler / Hello World):
+- Compiler v0 PR-A: `onto compile <nodeId>` for a single leaf node — runs the model with the assembled context, writes the response as `.ontology/artifacts/generated/<nodeId>.<ext>`, emits a `compilation_run` event.
+- Compiler v0 PR-B + Hello World: extend compile to walk the topological plan from `computeCompilePlan`, feeding each node's output into its dependents' context. Ship a fixture project that compiles canon → ... → leaf into a working `print("hello world")` artifact.
 
 Planned (post-Bootstrap 0.5):
 - run-driven edge proposals (`run prompt --as-proposal` with edge target)
 - CLI surface for the semantic linker (`onto link <nodeId>` or similar)
-- Walker v1 PR-C: `:compile --plan` (read-only topological plan inspection)
 
 Planned (later):
-- Walker v1 (edit mode, :propose, :run, :compile --plan)
-- edge-aware SemanticLinker
+- edge-aware SemanticLinker hardening
 - PromptAST
 - compiler
 

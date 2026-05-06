@@ -1,6 +1,6 @@
 # RFC: Walker Interface
 
-**Status:** v0 Implemented (Bootstrap 0.4). v1 PR-A + PR-B shipped: edit mode + drafts + `:propose` + `:run`. Remaining v1 slice: `:compile --plan` (PR-C). v2 still planned.
+**Status:** Walker v1 complete — v0 (Bootstrap 0.4), v1 PR-A (drafts + `:propose`), v1 PR-B (`:run`), v1 PR-C (`:plan`) all shipped. v2 still planned.
 **Bootstrap target:** 0.4 (v0 read-only) → 0.6 (full pipeline cockpit)
 **Related:** Proposal System (RFC), Run Persistence (RFC)
 **Date:** 2026-05-05
@@ -212,8 +212,12 @@ Walker v1 ships in three slices:
 - Persistence is always on. Each `:run` produces a content-addressed record under `.ontology/runs/run_<id>.json` and emits a `run_persisted` event. Re-running with identical inputs surfaces the same id with a `(cached)` flag; no second dispatch fires.
 - `:clearrun` dismisses the result panel without affecting the persisted record.
 
-**PR-C (next):**
-- `:compile --plan` (read-only topological plan inspection).
+**PR-C (this slice):**
+- `:plan` computes the topological compile plan rooted at the focal: dependency closure, sequenced via Kahn's algorithm over the hard-dependency edge family (`depends_on`, `inherits_from`, `refines`, `implements`, `uses_token`).
+- The walker renders a green panel listing each step with its node id and the count of dependency edges resolved at that step. The focal is marked `*`. A cycle in the closure renders the panel in red with the unresolved set.
+- `:clearplan` dismisses the panel.
+- The same helper backs `onto compile plan <nodeId> [--json]` so scripts and the TUI agree on the order.
+- Read-only. The actual compiler ships in Bootstrap 0.8.
 
 ## 10. v2 scope
 
