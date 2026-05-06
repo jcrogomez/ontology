@@ -1,8 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { spawnSync } from "node:child_process";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
 import { runCli } from "./helpers/run-cli.js";
+
+const PYTHON_AVAILABLE = (() => {
+  const r = spawnSync("python3", ["--version"], { encoding: "utf-8" });
+  return !r.error && r.status === 0;
+})();
 
 // End-to-end coverage of `onto compile run <nodeId>`. The fixture builds a
 // minimal canon -> domain -> code/python chain and verifies that compiling
@@ -139,6 +145,41 @@ describe("onto compile run", () => {
     const r = runCli(tempDir, ["compile", "run", "node_0002", "--provider", "openai"]);
     expect(r.status).toBe(1);
     expect(r.stderr).toContain("Unsupported provider");
+  });
+
+  it.runIf(PYTHON_AVAILABLE)("fails the compile when the artifact does not parse for the declared language", () => {
+    // Build a fresh project where the leaf node's prompt is plain prose,
+    // not python. With the mock provider (identity functor), the artifact
+    // text equals the prompt, so the python parse-check must reject it.
+    const tmp2 = createTempProject();
+    try {
+      expect(runCli(tmp2, ["init"]).status).toBe(0);
+      expect(runCli(tmp2, ["node", "create", "--level", "domain", "--kind", "entity", "--prompt", "d"]).status).toBe(0);
+      expect(runCli(tmp2, ["node", "create",
+        "--level", "artifact",
+        "--kind", "artifact",
+        "--manifestation", "code",
+        "--language", "python",
+        "--prompt", "Here you go:\nIn this example, we've:",
+      ]).status).toBe(0);
+      runCli(tmp2, ["node", "link", "--from", "node_0001", "--to", "node_0000_canon", "--type", "refines"]);
+      runCli(tmp2, ["node", "link", "--from", "node_0002", "--to", "node_0001", "--type", "refines"]);
+
+      const r = runCli(tmp2, ["compile", "run", "node_0002", "--provider", "mock"]);
+      expect(r.status).toBe(1);
+      expect(r.stderr + r.stdout).toMatch(/validate_failed|python parse failed/i);
+
+      // The artifact was written before validation (so the user can inspect),
+      // but no compilation_run event was emitted for the focal step.
+      const artifactPath = path.join(tmp2, ".ontology/artifacts/generated/node_0002.py");
+      expect(fs.existsSync(artifactPath)).toBe(true);
+      const events = fs.readFileSync(path.join(tmp2, ".ontology/events.jsonl"), "utf-8")
+        .trim().split("\n").map(l => JSON.parse(l));
+      const focalCompileEvent = events.find(e => e.eventType === "compilation_run" && e.payload.nodeId === "node_0002");
+      expect(focalCompileEvent).toBeUndefined();
+    } finally {
+      cleanupTempProject(tmp2);
+    }
   });
 
   it("prints the focal-marked step list in human mode", () => {
