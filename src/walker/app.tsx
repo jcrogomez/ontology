@@ -31,6 +31,7 @@ import { proposeFromDraft } from "./actions/propose-from-draft.js";
 import { runFromWalker } from "./actions/run-from-walker.js";
 import { planFromWalker } from "./actions/plan-from-walker.js";
 import { compileFromWalker } from "./actions/compile-from-walker.js";
+import { parseProviderArgs } from "./state/parse-provider-args.js";
 import type { LlmProvider } from "../runtime/llm/types.js";
 
 export interface AppProps {
@@ -70,7 +71,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
   // updates runState on resolve. We use this two-stage pattern so the walker
   // re-renders into the "running" panel BEFORE the (potentially slow)
   // dispatch fires.
-  const [pendingRun, setPendingRun] = useState<{ provider: LlmProvider } | null>(null);
+  const [pendingRun, setPendingRun] = useState<{ provider: LlmProvider; model?: string; ollamaHost?: string } | null>(null);
 
   // Compile-plan preview state. The plan is computed synchronously (it is a
   // pure topological sort over edges, no I/O beyond loadEdges), so unlike
@@ -81,7 +82,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
   // each step in the plan). We use the same two-stage pattern: render
   // "running" synchronously, then carry out the dispatches in a useEffect.
   const [compileState, setCompileState] = useState<CompileResultPanelProps["state"]>({ kind: "idle" });
-  const [pendingCompile, setPendingCompile] = useState<{ provider: LlmProvider } | null>(null);
+  const [pendingCompile, setPendingCompile] = useState<{ provider: LlmProvider; model?: string; ollamaHost?: string } | null>(null);
 
   const neighborhood = useMemo<FocalNeighborhood | { error: string }>(() => {
     try {
@@ -127,6 +128,8 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       const result = await runFromWalker({
         focal: neighborhood.focal,
         provider: pendingRun.provider,
+        model: pendingRun.model,
+        ollamaHost: pendingRun.ollamaHost,
         cwd,
       });
       if (cancelled) return;
@@ -161,7 +164,13 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
     }
     let cancelled = false;
     (async () => {
-      const run = await compileFromWalker({ focalId, provider: pendingCompile.provider, cwd });
+      const run = await compileFromWalker({
+        focalId,
+        provider: pendingCompile.provider,
+        model: pendingCompile.model,
+        ollamaHost: pendingCompile.ollamaHost,
+        cwd,
+      });
       if (cancelled) return;
       setCompileState({ kind: "result", run });
       setPendingCompile(null);
@@ -305,7 +314,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       return;
     }
     if (cmd === "help") {
-      setMessage("i edit · :propose · :run [ollama] · :plan · :compile [ollama] · :clear{run,plan,compile,draft} · :q");
+      setMessage("i edit · :propose · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] · :clear{run,plan,compile,draft} · :q");
       return;
     }
     if (cmd === "propose") {
@@ -329,24 +338,26 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       setMessage(removed ? `draft cleared for ${focalId}` : `no draft to clear for ${focalId}`);
       return;
     }
-    // :run [provider]. Default provider is mock (safe + offline). Accepts
-    // ollama for live local model dispatch. Other providers are rejected.
+    // :run [provider] [--model <name>] [--host <url>]. Default provider is
+    // mock (safe + offline). For ollama, --model is recommended on modest
+    // hardware: the adapter default (`llama3.1:8b`) does not fit comfortably
+    // on 8GB Macs and tends to hit undici's fetch timeout. Try
+    // `:run ollama --model llama3.2:3b`.
     if (cmd === "run" || cmd.startsWith("run ")) {
       if ("error" in neighborhood) {
         setMessage("cannot run: focal node failed to load");
         return;
       }
-      const parts = cmd.split(/\s+/);
-      const providerArg = parts[1] ?? "mock";
-      if (providerArg !== "mock" && providerArg !== "ollama") {
-        setMessage(`unsupported provider: ${providerArg} (try mock or ollama)`);
+      const parsed = parseProviderArgs(cmd.slice("run".length));
+      if (!parsed.ok) {
+        setMessage(parsed.message);
         return;
       }
       // Show "running ..." synchronously, then schedule the actual dispatch
       // via a useEffect on pendingRun so the walker re-renders before the
       // (potentially slow) network call.
-      setRunState({ kind: "running", provider: providerArg });
-      setPendingRun({ provider: providerArg });
+      setRunState({ kind: "running", provider: parsed.args.provider, model: parsed.args.model });
+      setPendingRun(parsed.args);
       return;
     }
     if (cmd === "clearrun") {
@@ -371,22 +382,22 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       setMessage("plan dismissed");
       return;
     }
-    // :compile [provider] — run the topological plan and write artifacts.
-    // Synchronously renders "running"; the dispatch chain lands in a
-    // useEffect on pendingCompile.
+    // :compile [provider] [--model <name>] [--host <url>] — run the
+    // topological plan and write artifacts. See :run for the rationale on
+    // --model. Synchronously renders "running"; the dispatch chain lands in
+    // a useEffect on pendingCompile.
     if (cmd === "compile" || cmd.startsWith("compile ")) {
       if ("error" in neighborhood) {
         setMessage("cannot compile: focal node failed to load");
         return;
       }
-      const parts = cmd.split(/\s+/);
-      const providerArg = parts[1] ?? "mock";
-      if (providerArg !== "mock" && providerArg !== "ollama") {
-        setMessage(`unsupported provider: ${providerArg} (try mock or ollama)`);
+      const parsed = parseProviderArgs(cmd.slice("compile".length));
+      if (!parsed.ok) {
+        setMessage(parsed.message);
         return;
       }
-      setCompileState({ kind: "running", provider: providerArg });
-      setPendingCompile({ provider: providerArg });
+      setCompileState({ kind: "running", provider: parsed.args.provider, model: parsed.args.model });
+      setPendingCompile(parsed.args);
       return;
     }
     if (cmd === "clearcompile") {
