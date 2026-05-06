@@ -1,6 +1,6 @@
 # RFC: Walker Interface
 
-**Status:** v0 Implemented (Bootstrap 0.4) — read-only focal cell, arrow nav, color by poset, cross-token underline. v1 / v2 still planned.
+**Status:** v0 Implemented (Bootstrap 0.4). v1 PR-A shipped: edit mode + drafts + `:propose`. Remaining v1 slices: `:run` (PR-B) and `:compile --plan` (PR-C). v2 still planned.
 **Bootstrap target:** 0.4 (v0 read-only) → 0.6 (full pipeline cockpit)
 **Related:** Proposal System (RFC), Run Persistence (RFC)
 **Date:** 2026-05-05
@@ -197,12 +197,20 @@ This is enough to dogfood every subsequent feature.
 
 ## 9. v1 scope
 
-Walker v1 adds:
+Walker v1 ships in three slices:
 
-- Edit mode → drafts.
-- `:propose` integration (depends on Proposal System RFC).
-- `:run` integration.
-- `:compile --plan` (read-only plan inspection).
+**PR-A (this slice):**
+- Edit mode (`i` enters, `Esc` saves) backed by drafts under `.ontology/work/drafts/<focalId>.draft.json`.
+- A "(draft pending)" indicator on the identity bar when the focal has a saved draft.
+- `:propose` creates a `node_create` proposal as a child of the focal (level + kind inherited; payload.prompt = the draft text). The draft is cleared on success; the proposal carries its content forward.
+- `:cleardraft` removes a saved draft.
+- The walker never mutates the network directly. `:propose` produces a proposal that the user later applies via `onto proposal apply`.
+
+**PR-B (next):**
+- `:run` integration. Dispatches a model run from the walker against the focal node's assembled context.
+
+**PR-C (after PR-B):**
+- `:compile --plan` (read-only topological plan inspection).
 
 ## 10. v2 scope
 

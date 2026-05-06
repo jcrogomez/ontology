@@ -5,13 +5,17 @@ import { POSET_COLORS, levelTag, colorsEnabled } from "../theme/colors.js";
 
 export interface IdentityBarProps {
   node: OntologyNode;
+  // True when there's a saved draft for this focal node. Surfaced as a small
+  // "(draft pending)" annotation so a user returning to a node sees there's
+  // unfinished authoring work attached to it.
+  hasDraft?: boolean;
 }
 
 // The identity bar carries the focal node's id, label, and the three coordinate
 // tags (abstraction, plane, manifestation). Color encodes the abstraction level.
 // When colors are off we fall back to a textual [LEVEL] marker so the hierarchy
 // is still legible.
-export function IdentityBar({ node }: IdentityBarProps): React.ReactElement {
+export function IdentityBar({ node, hasDraft }: IdentityBarProps): React.ReactElement {
   const color = POSET_COLORS[node.coordinates.abstraction];
   const showColors = colorsEnabled();
   return (
@@ -22,6 +26,12 @@ export function IdentityBar({ node }: IdentityBarProps): React.ReactElement {
         </Text>
         <Text>  </Text>
         <Text>{node.label}</Text>
+        {hasDraft && (
+          <>
+            <Text>  </Text>
+            <Text color="yellow">(draft pending)</Text>
+          </>
+        )}
       </Box>
       <Box>
         {!showColors && <Text>{levelTag(node.coordinates.abstraction)} </Text>}

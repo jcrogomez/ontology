@@ -178,7 +178,7 @@ export function createPersistedRun(options: CreatePersistedRunOptions): {
   writeJson(persistedRunPath(id, cwd), run);
 
   // Append the run_persisted event to the temporal log so audits can replay session timelines.
-  const state = readState();
+  const state = readState(cwd);
   const eventId = "evt_" + randomBytes(4).toString("hex");
   const event = OntologyEventSchema.parse({
     eventId,
@@ -199,7 +199,7 @@ export function createPersistedRun(options: CreatePersistedRunOptions): {
   state.eventCount += 1;
   state.lastEventId = eventId;
   state.updatedAt = new Date().toISOString();
-  writeState(state);
+  writeState(state, cwd);
 
   return { run, event, cached: false };
 }

@@ -457,6 +457,24 @@ export type ProposalValidationSnapshot = z.infer<typeof ProposalValidationSnapsh
 export type ProposalProvenance = z.infer<typeof ProposalProvenanceSchema>;
 export type ProposalStatus = z.infer<typeof ProposalStatusSchema>;
 
+// Drafts are ephemeral working state. The walker (v1+) writes them when a user
+// edits a candidate child of the focal node; the user later promotes the draft
+// to a real proposal via `:propose`. Drafts are NOT events: they live under
+// .ontology/work/drafts/ and may be deleted at any time without auditing.
+//
+// They are the only mutable on-disk state in the system; everything else is
+// append-only or content-addressed. The justification: drafts are *intent
+// being typed*, not *intent committed*. A keystroke is not a graph mutation.
+export const NodeDraftSchema = z.object({
+  focalNodeId: z.string().startsWith("node_"),
+  // Prompt content the user is composing. Becomes payload.prompt on propose.
+  draftPrompt: z.string(),
+  createdAt: z.number().int().min(0),
+  updatedAt: z.number().int().min(0),
+});
+
+export type NodeDraft = z.infer<typeof NodeDraftSchema>;
+
 // Bootstrap boundary:
 // State provides high-level metrics for quick inspection without graph traversal.
 export const OntologyStateSchema = z.object({
