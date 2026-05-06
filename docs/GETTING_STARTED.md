@@ -158,7 +158,7 @@ onto runs show run_<id>
 onto runs verify run_<id>
 ```
 
-`runs verify` recomputes the deterministic id and the body hash; if either diverges from the stored value, it exits non-zero. This is the audit primitive that the upcoming Proposal System will rely on.
+`runs verify` recomputes the deterministic id and the body hash; if either diverges from the stored value, it exits non-zero. This is the audit primitive the Proposal System and the Compiler both rely on.
 
 ---
 
@@ -172,42 +172,91 @@ onto walk node_0000_canon
 
 A focal cell appears. The border is colored by the abstraction level (white = canon, blue = project, ..., red = unit). The path bar at the bottom shows a colored breadcrumb. Tokens that appear in more than one node's `requires` or `provides` are underlined.
 
-Navigate:
+Navigate (v1 commands):
 
-- `↑` parent
-- `↓` first child
-- `←` / `→` siblings
+- `↑` parent · `↓` first child · `←` / `→` siblings
+- `i` enter edit mode (compose a candidate child draft); `Esc` saves
+- `:propose` turns the draft into a proposal; `:cleardraft` discards it
+- `:run [ollama]` dispatches a model run against the focal's context
+- `:plan` previews the topological compile plan rooted at the focal
+- `:compile [ollama]` runs the full compile, writing artifacts to disk
+- `:clearrun` / `:clearplan` / `:clearcompile` dismiss panels
 - `q` or `:q` quit
 
-Try walking from canon down into your nodes. Notice how the colors change. Try the same on a node that has edges.
+Try walking from canon down into your nodes. Then try `:plan` to see the order, `:compile` to actually compile.
 
-`T`, `B`, `M`, `g`, `E` are reserved for v1+ — they will plug in time scrub, branch hop, manifestation rotation, and edge walks once those make sense for the kernel.
+---
+
+## 8. Compile to a real artifact
+
+Now the full canonical loop. Add a leaf node that *is* a piece of Python:
+
+```bash
+onto node create \
+  --level artifact \
+  --kind artifact \
+  --manifestation code \
+  --language python \
+  --prompt 'print("hello world")'
+
+# Link it as a refinement of one of your existing nodes (replace IDs as needed):
+onto node link --from node_0003 --to node_0002 --type refines
+
+# Preview the compile order (read-only):
+onto compile plan node_0003
+
+# Compile (writes the artifact and emits compilation_run events):
+onto compile run node_0003 --provider mock
+
+# The artifact is on disk:
+cat .ontology/artifacts/generated/node_0003.py
+python3 .ontology/artifacts/generated/node_0003.py
+```
+
+You should see:
+
+```
+hello world
+```
+
+That's the canon's axiom 6 (compiler functor) running real code. The mock provider acts as the **identity functor** for `code_sketch` task — it returns the prompt verbatim — which makes this work offline. With Ollama, replace `--provider mock` with `--provider ollama --model llama3.1:8b` and supply a higher-level prompt; the compile pipeline is identical.
+
+The shorter way to see all of this end-to-end is:
+
+```bash
+npm run example:hello-world
+```
+
+That builds a full canonical chain, compiles it, and runs the artifact for you. Read [`examples/hello-world/README.md`](../examples/hello-world/README.md) for the walkthrough.
 
 ---
 
 ## What you just touched
 
-In 5 minutes you exercised:
+In 5 minutes you exercised every axiom of the canon:
 
 - **Axiom 1** (typed directed multigraph): `node link` with edge types.
 - **Axiom 2** (temporal log): every command appended to `events.jsonl`.
-- **Axiom 3** (poset): the abstraction levels you assigned to each node.
+- **Axiom 3** (poset): the abstraction levels you assigned, with refinement direction enforced at link time and by `validate`.
+- **Axiom 4** (prompts as rewrite rules): partial. Prompts are stored verbatim today; the leaf's prompt is rewritten by the compiler into a file. PromptAST is a future refinement.
 - **Axiom 5** (presheaf context): `context assemble`'s local view, plus the underlined tokens in the walker.
-- **Run persistence**: content-addressed records with deterministic ids.
-- **Read-only LLM dispatch**: a model spoke; no `.ontology` byte was mutated.
+- **Axiom 6** (compiler functor): `onto compile run` walks the topological plan and writes structure-preserving artifacts.
+- **Axiom 7** (code as compiled shadow): the `.py` file you ran is traceable through `compilation_run` → `runId` → `node` back to the canon.
 
-What you did **not** touch (yet, on purpose):
+You also exercised:
 
-- **Axiom 4** (prompts as rewrite rules): prompts are still opaque text. PromptAST arrives later.
-- **Axiom 6** (compiler functor): no code is generated. The compiler is the last bootstrap.
-- **Proposal system**: today, mutations are typed CLI commands. The Proposal System will let model runs become typed candidate mutations you explicitly apply or reject. See [PROPOSAL_SYSTEM.md](PROPOSAL_SYSTEM.md).
+- **Run persistence**: content-addressed records with deterministic ids; cache hits surface as `(cached)`.
+- **Proposal system**: drafts in the walker → `:propose` → `apply` → real graph mutation. See [PROPOSAL_SYSTEM.md](PROPOSAL_SYSTEM.md).
+- **Audit chain**: every artifact ties back to events, runs, and node hashes. Use `onto runs verify <id>` to recompute hashes, `onto events tail` to see the temporal log.
 
 ---
 
 ## Where to go from here
 
+- [**Hello World example**](../examples/hello-world/README.md) — the canonical demo, end-to-end in one command.
+- [**Compiler**](COMPILER.md) — how `onto compile` produces artifacts and why each step has full provenance.
 - [**The Canon**](ONTOLOGY_CANON.md) and [**Mathematical Model**](MATHEMATICAL_MODEL.md) for the formal foundation.
-- [**Architecture**](ARCHITECTURE.md) for how the kernel, runtime, and assembler relate.
+- [**Architecture**](ARCHITECTURE.md) for how the kernel, runtime, assembler, proposal system, and compiler relate.
 - [**CLI Commands**](CLI_COMMANDS.md) for the full surface.
-- [**Roadmap**](ROADMAP.md) for what comes next.
+- [**Roadmap**](ROADMAP.md) for what comes next (PromptAST, Walker v2, edge-aware SemanticLinker hardening).
 - [**Walker Interface RFC**](WALKER_INTERFACE.md) if you want to extend or skin the walker.

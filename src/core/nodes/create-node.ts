@@ -10,6 +10,7 @@ import {
   OntologySchemaVersion,
   AbstractionLevelSchema,
   NodeKindSchema,
+  ManifestationSchema,
   type OntologyNode,
   type OntologyEvent
 } from "../../schemas/ontology.js";
@@ -25,6 +26,14 @@ export interface CreateNodeOptions {
   // the parent recorded in the proposal so the resulting node lands where the
   // proposal said it would.
   parentNodeId?: string;
+  // Optional manifestation. Defaults to "intent" (an unrendered intention).
+  // Compile artifacts use "code" / "test" / "build" so the artifact-writer
+  // can pick the correct file extension.
+  manifestation?: z.infer<typeof ManifestationSchema>;
+  // Optional language tag. Lands in node.technical.language and is used by
+  // the artifact writer to pick the right extension when manifestation is
+  // "code" or "test" (e.g., "python" → .py).
+  language?: string;
   // Optional event metadata. Proposal apply records the source proposalId here
   // so the temporal log carries the back-reference from the resulting
   // node_created event to the proposal that triggered it.
@@ -51,7 +60,7 @@ export function createNode(options: CreateNodeOptions): { node: OntologyNode; ev
       time: state.nodeCount,
       branch: state.activeBranch,
       plane: "semantic",
-      manifestation: "intent"
+      manifestation: options.manifestation ?? "intent"
     },
     inputs: [
       {
@@ -83,7 +92,7 @@ export function createNode(options: CreateNodeOptions): { node: OntologyNode; ev
       orbitOf: null
     },
     rules: [],
-    technical: {},
+    technical: options.language ? { language: options.language } : {},
     outputs: {
       files: []
     },

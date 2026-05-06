@@ -18,7 +18,8 @@
     "check": "tsc --noEmit",
     "start": "node dist/cli.js",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "example:hello-world": "bash examples/hello-world/build.sh"
   },
   "dependencies": {
     "commander": "^13.1.0",

@@ -1,99 +1,140 @@
 # Ontology
 
-> **A typed, temporal, multidimensional graph editor for intentions.**
+> **A typed, temporal, multidimensional graph that compiles intentions into running programs.**
 > Models may speak. Only explicit graph commands may mutate the network.
+> Code is the compiled shadow of a valid semantic network.
 
-Ontology is a terminal-first tool for building **a network of ideas that does not lose its mind** when an AI gets involved. Instead of letting prompts and outputs sprawl across chats, files, and notes, you connect intentions as typed nodes and edges in `.ontology/` — and the kernel guarantees nothing mutates the graph except explicit commands you ran.
+Ontology is a terminal-first system for building **a network of ideas that does not lose its mind** when an AI gets involved. Instead of letting prompts and outputs sprawl across chats, files, and notes, you connect intentions as typed nodes and edges in `.ontology/` — a kernel-verified intention network — and a compiler walks that network in topological order to produce executable artifacts. Every artifact is traceable to the proposal that birthed it, the model run that drafted it, the assembled context the model saw, and the hashes of the nodes and edges that authorized the compilation.
 
-The deeper bet: **code is the compiled shadow of a valid semantic network**, not the other way around. Today Ontology is a verified network kernel, a node editor, and a model runtime — not yet a code generator. We are building toward that, one bootstrap at a time.
+## See it in 60 seconds
 
 ```bash
+git clone https://github.com/jcrogomez/ontology.git
+cd ontology
 npm install
-npm run dev -- init
-npm run dev -- node create --level domain --kind entity \
-  --prompt "Harvest has seededQuantity, harvestedQuantity and status."
-npm run dev -- inspect
-npm run dev -- walk node_0001
+npm run example:hello-world
 ```
 
----
+That command builds a five-node intention chain, compiles it through the topological plan, writes a working Python script to `.ontology/artifacts/generated/`, and (if `python3` is on your PATH) runs it. You should see:
+
+```
+Step 7: artifact
+  Path:     .../examples/hello-world/.ontology/artifacts/generated/node_0005.py
+  Contents:
+    print("hello world")
+
+Step 8: run the artifact
+  hello world
+
+✓ Ontology compiled an intention into a working program.
+```
+
+Read [`examples/hello-world/README.md`](examples/hello-world/README.md) for the walkthrough.
+
+## What you actually get
+
+| Verb | What it means |
+| --- | --- |
+| `onto init` | Create a fresh `.ontology/` kernel (state, events log, edges log, canon node). |
+| `onto node create` | Add a typed semantic node. Supports `--manifestation` and `--language` for compile-ready leaves. |
+| `onto node link` | Connect two nodes with a typed edge. Refinement-family edges enforce the abstraction poset. |
+| `onto node list / show` | Inspect the network. |
+| `onto context assemble` | Compute a node's local context (parent path + edge neighbors). |
+| `onto run prompt / run context` | Dispatch a prompt to a model. Persist with `--persist`. Wrap the run as a proposal with `--as-proposal`. |
+| `onto runs list / show / verify` | Audit persisted run records. Every byte is content-addressed. |
+| `onto graph neighbors / path / subgraph` | Read-only traversal queries over the typed graph. |
+| `onto propose node / link` | Stage a typed candidate mutation without touching the graph. |
+| `onto proposal list / show / apply / reject` | Lifecycle the candidate. `apply` re-validates `parentHash`/endpoint hashes and stales on divergence. |
+| **`onto compile plan <id>`** | **Preview the topological compile order rooted at a node. Read-only.** |
+| **`onto compile run <id>`** | **Compile the focal and its dependency closure. Writes artifacts. Emits `compilation_run` events.** |
+| `onto walk <id>` | The Walker: an interactive focal-cell terminal interface. Edit drafts, propose, run models, preview plans, compile — all from the TUI. |
+| `onto validate`, `onto inspect`, `onto events tail`, `onto model doctor`, `onto doctor` | Observability. |
+
+The full surface is in [docs/CLI_COMMANDS.md](docs/CLI_COMMANDS.md).
+
+## The canonical loop, end-to-end
+
+```
+intention (graph)
+   ↓
+context (assembleContext, edge-aware)
+   ↓
+candidate (model run, persisted, hashed)
+   ↓
+deterministic validation (intent validator + presheaf gluing)
+   ↓
+proposal (typed candidate mutation, parentHash-pinned)
+   ↓
+explicit apply (user approval, fail-loud on stale dependencies)
+   ↓
+mutation (node_created / edge_created event)
+   ↓
+compilation (topological plan run, model dispatch, artifact written)
+   ↓
+file on disk (auditable: artifact → event → run → prompt hash → node)
+```
+
+Every step is recorded in the append-only `events.jsonl`. Every artifact ties back to a `compilation_run` event. The chain is replayable in either direction.
 
 ## Why this exists
 
-Most AI tooling today does this:
+Most AI tooling does this:
 
 ```
 prompt + files + model → output
 ```
 
-Ontology wants this:
+Ontology does this:
 
 ```
 graph state + typed context + model → candidate
 candidate + deterministic validators → accepted | rejected
 accepted candidate + explicit graph command → mutation
+network of mutations + topological plan + compiler → artifact
 ```
 
-That separation buys three things:
+That separation buys four things:
 
 1. **Memory.** The graph remembers every decision, every edge, every event, in an append-only log.
 2. **Trust.** A model can suggest. A user must approve. The graph is the source of truth.
 3. **Composition.** When a project grows, the topology of the graph determines what gets compiled, in what order, with what dependencies.
-
----
-
-## What Ontology can do today
-
-| Verb | What it means |
-| --- | --- |
-| `onto init` | Create a fresh `.ontology/` kernel (state, events log, edges log, canon node). |
-| `onto node create` | Add a typed semantic node. Append a `node_created` event. |
-| `onto node link` | Connect two nodes with a typed edge. Append an `edge_created` event. |
-| `onto context assemble` | Compute the local context for a node (parent path; optionally edge-aware with `--include-edges`). |
-| `onto run prompt` | Send a free-form prompt to a model (mock or local Ollama). |
-| `onto run context` | Send the assembled context for a node to a model. Optionally `--validate` and `--persist`. |
-| `onto run prompt --as-proposal` / `onto run context --as-proposal` | Same as above, but wrap the model's response into a typed candidate node mutation (a proposal). |
-| `onto runs list / show / verify` | Inspect persisted run records (content-addressed, audit-friendly). |
-| `onto propose node`, `onto proposal list / show / apply / reject` | The proposal lifecycle: typed candidate mutations applied or rejected explicitly. Models speak; the user commits. |
-| `onto walk <id>` | **Open the Walker**: an interactive focal-cell terminal interface. Read-only in v0. |
-| `onto inspect`, `onto validate`, `onto events tail`, `onto model doctor`, ... | Observability primitives. |
-
-The full list is in [docs/CLI_COMMANDS.md](docs/CLI_COMMANDS.md).
-
----
+4. **Provenance.** Every byte of every artifact traces back through the events log to the canon. Nothing slips through.
 
 ## Where to go next
 
-If you are a **first-time visitor**, start with the guided tour:
+If you're a **first-time visitor**, start with the guided tour:
 
-- [**Getting Started**](docs/GETTING_STARTED.md) — a hands-on walk from `init` to `walk` in 5 minutes.
+- [**Getting Started**](docs/GETTING_STARTED.md) — a hands-on walk from `init` to `compile` in 5 minutes.
+- [**Hello World example**](examples/hello-world/README.md) — the canonical demonstration.
 
 If you want to understand **the design**:
 
 - [**The Canon**](docs/ONTOLOGY_CANON.md) — the foundational definition.
-- [**The Mathematical Model**](docs/MATHEMATICAL_MODEL.md) — the 7 axioms.
-- [**The Architecture**](docs/ARCHITECTURE.md) — how Kernel, Observability, LLM Runtime, and Context Assembler relate.
+- [**The Mathematical Model**](docs/MATHEMATICAL_MODEL.md) — the seven axioms.
+- [**The Architecture**](docs/ARCHITECTURE.md) — how Kernel, Observability, LLM Runtime, Context Assembler, Proposal System, and Compiler relate.
+- [**The Compiler**](docs/COMPILER.md) — how `onto compile` walks the plan and produces artifacts.
+- [**The Walker**](docs/WALKER_INTERFACE.md) — the interactive TUI design.
 
 If you want to **contribute or extend**:
 
 - [**Roadmap**](docs/ROADMAP.md) — what is implemented, what is planned, in which bootstrap.
-- [**RFCs**](docs) — `RUN_PERSISTENCE.md`, `PROPOSAL_SYSTEM.md`, `WALKER_INTERFACE.md` — design specs for in-flight and upcoming work.
+- [**RFCs**](docs) — `RUN_PERSISTENCE.md`, `PROPOSAL_SYSTEM.md`, `WALKER_INTERFACE.md`, `COMPILER.md`.
 - [**Release Notes**](docs/RELEASE_NOTES.md) — the running changelog.
-
----
 
 ## Status
 
-**Bootstrap 0.5 complete.** Version `0.2.0-alpha.1`. The kernel is hardened; node creation, edges, edge-aware context, mock + Ollama runtimes, deterministic validation, content-addressed run persistence, the read-only Walker v0, poset enforcement, and the full Proposal System (propose → list/show/reject → apply with parentHash re-validation, plus `run prompt --as-proposal` / `run context --as-proposal` for run-driven proposals) are all implemented and tested.
+**Bootstrap 0.8 — Hello World.** Version `0.2.0-alpha.1`. The seven axioms of the mathematical canon are now all running concrete code:
 
-The canonical loop now runs end-to-end:
+| Axiom | Implementation |
+| --- | --- |
+| 1. Typed directed multigraph | `node link` with 18 edge types, multigraph allowed |
+| 2. Temporal log | append-only `events.jsonl` with hash chain |
+| 3. Abstraction poset | enforced at `node link` and `validate` for the refinement family |
+| 4. Prompts as rewrite rules | partially: prompts are stored verbatim today; PromptAST is post-hello-world |
+| 5. Presheaf context | `assembleContext`, `glueFragments`, `validateIntent`, edge-aware `semanticLink` |
+| 6. Compiler functor | `onto compile run` walks the topological plan and produces structure-preserving artifacts |
+| 7. Code as compiled shadow | every artifact under `.ontology/artifacts/generated/` ties back through events to nodes |
 
-```
-graph state + typed context + model → run_persisted → proposal_created → user reviews → proposal_applied → node_created
-```
-
-Every step is in the append-only events log; every node can be traced back to the model run that proposed it.
-
-Next on the runway: Walker v1 (edit mode, `:propose`, `:run`, `:compile --plan`), `onto propose link` (edge_create proposals), and the edge-aware SemanticLinker.
+What's left for the canonical statement to be *fully* realized: PromptAST (axiom 4 made structural rather than textual). Everything else is now operational.
 
 Ontology is alpha-quality. The append-only log is single-writer (CLI single-shot); concurrent writes from multiple processes are not yet protected. Everything else is meant to fail loudly and exit `1` rather than silently corrupt.

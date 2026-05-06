@@ -41,13 +41,15 @@
 - Compilation maps intention objects and semantic relations into executable artifact objects and relations.
 - Compilation must preserve structure.
 - Framework choice must come from target/stack nodes, not from hardcoded compiler assumptions.
-- Bootstrap 0.1 does not compile.
+- **Implemented (Bootstrap 0.8).** `onto compile run <nodeId>` walks the topological plan computed by `computeCompilePlan` and dispatches each step's prompt against the configured provider. The order is *derived* from the graph (hard-dependency edges + Kahn's algorithm), not hand-coded; that is the structure-preserving property. See `docs/COMPILER.md` for the full implementation.
+- The mock provider acts as the **identity functor** when `task: code_sketch` — it returns the prompt verbatim. This makes mock-driven compilation a degenerate but mathematically valid case of axiom 6, and is what powers the offline `npm run example:hello-world` demo.
 
 ## 7. Code as Compiled Shadow
 
 - Code is not the source of truth.
 - Code is a generated artifact.
 - Generated artifacts must be traceable to nodes, edges, events and hashes.
+- **Implemented.** Every artifact under `.ontology/artifacts/generated/<nodeId>.<ext>` is anchored by a `compilation_run` event whose payload carries `nodeId`, `runId`, `cached`, and `artifactRelativePath`. The `runId` resolves to a content-addressed `PersistedRun` record whose `input.promptHash` ties back to the source node body. The audit chain `artifact → event → run → prompt hash → node` is replayable end-to-end.
 
 ```text
 ┌─────────────────────────────────────────────┐
