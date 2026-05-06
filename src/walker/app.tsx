@@ -24,9 +24,11 @@ import { PathSection } from "./layout/path-section.js";
 import { HintBar } from "./layout/hint-bar.js";
 import { DraftEditor } from "./layout/draft-editor.js";
 import { RunResultPanel, type RunResultPanelProps } from "./layout/run-result-panel.js";
+import { CompilePlanPanel, type CompilePlanPanelProps } from "./layout/compile-plan-panel.js";
 import { loadDraft, saveDraft, clearDraft } from "../core/drafts/persist.js";
 import { proposeFromDraft } from "./actions/propose-from-draft.js";
 import { runFromWalker } from "./actions/run-from-walker.js";
+import { planFromWalker } from "./actions/plan-from-walker.js";
 import type { LlmProvider } from "../runtime/llm/types.js";
 
 export interface AppProps {
@@ -67,6 +69,11 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
   // re-renders into the "running" panel BEFORE the (potentially slow)
   // dispatch fires.
   const [pendingRun, setPendingRun] = useState<{ provider: LlmProvider } | null>(null);
+
+  // Compile-plan preview state. The plan is computed synchronously (it is a
+  // pure topological sort over edges, no I/O beyond loadEdges), so unlike
+  // :run there is no pending sentinel.
+  const [planState, setPlanState] = useState<CompilePlanPanelProps["state"]>({ kind: "idle" });
 
   const neighborhood = useMemo<FocalNeighborhood | { error: string }>(() => {
     try {
@@ -269,7 +276,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       return;
     }
     if (cmd === "help") {
-      setMessage("v1: i edit · :propose · :run [ollama] · :clearrun · :cleardraft · :q");
+      setMessage("v1: i edit · :propose · :run [ollama] · :plan · :clearrun · :clearplan · :cleardraft · :q");
       return;
     }
     if (cmd === "propose") {
@@ -318,6 +325,23 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       setMessage("run result dismissed");
       return;
     }
+    if (cmd === "plan" || cmd === "compile --plan" || cmd === "compile-plan") {
+      // Topological compile-plan preview. Read-only: we never write any
+      // artifact or event here; the real compiler ships in Bootstrap 0.8.
+      const plan = planFromWalker({ focalId, cwd });
+      setPlanState({ kind: "result", plan });
+      if (!plan.ok) {
+        setMessage(`plan failed: ${plan.reason}`);
+      } else {
+        setMessage(`plan: ${plan.steps.length} step(s)`);
+      }
+      return;
+    }
+    if (cmd === "clearplan") {
+      setPlanState({ kind: "idle" });
+      setMessage("plan dismissed");
+      return;
+    }
     setMessage(`unknown command: :${cmd}`);
   }
 
@@ -356,6 +380,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
         />
       )}
       <RunResultPanel state={runState} />
+      <CompilePlanPanel state={planState} />
       <HintBar mode={mode === "edit" ? "view" : mode} command={command} message={message} />
     </Box>
   );

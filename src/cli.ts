@@ -22,6 +22,7 @@ import { graphPathCommand } from "./commands/graph/path.js";
 import { graphSubgraphCommand } from "./commands/graph/subgraph.js";
 import { proposeNodeCommand } from "./commands/proposal/propose-node.js";
 import { proposeLinkCommand } from "./commands/proposal/propose-link.js";
+import { compilePlanCommand } from "./commands/compile/plan.js";
 import { proposalListCommand } from "./commands/proposal/list.js";
 import { proposalShowCommand } from "./commands/proposal/show.js";
 import { proposalRejectCommand } from "./commands/proposal/reject.js";
@@ -504,6 +505,23 @@ proposal
       } else {
         console.error(`✖ Error applying proposal: ${errorMessage(err)}`);
       }
+      process.exit(1);
+    }
+  });
+
+const compile = program
+  .command("compile")
+  .description("Compile-related commands. v0 exposes only --plan (preview); the actual compiler ships in Bootstrap 0.8.");
+
+compile
+  .command("plan <id>")
+  .description("Print the topological compile plan rooted at a node, in dependency order. Read-only preview, no artifact written.")
+  .option("--json", "Output results in JSON format")
+  .action(async (id, options) => {
+    try {
+      await compilePlanCommand(id, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error computing compile plan: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
