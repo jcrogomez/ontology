@@ -1,6 +1,6 @@
 # RFC: Walker Interface
 
-**Status:** v0 Implemented (Bootstrap 0.4). v1 PR-A shipped: edit mode + drafts + `:propose`. Remaining v1 slices: `:run` (PR-B) and `:compile --plan` (PR-C). v2 still planned.
+**Status:** v0 Implemented (Bootstrap 0.4). v1 PR-A + PR-B shipped: edit mode + drafts + `:propose` + `:run`. Remaining v1 slice: `:compile --plan` (PR-C). v2 still planned.
 **Bootstrap target:** 0.4 (v0 read-only) → 0.6 (full pipeline cockpit)
 **Related:** Proposal System (RFC), Run Persistence (RFC)
 **Date:** 2026-05-05
@@ -206,10 +206,13 @@ Walker v1 ships in three slices:
 - `:cleardraft` removes a saved draft.
 - The walker never mutates the network directly. `:propose` produces a proposal that the user later applies via `onto proposal apply`.
 
-**PR-B (next):**
-- `:run` integration. Dispatches a model run from the walker against the focal node's assembled context.
+**PR-B (this slice):**
+- `:run` (default `mock`) and `:run ollama` dispatch a model run against the focal node's assembled context.
+- The walker stays interactive while the dispatch is in flight: a "running" panel renders synchronously, then the result panel replaces it on resolve.
+- Persistence is always on. Each `:run` produces a content-addressed record under `.ontology/runs/run_<id>.json` and emits a `run_persisted` event. Re-running with identical inputs surfaces the same id with a `(cached)` flag; no second dispatch fires.
+- `:clearrun` dismisses the result panel without affecting the persisted record.
 
-**PR-C (after PR-B):**
+**PR-C (next):**
 - `:compile --plan` (read-only topological plan inspection).
 
 ## 10. v2 scope

@@ -158,18 +158,24 @@ This document outlines the available CLI commands across current Bootstrap phase
 - **Flags:** `--depth <n>` (default `2`), `--type <a,b,c>` (filter edges), `--json`.
 - **Output:** the focal node (marked `*`) plus all nodes reachable within `depth` hops, and only the edges where both endpoints fall inside the slice. Boundary edges are excluded.
 
-### `walk <nodeId>` *(v0 + v1 PR-A)*
+### `walk <nodeId>` *(v0 + v1 PR-A + v1 PR-B)*
 
 - **Purpose:** Open the Walker, an interactive focal-cell terminal interface for the intention graph. Color encodes the abstraction level, tokens shared across the local neighborhood are underlined (presheaf overlap), and the path bar renders a colored breadcrumb from canon to focal.
 - **Example:** `npm run dev -- walk node_0000_canon`
 - **v0 keys:** `↑` parent · `↓` child · `←/→` siblings · `:q` / `q` quit · `:help` flash help.
-- **v1 PR-A additions:**
+- **v1 PR-A — drafts + propose:**
   - `i` enters edit mode. The user composes the prompt for a *candidate child* of the focal (the focal node itself is never edited — only explicit graph commands may mutate the network).
   - `Esc` exits edit mode and saves the buffer as a draft to `.ontology/work/drafts/<focalId>.draft.json`. Re-entering edit mode resumes from the saved draft.
   - The identity bar shows `(draft pending)` when a draft exists for the focal.
   - `:propose` creates a `node_create` proposal from the saved draft (level + kind inherited from focal; the proposal is a child refinement). The draft is cleared on success. The resulting proposal lives in `pending` status; apply it via `onto proposal apply <id>`.
   - `:cleardraft` removes the saved draft for the focal without creating a proposal.
-- **Notes:** Requires an interactive TTY. PR-B will add `:run`, PR-C will add `:compile --plan`. See `docs/WALKER_INTERFACE.md`.
+- **v1 PR-B — run from walker:**
+  - `:run` dispatches a model run against the focal's assembled context with the `mock` provider by default.
+  - `:run ollama` uses the local Ollama adapter (fails loudly if unavailable).
+  - The walker stays interactive while the dispatch is in flight: a "running" panel renders synchronously, then the result panel replaces it on resolve.
+  - Each `:run` is automatically persisted under `.ontology/runs/run_<id>.json` and emits a `run_persisted` event. Re-running with identical inputs is a cache hit (the panel surfaces `(cached)` and no second dispatch fires).
+  - `:clearrun` dismisses the result panel without affecting the persisted record.
+- **Notes:** Requires an interactive TTY. PR-C will add `:compile --plan`. See `docs/WALKER_INTERFACE.md`.
 
 ### `propose link` *(post-Bootstrap 0.5, PR #96)*
 

@@ -23,8 +23,11 @@ import { EdgesSection } from "./layout/edges-section.js";
 import { PathSection } from "./layout/path-section.js";
 import { HintBar } from "./layout/hint-bar.js";
 import { DraftEditor } from "./layout/draft-editor.js";
+import { RunResultPanel, type RunResultPanelProps } from "./layout/run-result-panel.js";
 import { loadDraft, saveDraft, clearDraft } from "../core/drafts/persist.js";
 import { proposeFromDraft } from "./actions/propose-from-draft.js";
+import { runFromWalker } from "./actions/run-from-walker.js";
+import type { LlmProvider } from "../runtime/llm/types.js";
 
 export interface AppProps {
   initialNodeId: string;
@@ -56,6 +59,15 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
   // whole neighborhood on every draft change.
   const [draftTick, setDraftTick] = useState(0);
 
+  // Run-result state machine. The walker stays interactive while a dispatch
+  // is in flight: kicked off via useEffect on a "running" sentinel.
+  const [runState, setRunState] = useState<RunResultPanelProps["state"]>({ kind: "idle" });
+  // Pending kickoff: when set, the effect below dispatches to the model and
+  // updates runState on resolve. We use this two-stage pattern so the walker
+  // re-renders into the "running" panel BEFORE the (potentially slow)
+  // dispatch fires.
+  const [pendingRun, setPendingRun] = useState<{ provider: LlmProvider } | null>(null);
+
   const neighborhood = useMemo<FocalNeighborhood | { error: string }>(() => {
     try {
       return loadFocalNeighborhood(focalId, cwd);
@@ -84,6 +96,45 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
     const t = setTimeout(() => setMessage(null), 1500);
     return () => clearTimeout(t);
   }, [message]);
+
+  // Async dispatcher for `:run`. The handler that types pendingRun runs
+  // synchronously and immediately re-renders into the "running" panel; this
+  // effect then carries out the dispatch off the keystroke path.
+  useEffect(() => {
+    if (!pendingRun) return;
+    if ("error" in neighborhood) {
+      setRunState({ kind: "error", message: "focal node failed to load" });
+      setPendingRun(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const result = await runFromWalker({
+        focal: neighborhood.focal,
+        provider: pendingRun.provider,
+        cwd,
+      });
+      if (cancelled) return;
+      if (!result.ok) {
+        setRunState({ kind: "error", message: result.message });
+      } else {
+        setRunState({
+          kind: "result",
+          runId: result.runId,
+          cached: result.cached,
+          provider: result.provider,
+          model: result.model,
+          responseText: result.responseText,
+          durationMs: result.durationMs,
+        });
+      }
+      setPendingRun(null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingRun]);
 
   // Helper: persist the current edit-mode buffer and exit edit mode.
   function commitDraftAndExit(): void {
@@ -218,7 +269,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       return;
     }
     if (cmd === "help") {
-      setMessage("v1: i = edit draft, :propose creates a proposal, q quits. v2 adds run/compile.");
+      setMessage("v1: i edit · :propose · :run [ollama] · :clearrun · :cleardraft · :q");
       return;
     }
     if (cmd === "propose") {
@@ -240,6 +291,31 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       const removed = clearDraft(focalId, cwd);
       setDraftTick(t => t + 1);
       setMessage(removed ? `draft cleared for ${focalId}` : `no draft to clear for ${focalId}`);
+      return;
+    }
+    // :run [provider]. Default provider is mock (safe + offline). Accepts
+    // ollama for live local model dispatch. Other providers are rejected.
+    if (cmd === "run" || cmd.startsWith("run ")) {
+      if ("error" in neighborhood) {
+        setMessage("cannot run: focal node failed to load");
+        return;
+      }
+      const parts = cmd.split(/\s+/);
+      const providerArg = parts[1] ?? "mock";
+      if (providerArg !== "mock" && providerArg !== "ollama") {
+        setMessage(`unsupported provider: ${providerArg} (try mock or ollama)`);
+        return;
+      }
+      // Show "running ..." synchronously, then schedule the actual dispatch
+      // via a useEffect on pendingRun so the walker re-renders before the
+      // (potentially slow) network call.
+      setRunState({ kind: "running", provider: providerArg });
+      setPendingRun({ provider: providerArg });
+      return;
+    }
+    if (cmd === "clearrun") {
+      setRunState({ kind: "idle" });
+      setMessage("run result dismissed");
       return;
     }
     setMessage(`unknown command: :${cmd}`);
@@ -279,6 +355,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
           onSubmit={commitDraftAndExit}
         />
       )}
+      <RunResultPanel state={runState} />
       <HintBar mode={mode === "edit" ? "view" : mode} command={command} message={message} />
     </Box>
   );
