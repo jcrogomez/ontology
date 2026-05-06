@@ -6,6 +6,7 @@ import type { LlmProvider, LlmTask } from "../llm/types.js";
 import { hashPrompt } from "../../core/integrity/hash.js";
 import { createPersistedRun, computeRunId, loadPersistedRun } from "../../core/runs/persist.js";
 import { writeArtifact, type WriteArtifactResult } from "./artifact-writer.js";
+import { extractCodeFence } from "./post/extract-code-fence.js";
 import { getOntologyPaths } from "../../core/project/paths.js";
 import { appendJsonl } from "../../core/fs/json.js";
 import { readState, writeState } from "../../core/state/state-store.js";
@@ -143,12 +144,29 @@ export async function compileNode(options: CompileNodeOptions): Promise<CompileN
     response = { text: dispatched.text, provider: dispatched.provider, model: dispatched.model };
   }
 
+  // For manifestation:"code" nodes, project the dispatcher's text through a
+  // markdown-fence extractor before writing. Chat-tuned models routinely wrap
+  // code in ```lang ... ``` and surround it with prose; that prose would land
+  // verbatim in a .py/.ts/.rs file and break the artifact at parse time.
+  // The mock provider's identity-functor output has no fence, so this is a
+  // no-op there. The persisted run still records the raw response text
+  // (axiom 9: full provenance back to the prompt hash); the projection lives
+  // between run.text and the on-disk artifact.
+  let artifactContent = response.text;
+  if (options.node.coordinates.manifestation === "code") {
+    const projected = extractCodeFence({
+      text: response.text,
+      language: options.node.technical.language,
+    });
+    artifactContent = projected.content;
+  }
+
   // Write the artifact.
   let artifact: WriteArtifactResult;
   try {
     artifact = writeArtifact({
       node: options.node,
-      content: response.text,
+      content: artifactContent,
       cwd,
     });
   } catch (err: unknown) {
