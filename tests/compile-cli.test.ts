@@ -87,6 +87,36 @@ describe("onto compile run", () => {
     expect(artifact).toBe(node.prompt.raw);
   });
 
+  it("strips a markdown fence from the dispatcher response when manifestation=code", () => {
+    const fenced = 'Here you go:\n```python\nprint("from fence")\n```\nHope it helps!';
+    const tmp2 = createTempProject();
+    try {
+      expect(runCli(tmp2, ["init"]).status).toBe(0);
+      expect(runCli(tmp2, ["node", "create", "--level", "domain", "--kind", "entity", "--prompt", "d"]).status).toBe(0);
+      expect(runCli(tmp2, ["node", "create",
+        "--level", "artifact",
+        "--kind", "artifact",
+        "--manifestation", "code",
+        "--language", "python",
+        "--prompt", fenced,
+      ]).status).toBe(0);
+      runCli(tmp2, ["node", "link", "--from", "node_0001", "--to", "node_0000_canon", "--type", "refines"]);
+      runCli(tmp2, ["node", "link", "--from", "node_0002", "--to", "node_0001", "--type", "refines"]);
+      runCli(tmp2, ["compile", "run", "node_0002", "--provider", "mock"]);
+      const artifact = fs.readFileSync(path.join(tmp2, ".ontology/artifacts/generated/node_0002.py"), "utf-8");
+      // The mock returns the prompt verbatim; the extractor projects out the
+      // fenced body. Provenance: the persisted run still carries the raw
+      // fenced text — the projection lives between run.text and disk.
+      expect(artifact).toBe('print("from fence")');
+      const runs = fs.readdirSync(path.join(tmp2, ".ontology/runs"));
+      const focalRun = runs.map(f => JSON.parse(fs.readFileSync(path.join(tmp2, ".ontology/runs", f), "utf-8")))
+                           .find((r: any) => r.input.targetNodeId === "node_0002");
+      expect(focalRun.output.text).toBe(fenced);
+    } finally {
+      cleanupTempProject(tmp2);
+    }
+  });
+
   it("the artifact extension follows the manifestation+language map", () => {
     // node_0001 has default manifestation=intent, no language → .txt
     runCli(tempDir, ["compile", "run", "node_0002", "--provider", "mock"]);
