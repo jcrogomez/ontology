@@ -93,6 +93,46 @@ describe("onto compile run", () => {
     expect(artifact).toBe(node.prompt.raw);
   });
 
+  it("threads upstream refinement parents into the run's contextHash, leaf inherits non-null", () => {
+    runCli(tempDir, ["compile", "run", "node_0002", "--provider", "mock"]);
+    const runs = fs.readdirSync(path.join(tempDir, ".ontology/runs"))
+      .map(f => JSON.parse(fs.readFileSync(path.join(tempDir, ".ontology/runs", f), "utf-8")));
+    const byTarget = Object.fromEntries(runs.map((r: any) => [r.input.targetNodeId, r]));
+    // canon has no refinement parent → contextHash stays null.
+    expect(byTarget["node_0000_canon"].input.contextHash).toBeNull();
+    // The domain (node_0001) refines canon → contextHash set, ctx:hash:<sha>.
+    expect(byTarget["node_0001"].input.contextHash).toMatch(/^ctx:hash:[0-9a-f]{64}$/);
+    // The leaf (node_0002) refines node_0001 → its contextHash is distinct
+    // from node_0001's (the upstream content differs).
+    expect(byTarget["node_0002"].input.contextHash).toMatch(/^ctx:hash:[0-9a-f]{64}$/);
+    expect(byTarget["node_0002"].input.contextHash).not.toBe(byTarget["node_0001"].input.contextHash);
+  });
+
+  it("changing an upstream node's prompt invalidates the leaf's run id", () => {
+    // First compile under the original chain. Capture the leaf's run id.
+    runCli(tempDir, ["compile", "run", "node_0002", "--provider", "mock"]);
+    const runsDir = path.join(tempDir, ".ontology/runs");
+    const runsBefore = fs.readdirSync(runsDir).map(f => JSON.parse(fs.readFileSync(path.join(runsDir, f), "utf-8")));
+    const leafBefore = runsBefore.find((r: any) => r.input.targetNodeId === "node_0002");
+    expect(leafBefore).toBeDefined();
+
+    // Mutate the domain (node_0001) prompt on disk and recompile. With the
+    // upstream contextHash now in play, the leaf's run id must change even
+    // though node_0002's own prompt did not.
+    const domainPath = path.join(tempDir, ".ontology/nodes/node_0001.json");
+    const domain = JSON.parse(fs.readFileSync(domainPath, "utf-8"));
+    domain.prompt.raw = "Greeting domain — RENAMED";
+    fs.writeFileSync(domainPath, JSON.stringify(domain, null, 2));
+
+    runCli(tempDir, ["compile", "run", "node_0002", "--provider", "mock"]);
+    const runsAfter = fs.readdirSync(runsDir).map(f => JSON.parse(fs.readFileSync(path.join(runsDir, f), "utf-8")));
+    const leafIdsAfter = runsAfter.filter((r: any) => r.input.targetNodeId === "node_0002").map((r: any) => r.id);
+    // The original leaf run is still on disk (provenance never lies), and a
+    // new run with a different id is added because the upstream changed.
+    expect(leafIdsAfter).toContain(leafBefore.id);
+    expect(leafIdsAfter.length).toBeGreaterThanOrEqual(2);
+  });
+
   it("strips a markdown fence from the dispatcher response when manifestation=code", () => {
     const fenced = 'Here you go:\n```python\nprint("from fence")\n```\nHope it helps!';
     const tmp2 = createTempProject();

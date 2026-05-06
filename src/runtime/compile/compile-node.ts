@@ -8,6 +8,11 @@ import { createPersistedRun, computeRunId, loadPersistedRun } from "../../core/r
 import { writeArtifact, type WriteArtifactResult } from "./artifact-writer.js";
 import { extractCodeFence } from "./post/extract-code-fence.js";
 import { validateLanguage } from "./post/validate-language.js";
+import {
+  buildUpstreamSystemPrompt,
+  hashUpstreamContext,
+  type UpstreamContextItem,
+} from "./upstream-context.js";
 import { getOntologyPaths } from "../../core/project/paths.js";
 import { appendJsonl } from "../../core/fs/json.js";
 import { readState, writeState } from "../../core/state/state-store.js";
@@ -38,11 +43,18 @@ export interface CompileNodeOptions {
   model?: string;
   ollamaHost?: string;
   cwd?: string;
-  // Compilation results from earlier steps in the same plan run, keyed by
-  // node id. Future versions may use this to thread upstream outputs into
-  // the prompt; today the helper does NOT inject them automatically — it
-  // is exposed so callers can build a richer prompt themselves if needed.
-  upstreamArtifacts?: Record<string, string>;
+  // Direct refinement parents' compiled outputs, in the order they were
+  // produced by the plan-runner (deterministic — sorted by nodeId). When
+  // present, they are concatenated into the dispatcher's `system` prompt
+  // and hashed into `PersistedRunInput.contextHash` so the run id reflects
+  // both the focal prompt and the lineage that informed it.
+  //
+  // The mock adapter ignores `system` for `code_sketch`, so threading
+  // upstreams here does NOT change the mock's artifact bytes — only the
+  // run id changes. That is the correct behavior for the identity functor:
+  // structurally distinct runs get distinct ids, even when the projection
+  // to disk is the same.
+  upstream?: UpstreamContextItem[];
 }
 
 export type CompileNodeResult =
@@ -62,18 +74,25 @@ export async function compileNode(options: CompileNodeOptions): Promise<CompileN
   const cwd = options.cwd ?? process.cwd();
   const provider: LlmProvider = options.provider ?? "mock";
 
-  // The compile prompt is the node's raw prompt. Future versions may prepend
-  // the assembled context as system instructions when the dispatch interface
-  // grows a system slot. For v0 we keep the contract narrow so the mock's
-  // identity-functor behavior is preserved end-to-end.
+  // The compile prompt is the node's raw prompt. The upstream refinement
+  // parents' compiled outputs (passed in by the plan-runner) become the
+  // dispatcher's `system` prompt, when present — that is the inductive form
+  // of axiom 7 (each compile sees the lineage one hop up; transitivity is
+  // preserved because each parent was already compiled with ITS parents in
+  // system). Mock identity is preserved because the mock adapter ignores
+  // `system` for code_sketch.
   const promptText = options.node.prompt.raw ?? "";
+  const upstream = options.upstream ?? [];
+  const systemPrompt = buildUpstreamSystemPrompt(upstream);
+  const contextHash = hashUpstreamContext(upstream);
 
-  // Build the deterministic run envelope. Including the focal node's id and
-  // its abstraction in the input means two structurally identical compiles
-  // of two different nodes still produce different run ids.
+  // Build the deterministic run envelope. Including the focal node's id, its
+  // branch, and the upstream contextHash in the input means two structurally
+  // distinct compiles never collide on a run id — even when the focal prompt
+  // is identical, a different lineage produces a different id.
   const runInput: PersistedRunInput = {
     promptHash: hashPrompt(promptText),
-    contextHash: null,
+    contextHash,
     targetNodeId: options.node.id,
     branch: options.node.coordinates.branch,
     time: null,
@@ -109,7 +128,11 @@ export async function compileNode(options: CompileNodeOptions): Promise<CompileN
     let dispatched;
     try {
       dispatched = await dispatchLlmRequest(
-        { task: COMPILE_TASK, prompt: promptText },
+        {
+          task: COMPILE_TASK,
+          prompt: promptText,
+          ...(systemPrompt ? { system: systemPrompt } : {}),
+        },
         { provider, defaultModel: options.model, ollamaHost: options.ollamaHost },
       );
     } catch (err: unknown) {
