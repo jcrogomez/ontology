@@ -266,4 +266,62 @@ describe("onto compile run", () => {
     expect(r.status).toBe(0);
     expect(r.stdout).toContain("Provider:  per-node (model.ref)");
   });
+
+  it.runIf(PYTHON_AVAILABLE)("--runtime-check passes when the artifact runs (mock identity, valid Python)", () => {
+    // The leaf prompt is `print("hello world")` — runs cleanly under python3.
+    const r = runCli(tempDir, ["compile", "run", "node_0002", "--provider", "mock", "--runtime-check"]);
+    expect(r.status).toBe(0);
+    const artifact = fs.readFileSync(path.join(tempDir, ".ontology/artifacts/generated/node_0002.py"), "utf-8");
+    expect(artifact).toBe('print("hello world")');
+  });
+
+  it.runIf(PYTHON_AVAILABLE)("--runtime-check rejects an artifact that parses but raises NameError", () => {
+    // Mock identity returns the prompt verbatim. The prompt parses but
+    // references an undefined symbol → python3 exits non-zero.
+    const tmp2 = createTempProject();
+    try {
+      expect(runCli(tmp2, ["init"]).status).toBe(0);
+      expect(runCli(tmp2, ["node", "create", "--level", "domain", "--kind", "entity", "--prompt", "d"]).status).toBe(0);
+      expect(runCli(tmp2, ["node", "create",
+        "--level", "artifact",
+        "--kind", "artifact",
+        "--manifestation", "code",
+        "--language", "python",
+        "--prompt", "undefined_symbol_42",  // parses, NameError at runtime
+      ]).status).toBe(0);
+      runCli(tmp2, ["node", "link", "--from", "node_0001", "--to", "node_0000_canon", "--type", "refines"]);
+      runCli(tmp2, ["node", "link", "--from", "node_0002", "--to", "node_0001", "--type", "refines"]);
+      const r = runCli(tmp2, ["compile", "run", "node_0002", "--provider", "mock", "--runtime-check"]);
+      expect(r.status).toBe(1);
+      expect(r.stderr + r.stdout).toMatch(/runtime_failed|runtime failed/i);
+      // Without --runtime-check, the same project should compile cleanly
+      // (the artifact parses; the runtime check is what catches it).
+      const r2 = runCli(tmp2, ["compile", "run", "node_0002", "--provider", "mock"]);
+      expect(r2.status).toBe(0);
+    } finally {
+      cleanupTempProject(tmp2);
+    }
+  });
+
+  it.runIf(PYTHON_AVAILABLE)("--runtime-check honors --runtime-check-timeout-ms and reports timeouts as runtime_failed", () => {
+    const tmp2 = createTempProject();
+    try {
+      expect(runCli(tmp2, ["init"]).status).toBe(0);
+      expect(runCli(tmp2, ["node", "create", "--level", "domain", "--kind", "entity", "--prompt", "d"]).status).toBe(0);
+      expect(runCli(tmp2, ["node", "create",
+        "--level", "artifact",
+        "--kind", "artifact",
+        "--manifestation", "code",
+        "--language", "python",
+        "--prompt", "import time; time.sleep(60)",
+      ]).status).toBe(0);
+      runCli(tmp2, ["node", "link", "--from", "node_0001", "--to", "node_0000_canon", "--type", "refines"]);
+      runCli(tmp2, ["node", "link", "--from", "node_0002", "--to", "node_0001", "--type", "refines"]);
+      const r = runCli(tmp2, ["compile", "run", "node_0002", "--provider", "mock", "--runtime-check", "--runtime-check-timeout-ms", "300"]);
+      expect(r.status).toBe(1);
+      expect(r.stderr + r.stdout).toMatch(/runtime_failed|timeout/i);
+    } finally {
+      cleanupTempProject(tmp2);
+    }
+  });
 });

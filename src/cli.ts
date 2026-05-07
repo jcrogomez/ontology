@@ -535,6 +535,8 @@ compile
   .option("--provider <provider>", "LLM provider override (mock or ollama). When omitted, each node compiles via its own model.ref resolved through the registry.")
   .option("--model <model>", "Model override (only meaningful with --provider; ignored on the per-node ref path)")
   .option("--ollama-host <host>", "Host for Ollama provider")
+  .option("--runtime-check", "After parse-check, execute the artifact (with timeout) and fail with runtime_failed on non-zero exit")
+  .option("--runtime-check-timeout-ms <ms>", "Wall-clock timeout for the runtime check (default 5000, max 60000)", (v) => parseInt(v, 10))
   .option("--json", "Output results in JSON format")
   .action(async (id, options) => {
     try {

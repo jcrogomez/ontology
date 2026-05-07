@@ -7,6 +7,12 @@ export interface CompileRunOptions {
   model?: string;
   ollamaHost?: string;
   json?: boolean;
+  // Opt-in: after parse-check, execute the compiled artifact under a
+  // subprocess timeout. Non-zero exit / timeout fails the compile with
+  // runtime_failed. Off by default — running arbitrary LLM output has
+  // operational consequences.
+  runtimeCheck?: boolean;
+  runtimeCheckTimeoutMs?: number;
 }
 
 // `onto compile <nodeId>`
@@ -44,6 +50,8 @@ export async function compileRunCommand(focalId: string, options: CompileRunOpti
     provider,
     model: options.model,
     ollamaHost: options.ollamaHost,
+    runtimeCheck: options.runtimeCheck,
+    runtimeCheckTimeoutMs: options.runtimeCheckTimeoutMs,
   });
 
   if (!result.ok) {
