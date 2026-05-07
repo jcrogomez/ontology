@@ -10,6 +10,7 @@ import { writeArtifact, type WriteArtifactResult } from "./artifact-writer.js";
 import { extractCodeFence } from "./post/extract-code-fence.js";
 import { validateLanguage } from "./post/validate-language.js";
 import { runtimeCheck } from "./post/runtime-check.js";
+import { parsePromptAST } from "../prompt/parse.js";
 import {
   buildUpstreamSystemPrompt,
   hashUpstreamContext,
@@ -128,14 +129,26 @@ export async function compileNode(options: CompileNodeOptions): Promise<CompileN
     resolvedModel = r.resolved.model;
   }
 
-  // The compile prompt is the node's raw prompt. The upstream refinement
-  // parents' compiled outputs (passed in by the plan-runner) become the
-  // dispatcher's `system` prompt, when present — that is the inductive form
-  // of axiom 7 (each compile sees the lineage one hop up; transitivity is
-  // preserved because each parent was already compiled with ITS parents in
-  // system). Mock identity is preserved because the mock adapter ignores
-  // `system` for code_sketch.
-  const promptText = options.node.prompt.raw ?? "";
+  // The compile prompt is the node's raw prompt, parsed through PromptAST
+  // (axiom 2). The author's `@requires:`, `@provides:`, `@expand:` markers
+  // are stripped from the body before dispatch — the model sees only the
+  // prose, not the metadata that frames it. The hash key remains the RAW
+  // prompt so existing run caches stay valid and the audit chain hashes
+  // exactly what the author wrote.
+  //
+  // The upstream refinement parents' compiled outputs (passed in by the
+  // plan-runner) become the dispatcher's `system` prompt, when present —
+  // that is the inductive form of axiom 7 (each compile sees the lineage
+  // one hop up; transitivity is preserved because each parent was already
+  // compiled with ITS parents in system). Mock identity is preserved
+  // because the mock adapter ignores `system` for code_sketch.
+  const rawPrompt = options.node.prompt.raw ?? "";
+  const promptAst = parsePromptAST(rawPrompt);
+  // Dispatch surface: body for prompts that declared markers; raw otherwise.
+  // Falling back to raw when no markers are present means a marker-free
+  // prompt is dispatched byte-identical to before this change — the mock
+  // identity functor's contract holds without modification.
+  const promptForDispatch = promptAst.body.length > 0 ? promptAst.body : rawPrompt;
   const upstream = options.upstream ?? [];
   const systemPrompt = buildUpstreamSystemPrompt(upstream);
   const contextHash = hashUpstreamContext(upstream);
@@ -145,7 +158,11 @@ export async function compileNode(options: CompileNodeOptions): Promise<CompileN
   // distinct compiles never collide on a run id — even when the focal prompt
   // is identical, a different lineage produces a different id.
   const runInput: PersistedRunInput = {
-    promptHash: hashPrompt(promptText),
+    // Hash the RAW prompt (axiom 9 — provenance), not the body. Two prompts
+    // that differ only in markers produce different runIds even when their
+    // dispatch surface is the same: the author's intent is part of the
+    // record.
+    promptHash: hashPrompt(rawPrompt),
     contextHash,
     targetNodeId: options.node.id,
     branch: options.node.coordinates.branch,
@@ -184,7 +201,7 @@ export async function compileNode(options: CompileNodeOptions): Promise<CompileN
       dispatched = await dispatchLlmRequest(
         {
           task: COMPILE_TASK,
-          prompt: promptText,
+          prompt: promptForDispatch,
           // Pass the resolved model in `request.model` so it flows to BOTH
           // adapters consistently. Mock's adapter reads `request.model`
           // directly (its `defaultModel` is ignored); ollama's adapter

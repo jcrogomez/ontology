@@ -267,6 +267,47 @@ describe("onto compile run", () => {
     expect(r.stdout).toContain("Provider:  per-node (model.ref)");
   });
 
+  it("PromptAST: markers in the prompt are stripped from the dispatch surface", () => {
+    // Mock identity returns the dispatch prompt verbatim. If the parser
+    // works, the artifact is the BODY (markers stripped); the run record's
+    // promptHash is over the RAW (markers included), so an identical body
+    // with no markers produces a DIFFERENT runId — provenance preserved.
+    const tmp2 = createTempProject();
+    try {
+      expect(runCli(tmp2, ["init"]).status).toBe(0);
+      expect(runCli(tmp2, ["node", "create", "--level", "domain", "--kind", "entity", "--prompt", "d"]).status).toBe(0);
+      const promptWithMarkers = "@requires: ConfigToken\n@provides: Greeting\nprint(\"ok\")";
+      expect(runCli(tmp2, ["node", "create",
+        "--level", "artifact",
+        "--kind", "artifact",
+        "--manifestation", "code",
+        "--language", "python",
+        "--prompt", promptWithMarkers,
+      ]).status).toBe(0);
+      runCli(tmp2, ["node", "link", "--from", "node_0001", "--to", "node_0000_canon", "--type", "refines"]);
+      runCli(tmp2, ["node", "link", "--from", "node_0002", "--to", "node_0001", "--type", "refines"]);
+
+      runCli(tmp2, ["compile", "run", "node_0002", "--provider", "mock"]);
+
+      // Artifact = body only (markers stripped).
+      const artifact = fs.readFileSync(path.join(tmp2, ".ontology/artifacts/generated/node_0002.py"), "utf-8");
+      expect(artifact).toBe('print("ok")');
+
+      // Persisted run records the body as output.text (mock identity over
+      // the dispatch surface), and hashes the raw prompt as promptHash.
+      const runs = fs.readdirSync(path.join(tmp2, ".ontology/runs"))
+        .map(f => JSON.parse(fs.readFileSync(path.join(tmp2, ".ontology/runs", f), "utf-8")));
+      const focalRun = runs.find((r: any) => r.input.targetNodeId === "node_0002");
+      expect(focalRun).toBeDefined();
+      expect(focalRun.output.text).toBe('print("ok")');
+      // The hash includes the marker lines — so a prompt of just 'print("ok")'
+      // would produce a different hash, even though the body is identical.
+      expect(focalRun.input.promptHash).toMatch(/^prompt:hash:/);
+    } finally {
+      cleanupTempProject(tmp2);
+    }
+  });
+
   it.runIf(PYTHON_AVAILABLE)("--runtime-check passes when the artifact runs (mock identity, valid Python)", () => {
     // The leaf prompt is `print("hello world")` — runs cleanly under python3.
     const r = runCli(tempDir, ["compile", "run", "node_0002", "--provider", "mock", "--runtime-check"]);
