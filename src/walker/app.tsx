@@ -31,7 +31,13 @@ import { proposeFromDraft } from "./actions/propose-from-draft.js";
 import { runFromWalker } from "./actions/run-from-walker.js";
 import { planFromWalker } from "./actions/plan-from-walker.js";
 import { compileFromWalker } from "./actions/compile-from-walker.js";
+import { validateFromWalker } from "./actions/validate-from-walker.js";
+import { branchListFromWalker } from "./actions/branch-list-from-walker.js";
+import { contextFromWalker } from "./actions/context-from-walker.js";
+import { queryFromWalker } from "./actions/query-from-walker.js";
+import { InfoPanel, type InfoPanelState } from "./layout/info-panel.js";
 import { parseProviderArgs } from "./state/parse-provider-args.js";
+import { parseQueryArgs } from "./state/parse-query-args.js";
 import type { LlmProvider } from "../runtime/llm/types.js";
 
 export interface AppProps {
@@ -82,7 +88,13 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
   // each step in the plan). We use the same two-stage pattern: render
   // "running" synchronously, then carry out the dispatches in a useEffect.
   const [compileState, setCompileState] = useState<CompileResultPanelProps["state"]>({ kind: "idle" });
-  const [pendingCompile, setPendingCompile] = useState<{ provider: LlmProvider; model?: string; ollamaHost?: string } | null>(null);
+  const [pendingCompile, setPendingCompile] = useState<{ provider: LlmProvider; model?: string; ollamaHost?: string; runtimeCheck?: boolean } | null>(null);
+
+  // Unified info panel for read-only commands (:validate, :branch list,
+  // :query, :context). One slot at a time; :clearinfo dismisses any
+  // active variant. Each command builds its result synchronously, so no
+  // pending sentinel is needed.
+  const [infoState, setInfoState] = useState<InfoPanelState>({ kind: "idle" });
 
   const neighborhood = useMemo<FocalNeighborhood | { error: string }>(() => {
     try {
@@ -169,6 +181,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
         provider: pendingCompile.provider,
         model: pendingCompile.model,
         ollamaHost: pendingCompile.ollamaHost,
+        runtimeCheck: pendingCompile.runtimeCheck,
         cwd,
       });
       if (cancelled) return;
@@ -314,7 +327,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       return;
     }
     if (cmd === "help") {
-      setMessage("i edit · :propose · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] · :clear{run,plan,compile,draft} · :q");
+      setMessage("i edit · :propose · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :clear{run,plan,compile,info,draft} · :q");
       return;
     }
     if (cmd === "propose") {
@@ -382,10 +395,11 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       setMessage("plan dismissed");
       return;
     }
-    // :compile [provider] [--model <name>] [--host <url>] — run the
-    // topological plan and write artifacts. See :run for the rationale on
-    // --model. Synchronously renders "running"; the dispatch chain lands in
-    // a useEffect on pendingCompile.
+    // :compile [provider] [--model <name>] [--host <url>] [--runtime-check]
+    // Run the topological plan and write artifacts. See :run for the
+    // rationale on --model. `--runtime-check` matches the CLI flag — after
+    // parse-validation, executes the artifact under a timeout and fails
+    // the step with runtime_failed on non-zero exit.
     if (cmd === "compile" || cmd.startsWith("compile ")) {
       if ("error" in neighborhood) {
         setMessage("cannot compile: focal node failed to load");
@@ -403,6 +417,64 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
     if (cmd === "clearcompile") {
       setCompileState({ kind: "idle" });
       setMessage("compile result dismissed");
+      return;
+    }
+    // :validate — lightweight topology + integrity check against the
+    // current network. Re-uses the production hash + poset primitives;
+    // runs synchronously. For the full audit (events, registry contents,
+    // root canon phrases) the user runs `onto validate` from a shell.
+    if (cmd === "validate") {
+      const result = validateFromWalker(cwd);
+      setInfoState({ kind: "validate", result });
+      setMessage(
+        result.ok
+          ? `network kernel stable (${result.scanned.nodes} node(s), ${result.scanned.edges} edge(s))`
+          : `${result.violations.length} violation(s); see panel`,
+      );
+      return;
+    }
+    // :branch list — list distinct branches in the network. Read-only,
+    // synchronous, wraps `listBranches` from the fibration library
+    // (Bootstrap 0.9, PR #111).
+    if (cmd === "branch list" || cmd === "branches") {
+      const result = branchListFromWalker(cwd);
+      setInfoState({ kind: "branches", result });
+      if (!result.ok) setMessage(result.message ?? "branch list failed");
+      return;
+    }
+    // :context — assemble the focal node's context (presheaf preview).
+    // Same path the dispatcher uses for `:run`, stopped before the model
+    // call — purely "what does this node see?".
+    if (cmd === "context") {
+      if ("error" in neighborhood) {
+        setMessage("cannot assemble context: focal node failed to load");
+        return;
+      }
+      const result = contextFromWalker(focalId, cwd);
+      setInfoState({ kind: "context", result, focalId });
+      if (!result.ok) setMessage(result.message ?? "context assembly failed");
+      return;
+    }
+    // :query [--kind X] [--has-incoming refines] [--provides spec] ...
+    // Yoneda-shape search across every node in the network. Wraps
+    // `queryNodes` from the representable-functor module (PR #111).
+    if (cmd === "query" || cmd.startsWith("query ")) {
+      const parsed = parseQueryArgs(cmd.slice("query".length));
+      if (!parsed.ok) {
+        setMessage(parsed.message);
+        return;
+      }
+      const result = queryFromWalker(parsed.shape, cwd);
+      const summary = Object.entries(parsed.shape)
+        .map(([k, v]) => Array.isArray(v) ? `${k}=${v.join(",")}` : `${k}=${String(v)}`)
+        .join(" ");
+      setInfoState({ kind: "query", result, shapeSummary: summary });
+      if (!result.ok) setMessage(result.message ?? "query failed");
+      return;
+    }
+    if (cmd === "clearinfo") {
+      setInfoState({ kind: "idle" });
+      setMessage("info panel dismissed");
       return;
     }
     setMessage(`unknown command: :${cmd}`);
@@ -445,6 +517,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       <RunResultPanel state={runState} />
       <CompilePlanPanel state={planState} />
       <CompileResultPanel state={compileState} />
+      <InfoPanel state={infoState} />
       <HintBar mode={mode === "edit" ? "view" : mode} command={command} message={message} />
     </Box>
   );

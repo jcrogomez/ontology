@@ -92,4 +92,33 @@ describe("parseProviderArgs", () => {
       if (!r.ok) expect(r.message).toMatch(/unexpected argument: llama3\.2:3b/);
     });
   });
+
+  describe("--runtime-check (boolean)", () => {
+    it("sets runtimeCheck:true when present", () => {
+      const r = parseProviderArgs("ollama --model llama3.2:3b --runtime-check");
+      expect(r).toEqual({
+        ok: true,
+        args: { provider: "ollama", model: "llama3.2:3b", runtimeCheck: true },
+      });
+    });
+
+    it("is position-independent (works before --model and --host)", () => {
+      const r = parseProviderArgs("ollama --runtime-check --model llama3.2:3b --host http://x:11434");
+      expect(r).toEqual({
+        ok: true,
+        args: { provider: "ollama", model: "llama3.2:3b", ollamaHost: "http://x:11434", runtimeCheck: true },
+      });
+    });
+
+    it("works without an explicit provider", () => {
+      const r = parseProviderArgs("--runtime-check");
+      expect(r).toEqual({ ok: true, args: { provider: "mock", runtimeCheck: true } });
+    });
+
+    it("is omitted from args when not present (no spurious false)", () => {
+      const r = parseProviderArgs("ollama --model llama3.2:3b");
+      expect(r.ok).toBe(true);
+      if (r.ok) expect("runtimeCheck" in r.args).toBe(false);
+    });
+  });
 });
