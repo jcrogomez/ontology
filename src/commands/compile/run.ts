@@ -21,10 +21,16 @@ export interface CompileRunOptions {
 // prompt becomes its artifact via a model dispatch; the kernel guarantees
 // every artifact ties back to a hashed run, a node, and an event.
 export async function compileRunCommand(focalId: string, options: CompileRunOptions): Promise<void> {
-  const provider = (options.provider ?? "mock") as LlmProvider;
-  if (provider !== "mock" && provider !== "ollama") {
-    failWith(`Unsupported provider: ${provider} (try mock or ollama)`, options.json);
-    return;
+  // When --provider is given, it's a global override that forces every step
+  // through the same provider. When omitted, compileNode routes per node via
+  // node.model.ref (default "mock_default", so legacy chains behave as before).
+  let provider: LlmProvider | undefined;
+  if (options.provider !== undefined) {
+    if (options.provider !== "mock" && options.provider !== "ollama") {
+      failWith(`Unsupported provider: ${options.provider} (try mock or ollama)`, options.json);
+      return;
+    }
+    provider = options.provider as LlmProvider;
   }
 
   const focal = loadNodeById(focalId);
@@ -87,7 +93,7 @@ export async function compileRunCommand(focalId: string, options: CompileRunOpti
 
   console.log(`=== ONTOLOGY COMPILE ===`);
   console.log(`Focal:     ${result.focalId}`);
-  console.log(`Provider:  ${provider}`);
+  console.log(`Provider:  ${provider ?? "per-node (model.ref)"}`);
   console.log(`Steps:     ${result.steps.length}`);
   console.log(``);
   for (let i = 0; i < result.steps.length; i++) {
