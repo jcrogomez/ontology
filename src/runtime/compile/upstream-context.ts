@@ -39,15 +39,27 @@ export interface UpstreamContextItem {
 // Returns null when there are no upstreams — callers should pass undefined
 // `system` in that case so cache keys for upstream-less compiles stay
 // indistinguishable from pre-threading runs (no spurious contextHash).
+//
+// Format choice: XML-style <context source=... level=...>...</context> tags.
+// The earlier draft of this helper used `[<id> :: <level>]` bracket headers.
+// On small models (e.g. llama3.2:3b) those headers leaked verbatim into
+// generated artifacts — the model pattern-matched the bracket format in
+// the system prompt and emitted similar-looking text instead of the code
+// it was supposed to produce. XML angle brackets are structurally distinct
+// from any code pattern the model would naturally emit, so the mimicry
+// vector is closed. The hash (`hashUpstreamContext`) is independent of
+// the visible format, so this change does not invalidate any existing
+// run cache; the contextHash for a given (nodeId, text) tuple is stable.
 export function buildUpstreamSystemPrompt(upstream: UpstreamContextItem[]): string | null {
   if (upstream.length === 0) return null;
   const sections = upstream.map((u) => {
-    const tag = u.level ? `[${u.nodeId} :: ${u.level}]` : `[${u.nodeId}]`;
-    return `${tag}\n${u.text}`;
+    const attrs = u.level
+      ? `source="${u.nodeId}" level="${u.level}"`
+      : `source="${u.nodeId}"`;
+    return `<context ${attrs}>\n${u.text}\n</context>`;
   });
   return [
-    "You are compiling one node of an Ontology semantic graph.",
-    "The following upstream nodes have already been compiled. Their outputs are the refinement context — your output should be consistent with what they expressed, not restate it.",
+    "You are compiling one node of an Ontology semantic graph. The upstream refinement parents listed below have already been compiled. Treat their outputs as context; your output should be consistent with what they expressed without restating it. Do NOT echo the <context> tags or their attributes in your response — they are framing for you, not content to produce.",
     "",
     sections.join("\n\n"),
   ].join("\n");
