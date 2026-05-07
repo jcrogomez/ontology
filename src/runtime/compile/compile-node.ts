@@ -19,6 +19,22 @@ import {
 import { getOntologyPaths } from "../../core/project/paths.js";
 import { appendJsonl } from "../../core/fs/json.js";
 import { readState, writeState } from "../../core/state/state-store.js";
+import {
+  type EffectWithLog,
+  type LogEntry,
+  pureWithLog,
+  failWithLog,
+  bindWithLog,
+  runWithLog,
+} from "../effects/io.js";
+import { ok, err } from "../effects/result.js";
+import {
+  type AsyncEffectWithLog,
+  bindAsyncWithLog,
+  liftEffectWithLog,
+  liftPromiseWithLog,
+  runAsyncWithLog,
+} from "../effects/async.js";
 
 // Single-node compile primitive.
 //
@@ -32,13 +48,27 @@ import { readState, writeState } from "../../core/state/state-store.js";
 //   4. appends a compilation_run event to events.jsonl carrying the nodeId,
 //      runId, artifact relative path, and the bytes written.
 //
-// This function compiles ONE node. The plan-runner walks the topological plan
-// and calls this helper for each step.
+// Internal structure (Bootstrap 1.0): the body is composed of small
+// EffectWithLog steps. Each step emits a log entry. Logs accumulate
+// across the entire pipeline, **including across failure** — diagnostic
+// breadcrumbs survive even when a downstream step rejects. The user-
+// facing function has zero try/catch; the only places try/catch lives are
+// inside the boundary helpers (`liftPromiseWithLog`, the small wrappers
+// around `writeArtifact` / `createPersistedRun`) where they are isolated
+// to one concern per call.
 //
-// Provenance contract: the resulting compilation_run event ties together
-// the node id, the run id (which itself ties to the assembled-prompt hash),
-// and the on-disk artifact. An auditor can re-trace: artifact → event →
-// run → prompt hash → node body. Nothing slips through.
+// Shape of the pipeline:
+//   sync   resolveModel → buildPrelude → checkCache
+//          (LogResult<{resolved, prelude, cache}, CompileFailure>)
+//   async  if not cache hit: dispatch + persist
+//          (LogResult<{runId, response, cached:false}, CompileFailure>)
+//   sync   projectArtifact → writeArtifact → validateLanguage
+//                          → runtimeCheck (optional) → emitEvent
+//          (LogResult<{artifact, event}, CompileFailure>)
+//
+// Translation at the boundary preserves the original CompileNodeResult
+// contract bit-for-bit: same reasons, same fields, same side effects.
+// The new `logs` field is purely additive (optional).
 
 export interface CompileNodeOptions {
   node: OntologyNode;
@@ -70,13 +100,20 @@ export interface CompileNodeOptions {
   // present, they are concatenated into the dispatcher's `system` prompt
   // and hashed into `PersistedRunInput.contextHash` so the run id reflects
   // both the focal prompt and the lineage that informed it.
-  //
-  // The mock adapter ignores `system` for `code_sketch`, so threading
-  // upstreams here does NOT change the mock's artifact bytes — only the
-  // run id changes. That is the correct behavior for the identity functor:
-  // structurally distinct runs get distinct ids, even when the projection
-  // to disk is the same.
   upstream?: UpstreamContextItem[];
+}
+
+export type CompileNodeFailureReason =
+  | "dispatch_failed"
+  | "persist_failed"
+  | "write_failed"
+  | "validate_failed"
+  | "runtime_failed"
+  | "model_ref_unresolved";
+
+interface CompileFailure {
+  reason: CompileNodeFailureReason;
+  message: string;
 }
 
 export type CompileNodeResult =
@@ -87,280 +124,484 @@ export type CompileNodeResult =
       artifact: WriteArtifactResult;
       event: OntologyEvent;
       response: { text: string; provider: LlmProvider; model: string };
+      // Diagnostic breadcrumbs from the EffectWithLog pipeline. One entry
+      // per sub-step (resolve, parse, build, cache-check, dispatch,
+      // persist, project, write, validate, runtime-check, emit). Always
+      // populated; consumers that don't need them can ignore.
+      logs: readonly LogEntry[];
     }
-  | { ok: false; reason: "dispatch_failed" | "persist_failed" | "write_failed" | "validate_failed" | "runtime_failed" | "model_ref_unresolved"; message: string };
+  | {
+      ok: false;
+      reason: CompileNodeFailureReason;
+      message: string;
+      // Same logs as the success variant — populated even on failure so
+      // an auditor can see how far the pipeline got before rejecting.
+      logs: readonly LogEntry[];
+    };
 
 const COMPILE_TASK: LlmTask = "code_sketch";
 
-export async function compileNode(options: CompileNodeOptions): Promise<CompileNodeResult> {
-  const cwd = options.cwd ?? process.cwd();
+interface ResolvedModelHandle {
+  provider: LlmProvider;
+  // Optional override (path (a)). Distinct from `defaultModel` below:
+  // overrides the resolved model name when set explicitly via CLI.
+  resolvedModel: string | undefined;
+}
 
-  // Provider/model resolution. Two paths:
-  //   (a) CLI override:    options.provider is set → use it for every node,
-  //                        options.model is the override model name.
-  //   (b) Per-node routing: options.provider is undefined → look up
-  //                        node.model.ref in the registry; the registry
-  //                        entry's (provider, name) is what we dispatch
-  //                        with. options.model is ignored on this path.
-  //
-  // Path (a) preserves the original CLI semantics: `--provider ollama
-  // --model llama3.2:3b` forces every step through that pair. Path (b)
-  // is the new default — each node compiles with the model its author
-  // chose, so abstract intentions can use mock while artifact leaves
-  // use a coder-tuned LLM.
-  let provider: LlmProvider;
-  let resolvedModel: string | undefined;
-  if (options.provider) {
-    provider = options.provider;
-    resolvedModel = options.model;
-  } else {
+interface PreludeShape {
+  rawPrompt: string;
+  promptForDispatch: string;
+  systemPrompt: string | null;
+  runInput: PersistedRunInput;
+  runModel: PersistedRunModel;
+}
+
+type CacheOutcome =
+  | { kind: "hit"; runId: string; response: { text: string; provider: LlmProvider; model: string } }
+  | { kind: "miss"; expectedId: string };
+
+interface DispatchResult {
+  runId: string;
+  response: { text: string; provider: LlmProvider; model: string };
+}
+
+interface PostShape {
+  artifact: WriteArtifactResult;
+  event: OntologyEvent;
+}
+
+// ── Sync sub-steps ──────────────────────────────────────────────────────────
+
+// (a) Resolve the (provider, model) pair for this node.
+function resolveModelE(options: CompileNodeOptions): EffectWithLog<ResolvedModelHandle, CompileFailure> {
+  return () => {
+    if (options.provider) {
+      return {
+        value: ok({ provider: options.provider, resolvedModel: options.model }),
+        logs: [{ level: "info", message: `resolveModel: explicit override (provider=${options.provider}${options.model ? `, model=${options.model}` : ""})` }],
+      };
+    }
     if (!options.registry) {
       return {
-        ok: false,
-        reason: "model_ref_unresolved",
-        message: "compileNode called without an explicit provider and without a registry; cannot resolve node.model.ref",
+        value: err({
+          reason: "model_ref_unresolved",
+          message: "compileNode called without an explicit provider and without a registry; cannot resolve node.model.ref",
+        }),
+        logs: [{ level: "error", message: "resolveModel: registry missing on per-node path" }],
       };
     }
     const r = resolveNodeModel(options.node.model.ref, options.registry);
     if (!r.ok) {
-      return { ok: false, reason: "model_ref_unresolved", message: r.message };
+      return {
+        value: err({ reason: "model_ref_unresolved", message: r.message }),
+        logs: [{ level: "error", message: `resolveModel: ${r.message}` }],
+      };
     }
-    provider = r.resolved.provider;
-    resolvedModel = r.resolved.model;
-  }
-
-  // The compile prompt is the node's raw prompt, parsed through PromptAST
-  // (axiom 2). The author's `@requires:`, `@provides:`, `@expand:` markers
-  // are stripped from the body before dispatch — the model sees only the
-  // prose, not the metadata that frames it. The hash key remains the RAW
-  // prompt so existing run caches stay valid and the audit chain hashes
-  // exactly what the author wrote.
-  //
-  // The upstream refinement parents' compiled outputs (passed in by the
-  // plan-runner) become the dispatcher's `system` prompt, when present —
-  // that is the inductive form of axiom 7 (each compile sees the lineage
-  // one hop up; transitivity is preserved because each parent was already
-  // compiled with ITS parents in system). Mock identity is preserved
-  // because the mock adapter ignores `system` for code_sketch.
-  const rawPrompt = options.node.prompt.raw ?? "";
-  const promptAst = parsePromptAST(rawPrompt);
-  // Dispatch surface: body for prompts that declared markers; raw otherwise.
-  // Falling back to raw when no markers are present means a marker-free
-  // prompt is dispatched byte-identical to before this change — the mock
-  // identity functor's contract holds without modification.
-  const promptForDispatch = promptAst.body.length > 0 ? promptAst.body : rawPrompt;
-  const upstream = options.upstream ?? [];
-  const systemPrompt = buildUpstreamSystemPrompt(upstream);
-  const contextHash = hashUpstreamContext(upstream);
-
-  // Build the deterministic run envelope. Including the focal node's id, its
-  // branch, and the upstream contextHash in the input means two structurally
-  // distinct compiles never collide on a run id — even when the focal prompt
-  // is identical, a different lineage produces a different id.
-  const runInput: PersistedRunInput = {
-    // Hash the RAW prompt (axiom 9 — provenance), not the body. Two prompts
-    // that differ only in markers produce different runIds even when their
-    // dispatch surface is the same: the author's intent is part of the
-    // record.
-    promptHash: hashPrompt(rawPrompt),
-    contextHash,
-    targetNodeId: options.node.id,
-    branch: options.node.coordinates.branch,
-    time: null,
-    task: COMPILE_TASK as string,
-    includeEdges: false,
-    edgeTypes: null,
-  };
-  const runModel: PersistedRunModel = {
-    provider,
-    model: resolvedModel ?? (provider === "mock" ? "mock_default" : "unknown"),
-    host: options.ollamaHost ?? null,
-  };
-
-  // Cache hit on the deterministic id: we still need to write the artifact
-  // and emit the compilation_run event. The cached run gives us the response
-  // without re-dispatching to the model.
-  const expectedId = computeRunId(runInput, runModel);
-  const cachedRun = loadPersistedRun(expectedId, cwd);
-  let runId: string;
-  let cached: boolean;
-  let response: { text: string; provider: LlmProvider; model: string };
-
-  if (cachedRun) {
-    runId = cachedRun.id;
-    cached = true;
-    response = {
-      text: cachedRun.output.text,
-      provider: cachedRun.model.provider,
-      model: cachedRun.model.model,
+    return {
+      value: ok({ provider: r.resolved.provider, resolvedModel: r.resolved.model }),
+      logs: [{ level: "info", message: `resolveModel: ref=${options.node.model.ref} → provider=${r.resolved.provider}, model=${r.resolved.model}` }],
     };
-  } else {
-    const start = Date.now();
-    let dispatched;
-    try {
-      dispatched = await dispatchLlmRequest(
+  };
+}
+
+// (b) Parse the prompt AST + build the run envelope. Cannot fail.
+function buildPreludeE(
+  options: CompileNodeOptions,
+  handle: ResolvedModelHandle,
+): EffectWithLog<PreludeShape, never> {
+  return () => {
+    const rawPrompt = options.node.prompt.raw ?? "";
+    const promptAst = parsePromptAST(rawPrompt);
+    const promptForDispatch = promptAst.body.length > 0 ? promptAst.body : rawPrompt;
+    const upstream = options.upstream ?? [];
+    const systemPrompt = buildUpstreamSystemPrompt(upstream);
+    const contextHash = hashUpstreamContext(upstream);
+
+    const runInput: PersistedRunInput = {
+      // Hash the RAW prompt (axiom 9 — provenance), not the body. Two
+      // prompts that differ only in markers produce different runIds even
+      // when their dispatch surface is the same: the author's intent is
+      // part of the record.
+      promptHash: hashPrompt(rawPrompt),
+      contextHash,
+      targetNodeId: options.node.id,
+      branch: options.node.coordinates.branch,
+      time: null,
+      task: COMPILE_TASK as string,
+      includeEdges: false,
+      edgeTypes: null,
+    };
+    const runModel: PersistedRunModel = {
+      provider: handle.provider,
+      model: handle.resolvedModel ?? (handle.provider === "mock" ? "mock_default" : "unknown"),
+      host: options.ollamaHost ?? null,
+    };
+
+    const markersTag = (promptAst.markers.requires.length || promptAst.markers.provides.length || promptAst.markers.expand.length)
+      ? ` (markers: ${promptAst.markers.requires.length}R/${promptAst.markers.provides.length}P/${promptAst.markers.expand.length}E)`
+      : "";
+    return {
+      value: ok({ rawPrompt, promptForDispatch, systemPrompt, runInput, runModel }),
+      logs: [{ level: "info", message: `buildPrelude: ${rawPrompt.length} bytes raw, ${promptForDispatch.length} bytes dispatch${markersTag}, upstream=${upstream.length}` }],
+    };
+  };
+}
+
+// (c) Cache check. Cannot fail; returns either a hit (with response) or a
+// miss (carrying the expectedId we'll need to record).
+function checkCacheE(
+  prelude: PreludeShape,
+  cwd: string,
+): EffectWithLog<CacheOutcome, never> {
+  return () => {
+    const expectedId = computeRunId(prelude.runInput, prelude.runModel);
+    const cachedRun = loadPersistedRun(expectedId, cwd);
+    if (cachedRun) {
+      return {
+        value: ok({
+          kind: "hit",
+          runId: cachedRun.id,
+          response: {
+            text: cachedRun.output.text,
+            provider: cachedRun.model.provider,
+            model: cachedRun.model.model,
+          },
+        }),
+        logs: [{ level: "info", message: `checkCache: hit (runId=${cachedRun.id})` }],
+      };
+    }
+    return {
+      value: ok({ kind: "miss", expectedId }),
+      logs: [{ level: "info", message: `checkCache: miss (expectedId=${expectedId})` }],
+    };
+  };
+}
+
+// ── Async slice: dispatch + persist (only on cache miss) ────────────────────
+
+function dispatchAndPersistE(
+  options: CompileNodeOptions,
+  handle: ResolvedModelHandle,
+  prelude: PreludeShape,
+): AsyncEffectWithLog<DispatchResult, CompileFailure> {
+  const start = Date.now();
+  // Dispatch is the only genuinely async step. liftPromiseWithLog catches
+  // any thrown error and translates it to a typed CompileFailure; nothing
+  // else in this module ever needs try/catch.
+  const dispatched = liftPromiseWithLog(
+    `dispatch (${handle.provider}${handle.resolvedModel ? `/${handle.resolvedModel}` : ""})`,
+    () =>
+      dispatchLlmRequest(
         {
           task: COMPILE_TASK,
-          prompt: promptForDispatch,
-          // Pass the resolved model in `request.model` so it flows to BOTH
-          // adapters consistently. Mock's adapter reads `request.model`
-          // directly (its `defaultModel` is ignored); ollama's adapter
-          // honors `request.model` if set, falling back to defaultModel
-          // otherwise. Without this, the mock adapter would always echo
-          // "mock_default" as `dispatched.model`, which would then leak
-          // into the persisted run's model field and break runId
-          // determinism between the pre-dispatch expectedId and the
-          // post-dispatch persisted id.
-          ...(resolvedModel ? { model: resolvedModel } : {}),
-          ...(systemPrompt ? { system: systemPrompt } : {}),
+          prompt: prelude.promptForDispatch,
+          ...(handle.resolvedModel ? { model: handle.resolvedModel } : {}),
+          ...(prelude.systemPrompt ? { system: prelude.systemPrompt } : {}),
         },
-        { provider, defaultModel: resolvedModel, ollamaHost: options.ollamaHost },
-      );
-    } catch (err: unknown) {
+        { provider: handle.provider, defaultModel: handle.resolvedModel, ollamaHost: options.ollamaHost },
+      ),
+    (raw): CompileFailure => ({
+      reason: "dispatch_failed",
+      message: raw instanceof Error ? raw.message : String(raw),
+    }),
+  );
+
+  // Persist: synchronous in nature, but we keep it inside the async
+  // pipeline for composition. Wrap in a lifted EffectWithLog that knows
+  // how to recover from a thrown persist (the slot exists for IO bombs).
+  return bindAsyncWithLog(dispatched, (resp) =>
+    liftEffectWithLog<DispatchResult, CompileFailure>(() => {
+      const durationMs = Date.now() - start;
+      let persisted: ReturnType<typeof createPersistedRun>;
+      try {
+        persisted = createPersistedRun({
+          kind: "context",
+          input: prelude.runInput,
+          model: { ...prelude.runModel, model: resp.model },
+          output: { text: resp.text, parsed: null },
+          validation: null,
+          durationMs,
+          cwd: options.cwd,
+        });
+      } catch (raw: unknown) {
+        return {
+          value: err({
+            reason: "persist_failed",
+            message: raw instanceof Error ? raw.message : String(raw),
+          }),
+          logs: [{ level: "error", message: "persist: failed", data: raw }],
+        };
+      }
       return {
-        ok: false,
-        reason: "dispatch_failed",
-        message: err instanceof Error ? err.message : String(err),
+        value: ok({
+          runId: persisted.run.id,
+          response: { text: resp.text, provider: resp.provider, model: resp.model },
+        }),
+        logs: [{ level: "info", message: `persist: ok (runId=${persisted.run.id}, durationMs=${durationMs})` }],
+      };
+    }),
+  );
+}
+
+// ── Sync post-dispatch sub-steps ────────────────────────────────────────────
+
+interface PostInput {
+  options: CompileNodeOptions;
+  runId: string;
+  cached: boolean;
+  response: { text: string; provider: LlmProvider; model: string };
+}
+
+// (e) Project the response text into the artifact body. For code nodes,
+// strip the markdown fence; otherwise pass through verbatim.
+function projectArtifactE(input: PostInput): EffectWithLog<string, never> {
+  return () => {
+    const { options, response } = input;
+    if (options.node.coordinates.manifestation !== "code") {
+      return {
+        value: ok(response.text),
+        logs: [{ level: "info", message: "projectArtifact: pass-through (manifestation != code)" }],
       };
     }
-    const durationMs = Date.now() - start;
-
-    let persisted;
-    try {
-      persisted = createPersistedRun({
-        kind: "context",
-        input: runInput,
-        model: { ...runModel, model: dispatched.model },
-        output: { text: dispatched.text, parsed: null },
-        validation: null,
-        durationMs,
-        cwd,
-      });
-    } catch (err: unknown) {
-      return {
-        ok: false,
-        reason: "persist_failed",
-        message: err instanceof Error ? err.message : String(err),
-      };
-    }
-
-    runId = persisted.run.id;
-    cached = false;
-    response = { text: dispatched.text, provider: dispatched.provider, model: dispatched.model };
-  }
-
-  // For manifestation:"code" nodes, project the dispatcher's text through a
-  // markdown-fence extractor before writing. Chat-tuned models routinely wrap
-  // code in ```lang ... ``` and surround it with prose; that prose would land
-  // verbatim in a .py/.ts/.rs file and break the artifact at parse time.
-  // The mock provider's identity-functor output has no fence, so this is a
-  // no-op there. The persisted run still records the raw response text
-  // (axiom 9: full provenance back to the prompt hash); the projection lives
-  // between run.text and the on-disk artifact.
-  let artifactContent = response.text;
-  if (options.node.coordinates.manifestation === "code") {
     const projected = extractCodeFence({
       text: response.text,
       language: options.node.technical.language,
     });
-    artifactContent = projected.content;
-  }
-
-  // Write the artifact.
-  let artifact: WriteArtifactResult;
-  try {
-    artifact = writeArtifact({
-      node: options.node,
-      content: artifactContent,
-      cwd,
-    });
-  } catch (err: unknown) {
     return {
-      ok: false,
-      reason: "write_failed",
-      message: err instanceof Error ? err.message : String(err),
+      value: ok(projected.content),
+      logs: [{
+        level: "info",
+        message: projected.extracted
+          ? `projectArtifact: extracted ${projected.content.length} bytes from fence (info=${projected.fenceInfo ?? "none"})`
+          : "projectArtifact: no fence detected, pass-through",
+      }],
     };
-  }
+  };
+}
 
-  // Parse-check the artifact against its declared language. Axiom 8: a model
-  // emitting non-parseable code where the node declares one is a contradiction
-  // and must surface as an explicit validation failure. If the language has
-  // no registered validator, or the validator binary is not on PATH, the step
-  // is skipped (no false positives in CI environments without the toolchain).
-  // The compilation_run event is intentionally NOT emitted on failure: the
-  // artifact stays on disk for inspection, but the audit chain does not record
-  // it as a successful compilation.
-  if (options.node.coordinates.manifestation === "code" && options.node.technical.language) {
+// (f) Write the artifact to disk.
+function writeArtifactE(
+  input: PostInput,
+  content: string,
+): EffectWithLog<WriteArtifactResult, CompileFailure> {
+  return () => {
+    try {
+      const artifact = writeArtifact({
+        node: input.options.node,
+        content,
+        cwd: input.options.cwd,
+      });
+      return {
+        value: ok(artifact),
+        logs: [{ level: "info", message: `writeArtifact: ${artifact.relativePath} (${artifact.bytesWritten} bytes)` }],
+      };
+    } catch (raw: unknown) {
+      return {
+        value: err({
+          reason: "write_failed",
+          message: raw instanceof Error ? raw.message : String(raw),
+        }),
+        logs: [{ level: "error", message: "writeArtifact: failed", data: raw }],
+      };
+    }
+  };
+}
+
+// (g) Parse-check the artifact against its declared language.
+function validateLanguageE(
+  input: PostInput,
+  artifact: WriteArtifactResult,
+): EffectWithLog<void, CompileFailure> {
+  return () => {
+    const node = input.options.node;
+    if (node.coordinates.manifestation !== "code" || !node.technical.language) {
+      return {
+        value: ok(undefined),
+        logs: [{ level: "info", message: "validateLanguage: skipped (not code or no language)" }],
+      };
+    }
     const check = validateLanguage({
       absolutePath: artifact.absolutePath,
-      language: options.node.technical.language,
+      language: node.technical.language,
     });
     if (check.status === "failed") {
       return {
-        ok: false,
-        reason: "validate_failed",
-        message: `${options.node.technical.language} parse failed for ${artifact.relativePath}: ${check.message}`,
+        value: err({
+          reason: "validate_failed",
+          message: `${node.technical.language} parse failed for ${artifact.relativePath}: ${check.message}`,
+        }),
+        logs: [{ level: "error", message: `validateLanguage: ${node.technical.language} parse failed: ${check.message}` }],
       };
     }
-  }
+    return {
+      value: ok(undefined),
+      logs: [{ level: "info", message: `validateLanguage: ${check.status}` }],
+    };
+  };
+}
 
-  // Optional runtime check. Strictly opt-in: parse-pass is not the same as
-  // runs-correctly (a class definition referencing an undefined symbol
-  // parses fine but raises NameError at execution). Off by default because
-  // running arbitrary LLM output has operational consequences; the CLI
-  // surfaces this via --runtime-check.
-  if (
-    options.runtimeCheck &&
-    options.node.coordinates.manifestation === "code" &&
-    options.node.technical.language
-  ) {
+// (h) Optional runtime check (opt-in via options.runtimeCheck).
+function runtimeCheckE(
+  input: PostInput,
+  artifact: WriteArtifactResult,
+): EffectWithLog<void, CompileFailure> {
+  return () => {
+    const opts = input.options;
+    const node = opts.node;
+    if (!opts.runtimeCheck || node.coordinates.manifestation !== "code" || !node.technical.language) {
+      return {
+        value: ok(undefined),
+        logs: [{ level: "info", message: "runtimeCheck: skipped (off or not code)" }],
+      };
+    }
     const rc = runtimeCheck({
       absolutePath: artifact.absolutePath,
-      language: options.node.technical.language,
-      timeoutMs: options.runtimeCheckTimeoutMs,
+      language: node.technical.language,
+      timeoutMs: opts.runtimeCheckTimeoutMs,
     });
     if (rc.status === "failed") {
       return {
-        ok: false,
-        reason: "runtime_failed",
-        message: `${options.node.technical.language} runtime failed for ${artifact.relativePath}: ${rc.message}`,
+        value: err({
+          reason: "runtime_failed",
+          message: `${node.technical.language} runtime failed for ${artifact.relativePath}: ${rc.message}`,
+        }),
+        logs: [{ level: "error", message: `runtimeCheck: ${node.technical.language} failed: ${rc.message}` }],
       };
     }
+    return {
+      value: ok(undefined),
+      logs: [{ level: "info", message: `runtimeCheck: ${rc.status}` }],
+    };
+  };
+}
+
+// (i) Emit the compilation_run event and update state. Cannot meaningfully
+// fail today (state.json + events.jsonl are append/write-locally).
+// If a future iteration tightens this, it joins the failure channel.
+function emitEventE(
+  input: PostInput,
+  artifact: WriteArtifactResult,
+): EffectWithLog<OntologyEvent, never> {
+  return () => {
+    const cwd = input.options.cwd;
+    const paths = getOntologyPaths(cwd);
+    const state = readState(cwd);
+    const eventId = "evt_" + randomBytes(4).toString("hex");
+    const event = OntologyEventSchema.parse({
+      eventId,
+      sequence: state.eventCount,
+      timestamp: new Date().toISOString(),
+      eventType: "compilation_run",
+      branch: state.activeBranch,
+      previousEventId: state.lastEventId,
+      payload: {
+        nodeId: input.options.node.id,
+        runId: input.runId,
+        cached: input.cached,
+        artifactRelativePath: artifact.relativePath,
+        bytes: artifact.bytesWritten,
+      },
+    });
+    appendJsonl(paths.eventsPath, event);
+    state.eventCount += 1;
+    state.lastEventId = eventId;
+    state.updatedAt = new Date().toISOString();
+    writeState(state, cwd);
+    return {
+      value: ok(event),
+      logs: [{ level: "info", message: `emitEvent: ${eventId} (sequence=${event.sequence})` }],
+    };
+  };
+}
+
+// ── Top-level orchestration ─────────────────────────────────────────────────
+
+export async function compileNode(options: CompileNodeOptions): Promise<CompileNodeResult> {
+  const cwd = options.cwd ?? process.cwd();
+  const optionsWithCwd = { ...options, cwd };
+
+  // (1) Synchronous prelude: resolve model, build run envelope, check cache.
+  // Each sub-step's logs accumulate; an err short-circuits the rest.
+  const preludePipeline = bindWithLog(resolveModelE(optionsWithCwd), (handle) =>
+    bindWithLog(buildPreludeE(optionsWithCwd, handle), (prelude) =>
+      bindWithLog(checkCacheE(prelude, cwd), (cache) =>
+        pureWithLog({ handle, prelude, cache }))));
+  const preludeOutcome = runWithLog(preludePipeline);
+
+  if (preludeOutcome.value.tag === "err") {
+    return packageFailure(preludeOutcome.value.error, preludeOutcome.logs);
   }
 
-  // Emit compilation_run event. The event ties the artifact back to its run
-  // and node, completing the audit chain: nodeId → runId → artifactPath.
-  const paths = getOntologyPaths(cwd);
-  const state = readState(cwd);
-  const eventId = "evt_" + randomBytes(4).toString("hex");
-  const event = OntologyEventSchema.parse({
-    eventId,
-    sequence: state.eventCount,
-    timestamp: new Date().toISOString(),
-    eventType: "compilation_run",
-    branch: state.activeBranch,
-    previousEventId: state.lastEventId,
-    payload: {
-      nodeId: options.node.id,
-      runId,
-      cached,
-      artifactRelativePath: artifact.relativePath,
-      bytes: artifact.bytesWritten,
-    },
-  });
-  appendJsonl(paths.eventsPath, event);
+  const { handle, prelude, cache } = preludeOutcome.value.value;
+  const accumulatedLogs: LogEntry[] = [...preludeOutcome.logs];
 
-  state.eventCount += 1;
-  state.lastEventId = eventId;
-  state.updatedAt = new Date().toISOString();
-  writeState(state, cwd);
+  // (2) Async slice: cache hit short-circuits to the post-dispatch slice
+  // with a synthetic log entry; cache miss runs dispatch + persist.
+  let runId: string;
+  let cached: boolean;
+  let response: { text: string; provider: LlmProvider; model: string };
+
+  if (cache.kind === "hit") {
+    runId = cache.runId;
+    cached = true;
+    response = cache.response;
+    accumulatedLogs.push({ level: "info", message: "dispatch: skipped (cache hit)" });
+  } else {
+    const dispatchOutcome = await runAsyncWithLog(dispatchAndPersistE(optionsWithCwd, handle, prelude));
+    accumulatedLogs.push(...dispatchOutcome.logs);
+    if (dispatchOutcome.value.tag === "err") {
+      return packageFailure(dispatchOutcome.value.error, accumulatedLogs);
+    }
+    runId = dispatchOutcome.value.value.runId;
+    cached = false;
+    response = dispatchOutcome.value.value.response;
+  }
+
+  // (3) Synchronous post-dispatch slice: project, write, validate, runtime
+  // check, emit event. Same shape as prelude — bindWithLog tower, single
+  // run at the end, logs accumulate.
+  const postInput: PostInput = { options: optionsWithCwd, runId, cached, response };
+  const postPipeline: EffectWithLog<PostShape, CompileFailure> = bindWithLog(
+    projectArtifactE(postInput),
+    (content) => bindWithLog(
+      writeArtifactE(postInput, content),
+      (artifact) => bindWithLog(
+        validateLanguageE(postInput, artifact),
+        () => bindWithLog(
+          runtimeCheckE(postInput, artifact),
+          () => bindWithLog(
+            emitEventE(postInput, artifact),
+            (event) => pureWithLog({ artifact, event } as PostShape),
+          ),
+        ),
+      ),
+    ),
+  );
+  const postOutcome = runWithLog(postPipeline);
+  accumulatedLogs.push(...postOutcome.logs);
+
+  if (postOutcome.value.tag === "err") {
+    return packageFailure(postOutcome.value.error, accumulatedLogs);
+  }
 
   return {
     ok: true,
     runId,
     cached,
-    artifact,
-    event,
+    artifact: postOutcome.value.value.artifact,
+    event: postOutcome.value.value.event,
     response,
+    logs: accumulatedLogs,
   };
 }
+
+// Translate a CompileFailure + accumulated logs into the public failure
+// shape. The reason / message fields match the original union exactly so
+// callers (compile-plan-runner, walker actions, the CLI) do not change.
+function packageFailure(failure: CompileFailure, logs: readonly LogEntry[]): CompileNodeResult {
+  return { ok: false, reason: failure.reason, message: failure.message, logs };
+}
+
+// Tiny helper used by `failWithLog` consumers in unit tests. Re-exported
+// for symmetry with the other effect modules; not load-bearing.
+export const _internalFailWithLog = failWithLog;
