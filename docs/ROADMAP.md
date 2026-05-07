@@ -53,6 +53,36 @@ Planned (post-Bootstrap 0.8):
 - Walker v2 (plane / time / branch / manifestation rotation, proposal-review pane).
 - Visual DAG Studio (web-based UI).
 
+Bootstrap 0.9 — **Categorical Extensions** (shipped together as four additive
+runtime libraries, see [`CATEGORICAL_VISION.md`](CATEGORICAL_VISION.md)):
+- `onto query` — representable-functor (Yoneda) search by Hom-profile.
+  Query shape covers intrinsic coordinates plus incoming / outgoing edge
+  types and context-contract tokens. `src/runtime/query/`,
+  `src/commands/query/`. See [`QUERY_REPRESENTABLE.md`](QUERY_REPRESENTABLE.md).
+- Effect monad library — `Result<T,E>`, `Effect<T,E>`, `EffectWithLog<T,E>`,
+  monad laws tested. Library only; compiler integration is the next
+  milestone. `src/runtime/effects/`. See [`EFFECT_MONAD.md`](EFFECT_MONAD.md).
+- Branch fibration — branches modelled as Grothendieck fibers over the
+  temporal log. `listBranches`, `computeBranchFiber`, `describeCartesianLift`.
+  Read-only programmatic library; CLI surface is future work.
+  `src/runtime/fibration/`. See [`BRANCH_FIBRATION.md`](BRANCH_FIBRATION.md).
+- Topos predicate algebra — three-valued Ω = `true | false | unknown`,
+  composable rule predicates (`pAnd`, `pOr`, `pImplies`, …),
+  `compileNodeRules` lifts a node's `requires` / `provides` / `forbids` into
+  a single predicate. Additive: `intent-validator.ts` unchanged. A
+  follow-up may port the validator onto this algebra.
+  `src/runtime/topos/`. See [`RULES_TOPOS.md`](RULES_TOPOS.md).
+
+Follow-ups unlocked by Bootstrap 0.9:
+- Compiler refactor onto `EffectWithLog` (principled diagnostic accumulation,
+  no more try/catch).
+- Branch-aware compile (`onto compile run --branch feature/x` walks one
+  fiber, not the whole graph).
+- `onto branch lift <nodeId> --to feature/x` — turn the read-only
+  `describeCartesianLift` into an `edge_create` / `node_create` proposal.
+- Validator port: rebuild `intent-validator.ts` on top of the topos algebra.
+- `onto query` extensions: negation in shapes, exact edge profiles, multi-shape OR.
+
 At this stage, Ontology is a verified network kernel, a node editor, a proposal system, an interactive walker, AND a compiler that produces auditable, runnable artifacts.
 
 **Known limitations:**

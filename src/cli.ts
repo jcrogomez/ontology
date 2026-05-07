@@ -30,6 +30,7 @@ import { proposalRejectCommand } from "./commands/proposal/reject.js";
 import { proposalApplyCommand } from "./commands/proposal/apply.js";
 import { modelDoctorCommand } from "./commands/model/doctor.js";
 import { modelListCommand } from "./commands/model/list.js";
+import { registerQueryCommand } from "./commands/query/index.js";
 import { errorMessage } from "./core/errors.js";
 
 const program = new Command();
@@ -546,5 +547,7 @@ compile
       process.exit(1);
     }
   });
+
+registerQueryCommand(program);
 
 program.parse(process.argv);

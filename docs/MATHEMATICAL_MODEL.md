@@ -2,6 +2,13 @@
 
 "Ontology is a typed, temporal, directed graph enriched with a partial order of abstraction, where prompts act as rewrite rules that expand subgraphs, context is assigned locally as a presheaf over graph neighborhoods, and compilation is a structure-preserving functor from the category of intention to the category of executable artifacts."
 
+> The seven axioms below are the *foundation*. The companion document
+> [`CATEGORICAL_VISION.md`](CATEGORICAL_VISION.md) maps the four further
+> categorical concepts the project now embodies — **monads, representable
+> functors / Yoneda, fibrations, and a topos-style subobject classifier** —
+> onto concrete modules under `src/runtime/effects/`, `src/runtime/query/`,
+> `src/runtime/fibration/`, and `src/runtime/topos/` respectively.
+
 ## 1. Typed Directed Multigraph
 
 - Nodes are typed semantic objects.
@@ -50,6 +57,49 @@
 - Code is a generated artifact.
 - Generated artifacts must be traceable to nodes, edges, events and hashes.
 - **Implemented.** Every artifact under `.ontology/artifacts/generated/<nodeId>.<ext>` is anchored by a `compilation_run` event whose payload carries `nodeId`, `runId`, `cached`, and `artifactRelativePath`. The `runId` resolves to a content-addressed `PersistedRun` record whose `input.promptHash` ties back to the source node body. The audit chain `artifact → event → run → prompt hash → node` is replayable end-to-end.
+
+## 8. Beyond the seven axioms — categorical extensions
+
+Four further categorical concepts now ship as runtime libraries. They are
+*additive*: they extend the model without altering axioms 1–7.
+
+### 8.1 Monad — `src/runtime/effects/`
+
+The trio `Result<T,E>`, `Effect<T,E> = () => Result<T,E>`, and
+`EffectWithLog<T,E> = () => { value: Result<T,E>; logs: LogEntry[] }` provides
+a principled foundation for the compiler to thread errors and diagnostics.
+All three obey the three monad laws (left identity, right identity,
+associativity). `bindWithLog` concatenates logs even when the inner effect
+fails.
+
+The compiler does *not* yet use the library — that integration is the next
+milestone. See [`EFFECT_MONAD.md`](EFFECT_MONAD.md).
+
+### 8.2 Representable functor / Yoneda — `src/runtime/query/`
+
+`onto query` exposes a node's Hom-profile as a search verb. A query shape is
+a partial Hom-profile (incoming / outgoing edge types, context tokens,
+intrinsic coordinates); the matcher returns every node whose actual profile
+is a superset. The empty shape `{}` matches every node — the trivial Yoneda
+identity. See [`QUERY_REPRESENTABLE.md`](QUERY_REPRESENTABLE.md).
+
+### 8.3 Grothendieck fibration — `src/runtime/fibration/`
+
+Branches are modelled as **fibers** over the temporal log. The functor
+`p : Events × Branches → Events` "forgets the branch label". `computeBranchFiber`
+returns the induced subgraph on a single branch; `describeCartesianLift`
+describes the proposal that would relabel a node from one branch to another.
+Read-only library; CLI surface is future work. See
+[`BRANCH_FIBRATION.md`](BRANCH_FIBRATION.md).
+
+### 8.4 Topos / subobject classifier — `src/runtime/topos/`
+
+Rules (`requires` / `provides` / `forbids`) lift into a composable predicate
+algebra over a three-valued Ω = `"true" | "false" | "unknown"`. The "unknown"
+value reflects partial information in a graph still under construction; the
+evaluator is monotone wrt information refinement. The existing
+`intent-validator.ts` is unchanged; this is the algebra a follow-up port
+would build on. See [`RULES_TOPOS.md`](RULES_TOPOS.md).
 
 ```text
 ┌─────────────────────────────────────────────┐
