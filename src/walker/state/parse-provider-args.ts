@@ -25,6 +25,11 @@ export interface ProviderArgs {
   provider: LlmProvider;
   model?: string;
   ollamaHost?: string;
+  // Boolean flag — when true, compileFromWalker forwards runtimeCheck:true
+  // to runCompilePlan so the leaf artifact is executed post parse-validation.
+  // Off by default (running arbitrary LLM output is opt-in). Only meaningful
+  // for `:compile`; `:run` ignores it.
+  runtimeCheck?: boolean;
 }
 
 export type ParseProviderArgsResult =
@@ -37,6 +42,7 @@ export function parseProviderArgs(rest: string): ParseProviderArgsResult {
   let provider: LlmProvider = "mock";
   let model: string | undefined;
   let ollamaHost: string | undefined;
+  let runtimeCheck: boolean | undefined;
   let i = 0;
 
   // Optional leading positional: the provider.
@@ -69,8 +75,22 @@ export function parseProviderArgs(rest: string): ParseProviderArgsResult {
       i += 2;
       continue;
     }
+    // Boolean flag (no value). Position-independent.
+    if (tok === "--runtime-check") {
+      runtimeCheck = true;
+      i += 1;
+      continue;
+    }
     return { ok: false, message: `unexpected argument: ${tok}` };
   }
 
-  return { ok: true, args: { provider, model, ollamaHost } };
+  return {
+    ok: true,
+    args: {
+      provider,
+      ...(model !== undefined ? { model } : {}),
+      ...(ollamaHost !== undefined ? { ollamaHost } : {}),
+      ...(runtimeCheck !== undefined ? { runtimeCheck } : {}),
+    },
+  };
 }

@@ -11,6 +11,12 @@ export interface CompileFromWalkerOptions {
   // Optional ollama host. Falls through to OLLAMA_HOST env then the adapter
   // default (http://127.0.0.1:11434).
   ollamaHost?: string;
+  // When true, after parse-validation the artifact is executed in a
+  // subprocess with a wall-clock timeout. Non-zero exit / timeout produces
+  // a runtime_failed step. Surfaces the same flag the CLI exposes as
+  // `--runtime-check`. Off by default — running arbitrary LLM output is
+  // an opt-in operational decision.
+  runtimeCheck?: boolean;
   cwd?: string;
 }
 
@@ -24,6 +30,7 @@ export async function compileFromWalker(options: CompileFromWalkerOptions): Prom
     provider: options.provider,
     model: options.model,
     ollamaHost: options.ollamaHost,
+    runtimeCheck: options.runtimeCheck,
     cwd: options.cwd,
   });
 }
