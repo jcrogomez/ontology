@@ -9,6 +9,7 @@ import { createPersistedRun, computeRunId, loadPersistedRun } from "../../core/r
 import { writeArtifact, type WriteArtifactResult } from "./artifact-writer.js";
 import { extractCodeFence } from "./post/extract-code-fence.js";
 import { validateLanguage } from "./post/validate-language.js";
+import { runtimeCheck } from "./post/runtime-check.js";
 import {
   buildUpstreamSystemPrompt,
   hashUpstreamContext,
@@ -55,6 +56,14 @@ export interface CompileNodeOptions {
   // Models registry. Required when `provider` is undefined (per-node routing
   // path). The plan-runner loads it once and threads it to every step.
   registry?: { models: OntologyModel[] };
+  // When true, after parse-validation the compiled artifact is **executed**
+  // in a subprocess with a timeout (default 5s, max 60s). Non-zero exit or
+  // timeout produces a `runtime_failed` outcome. Off by default because
+  // running arbitrary LLM-generated code is a non-trivial operational
+  // decision. Surfaces only via the CLI flag `--runtime-check` today.
+  runtimeCheck?: boolean;
+  // Custom runtime check timeout. Ignored when runtimeCheck is false/undefined.
+  runtimeCheckTimeoutMs?: number;
   // Direct refinement parents' compiled outputs, in the order they were
   // produced by the plan-runner (deterministic — sorted by nodeId). When
   // present, they are concatenated into the dispatcher's `system` prompt
@@ -78,7 +87,7 @@ export type CompileNodeResult =
       event: OntologyEvent;
       response: { text: string; provider: LlmProvider; model: string };
     }
-  | { ok: false; reason: "dispatch_failed" | "persist_failed" | "write_failed" | "validate_failed" | "model_ref_unresolved"; message: string };
+  | { ok: false; reason: "dispatch_failed" | "persist_failed" | "write_failed" | "validate_failed" | "runtime_failed" | "model_ref_unresolved"; message: string };
 
 const COMPILE_TASK: LlmTask = "code_sketch";
 
@@ -274,6 +283,30 @@ export async function compileNode(options: CompileNodeOptions): Promise<CompileN
         ok: false,
         reason: "validate_failed",
         message: `${options.node.technical.language} parse failed for ${artifact.relativePath}: ${check.message}`,
+      };
+    }
+  }
+
+  // Optional runtime check. Strictly opt-in: parse-pass is not the same as
+  // runs-correctly (a class definition referencing an undefined symbol
+  // parses fine but raises NameError at execution). Off by default because
+  // running arbitrary LLM output has operational consequences; the CLI
+  // surfaces this via --runtime-check.
+  if (
+    options.runtimeCheck &&
+    options.node.coordinates.manifestation === "code" &&
+    options.node.technical.language
+  ) {
+    const rc = runtimeCheck({
+      absolutePath: artifact.absolutePath,
+      language: options.node.technical.language,
+      timeoutMs: options.runtimeCheckTimeoutMs,
+    });
+    if (rc.status === "failed") {
+      return {
+        ok: false,
+        reason: "runtime_failed",
+        message: `${options.node.technical.language} runtime failed for ${artifact.relativePath}: ${rc.message}`,
       };
     }
   }

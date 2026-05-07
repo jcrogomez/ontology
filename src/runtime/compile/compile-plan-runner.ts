@@ -24,6 +24,10 @@ export interface CompilePlanRunOptions {
   model?: string;
   ollamaHost?: string;
   cwd?: string;
+  // Forwarded to compileNode. When true, compiled artifacts are executed
+  // post parse-check; non-zero exit / timeout produces runtime_failed.
+  runtimeCheck?: boolean;
+  runtimeCheckTimeoutMs?: number;
 }
 
 export interface CompilePlanStepResult {
@@ -115,6 +119,8 @@ export async function runCompilePlan(options: CompilePlanRunOptions): Promise<Co
       provider: options.provider,
       model: options.model,
       ollamaHost: options.ollamaHost,
+      runtimeCheck: options.runtimeCheck,
+      runtimeCheckTimeoutMs: options.runtimeCheckTimeoutMs,
       cwd,
       upstream,
       registry,
