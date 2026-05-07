@@ -28,15 +28,23 @@ export async function compilePlanCommand(focalId: string, options: CompilePlanOp
         focal: plan.focalId,
         steps: plan.steps,
         closure: plan.closure,
+        warnings: plan.warnings,
       }, null, 2));
     } else {
-      console.log(JSON.stringify({
+      const base: Record<string, unknown> = {
         ok: false,
         reason: plan.reason,
         focal: plan.focalId,
-        partialSteps: plan.partialSteps,
-        unresolved: plan.unresolved,
-      }, null, 2));
+      };
+      if (plan.reason === "cycle") {
+        base.partialSteps = plan.partialSteps;
+        base.unresolved = plan.unresolved;
+      } else if (plan.reason === "conflict") {
+        base.conflicts = plan.conflicts;
+      } else if (plan.reason === "superseded_focal") {
+        base.successor = plan.successor;
+      }
+      console.log(JSON.stringify(base, null, 2));
     }
     if (!plan.ok) process.exit(1);
     return;
@@ -49,6 +57,13 @@ export async function compilePlanCommand(focalId: string, options: CompilePlanOp
     if (plan.reason === "cycle") {
       console.error(`  Unresolved nodes (cycle): ${plan.unresolved.join(", ")}`);
       console.error(`  Sequenced before the cycle: ${plan.partialSteps.length} step(s)`);
+    } else if (plan.reason === "conflict") {
+      console.error(`  Contradicts edge(s) within the closure:`);
+      for (const c of plan.conflicts) {
+        console.error(`    ${c.from}  -[contradicts]→  ${c.to}  (edgeId=${c.edgeId})`);
+      }
+    } else if (plan.reason === "superseded_focal") {
+      console.error(`  Focal node is superseded by ${plan.successor}; compile that instead.`);
     }
     process.exit(1);
   }
@@ -60,6 +75,13 @@ export async function compilePlanCommand(focalId: string, options: CompilePlanOp
     const marker = step.nodeId === focalId ? "*" : " ";
     const depsTag = step.dependsOn.length > 0 ? `  depends on ${step.dependsOn.length} edge(s)` : "";
     console.log(` ${marker} ${String(i + 1).padStart(2, " ")}. ${step.nodeId}${depsTag}`);
+  }
+  if (plan.warnings.length > 0) {
+    console.log(``);
+    console.log(`Warnings:`);
+    for (const w of plan.warnings) {
+      console.log(`  - ${w.predecessor} excluded (superseded by ${w.successor})`);
+    }
   }
 }
 
