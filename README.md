@@ -47,6 +47,7 @@ Read [`examples/hello-world/README.md`](examples/hello-world/README.md) for the 
 | `onto proposal list / show / apply / reject` | Lifecycle the candidate. `apply` re-validates `parentHash`/endpoint hashes and stales on divergence. |
 | **`onto compile plan <id>`** | **Preview the topological compile order rooted at a node. Read-only.** |
 | **`onto compile run <id>`** | **Compile the focal and its dependency closure. Writes artifacts. Emits `compilation_run` events.** |
+| **`onto query`** | **Yoneda search by Hom-profile. Find every node whose edges + context-contract + coordinates match a query shape.** |
 | `onto walk <id>` | The Walker: an interactive focal-cell terminal interface. Edit drafts, propose, run models, preview plans, compile — all from the TUI. |
 | `onto validate`, `onto inspect`, `onto events tail`, `onto model doctor`, `onto doctor` | Observability. |
 
@@ -111,9 +112,17 @@ If you want to understand **the design**:
 
 - [**The Canon**](docs/ONTOLOGY_CANON.md) — the foundational definition.
 - [**The Mathematical Model**](docs/MATHEMATICAL_MODEL.md) — the seven axioms.
+- [**The Categorical Vision**](docs/CATEGORICAL_VISION.md) — the nine-concept map (categories, functors, Yoneda, monads, fibrations, topos, …) onto concrete modules.
 - [**The Architecture**](docs/ARCHITECTURE.md) — how Kernel, Observability, LLM Runtime, Context Assembler, Proposal System, and Compiler relate.
 - [**The Compiler**](docs/COMPILER.md) — how `onto compile` walks the plan and produces artifacts.
 - [**The Walker**](docs/WALKER_INTERFACE.md) — the interactive TUI design.
+
+For the four post-axiom categorical extensions:
+
+- [**Yoneda Query**](docs/QUERY_REPRESENTABLE.md) — `onto query` search by Hom-profile.
+- [**Effect Monad**](docs/EFFECT_MONAD.md) — `Result` / `Effect` / `EffectWithLog` with proven monad laws.
+- [**Branch Fibration**](docs/BRANCH_FIBRATION.md) — branches as Grothendieck fibers over the event log.
+- [**Rules as Topos**](docs/RULES_TOPOS.md) — three-valued Ω predicate algebra over `requires` / `provides` / `forbids`.
 
 If you want to **contribute or extend**:
 
