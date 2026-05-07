@@ -10,24 +10,43 @@ describe("buildUpstreamSystemPrompt", () => {
     expect(buildUpstreamSystemPrompt([])).toBe(null);
   });
 
-  it("includes each upstream as its own labeled section", () => {
+  it("wraps each upstream in a <context> tag with source and level attributes", () => {
     const items: UpstreamContextItem[] = [
       { nodeId: "node_0000_canon", level: "canon", text: "Axioms here." },
       { nodeId: "node_0001", level: "project", text: "A demo project." },
     ];
     const s = buildUpstreamSystemPrompt(items);
     expect(s).not.toBe(null);
-    expect(s!).toContain("[node_0000_canon :: canon]");
+    expect(s!).toContain('<context source="node_0000_canon" level="canon">');
     expect(s!).toContain("Axioms here.");
-    expect(s!).toContain("[node_0001 :: project]");
+    expect(s!).toContain("</context>");
+    expect(s!).toContain('<context source="node_0001" level="project">');
     expect(s!).toContain("A demo project.");
   });
 
-  it("uses a bracketed id-only label when level is missing", () => {
+  it("omits the level attribute when level is missing", () => {
     const items: UpstreamContextItem[] = [{ nodeId: "node_x", text: "body" }];
     const s = buildUpstreamSystemPrompt(items);
-    expect(s!).toContain("[node_x]");
-    expect(s!).not.toContain("::");
+    expect(s!).toContain('<context source="node_x">');
+    expect(s!).not.toContain("level=");
+  });
+
+  it("does NOT emit the legacy [id :: level] bracket format (mimicry vector closed)", () => {
+    // Regression guard: the old format was `[<id> :: <level>]`. Small
+    // chat-tuned models pattern-matched those brackets into their output.
+    // The new format uses XML angle brackets, which models do not emit
+    // when generating code under normal circumstances.
+    const items: UpstreamContextItem[] = [
+      { nodeId: "node_x", level: "canon", text: "t" },
+    ];
+    const s = buildUpstreamSystemPrompt(items)!;
+    expect(s).not.toMatch(/\[\s*node_/);
+    expect(s).not.toContain(" :: ");
+  });
+
+  it("instructs the model not to echo the framing tags", () => {
+    const s = buildUpstreamSystemPrompt([{ nodeId: "x", text: "y" }])!;
+    expect(s).toMatch(/Do NOT echo the <context> tags/i);
   });
 
   it("preserves item order", () => {
@@ -35,8 +54,8 @@ describe("buildUpstreamSystemPrompt", () => {
     const b: UpstreamContextItem = { nodeId: "node_b", text: "B" };
     const ab = buildUpstreamSystemPrompt([a, b])!;
     const ba = buildUpstreamSystemPrompt([b, a])!;
-    expect(ab.indexOf("[node_a]")).toBeLessThan(ab.indexOf("[node_b]"));
-    expect(ba.indexOf("[node_b]")).toBeLessThan(ba.indexOf("[node_a]"));
+    expect(ab.indexOf('source="node_a"')).toBeLessThan(ab.indexOf('source="node_b"'));
+    expect(ba.indexOf('source="node_b"')).toBeLessThan(ba.indexOf('source="node_a"'));
   });
 });
 
