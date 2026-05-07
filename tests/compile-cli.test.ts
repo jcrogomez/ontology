@@ -230,4 +230,40 @@ describe("onto compile run", () => {
     expect(r.stdout).toContain("* "); // focal marker
     expect(r.stdout).toContain("Focal artifact:");
   });
+
+  it("compiles via per-node model.ref when --provider is omitted", () => {
+    // No --provider means the per-node routing path: each node's
+    // model.ref is resolved against .ontology/models/registry.json.
+    // The default ref is "mock_default", which the bootstrap registry
+    // resolves to (provider=mock, name=deterministic-mock-model).
+    const r = runCli(tempDir, ["compile", "run", "node_0002", "--json"]);
+    expect(r.status).toBe(0);
+    const parsed = JSON.parse(r.stdout);
+    expect(parsed.ok).toBe(true);
+    expect(parsed.steps).toHaveLength(3);
+    // Inspect the run records to confirm the resolved model name made
+    // it onto disk — distinct from the explicit --provider mock path.
+    const runs = fs.readdirSync(path.join(tempDir, ".ontology/runs"))
+      .map(f => JSON.parse(fs.readFileSync(path.join(tempDir, ".ontology/runs", f), "utf-8")));
+    const focalRun = runs.find((rr: any) => rr.input.targetNodeId === "node_0002");
+    expect(focalRun).toBeDefined();
+    expect(focalRun.model.provider).toBe("mock");
+    expect(focalRun.model.model).toBe("deterministic-mock-model");
+  });
+
+  it("per-node and explicit --provider mock paths produce DISTINCT runIds (different model.model)", () => {
+    runCli(tempDir, ["compile", "run", "node_0002", "--provider", "mock"]);
+    const overrideRunIds = new Set(fs.readdirSync(path.join(tempDir, ".ontology/runs")));
+    runCli(tempDir, ["compile", "run", "node_0002"]); // per-node path
+    const allRunIds = new Set(fs.readdirSync(path.join(tempDir, ".ontology/runs")));
+    // Per-node path added 3 fresh records; the override-path records are
+    // still on disk (provenance: nothing is deleted across paths).
+    expect(allRunIds.size).toBe(overrideRunIds.size + 3);
+  });
+
+  it("human mode shows 'per-node (model.ref)' when --provider is omitted", () => {
+    const r = runCli(tempDir, ["compile", "run", "node_0002"]);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("Provider:  per-node (model.ref)");
+  });
 });

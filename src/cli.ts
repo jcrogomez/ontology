@@ -532,8 +532,8 @@ compile
 compile
   .command("run <id>")
   .description("Compile the focal node and its dependency closure, writing artifacts to .ontology/artifacts/generated/. The structure-preserving functor of the canon, made concrete.")
-  .option("--provider <provider>", "LLM provider to use (mock or ollama)", "mock")
-  .option("--model <model>", "Model to use for the selected LLM provider")
+  .option("--provider <provider>", "LLM provider override (mock or ollama). When omitted, each node compiles via its own model.ref resolved through the registry.")
+  .option("--model <model>", "Model override (only meaningful with --provider; ignored on the per-node ref path)")
   .option("--ollama-host <host>", "Host for Ollama provider")
   .option("--json", "Output results in JSON format")
   .action(async (id, options) => {

@@ -1,6 +1,6 @@
 import type { OntologyNode, OntologyEdge } from "../../schemas/ontology.js";
 import type { LlmProvider } from "../llm/types.js";
-import { loadEdges, loadNodeById } from "../../core/project/load.js";
+import { loadEdges, loadNodeById, loadModelsRegistry } from "../../core/project/load.js";
 import { computeCompilePlan, type CompilePlan } from "../graph/compile-plan.js";
 import { compileNode, type CompileNodeResult } from "./compile-node.js";
 import type { WriteArtifactResult } from "./artifact-writer.js";
@@ -63,6 +63,10 @@ export async function runCompilePlan(options: CompilePlanRunOptions): Promise<Co
   // Compute the plan. Any cycle or missing-node failure surfaces here.
   const edges = loadEdges(cwd);
   const plan = computeCompilePlan(options.focalId, edges);
+  // Load the models registry once. compileNode needs it on the per-node
+  // routing path (when no CLI provider override is in play); harmless to
+  // pass when the override path is taken.
+  const registry = loadModelsRegistry(cwd);
   if (!plan.ok) {
     return {
       ok: false,
@@ -113,6 +117,7 @@ export async function runCompilePlan(options: CompilePlanRunOptions): Promise<Co
       ollamaHost: options.ollamaHost,
       cwd,
       upstream,
+      registry,
     });
 
     if (!stepResult.ok) {

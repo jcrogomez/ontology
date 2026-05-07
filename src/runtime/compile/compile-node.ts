@@ -1,7 +1,8 @@
 import { randomBytes } from "node:crypto";
-import type { OntologyNode, OntologyEvent, PersistedRunInput, PersistedRunModel } from "../../schemas/ontology.js";
+import type { OntologyNode, OntologyEvent, OntologyModel, PersistedRunInput, PersistedRunModel } from "../../schemas/ontology.js";
 import { OntologyEventSchema } from "../../schemas/ontology.js";
 import { dispatchLlmRequest } from "../llm/dispatcher.js";
+import { resolveNodeModel } from "../llm/resolve-node-model.js";
 import type { LlmProvider, LlmTask } from "../llm/types.js";
 import { hashPrompt } from "../../core/integrity/hash.js";
 import { createPersistedRun, computeRunId, loadPersistedRun } from "../../core/runs/persist.js";
@@ -39,10 +40,21 @@ import { readState, writeState } from "../../core/state/state-store.js";
 
 export interface CompileNodeOptions {
   node: OntologyNode;
-  provider?: LlmProvider; // default "mock"
+  // CLI-level override. When set, every node compiles through this provider
+  // regardless of its `model.ref`. When undefined, the node's `model.ref`
+  // is resolved against the registry (passed in `registry`). The schema
+  // defaults `model.ref` to "mock_default", so legacy chains with no
+  // explicit per-node selection still flow through mock.
+  provider?: LlmProvider;
+  // CLI-level model override. Only meaningful when `provider` is also set;
+  // ignored when resolving via per-node ref (the registry entry's `name`
+  // is used instead).
   model?: string;
   ollamaHost?: string;
   cwd?: string;
+  // Models registry. Required when `provider` is undefined (per-node routing
+  // path). The plan-runner loads it once and threads it to every step.
+  registry?: { models: OntologyModel[] };
   // Direct refinement parents' compiled outputs, in the order they were
   // produced by the plan-runner (deterministic — sorted by nodeId). When
   // present, they are concatenated into the dispatcher's `system` prompt
@@ -66,13 +78,46 @@ export type CompileNodeResult =
       event: OntologyEvent;
       response: { text: string; provider: LlmProvider; model: string };
     }
-  | { ok: false; reason: "dispatch_failed" | "persist_failed" | "write_failed" | "validate_failed"; message: string };
+  | { ok: false; reason: "dispatch_failed" | "persist_failed" | "write_failed" | "validate_failed" | "model_ref_unresolved"; message: string };
 
 const COMPILE_TASK: LlmTask = "code_sketch";
 
 export async function compileNode(options: CompileNodeOptions): Promise<CompileNodeResult> {
   const cwd = options.cwd ?? process.cwd();
-  const provider: LlmProvider = options.provider ?? "mock";
+
+  // Provider/model resolution. Two paths:
+  //   (a) CLI override:    options.provider is set → use it for every node,
+  //                        options.model is the override model name.
+  //   (b) Per-node routing: options.provider is undefined → look up
+  //                        node.model.ref in the registry; the registry
+  //                        entry's (provider, name) is what we dispatch
+  //                        with. options.model is ignored on this path.
+  //
+  // Path (a) preserves the original CLI semantics: `--provider ollama
+  // --model llama3.2:3b` forces every step through that pair. Path (b)
+  // is the new default — each node compiles with the model its author
+  // chose, so abstract intentions can use mock while artifact leaves
+  // use a coder-tuned LLM.
+  let provider: LlmProvider;
+  let resolvedModel: string | undefined;
+  if (options.provider) {
+    provider = options.provider;
+    resolvedModel = options.model;
+  } else {
+    if (!options.registry) {
+      return {
+        ok: false,
+        reason: "model_ref_unresolved",
+        message: "compileNode called without an explicit provider and without a registry; cannot resolve node.model.ref",
+      };
+    }
+    const r = resolveNodeModel(options.node.model.ref, options.registry);
+    if (!r.ok) {
+      return { ok: false, reason: "model_ref_unresolved", message: r.message };
+    }
+    provider = r.resolved.provider;
+    resolvedModel = r.resolved.model;
+  }
 
   // The compile prompt is the node's raw prompt. The upstream refinement
   // parents' compiled outputs (passed in by the plan-runner) become the
@@ -102,7 +147,7 @@ export async function compileNode(options: CompileNodeOptions): Promise<CompileN
   };
   const runModel: PersistedRunModel = {
     provider,
-    model: options.model ?? (provider === "mock" ? "mock_default" : "unknown"),
+    model: resolvedModel ?? (provider === "mock" ? "mock_default" : "unknown"),
     host: options.ollamaHost ?? null,
   };
 
@@ -131,9 +176,19 @@ export async function compileNode(options: CompileNodeOptions): Promise<CompileN
         {
           task: COMPILE_TASK,
           prompt: promptText,
+          // Pass the resolved model in `request.model` so it flows to BOTH
+          // adapters consistently. Mock's adapter reads `request.model`
+          // directly (its `defaultModel` is ignored); ollama's adapter
+          // honors `request.model` if set, falling back to defaultModel
+          // otherwise. Without this, the mock adapter would always echo
+          // "mock_default" as `dispatched.model`, which would then leak
+          // into the persisted run's model field and break runId
+          // determinism between the pre-dispatch expectedId and the
+          // post-dispatch persisted id.
+          ...(resolvedModel ? { model: resolvedModel } : {}),
           ...(systemPrompt ? { system: systemPrompt } : {}),
         },
-        { provider, defaultModel: options.model, ollamaHost: options.ollamaHost },
+        { provider, defaultModel: resolvedModel, ollamaHost: options.ollamaHost },
       );
     } catch (err: unknown) {
       return {
