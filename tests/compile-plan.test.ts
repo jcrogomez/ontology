@@ -166,4 +166,106 @@ describe("computeCompilePlan", () => {
     if (!plan.ok) return;
     expect(plan.closure).toEqual(["A", "FOCAL"]);
   });
+
+  describe("contradicts edges (axiom 8 — explicit failure)", () => {
+    it("halts with reason='conflict' when the closure contains a contradicts edge", () => {
+      // FOCAL depends on A, FOCAL also contradicts A. Both are inside the
+      // closure → axiom 8 says fail loud, do not arbitrate the order.
+      const edges = [
+        edge("e1", "FOCAL", "A", "depends_on"),
+        edge("e2", "FOCAL", "A", "contradicts"),
+      ];
+      const plan = computeCompilePlan("FOCAL", edges);
+      expect(plan.ok).toBe(false);
+      if (plan.ok) return;
+      expect(plan.reason).toBe("conflict");
+      if (plan.reason !== "conflict") return;
+      expect(plan.conflicts).toEqual([
+        { from: "FOCAL", to: "A", edgeId: "e2" },
+      ]);
+    });
+
+    it("ignores contradicts edges between nodes that are NOT both in the closure", () => {
+      // A and B contradict each other but neither is in FOCAL's closure.
+      // The plan succeeds; the contradiction is irrelevant to this compile.
+      const edges = [
+        edge("e1", "A", "B", "contradicts"),
+        // FOCAL has no deps; closure = {FOCAL}.
+      ];
+      const plan = computeCompilePlan("FOCAL", edges);
+      expect(plan.ok).toBe(true);
+      if (!plan.ok) return;
+      expect(plan.closure).toEqual(["FOCAL"]);
+    });
+
+    it("reports multiple contradicts edges in deterministic order", () => {
+      const edges = [
+        edge("e1", "FOCAL", "A", "depends_on"),
+        edge("e2", "FOCAL", "B", "depends_on"),
+        edge("e3", "B", "A", "contradicts"),
+        edge("e4", "A", "B", "contradicts"),
+      ];
+      const plan = computeCompilePlan("FOCAL", edges);
+      expect(plan.ok).toBe(false);
+      if (plan.ok) return;
+      expect(plan.reason).toBe("conflict");
+      if (plan.reason !== "conflict") return;
+      expect(plan.conflicts.map(c => c.edgeId)).toEqual(["e3", "e4"]);
+    });
+  });
+
+  describe("supersedes edges (axiom 8 — predecessor excluded)", () => {
+    it("excludes a superseded predecessor from the closure (and warns)", () => {
+      // V2 supersedes V1. FOCAL depends on V2 (canonical); V1 is not
+      // referenced from focal directly, but if it were the closure-walk
+      // would skip it.
+      const edges = [
+        edge("e1", "FOCAL", "V2", "depends_on"),
+        edge("e2", "V2", "V1", "supersedes"),
+        // Suppose V2 still has an inherited dep on V1's parent A:
+        edge("e3", "V2", "A", "depends_on"),
+      ];
+      const plan = computeCompilePlan("FOCAL", edges);
+      expect(plan.ok).toBe(true);
+      if (!plan.ok) return;
+      expect(plan.closure).toEqual(["A", "FOCAL", "V2"]);
+      expect(plan.closure).not.toContain("V1");
+    });
+
+    it("emits a warning when a superseded predecessor is reachable via hard deps", () => {
+      // FOCAL depends on V1 directly (the user has a stale ref). V2
+      // supersedes V1. The closure walk drops V1; the warning surfaces.
+      const edges = [
+        edge("e1", "FOCAL", "V1", "depends_on"),
+        edge("e2", "V2", "V1", "supersedes"),
+      ];
+      const plan = computeCompilePlan("FOCAL", edges);
+      expect(plan.ok).toBe(true);
+      if (!plan.ok) return;
+      expect(plan.closure).not.toContain("V1");
+      expect(plan.warnings).toEqual([
+        { kind: "superseded", successor: "V2", predecessor: "V1" },
+      ]);
+    });
+
+    it("halts with reason='superseded_focal' when the focal itself is deprecated", () => {
+      // V2 supersedes V1; the user asks for a compile of V1.
+      const edges = [
+        edge("e1", "V2", "V1", "supersedes"),
+      ];
+      const plan = computeCompilePlan("V1", edges);
+      expect(plan.ok).toBe(false);
+      if (plan.ok) return;
+      expect(plan.reason).toBe("superseded_focal");
+      if (plan.reason !== "superseded_focal") return;
+      expect(plan.successor).toBe("V2");
+    });
+
+    it("a non-superseded compile produces an empty warnings array (regression guard)", () => {
+      const plan = computeCompilePlan("X", []);
+      expect(plan.ok).toBe(true);
+      if (!plan.ok) return;
+      expect(plan.warnings).toEqual([]);
+    });
+  });
 });
