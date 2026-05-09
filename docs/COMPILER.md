@@ -110,11 +110,24 @@ onto runs verify run_c9a8e3f2
 
 You can run that chain on any artifact in the project. Without the chain, a generated file is opaque; with it, it has full provenance.
 
+## What the compiler does (Bootstrap 0.9 hardening)
+
+The Bootstrap 0.8 v0 listed four gaps in this section. Three closed in 0.9:
+
+- **Prompt parsing — shipped (PR #113).** `parsePromptAST(raw)` recognises three line-anchored markers (`@requires:`, `@provides:`, `@expand:`), strips them from the prompt body, and emits a deduplicated `PromptAST`. `compileNode` consumes the parsed body instead of `prompt.raw`. Axiom 4 is now structural rather than textual. See `src/runtime/prompt/parse.ts`.
+- **Upstream-output threading — shipped (PR #105).** The plan-runner threads each refinement parent's compiled response into the per-node `compileNode` call as `UpstreamContextItem[]`, and the system prompt renders them under XML `<context>` tags (PR #109 fixed an earlier format leak). Downstream nodes now actually see what their refinement parents produced.
+- **`contradicts` / `supersedes` semantics in the plan — shipped (PR #112).** `computeCompilePlan` rejects any plan whose closure contains a `contradicts` edge as a hard `CompilePlanError`, and halts BFS on `supersedes` with a `superseded` warning. Note the asymmetry: `contradicts` is loud (the plan errors out); `supersedes` is silent-by-design (the predecessor is dropped from the closure even when its successor is unreachable from the focal — that is the intended semantics of "this node has been replaced"). Tests should pin both behaviours.
+
+Per-artifact validation gates were also added in 0.9:
+
+- **Language parse-check (PR #104).** Every code artifact is parse-validated against the node's `technical.language` after write. Failures emit a `validate_failed` step and abort the plan. A deterministic, model-agnostic floor on artifact quality.
+- **Optional `--runtime-check` (PR #110).** `onto compile run --runtime-check` executes each artifact under a wall-clock timeout (default 5000 ms, max 60000 ms) and surfaces non-zero exits, signal kills, and timeouts as `runtime_failed` step records.
+- **Code-fence stripping (PR #103).** When `coordinates.manifestation === "code"`, the artifact-writer strips a leading/trailing markdown code fence so a model returning ```` ```python ... ``` ```` produces a runnable file.
+- **Per-node `model.ref` routing (PR #108).** Without `--provider` override, each node compiles via its own `technical.model.ref` resolved through the registry, so the per-step run record honestly reports which model produced which artifact.
+
 ## What the compiler does not do (yet)
 
-- **Prompt parsing.** `compileNode` sends the focal's `prompt.raw` directly to the model. Future work (Bootstrap 0.7+, post-hello-world) will parse prompts into a structured AST (`@requires:`, `@provides:`, `@expand:` markers), validate them against the assembled context, and surface the AST to the model as a system prompt.
-- **Upstream-output threading.** The plan-runner accumulates each step's response in an `upstreamArtifacts` map and passes it to `compileNode`, but `compileNode` v0 does not inject it into the prompt. The contract is in place for the next iteration.
-- **`contradicts` / `supersedes` semantics in the plan.** The plan helper currently ignores these edge types. A future pass will halt on `contradicts` and exclude `supersedes` predecessors.
-- **Real validation between steps.** Today the compiler trusts the kernel. Future work may run `validateIntent` on each step's output and refuse to advance the plan when a candidate breaks the gluing.
+- **`validateIntent` between steps.** Artifact-level validation (parse-check, optional runtime-check) is in place, but the deterministic intent validator does not yet run on each step's output to refuse advancing the plan when a candidate breaks the gluing.
+- **Branch-aware compile.** `computeBranchFiber` is in place (PR #111); `onto compile run --branch <name>` to walk one fiber instead of the whole graph is the open CLI gap.
 
 These are explicit, documented gaps. They can be filled without changing the kernel surface — `compileNode` and `runCompilePlan` are the extension points.

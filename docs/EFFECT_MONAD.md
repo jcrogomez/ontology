@@ -1,7 +1,11 @@
 # Effect Monad — Design Note
 
-> Status: foundation only. **This PR adds the library and tests.** It does
-> NOT wire the effect monad into the compiler. That is the next milestone.
+> Status: shipped and integrated. The library ships in PR #111 with proven
+> monad laws. PR #115 wires `EffectWithLog` into `compileNode`: dispatch /
+> write / parse-validate / runtime-check are now `EffectWithLog` steps
+> chained via `bindWithLog`, and the top-level `try/catch` is gone. Partial
+> diagnostics survive failure; a step's log is non-empty even when the
+> step record reports an error.
 
 ## Motivation
 

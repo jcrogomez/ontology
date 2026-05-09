@@ -1,7 +1,10 @@
 # Branch Fibration
 
-Status: experimental, read-only library. No CLI surface yet (see *Future
-Work*). All helpers live under `src/runtime/fibration/`.
+Status: read-only library shipped in PR #111. Walker `:branch list` (PR #114)
+is the first surface; an `onto branch` CLI (`onto branch list` / `onto branch
+fiber <branch>`), branch-aware compile (`onto compile run --branch <name>`),
+and the cartesian-lift proposal (`onto branch lift`) are open follow-ups —
+see *Future Work*. All helpers live under `src/runtime/fibration/`.
 
 This module models Ontology branches as a **Grothendieck fibration** over the
 base category of operations. It is a pure, additive view: nothing here mutates
