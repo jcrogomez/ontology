@@ -1,8 +1,8 @@
 # Ontology Roadmap
 
-## Current State: Bootstrap 0.2.x / Context + Mock Runtime Preparation
+## Current State: Bootstrap 0.9 — Categorical Extensions + Compiler Hardening (`0.3.0-alpha.0`)
 
-Ontology is currently in the **Bootstrap 0.2.x / Context + Mock Runtime Preparation** phase. This phase introduces the foundational capabilities to grow the intention network through controlled CLI mutations—specifically, generating semantic nodes.
+Ontology has reached **Bootstrap 0.9**. The seven axioms of the canon all run concrete code (axiom 4 is now structural via `parsePromptAST`), and four additive categorical extensions (Yoneda query, effect monad, branch fibration, topos predicate algebra) ship as runtime libraries with first-line CLI / Walker surfaces. The compiler is hardened end-to-end: code-fence stripping, language parse-check on every artifact, optional `--runtime-check`, refinement-parent context threading, per-node `model.ref` routing, and a top-level `EffectWithLog` that retires the legacy try/catch tower. `computeCompilePlan` rejects `contradicts` and halts BFS on `supersedes`, so contradictions surface as failures.
 
 ## Near-term tactical roadmap
 
@@ -44,29 +44,27 @@ Implemented:
 - Walker v1 PR-B (post-0.5, PR #100): `:run` integration. Dispatches a model run against the focal's assembled context, persists the result by default, and renders it in a `:clearrun`-able panel below the focal cell. The walker stays interactive during dispatch; cache hits surface as `(cached)` with no second LLM call.
 - Walker v1 PR-C (post-0.5, PR #101): `:plan` topological compile-plan preview + `onto compile plan <nodeId>` CLI surface. Pure helper `computeCompilePlan` runs Kahn's algorithm over the hard-dependency edge family, detects cycles, returns deterministic ordering. **Walker v1 milestone complete.**
 - **Bootstrap 0.8 — Hello World** (post-0.5, PR #102): the compiler ships. `onto compile run <nodeId>` walks the topological plan, dispatches each node's prompt against the configured provider, and writes artifacts to `.ontology/artifacts/generated/`. Each step emits both `run_persisted` and `compilation_run` events; full audit chain `artifact → compilation_run → runId → run record → prompt hash → node` is replayable. The mock provider acts as the identity functor for `task: code_sketch`, so a leaf node whose `prompt.raw` is literal source compiles offline. Walker integration via `:compile`. Hello-world example at `examples/hello-world/` produces an executable Python script via `npm run example:hello-world`. **Axiom 6 (compiler functor) and axiom 7 (code as compiled shadow) both running concrete code.**
+- **Compiler hardening** (post-0.8, PRs #103-#105, #108-#110, #112): code-fence stripping for `manifestation: code` artifacts (PR #103); language parse-check after every write, surfaces as `validate_failed` (PR #104); refinement-parent context threading into per-node prompts so upstream `provides` reach downstream steps (PR #105); per-node `model.ref` routing through the registry when no `--provider` override is given (PR #108); system-prompt format leak fixed by switching to XML `<context>` tags (PR #109); optional `--runtime-check` executes the artifact under a wall-clock timeout post parse-validation (PR #110); `computeCompilePlan` rejects `contradicts` as a hard error and halts BFS on `supersedes` with a `superseded` warning (PR #112).
+- **Walker UX** (post-0.8, PR #106): `:run` and `:compile` accept `--model` and `--ollama-host`. Args round-trip through the same dispatcher path the CLI uses.
+- **Test reliability** (post-0.8, PR #107): vitest `hookTimeout` bumped to 30s to absorb tsx cold-start.
+- **PromptAST — axiom 4 made structural** (post-0.8, PR #113): `parsePromptAST(raw)` recognises three line-anchored markers (`@requires:`, `@provides:`, `@expand:`), strips them from the prompt body, and emits a deduplicated `PromptAST`. `compileNode` consumes the parsed body instead of the raw text. Closes the last "axiom 4 stored as text" gap. `src/runtime/prompt/`.
+- **Walker hardening** (post-0.8, PR #114): `:validate` (deterministic intent validation), `:branch list` (first fibration surface), `:context` (explicit assembly with edge filters), `:query` (ad-hoc Yoneda search against the focal), and `:compile --runtime-check`.
+- **Compiler refactor onto `EffectWithLog`** (post-0.8, PR #115): `compileNode` no longer wraps the dispatch / write / validate pipeline in a top-level `try/catch`. Failures bubble through `bindWithLog`; partial diagnostics survive even on error.
 
-Planned (post-Bootstrap 0.8):
-- PromptAST (axiom 4): parse prompts into structured rewrite rules so the compiler can use AST-aware dispatch.
-- Compiler hardening: thread upstream-step outputs into downstream prompts; enforce `contradicts` / `supersedes` plan semantics; run `validateIntent` between steps.
-- run-driven edge proposals (`run prompt --as-proposal` with edge target).
-- CLI surface for the semantic linker (`onto link <nodeId>` or similar).
-- Walker v2 (plane / time / branch / manifestation rotation, proposal-review pane).
-- Visual DAG Studio (web-based UI).
-
-Bootstrap 0.9 — **Categorical Extensions** (shipped together as four additive
-runtime libraries, see [`CATEGORICAL_VISION.md`](CATEGORICAL_VISION.md)):
-- `onto query` — representable-functor (Yoneda) search by Hom-profile.
+Bootstrap 0.9 — **Categorical Extensions** (PR #111, shipped together as four additive
+runtime libraries with proven laws, see [`CATEGORICAL_VISION.md`](CATEGORICAL_VISION.md)):
+- ✅ `onto query` — representable-functor (Yoneda) search by Hom-profile.
   Query shape covers intrinsic coordinates plus incoming / outgoing edge
   types and context-contract tokens. `src/runtime/query/`,
-  `src/commands/query/`. See [`QUERY_REPRESENTABLE.md`](QUERY_REPRESENTABLE.md).
-- Effect monad library — `Result<T,E>`, `Effect<T,E>`, `EffectWithLog<T,E>`,
-  monad laws tested. Library only; compiler integration is the next
-  milestone. `src/runtime/effects/`. See [`EFFECT_MONAD.md`](EFFECT_MONAD.md).
-- Branch fibration — branches modelled as Grothendieck fibers over the
+  `src/commands/query/`. Walker `:query`. See [`QUERY_REPRESENTABLE.md`](QUERY_REPRESENTABLE.md).
+- ✅ Effect monad library — `Result<T,E>`, `Effect<T,E>`, `EffectWithLog<T,E>`,
+  monad laws tested. **Compiler integration shipped in PR #115.**
+  `src/runtime/effects/`. See [`EFFECT_MONAD.md`](EFFECT_MONAD.md).
+- ✅ Branch fibration — branches modelled as Grothendieck fibers over the
   temporal log. `listBranches`, `computeBranchFiber`, `describeCartesianLift`.
-  Read-only programmatic library; CLI surface is future work.
-  `src/runtime/fibration/`. See [`BRANCH_FIBRATION.md`](BRANCH_FIBRATION.md).
-- Topos predicate algebra — three-valued Ω = `true | false | unknown`,
+  Walker `:branch list` (PR #114) is the first surface; an `onto branch` CLI
+  is open follow-up. `src/runtime/fibration/`. See [`BRANCH_FIBRATION.md`](BRANCH_FIBRATION.md).
+- ✅ Topos predicate algebra — three-valued Ω = `true | false | unknown`,
   composable rule predicates (`pAnd`, `pOr`, `pImplies`, …),
   `compileNodeRules` lifts a node's `requires` / `provides` / `forbids` into
   a single predicate. Additive: `intent-validator.ts` unchanged. A
@@ -74,22 +72,35 @@ runtime libraries, see [`CATEGORICAL_VISION.md`](CATEGORICAL_VISION.md)):
   `src/runtime/topos/`. See [`RULES_TOPOS.md`](RULES_TOPOS.md).
 
 Follow-ups unlocked by Bootstrap 0.9:
-- Compiler refactor onto `EffectWithLog` (principled diagnostic accumulation,
-  no more try/catch).
-- Branch-aware compile (`onto compile run --branch feature/x` walks one
-  fiber, not the whole graph).
-- `onto branch lift <nodeId> --to feature/x` — turn the read-only
+- ✅ Compiler refactor onto `EffectWithLog` (PR #115).
+- 🟡 Branch-aware compile (`onto compile run --branch feature/x` walks one
+  fiber, not the whole graph). `computeBranchFiber` is in place; only the
+  CLI wiring is missing.
+- 🟡 `onto branch list` and `onto branch fiber <branch>` — surface the
+  programmatic fibration API to the CLI.
+- 🟡 `onto branch lift <nodeId> --to feature/x` — turn the read-only
   `describeCartesianLift` into an `edge_create` / `node_create` proposal.
-- Validator port: rebuild `intent-validator.ts` on top of the topos algebra.
-- `onto query` extensions: negation in shapes, exact edge profiles, multi-shape OR.
+- 🟡 Validator port: rebuild `intent-validator.ts` on top of the topos algebra.
+- 🟡 `onto query` extensions: negation in shapes, exact edge profiles, multi-shape OR.
 
-At this stage, Ontology is a verified network kernel, a node editor, a proposal system, an interactive walker, AND a compiler that produces auditable, runnable artifacts.
+Other open follow-ups:
+- 🟡 `run prompt --as-proposal` with `edge_create` target (the discriminated-union
+  mutation schema already supports it; the model-driven candidate edge is the gap).
+- 🟡 CLI surface for the semantic linker (`onto link <nodeId>`).
+- 🟡 Walker v2 (plane / time / branch / manifestation rotation, proposal-review pane).
+- 🟡 Visual DAG Studio (web-based UI).
+- 🟡 `runFromWalker` port onto `EffectWithLog` (compiler-side already done in PR #115).
+- 🟡 Atomic `state.json` writes (write-to-temp + rename) and advisory lock for
+  multi-process safety.
+
+At this stage, Ontology is a verified network kernel, a node editor, a proposal system, an interactive walker, a compiler that produces auditable runnable artifacts with structural validation, and a categorical layer (Yoneda query, effect monad, fibration, topos) that future work can build on.
 
 **Known limitations:**
-- PromptAST (axiom 4) not yet implemented; prompts are still stored verbatim
-- compiler does not yet thread upstream outputs or enforce `contradicts` / `supersedes`
-- semantic linker is exposed only as a programmatic API (no CLI surface)
-- single-writer state.json (CLI single-shot); concurrent invocations are not lock-protected
+- Branch fibration has no `onto` CLI surface yet — only walker `:branch list`. Branch-aware compile is a follow-up.
+- Topos predicate algebra is library-only; the validator port is pending.
+- Semantic linker is exposed only as a programmatic API (`semanticLink()`).
+- `runFromWalker` is still on the legacy try/catch path; the `EffectWithLog` refactor covers `compileNode` only.
+- `state.json` and `events.jsonl` writes are not crash-atomic — a SIGKILL or out-of-disk mid-write can truncate the file. The single-writer assumption (CLI single-shot) is unchanged; concurrent invocations from multiple processes are not lock-protected.
 
 ## Next Phases
 
@@ -127,8 +138,8 @@ See `docs/PROPOSAL_SYSTEM.md` for the full design.
 - Graph query CLI (`graph neighbors`, `graph path`, `graph subgraph`). PR #98.
 - Walker v1: edit mode, `:propose`, `:run`, `:plan`. PRs #99 / #100 / #101.
 
-### Bootstrap 0.7: PromptAST (planned)
-- Parse natural language prompts into structural Abstract Syntax Trees (AST) as formal rewrite rules.
+### Bootstrap 0.7: PromptAST ✓
+- Parse natural language prompts into structural Abstract Syntax Trees (AST) as formal rewrite rules. Shipped in PR #113: `parsePromptAST(raw)` recognises `@requires:` / `@provides:` / `@expand:` markers, strips them from the prompt body, and emits a deduplicated `PromptAST` consumed by `compileNode`.
 
 ### Bootstrap 0.8: Compiler + Hello World ✓
 - Compiler v0: `onto compile run <nodeId>` walks the topological plan from `computeCompilePlan` and produces artifacts at `.ontology/artifacts/generated/`. Each step emits `run_persisted` and `compilation_run` events; the artifact path is anchored in the temporal log.
@@ -137,6 +148,12 @@ See `docs/PROPOSAL_SYSTEM.md` for the full design.
 - Hello-world fixture: `npm run example:hello-world` builds canon → ... → leaf, compiles, and runs the produced Python script.
 - PR #102. See `docs/COMPILER.md`.
 
+### Bootstrap 0.9: Categorical Extensions + Compiler Hardening ✓
+- Categorical extensions (PR #111): four additive runtime libraries land together — Yoneda query, effect monad, branch fibration, topos predicate algebra. Each ships with proven laws or property tests. See `docs/CATEGORICAL_VISION.md` for the nine-concept map.
+- Compiler hardening (PRs #103-#105, #108-#110, #112): code-fence stripping, language parse-check after every artifact write, refinement-parent context threading, per-node `model.ref` routing, system-prompt format leak fix, optional `--runtime-check`, and `contradicts` / `supersedes` plan semantics.
+- Walker hardening (PRs #106, #114): `--model` / `--ollama-host` on `:run` and `:compile`; `:validate`, `:branch list`, `:context`, `:query`, `:compile --runtime-check`.
+- Compiler refactor onto `EffectWithLog` (PR #115): `compileNode` is no longer a top-level try/catch; failures bubble through `bindWithLog` and partial diagnostics survive.
+
 ---
 
 ## Future Capabilities (Planned / Not Yet Implemented)
@@ -144,16 +161,16 @@ See `docs/PROPOSAL_SYSTEM.md` for the full design.
 The following components are strictly **planned** and **do not yet exist** in the current architecture. They represent the long-term vision of Ontology as a complete ecosystem.
 
 ### SemanticLinker
-*(Edge-aware Implemented / Advanced features Planned)*
-A dynamic linking system designed to automatically resolve and bind context, dependencies, and interfaces across the semantic network during the compilation functor process. Today it is exposed only as the programmatic `semanticLink()` API; future work adds a CLI surface and runs the linker between compile steps.
+*(Edge-aware Implemented / CLI surface Planned)*
+A dynamic linking system designed to automatically resolve and bind context, dependencies, and interfaces across the semantic network during the compilation functor process. Today it is exposed only as the programmatic `semanticLink()` API; future work adds a CLI surface (`onto link <nodeId>`) and runs the linker between compile steps.
 
-### Compiler
-*(v0 Implemented / Hardening Planned)*
-The compilation engine responsible for executing the structure-preserving functor from the category of intention (the `.ontology` network) to the category of executable artifacts. Bootstrap 0.8 ships the v0: `onto compile run` walks the topological plan and writes artifacts. Future hardening: thread upstream-step outputs into downstream prompts, enforce `contradicts` / `supersedes` plan semantics, run `validateIntent` between steps. See `docs/COMPILER.md`.
+### Branch Fibration CLI
+*(Library + Walker surface Implemented / `onto branch` CLI Planned)*
+The fibration library ships in PR #111 with `listBranches`, `computeBranchFiber`, `describeCartesianLift`. Walker `:branch list` lands in PR #114. Open: `onto branch list`, `onto branch fiber <branch>` (read-only), `onto compile run --branch <name>` (walk one fiber), and `onto branch lift <nodeId> --to <branch>` (turn the read-only `describeCartesianLift` into a proposal).
 
-### PromptAST
-*(Planned / Not yet implemented)*
-Parse prompts into structured rewrite rules with explicit markers (`@requires:`, `@provides:`, `@expand:`). Lifts axiom 4 from "stored as text" to "structural rewrite rule" so the compiler can dispatch with AST-aware system prompts.
+### Topos Validator Port
+*(Library Implemented / Validator Port Planned)*
+`compileNodeRules` and `evaluatePredicate` are in place. Open: rebuild `intent-validator.ts` on the predicate algebra so rules compose first-class via `pAnd` / `pImplies` / etc. instead of imperative loops.
 
 ### Visual DAG Studio
 *(Planned / Not yet implemented)*

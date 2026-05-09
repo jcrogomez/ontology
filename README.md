@@ -132,18 +132,27 @@ If you want to **contribute or extend**:
 
 ## Status
 
-**Bootstrap 0.8 — Hello World.** Version `0.2.0-alpha.1`. The seven axioms of the mathematical canon are now all running concrete code:
+**Bootstrap 0.9 — Categorical extensions + compiler hardening.** Version `0.3.0-alpha.0`. The seven axioms of the mathematical canon are running concrete code, including the previously textual axiom 4:
 
 | Axiom | Implementation |
 | --- | --- |
 | 1. Typed directed multigraph | `node link` with 18 edge types, multigraph allowed |
 | 2. Temporal log | append-only `events.jsonl` with hash chain |
 | 3. Abstraction poset | enforced at `node link` and `validate` for the refinement family |
-| 4. Prompts as rewrite rules | partially: prompts are stored verbatim today; PromptAST is post-hello-world |
+| 4. Prompts as rewrite rules | `parsePromptAST` lifts `@requires:` / `@provides:` / `@expand:` markers into a structured `PromptAST`; `compileNode` consumes the parsed body |
 | 5. Presheaf context | `assembleContext`, `glueFragments`, `validateIntent`, edge-aware `semanticLink` |
-| 6. Compiler functor | `onto compile run` walks the topological plan and produces structure-preserving artifacts |
-| 7. Code as compiled shadow | every artifact under `.ontology/artifacts/generated/` ties back through events to nodes |
+| 6. Compiler functor | `onto compile run` walks the topological plan; refinement-parent context threading, per-node `model.ref` routing through the registry, language parse-check on every artifact, optional `--runtime-check` execution, and a top-level `EffectWithLog` retire the legacy try/catch tower |
+| 7. Code as compiled shadow | every artifact under `.ontology/artifacts/generated/` ties back through events to nodes; code-fence stripping + parse validation enforce structural fidelity |
 
-What's left for the canonical statement to be *fully* realized: PromptAST (axiom 4 made structural rather than textual). Everything else is now operational.
+Compiler-plan hardening (Bootstrap 0.9): `computeCompilePlan` now rejects `contradicts` edges as plan errors and halts BFS on `supersedes` with a `superseded` warning, so contradictions surface as failures instead of silent compiles.
 
-Ontology is alpha-quality. The append-only log is single-writer (CLI single-shot); concurrent writes from multiple processes are not yet protected. Everything else is meant to fail loudly and exit `1` rather than silently corrupt.
+The four additive categorical extensions (`CATEGORICAL_VISION.md`) ship as runtime libraries with first-line surfaces:
+
+| Extension | Library | Surface |
+| --- | --- | --- |
+| Yoneda query | `src/runtime/query/representable.ts` | `onto query` CLI, walker `:query` |
+| Effect monad | `src/runtime/effects/io.ts` | in concrete use inside `compileNode` |
+| Branch fibration | `src/runtime/fibration/branch-fiber.ts` | walker `:branch list` (no `onto branch` CLI yet) |
+| Topos predicate algebra | `src/runtime/topos/predicate.ts` | library only — validator port pending |
+
+Ontology is alpha-quality. The append-only log is single-writer (CLI single-shot); concurrent writes from multiple processes are not yet protected, and `state.json` writes are not yet atomic on crash. Everything else is meant to fail loudly and exit `1` rather than silently corrupt.

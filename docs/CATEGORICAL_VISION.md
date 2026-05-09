@@ -165,9 +165,11 @@ associativity), proven on hand-picked values in
 are write-only and survive failure. This is exactly what the compiler needs
 for principled diagnostic accumulation.
 
-**Status.** The library ships and is tested. The compiler does *not* yet use
-it; that's the next milestone. Design rationale is in
-[`docs/EFFECT_MONAD.md`](docs/EFFECT_MONAD.md).
+**Status.** Shipped and integrated. The library ships in PR #111 with proven
+monad laws; `compileNode` is now built on `EffectWithLog` (PR #115) — the
+dispatch / write / validate / runtime-check pipeline composes via
+`bindWithLog`, and the top-level `try/catch` is retired. Design rationale is
+in [`docs/EFFECT_MONAD.md`](docs/EFFECT_MONAD.md).
 
 ### 2.7 Representable functor & Yoneda — *`onto query`, [src/runtime/query/](src/runtime/query/)*
 
@@ -227,9 +229,11 @@ computeAllFibers(state)             // partition of state by branch
 describeCartesianLift(node, target) // proposal for relabelling a node
 ```
 
-Status: read-only library, no CLI surface yet. Future work: branch-aware
-compile (`compile run --branch feature/x`), branch-merge proposals (a natural
-transformation between two functors into a fiber).
+Status: read-only library shipped in PR #111. Walker `:branch list` (PR #114)
+is the first surface. Open follow-ups: `onto branch list / fiber` CLI,
+branch-aware compile (`compile run --branch feature/x`), `onto branch lift`,
+and branch-merge proposals (a natural transformation between two functors
+into a fiber).
 
 Full design in [`docs/BRANCH_FIBRATION.md`](docs/BRANCH_FIBRATION.md).
 
@@ -285,19 +289,21 @@ Full design in [`docs/RULES_TOPOS.md`](docs/RULES_TOPOS.md).
 | Limit / colimit (compile plan)| ✅ shipped, not yet labelled as such              | `src/runtime/graph/compile-plan.ts`       |
 | Limit (context as presheaf)   | ✅ shipped (axiom 5)                              | `src/runtime/context/gluing.ts`           |
 | Adjunction (propose ⊣ apply)  | 🟡 candidate, not formal                          | `src/core/proposals/persist.ts`           |
-| Monad (Result / Effect)       | ✅ library shipped, **compiler integration TODO** | `src/runtime/effects/`                    |
-| Representable / Yoneda query  | ✅ shipped                                        | `src/runtime/query/`, `src/commands/query/` |
-| Fibration (branches)          | ✅ library shipped, **CLI surface TODO**          | `src/runtime/fibration/`                  |
+| Monad (Result / Effect)       | ✅ library shipped, ✅ `compileNode` on `EffectWithLog` (PR #115) | `src/runtime/effects/`                    |
+| Representable / Yoneda query  | ✅ shipped (CLI + walker `:query`)                | `src/runtime/query/`, `src/commands/query/` |
+| Fibration (branches)          | ✅ library shipped, walker `:branch list`, **`onto branch` CLI TODO** | `src/runtime/fibration/`                  |
 | Topos / Ω predicate algebra   | ✅ library shipped, **validator port TODO**       | `src/runtime/topos/`                      |
 
 ---
 
 ## 4. What this unlocks next
 
-- **Compiler refactor onto `EffectWithLog`** — every step accumulates logs
-  even when failing, errors propagate via `bindWithLog` instead of `try/catch`.
-- **Branch-aware compile** — `onto compile run --branch feature/x` walks the
-  fiber, not the global graph. Then a real natural transformation `merge` can
+- ✅ **Compiler refactor onto `EffectWithLog`** (PR #115) — every step
+  accumulates logs even when failing, errors propagate via `bindWithLog`
+  instead of `try/catch`.
+- 🟡 **Branch-aware compile** — `onto compile run --branch feature/x` walks
+  the fiber, not the global graph. `computeBranchFiber` is in place; only the
+  CLI wiring is missing. Then a real natural transformation `merge` can
   relate two fibers.
 - **`onto branch lift <nodeId> --to feature/x`** — turns the read-only
   `describeCartesianLift` into a proposal.
