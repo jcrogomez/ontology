@@ -31,6 +31,9 @@ import { proposalApplyCommand } from "./commands/proposal/apply.js";
 import { modelDoctorCommand } from "./commands/model/doctor.js";
 import { modelListCommand } from "./commands/model/list.js";
 import { registerQueryCommand } from "./commands/query/index.js";
+import { openCommand } from "./commands/open.js";
+import { projectsListCommand } from "./commands/projects/list.js";
+import { projectsForgetCommand } from "./commands/projects/forget.js";
 import { errorMessage } from "./core/errors.js";
 
 const program = new Command();
@@ -43,11 +46,54 @@ program
 program
   .command("init")
   .description("Initializes a new Ontology Network Kernel.")
-  .action(async () => {
+  .option("--name <name>", "Friendly name for the global project registry (defaults to the cwd basename)")
+  .action(async (options) => {
     try {
-      await initCommand();
+      await initCommand({ name: options.name });
     } catch (err: unknown) {
       console.error(`✖ Error during init: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("open [path]")
+  .description("Open an Ontology project: launches an interactive picker over previously created projects, or opens [path] directly when given.")
+  .action(async (pathArg) => {
+    try {
+      await openCommand({ path: pathArg });
+    } catch (err: unknown) {
+      console.error(`✖ Error during open: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+const projects = program
+  .command("projects")
+  .description("Manage the global Ontology project registry (~/.config/ontology/projects.json).");
+
+projects
+  .command("list")
+  .description("List every project the global registry knows about, separating live and stale entries.")
+  .option("--json", "Output results in JSON format")
+  .action(async (options) => {
+    try {
+      await projectsListCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error listing projects: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+projects
+  .command("forget <pathOrName>")
+  .description("Drop a project from the registry. Does not delete the project itself.")
+  .option("--json", "Output results in JSON format")
+  .action(async (pathOrName, options) => {
+    try {
+      await projectsForgetCommand(pathOrName, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error forgetting project: ${errorMessage(err)}`);
       process.exit(1);
     }
   });

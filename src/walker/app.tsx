@@ -35,9 +35,11 @@ import { validateFromWalker } from "./actions/validate-from-walker.js";
 import { branchListFromWalker } from "./actions/branch-list-from-walker.js";
 import { contextFromWalker } from "./actions/context-from-walker.js";
 import { queryFromWalker } from "./actions/query-from-walker.js";
+import { linkFromWalker } from "./actions/link-from-walker.js";
 import { InfoPanel, type InfoPanelState } from "./layout/info-panel.js";
 import { parseProviderArgs } from "./state/parse-provider-args.js";
 import { parseQueryArgs } from "./state/parse-query-args.js";
+import { parseLinkArgs } from "./state/parse-link-args.js";
 import type { LlmProvider } from "../runtime/llm/types.js";
 
 export interface AppProps {
@@ -327,7 +329,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       return;
     }
     if (cmd === "help") {
-      setMessage("i edit · :propose · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :clear{run,plan,compile,info,draft} · :q");
+      setMessage("i edit · :propose · :link --to <id> --type <edgeType> · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :clear{run,plan,compile,info,draft} · :q");
       return;
     }
     if (cmd === "propose") {
@@ -343,6 +345,37 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       // Re-evaluate hasDraft (clearDraft may have been called by the action).
       setDraftTick(t => t + 1);
       setMessage(`proposal ${result.proposalId} created (pending)`);
+      return;
+    }
+    // :link --to <nodeId> --type <edgeType> [--rationale <text>]
+    // Source endpoint is always the focal cell. Mirrors `onto propose link`
+    // semantics: validates edge type + poset direction + endpoint hashes,
+    // creates a `pending` edge_create proposal, and surfaces the proposal
+    // id via the message bar. Apply still happens via `onto proposal apply`
+    // — this keeps the explicit two-step graph-mutation flow consistent
+    // with how nodes are created from drafts.
+    if (cmd === "link" || cmd.startsWith("link ")) {
+      if ("error" in neighborhood) {
+        setMessage("cannot link: focal node failed to load");
+        return;
+      }
+      const parsed = parseLinkArgs(cmd.slice("link".length));
+      if (!parsed.ok) {
+        setMessage(parsed.message);
+        return;
+      }
+      const result = linkFromWalker({
+        focal: neighborhood.focal,
+        to: parsed.args.to,
+        type: parsed.args.type,
+        ...(parsed.args.rationale !== undefined && { rationale: parsed.args.rationale }),
+        cwd,
+      });
+      if (!result.ok) {
+        setMessage(result.message);
+        return;
+      }
+      setMessage(`proposal ${result.proposalId} created (pending) — ${result.from} → ${result.to} (${result.type})`);
       return;
     }
     if (cmd === "cleardraft") {

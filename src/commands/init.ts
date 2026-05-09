@@ -1,4 +1,5 @@
 import * as fs from "node:fs";
+import * as path from "node:path";
 import { randomBytes } from "node:crypto";
 import { getOntologyPaths } from "../core/project/paths.js";
 import { ensureDir, writeJson, appendJsonl } from "../core/fs/json.js";
@@ -12,6 +13,15 @@ import {
   type OntologyNode,
 } from "../schemas/ontology.js";
 import { hashObject } from "../core/integrity/hash.js";
+import { registerProject } from "../core/projects/registry.js";
+
+export interface InitOptions {
+  // Friendly name for the global project registry. Defaults to the basename
+  // of the current working directory. Does not change anything inside
+  // `.ontology/` itself — the project's internal `state.json.projectName`
+  // is left at its default.
+  name?: string;
+}
 
 // Bootstrap 0.1 creates the smallest trustworthy Ontology universe.
 //
@@ -23,7 +33,7 @@ import { hashObject } from "../core/integrity/hash.js";
 // empty typed-edge storage, model/processor registries, and a state file.
 // This is enough for Ontology to verify its own memory before learning to edit it.
 
-export async function initCommand(): Promise<void> {
+export async function initCommand(options: InitOptions = {}): Promise<void> {
   const paths = getOntologyPaths();
 
   if (fs.existsSync(paths.ontologyDir)) {
@@ -216,6 +226,23 @@ export async function initCommand(): Promise<void> {
   });
   writeJson(paths.statePath, state);
 
+  // Register this project in the global registry so `onto open` can list it
+  // later. Friendly name defaults to the cwd basename so the picker shows
+  // something more useful than "ontology-project". Failure to write the
+  // registry is non-fatal — the project itself is fine and the user can
+  // always re-register by opening it.
+  const projectAbsPath = path.resolve(process.cwd());
+  const friendlyName = options.name ?? path.basename(projectAbsPath);
+  try {
+    registerProject({
+      name: friendlyName,
+      path: projectAbsPath,
+      rootNodeId: "node_0000_canon",
+    });
+  } catch (err: unknown) {
+    console.error(`(warning) project not registered: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   console.log(`=== ONTOLOGY NETWORK KERNEL BOOTSTRAPPED ===
 
 Axiom:
@@ -228,6 +255,9 @@ Created:
   .ontology/edges.jsonl
   .ontology/models/registry.json
   .ontology/processors/registry.json
+
+Project "${friendlyName}" registered. Open later with:
+  onto open
 
 Next:
   onto validate
