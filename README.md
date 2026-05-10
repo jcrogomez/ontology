@@ -113,6 +113,7 @@ If you want to understand **the design**:
 - [**The Canon**](docs/ONTOLOGY_CANON.md) — the foundational definition.
 - [**The Mathematical Model**](docs/MATHEMATICAL_MODEL.md) — the seven axioms.
 - [**The Categorical Vision**](docs/CATEGORICAL_VISION.md) — the nine-concept map (categories, functors, Yoneda, monads, fibrations, topos, …) onto concrete modules.
+- [**Mathematical Claims — Audit & Map**](docs/MATHEMATICAL_CLAIMS.md) — every math claim classified into strict / operational / analogy / aspirational, with file citations. Read this alongside the two above to know how literally each claim holds.
 - [**The Architecture**](docs/ARCHITECTURE.md) — how Kernel, Observability, LLM Runtime, Context Assembler, Proposal System, and Compiler relate.
 - [**The Compiler**](docs/COMPILER.md) — how `onto compile` walks the plan and produces artifacts.
 - [**The Walker**](docs/WALKER_INTERFACE.md) — the interactive TUI design.
@@ -153,6 +154,6 @@ The four additive categorical extensions (`CATEGORICAL_VISION.md`) ship as runti
 | Yoneda query | `src/runtime/query/representable.ts` | `onto query` CLI, walker `:query` |
 | Effect monad | `src/runtime/effects/io.ts` | in concrete use inside `compileNode` |
 | Branch fibration | `src/runtime/fibration/branch-fiber.ts` | walker `:branch list` (no `onto branch` CLI yet) |
-| Topos predicate algebra | `src/runtime/topos/predicate.ts` | library only — validator port pending |
+| Topos predicate algebra | `src/runtime/topos/predicate.ts` | `intent-validator.ts` ported onto the algebra; verdict ∈ Ω exposed via `result.verdict` |
 
 Ontology is alpha-quality. The append-only log is single-writer (CLI single-shot); concurrent writes from multiple processes are not yet protected, and `state.json` writes are not yet atomic on crash. Everything else is meant to fail loudly and exit `1` rather than silently corrupt.

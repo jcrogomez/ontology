@@ -1,6 +1,51 @@
+// Intent validator — ported onto the rule-as-predicate algebra in
+// `runtime/topos/`.
+//
+// Before this port the function was an imperative cascade: walk three checks
+// in order, mutate `ok`, `score`, and `violations` on the way through. The
+// new shape lifts each check into a `Predicate` over a synthetic
+// `EvaluationContext` and folds them with `allOf`. The high-level contract
+// (`IntentValidationResult.{ok, score, violations, warnings}`) is preserved
+// so existing callers — `commands/run/context.ts` and `semantic-linker.ts` —
+// see no change.
+//
+// The port is not cosmetic. Three things actually move:
+//
+//   1. Validation is now a *single algebraic object* — the predicate built by
+//      `compileValidationPredicate(input)` — rather than a procedure. That
+//      object can be inspected, pretty-printed, or cached without re-running
+//      the checks.
+//   2. The verdict lives in Ω = {true, false, unknown} (see `topos/omega.ts`).
+//      Closed-world callers see the legacy two-valued behaviour because
+//      `buildEvaluationContext` classifies every synthetic token as either
+//      provided or denied. The exposed `verdict: Omega` field lets future
+//      callers opt into open-world reasoning.
+//   3. The score / violation mapping is now a small per-rule registry instead
+//      of being threaded through the control flow. Adding a fourth check is
+//      one entry in `buildRules`, not another `if` block.
+
 import type { ContextAssemblyOutput } from "./types.js";
 import type { GluingResult } from "./gluing.js";
 import type { LlmProvider } from "../llm/types.js";
+import {
+  type EvaluationContext,
+  type Omega,
+  type Predicate,
+  allOf,
+  atomForbids,
+  atomRequires,
+  evaluatePredicate,
+} from "../topos/index.js";
+
+// Synthetic tokens used to encode the validator's questions as atoms in the
+// predicate algebra. They are namespaced under `__validator__:` so they
+// cannot collide with any user-supplied requires/forbids token surfaced via
+// the ontology graph.
+const TOKEN_GLUING_OK = "__validator__:gluing_ok";
+const TOKEN_CANDIDATE_NONEMPTY = "__validator__:candidate_nonempty";
+const FORBID_PHRASE_PREFIX = "__validator__:forbid_phrase:";
+
+const FORBID_CONSTRAINT_PREFIX = "FORBID: ";
 
 export interface IntentValidationInput {
   assembled: ContextAssemblyOutput;
@@ -17,48 +62,142 @@ export interface IntentValidationResult {
   score: number;
   violations: string[];
   warnings: string[];
+  /**
+   * Three-valued verdict from the underlying predicate evaluation. Under the
+   * default closed-world build of the context this collapses to {true,
+   * false} and `ok === (verdict === "true")`. Exposed so future callers can
+   * distinguish "decisively rejected" from "could not decide".
+   */
+  verdict: Omega;
+}
+
+interface ValidationRule {
+  /** Human-readable id, surfaced in unknown-warnings for traceability. */
+  id: string;
+  /** Predicate over the synthetic context; must evaluate to "true" to pass. */
+  predicate: Predicate;
+  /**
+   * Score floor when the rule is decisively false. Preserves the legacy
+   * calibration: 0.0 (gluing), 0.25 (empty), 0.5 (forbidden phrase).
+   */
+  failScore: number;
+  /** Violation strings emitted when the rule is decisively false. */
+  failViolations: () => string[];
+}
+
+function isCandidateNonEmpty(text: string): boolean {
+  return !!text && text.trim().length > 0;
+}
+
+function extractForbiddenPhrases(constraints: readonly string[]): string[] {
+  const phrases: string[] = [];
+  for (const c of constraints) {
+    if (!c.startsWith(FORBID_CONSTRAINT_PREFIX)) continue;
+    phrases.push(c.substring(FORBID_CONSTRAINT_PREFIX.length).trim());
+  }
+  return phrases;
+}
+
+/**
+ * Build the closed-world `EvaluationContext` that the validator's predicate
+ * runs against. Every synthetic token is either provided or denied — there
+ * is no third state — which is what makes the validator's externally
+ * observable behaviour two-valued.
+ *
+ * Exposed for tests and for callers that want to evaluate a custom predicate
+ * against the same context as `validateIntent`.
+ */
+export function buildEvaluationContext(input: IntentValidationInput): EvaluationContext {
+  const provided = new Set<string>();
+  const denied = new Set<string>();
+
+  if (input.glued.ok) provided.add(TOKEN_GLUING_OK);
+  else denied.add(TOKEN_GLUING_OK);
+
+  if (isCandidateNonEmpty(input.candidate.text)) provided.add(TOKEN_CANDIDATE_NONEMPTY);
+  else denied.add(TOKEN_CANDIDATE_NONEMPTY);
+
+  for (const phrase of extractForbiddenPhrases(input.assembled.constraints)) {
+    const token = FORBID_PHRASE_PREFIX + phrase;
+    // A phrase token is "provided" iff the phrase appears in the candidate
+    // text. The validator predicate uses `atomForbids` over these tokens, so
+    // "provided" → predicate is false (phrase present) and "denied" →
+    // predicate is true (phrase absent).
+    if (input.candidate.text.includes(phrase)) provided.add(token);
+    else denied.add(token);
+  }
+
+  return { providedTokens: provided, deniedTokens: denied };
+}
+
+/**
+ * Compile the validator's three-rule registry. Returns both the conjunction
+ * predicate (for clients that just want a verdict) and the per-rule list (so
+ * scores and violation messages can be attributed to the failing rule).
+ */
+export function compileValidationPredicate(input: IntentValidationInput): {
+  predicate: Predicate;
+  rules: ValidationRule[];
+} {
+  const rules: ValidationRule[] = [
+    {
+      id: "gluing_ok",
+      predicate: atomRequires(TOKEN_GLUING_OK),
+      failScore: 0.0,
+      failViolations: () =>
+        input.glued.conflicts.map(
+          (c) => `Gluing conflict: ${c.type} - ${c.message}`,
+        ),
+    },
+    {
+      id: "candidate_nonempty",
+      predicate: atomRequires(TOKEN_CANDIDATE_NONEMPTY),
+      failScore: 0.25,
+      failViolations: () => ["empty_candidate"],
+    },
+  ];
+
+  for (const phrase of extractForbiddenPhrases(input.assembled.constraints)) {
+    rules.push({
+      id: `forbid:${phrase}`,
+      predicate: atomForbids(FORBID_PHRASE_PREFIX + phrase),
+      failScore: 0.5,
+      failViolations: () => [`Forbidden phrase found: ${phrase}`],
+    });
+  }
+
+  return { predicate: allOf(rules.map((r) => r.predicate)), rules };
 }
 
 export function validateIntent(input: IntentValidationInput): IntentValidationResult {
-  const { assembled, glued, candidate } = input;
-  const warnings = [...glued.warnings];
-  const violations: string[] = [];
+  const ctx = buildEvaluationContext(input);
+  const { predicate, rules } = compileValidationPredicate(input);
 
-  let ok = true;
+  const violations: string[] = [];
+  const warnings: string[] = [...input.glued.warnings];
   let score = 1.0;
 
-  // 1. Si glued.ok === false, la validación falla. (Score 0.0)
-  if (!glued.ok) {
-    ok = false;
-    score = Math.min(score, 0.0);
-    for (const conflict of glued.conflicts) {
-      violations.push(`Gluing conflict: ${conflict.type} - ${conflict.message}`);
+  for (const rule of rules) {
+    const verdict = evaluatePredicate(rule.predicate, ctx);
+    if (verdict === "false") {
+      score = Math.min(score, rule.failScore);
+      violations.push(...rule.failViolations());
+    } else if (verdict === "unknown") {
+      // In closed-world mode no rule should land here; if one does, the
+      // safe default is to surface it as a warning rather than mutate
+      // `ok`. This keeps the high-level contract two-valued while still
+      // making the three-valued evaluator's verdict observable.
+      warnings.push(`Undecided validator rule: ${rule.id}`);
     }
   }
 
-  // 2. Si candidate.text está vacío o sólo whitespace, falla. (Score 0.25)
-  if (!candidate.text || candidate.text.trim().length === 0) {
-    ok = false;
-    score = Math.min(score, 0.25);
-    violations.push("empty_candidate");
-  }
-
-  // 3. Si el texto contiene una frase explícitamente prohibida por una constraint simple, falla. (Score 0.5)
-  for (const constraint of assembled.constraints) {
-    if (constraint.startsWith("FORBID: ")) {
-      const forbiddenPhrase = constraint.substring(8).trim();
-      if (candidate.text.includes(forbiddenPhrase)) {
-        ok = false;
-        score = Math.min(score, 0.5);
-        violations.push(`Forbidden phrase found: ${forbiddenPhrase}`);
-      }
-    }
-  }
+  const verdict = evaluatePredicate(predicate, ctx);
 
   return {
-    ok,
+    ok: verdict === "true",
     score,
     violations,
     warnings,
+    verdict,
   };
 }

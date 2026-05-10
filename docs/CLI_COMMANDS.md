@@ -1,11 +1,19 @@
 # CLI Commands
 
-This document outlines the available CLI commands across current Bootstrap phases.
+This document is the full reference for the `onto` CLI surface as of
+Bootstrap 0.9 (post-validator-port).
 
 > **Note on Usage:**
 > For local development, execute commands via `npm run dev -- <command>`.
 > In production or as an installed package, the alias `onto <command>` is used.
 > The examples below use the development format.
+
+> **Section organisation.** Headers below are tagged by the Bootstrap
+> that introduced each command, for historical traceability. Every
+> command listed in §"Bootstrap 0.1" through §"Bootstrap 0.9" is
+> *currently shipped* — the Bootstrap tag tells you when it landed,
+> not whether it works today. The trailing §"Planned Commands"
+> section enumerates what is still unshipped.
 
 ## Bootstrap 0.1 Commands
 
@@ -225,7 +233,7 @@ This document outlines the available CLI commands across current Bootstrap phase
   - `.ontology/proposals/proposal_<id>.json` (Creates the proposal record)
   - `.ontology/events.jsonl` (Appends a `proposal_created` event)
   - `.ontology/state.json` (Updates summary counters and timestamp)
-- **What it does not do (yet):** It does not create the node. The proposal lives in `pending` status. `onto proposal apply` (planned, PR #94) will translate it into a real `node_create`. See `docs/PROPOSAL_SYSTEM.md`.
+- **What it does not do:** It does not create the node. The proposal lives in `pending` status. `onto proposal apply` (PR #94, shipped) translates it into a real `node_create` mutation. See `docs/PROPOSAL_SYSTEM.md`.
 
 ### `proposal list` *(Bootstrap 0.5, PR #93)*
 
@@ -282,11 +290,24 @@ This document outlines the available CLI commands across current Bootstrap phase
 
 ## Planned Commands
 
-The following commands are *Planned / Not yet implemented*:
+The following commands are *Planned / Not yet implemented*. The full
+roadmap lives in [`ROADMAP.md`](ROADMAP.md) §"Open follow-ups".
 
-### Proposal System (next steps, beyond Bootstrap 0.5)
-- Edge-aware SemanticLinker (consume the proposal's edges in compilation)
-- `run prompt --as-proposal` for `edge_create` proposals (today only `node_create` is supported via run-driven proposals)
-
-### Walker v1
-- `onto walk` edit mode, `:run`, `:propose`, `:compile --plan`
+- **`onto branch list`** / **`onto branch fiber <name>`** — read-only
+  surfaces over `listBranches` / `computeBranchFiber`. Library exists;
+  CLI wiring is pending.
+- **`onto compile run --branch <name>`** — walk one fiber instead of
+  the whole graph. Drops in on top of `computeBranchFiber`.
+- **`onto branch lift <nodeId> --to <branch>`** — turn the read-only
+  `describeCartesianLift` into an `edge_create` / `node_create`
+  proposal.
+- **`onto link <focalId>`** — CLI surface for the programmatic
+  `semanticLink({ includeEdges: true })`.
+- **`run prompt --as-proposal` with `edge_create` target** — the
+  discriminated-union mutation schema already supports it; the
+  model-driven candidate edge is the missing piece.
+- **`onto query` extensions** — negation in shapes (`!hasIncoming`),
+  exact edge profiles, multi-shape OR queries.
+- **`onto replay`** — rebuild `state.json` from `events.jsonl` and
+  assert equality. Would lift the "replayable" claim from analogy to
+  strict (see [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §4.4).

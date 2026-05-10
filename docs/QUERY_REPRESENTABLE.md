@@ -241,3 +241,12 @@ least one incoming `tests` edge), proposal scoring (candidates whose
 shape matches an existing well-formed cluster) — can express its
 predicate as a `QueryShape` and reuse this engine instead of
 hand-rolling traversal.
+
+## 8. Rigor classification
+
+[`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §3.7 classifies the
+Yoneda framing as T2 (operationally implemented). The matcher is a
+sound subset of the embedding — a partial Hom-profile under-determines
+the node — but the Yoneda lemma proper (*two nodes with equal
+Hom-profiles are equal up to iso*) is not pinned by any test. Today
+nodes are distinguished by `id`, not by Hom-profile equality.

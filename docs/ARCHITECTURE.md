@@ -1,77 +1,182 @@
 # Ontology Architecture
 
-This document describes the real, current architectural state of the Ontology project as of Bootstrap 0.2. It explicitly outlines how the different core modules relate and separates existing foundational elements from future planned systems.
+This document describes the current architectural state of the Ontology
+project (Bootstrap 0.9, version `0.3.0-alpha.0`, plus the post-0.9
+validator port). It explains how the modules relate; for the
+mathematical interpretation, read this alongside
+[`CATEGORICAL_VISION.md`](CATEGORICAL_VISION.md) and
+[`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md).
 
-## Core Architectural Modules
+## Module map
 
-### 1. The Kernel
-The Kernel is the foundational backbone of Ontology. It strictly manages the physical and semantic integrity of the `.ontology` intention network.
-- **Pure Core Logic (`src/core/`)**: Handles file-system abstractions, topological state mutations, and cryptographic hashing (using `node:crypto`). It has no side effects related to presentation or process termination.
-- **Strict Validation (`src/schemas/`)**: All network domains, events, nodes, and states are rigorously typed and validated via Zod schemas.
-- **Temporal Event Log**: A strictly append-only `events.jsonl` file tracks every mutation (e.g., `node_created`), forming the basis for auditability, replay, and temporal invariants.
-- **State Management**: Maintains `state.json` as the high-level summary (counts, last events, metadata) of the physical network.
+```
+src/
+  cli.ts                    — entry point + command registration
 
-### 2. Observability
-Observability in Ontology is strictly functional, terminal-first, and built into the CLI presentation layer.
-- **Design Philosophy**: Adheres to a stark, brutalist, and industrial design. It avoids complex UI rendering in favor of clear, monospaced typography, structural contrast, and simple unicode markers (✔, ✖).
-- **Inspection**: Centralized data loaders in `src/core/project/load.ts` perform read-only operations to load the topological state and output structural summaries.
-- **Error Handling**: Uses clear relative paths for missing files and synthesizes Zod validation issues into concise, readable formats. If a process fails, it fails loudly and exits explicitly with code 1.
+  schemas/                  — Zod schemas: nodes, edges, events, runs,
+                              proposals, prompt AST, error envelope.
+                              Every entry point parses through here.
+  core/                     — pure kernel primitives (no IO outside
+                              .ontology/). Hashing, file-system
+                              abstraction, project paths, drafts /
+                              proposals / runs persistence, render
+                              helpers, projects registry.
+  commands/                 — CLI surface. Each command is a thin
+                              translator from CLI args → kernel calls
+                              → render. Includes `init`, `validate`,
+                              `inspect`, `node {create,list,show}`,
+                              `node link`, `events tail`, `context
+                              assemble`, `run prompt|context`, `runs
+                              {list,show,verify}`, `graph
+                              {neighbors,path,subgraph}`, `propose
+                              {node,link}`, `proposal
+                              {list,show,apply,reject}`, `compile
+                              {plan,run}`, `query`, `walk`, `open`,
+                              `projects {list,forget}`, `model
+                              {doctor,list}`, `doctor`.
+  walker/                   — Ink-based interactive TUI (`onto walk`).
+                              Actions in `walker/actions/`; key handling
+                              and state in `walker/state/`.
+  runtime/
+    llm/                    — adapter boundary (mock + ollama),
+                              dispatcher, model registry, model
+                              resolution.
+    context/                — assembleContext (parent path + edge
+                              neighbors); presheaf `buildFragment`;
+                              gluing; semantic linker; intent
+                              validator (now built on the topos
+                              predicate algebra — see §"Validator").
+    graph/                  — pure helpers: traversal, edges helper,
+                              poset, compile-plan (Kahn's algorithm
+                              over hard-dependency edges).
+    compile/                — compile-node (one step), compile-plan-
+                              runner (outer loop), artifact-writer,
+                              manifestation-mapper, upstream-context
+                              threading, post-write checks
+                              (`extract-code-fence`, `validate-
+                              language`, optional `runtime-check`).
+                              Built on `EffectWithLog`.
+    prompt/                 — `parsePromptAST(raw)` (axiom 4 surface).
+    effects/                — Result / Effect / EffectWithLog monad
+                              library + async variant + monad-laws
+                              tests. See [`EFFECT_MONAD.md`](EFFECT_MONAD.md).
+    query/                  — Yoneda-style Hom-profile matcher. See
+                              [`QUERY_REPRESENTABLE.md`](QUERY_REPRESENTABLE.md).
+    fibration/              — `listBranches`, `computeBranchFiber`,
+                              `describeCartesianLift`. Read-only
+                              library. See [`BRANCH_FIBRATION.md`](BRANCH_FIBRATION.md).
+    topos/                  — three-valued Ω predicate algebra
+                              (`omega.ts`, `predicate.ts`, `rule-
+                              compiler.ts`). See [`RULES_TOPOS.md`](RULES_TOPOS.md).
+```
 
-### 3. LLM Runtime
-*(Isolated Integration Layer)*
-The LLM runtime handles the interface with external models.
-- **Isolation**: Housed strictly under `src/runtime/llm/`. It is entirely decoupled from the core structural graph commands (e.g., node creation).
-- **Safety**: Direct parsing of LLM outputs enforces robustness. All external model outputs are wrapped in `try/catch` blocks, re-throwing formatted errors that include raw content to assist with debugging.
-- **Current State**: The loop `graph → context → LLM (mock | ollama) → deterministic validation` is complete and operational. The loop runs strictly read-only over `.ontology` and does not mutate the network. The deterministic validation includes the intent validator and presheaf/gluing pipeline as a minimal implementation. The Ollama bridge is wired through both `run prompt` and `run context`; failures are surfaced loudly when Ollama is not reachable.
+## Layer boundaries
 
-**Implemented:**
-- mock adapter (acts as identity functor for task=code_sketch)
-- isolated Ollama adapter
-- dispatcher multi-provider
-- run prompt --provider ollama
-- run context --provider ollama
-- run context --include-edges (with --edge-types filter)
-- run context --persist (content-addressed run records)
-- run prompt / run context --as-proposal (model runs become typed candidate proposals)
-- model doctor/list
-- model observability
-- node link (typed semantic edge creation, with self-loop rejection and poset enforcement)
-- context assemble --include-edges (edge-aware context, with --edge-types filter)
-- semantic linker (edge-aware: passes includeEdges/edgeTypes through to the assembler so neighbor nodes contribute to the gluing pool)
-- proposal system (full lifecycle: propose node / propose link / list / show / apply with parentHash + endpoint hash re-validation / reject / staled)
-- graph query CLI (onto graph neighbors / path / subgraph)
-- Walker v0 + v1 (focal-cell TUI with edit / :propose / :run / :plan / :compile)
-- compiler (onto compile run / plan; topological plan-runner + manifestation-mapped artifact writer + compilation_run events)
+1. **`src/cli.ts`** — pure router. Translates `argv` to a command call
+   and exits with a status code. Never does work.
+2. **`src/commands/`** — CLI surface. Each command is the *only* place
+   that touches stdout / stderr in its flow. Commands compose pure
+   helpers from `runtime/` and persistence helpers from `core/`. They
+   never import sibling commands.
+3. **`src/runtime/`** — pure libraries. No filesystem effects except
+   through helpers from `core/project/load.ts`. No process exits, no
+   stdout. Anything that *can* be a pure function in `runtime/` is.
+4. **`src/core/`** — kernel primitives. Hashes, schemas, on-disk
+   layout, append-only writes. Owns the contract with `.ontology/`.
+5. **`src/walker/`** — Ink TUI. Renders react components against a
+   focal cell; calls into `runtime/` and `core/` exactly the same way
+   the CLI does. The walker never owns its own kernel state.
 
-**Known limitations:**
-- no PromptAST (axiom 4: prompts are stored verbatim today)
-- compiler v0 does not thread upstream-step outputs into downstream prompts; the compileNode contract receives an `upstreamArtifacts` map but ignores it
-- compiler v0 does not enforce contradicts / supersedes edge semantics in plan ordering
-- semantic linker is exposed only as a programmatic API; no CLI surface yet
+The boundary that matters most: **mutation is gated.** Only commands
+that explicitly intend to mutate (`init`, `node create`, `node link`,
+`proposal apply`, `compile run`, anything `--persist`) ever write. Read
+commands are pure functions over `.ontology/`.
 
-### 4. Context Assembler
-The Context Assembler is responsible for organizing the local graph state that bounds the constraints of a node.
-- **Mechanism**: In Ontology, context is defined locally as a presheaf over graph neighborhoods. The assembler calculates "requires", "provides", "forbids", and "optional" relationships based on a node's topological position.
-- **Data Flow**: Outputs structured, nested arrays of contextual strings formatted cleanly for terminal presentation. It does not act globally but defines the immediate boundaries required to parse intention.
+## Execution flow (typical `onto compile run`)
 
----
+```
+USER ── onto compile run node_0042 --provider mock
+          │
+          ▼
+src/cli.ts                  → dispatch
+src/commands/compile/run.ts → orchestration, stdout
+          │
+          ▼
+src/runtime/graph/compile-plan.ts
+          │  (Kahn's algorithm over depends_on / inherits_from / refines /
+          │   implements / uses_token; rejects contradicts; halts on
+          │   supersedes; deterministic alphabetic tie-break)
+          ▼
+src/runtime/compile/compile-plan-runner.ts
+          │  (for each step: compile-node → write → validate-language →
+          │   optional runtime-check, all chained via bindWithLog)
+          ▼
+src/runtime/llm/dispatcher.ts → mock | ollama adapter
+src/runtime/compile/artifact-writer.ts → .ontology/artifacts/generated/<id>.<ext>
+src/core/runs/persist.ts             → .ontology/runs/run_<hash>.json + run_persisted event
+src/core/state/state-store.ts        → events.jsonl (compilation_run) + state.json
+```
 
-## Module Relationships and Execution Flow
+Audit chain: every artifact resolves back through one
+`compilation_run` event (`runId`, `cached`, `artifactRelativePath`),
+which resolves to a content-addressed run record (`promptHash`,
+`contextHash`, `provider`, `model`), which resolves back to the
+`OntologyNode` whose `prompt.raw` produced it. Three audit primitives
+(`onto runs verify`, `onto runs show`, `onto events tail`) are all
+read-only.
 
-1. **Presentation Layer (`src/cli.ts`)**: Acts strictly as a router. It accepts terminal commands, parses arguments, and delegates to the appropriate command module.
-2. **Command Layer (`src/commands/`)**: Translates user intent (e.g., "create a domain node") into structured requests for the Kernel.
-3. **The Kernel (`src/core/`)**: Processes the request. It validates the inputs against the schemas, appends the action to the temporal `events.jsonl` log, mutates the graph (e.g., saving a new node file), and updates `state.json`.
-4. **Context & Runtime**: If the command requires contextual awareness or model validation, the Kernel queries the Context Assembler and delegates external parsing logic to the isolated LLM Runtime.
-5. **Observability**: Finally, the CLI presentation layer reads the resulting state (via observability loaders) and prints a brutalist, strictly formatted summary to the user.
+## Validator (post-0.9)
 
----
+`src/runtime/context/intent-validator.ts` is built on the topos
+predicate algebra (`src/runtime/topos/`). The three rules — gluing ok,
+candidate non-empty, FORBID phrase scan — compile to atomic
+`Predicate`s; `allOf` folds them into a single conjunction; the
+verdict comes from `evaluatePredicate(predicate, ctx)` against an
+`EvaluationContext` synthesised by `buildEvaluationContext`. The
+two-valued `IntentValidationResult.{ok, score, violations, warnings}`
+contract is preserved; the new `verdict: Omega` field exposes the
+three-valued underlying result. See [`RULES_TOPOS.md`](RULES_TOPOS.md).
 
-## Future Systems
+## State & persistence layout
 
-To maintain absolute clarity on the current state of the architecture, the following modules are **Planned / Not yet implemented**:
+```
+.ontology/
+  state.json                — high-level metrics: counts, lastEventId,
+                              activeBranch, rootNodeId, model registry
+                              pointer, processor registry pointer.
+  events.jsonl              — append-only temporal log: every mutation
+                              and every dispatched run.
+  edges.jsonl               — typed semantic edges (one JSON record
+                              per line).
+  nodes/node_<id>.json      — typed semantic nodes (Zod-validated).
+  models/registry.json      — model registry (mock + ollama defaults
+                              + per-project overrides).
+  processors/registry.json  — processor registry (placeholder; not
+                              load-bearing in the current pipeline).
+  runs/run_<id>.json        — content-addressed persisted runs.
+  proposals/proposal_<id>.json — typed candidate mutations (pending,
+                              applied, rejected, staled).
+  artifacts/generated/      — compiler outputs.
+  work/drafts/<focalId>.draft.json — walker working state.
+```
 
-- **Edge-aware Execution**: `context assemble --include-edges`, `run context --include-edges`, and `semanticLink({ includeEdges: true })` all project typed edges into an `edgeContext` block consumed by the gluing and validation pipelines.
-- **SemanticLinker**: edge-aware. The programmatic linker now walks the focal node's local neighborhood (parent path + edge neighbors filtered by `edgeTypes`), glues the presheaf fragments, and validates a candidate response. A focal `requires` can be satisfied by an edge neighbor's `provides`; a forbidden token introduced by an edge neighbor triggers a `forbidden_match`. CLI exposure of the linker is future work.
-- **PromptAST**: Planned. Prompts are still stored as raw intention text and are not parsed into rewrite rules. The compiler today sends `prompt.raw` directly to the model.
-- **Compiler hardening**: the v0 compiler ships in Bootstrap 0.8 and produces real artifacts (see `docs/COMPILER.md`). Future work threads upstream outputs into downstream contexts, enforces `contradicts` / `supersedes` semantics in plan order, and runs `validateIntent` between steps.
-- **Visual DAG Studio**: Planned web-based UI.
+Crash-safety caveat: writes to `state.json`, `events.jsonl`, and the
+projects registry (`~/.config/ontology/projects.json`) are direct
+`fs.writeFileSync` today. A SIGKILL or out-of-disk mid-write can
+truncate the file. The single-writer assumption (CLI single-shot, no
+multi-process locking) is unverified. Atomic writes + advisory lock
+are the highest-priority hardening item — see
+[`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §6 item 1.
+
+## What is *not* in the architecture
+
+- **No PromptAST rewriting.** Markers are parsed; nothing rewrites
+  the body based on them.
+- **No `compare` / `propose` context modes.** `assembleContext` rejects
+  any mode other than `strict`.
+- **No `onto branch` CLI.** Branch fibration is a programmatic
+  library + a single Walker action (`:branch list`).
+- **No `onto link <id>` CLI.** Semantic linker is programmatic only.
+- **No replay command.** Events are logged for audit; state is loaded
+  from `state.json` directly, not reconstructed from the log.
+- **No web UI / Visual DAG Studio.** Long-term roadmap item only.

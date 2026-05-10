@@ -238,7 +238,7 @@ In 5 minutes you exercised every axiom of the canon:
 - **Axiom 1** (typed directed multigraph): `node link` with edge types.
 - **Axiom 2** (temporal log): every command appended to `events.jsonl`.
 - **Axiom 3** (poset): the abstraction levels you assigned, with refinement direction enforced at link time and by `validate`.
-- **Axiom 4** (prompts as rewrite rules): partial. Prompts are stored verbatim today; the leaf's prompt is rewritten by the compiler into a file. PromptAST is a future refinement.
+- **Axiom 4** (prompts as rewrite rules): partial. `parsePromptAST(raw)` recognises `@requires:` / `@provides:` / `@expand:` markers and emits a deduplicated AST consumed by `compileNode`, but no module yet rewrites the body based on the markers. The leaf's prompt becomes the artifact byte-for-byte under the mock provider's identity behavior on `task: code_sketch`. See [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §2.4.
 - **Axiom 5** (presheaf context): `context assemble`'s local view, plus the underlined tokens in the walker.
 - **Axiom 6** (compiler functor): `onto compile run` walks the topological plan and writes structure-preserving artifacts.
 - **Axiom 7** (code as compiled shadow): the `.py` file you ran is traceable through `compilation_run` → `runId` → `node` back to the canon.
@@ -256,7 +256,8 @@ You also exercised:
 - [**Hello World example**](../examples/hello-world/README.md) — the canonical demo, end-to-end in one command.
 - [**Compiler**](COMPILER.md) — how `onto compile` produces artifacts and why each step has full provenance.
 - [**The Canon**](ONTOLOGY_CANON.md) and [**Mathematical Model**](MATHEMATICAL_MODEL.md) for the formal foundation.
-- [**Architecture**](ARCHITECTURE.md) for how the kernel, runtime, assembler, proposal system, and compiler relate.
+- [**Mathematical Claims — Audit & Map**](MATHEMATICAL_CLAIMS.md) for the rigor classification of every math claim in the project.
+- [**Architecture**](ARCHITECTURE.md) for how the kernel, runtime, assembler, proposal system, compiler, and walker relate.
 - [**CLI Commands**](CLI_COMMANDS.md) for the full surface.
-- [**Roadmap**](ROADMAP.md) for what comes next (PromptAST, Walker v2, edge-aware SemanticLinker hardening).
+- [**Roadmap**](ROADMAP.md) for what is shipped and what is next.
 - [**Walker Interface RFC**](WALKER_INTERFACE.md) if you want to extend or skin the walker.

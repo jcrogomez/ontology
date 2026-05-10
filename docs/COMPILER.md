@@ -73,13 +73,15 @@ onto node create \
   --prompt 'print("hello world")'
 ```
 
-## The mock provider as the identity functor
+## The mock provider as the identity functor (on one task)
 
 For `task: code_sketch`, the mock provider returns the prompt **verbatim** — no `[mock:...]` prefix. Every other task keeps the prefixed echo behavior so existing tests do not regress.
 
-This is deliberate: it makes mock-driven compilation a degenerate but mathematically valid case of axiom 6. The functor is the identity. The leaf node's `prompt.raw` *is* the artifact byte-for-byte. That's why the [hello world example](../examples/hello-world/README.md) works offline without a model: the leaf's prompt is literal Python, and the mock identity-functors it through to disk.
+This is deliberate: it makes mock-driven compilation a degenerate but useful case of axiom 6 — the leaf node's `prompt.raw` *is* the artifact byte-for-byte. That is why the [hello world example](../examples/hello-world/README.md) works offline without a model: the leaf's prompt is literal Python, and the mock identity-functors it through to disk.
 
-A real model (Ollama, etc.) is a non-identity functor. The same compile-plan structure, the same step-by-step audit chain, the same event log shape — only the per-step transformation changes.
+The "identity functor" framing is honest only on the `code_sketch` slice — on other tasks the mock prefixes a marker, which is not the identity. See [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §4.3 (T3 — useful analogy on a one-task slice).
+
+A real model (Ollama, etc.) is a non-identity functor on every task. The same compile-plan structure, the same step-by-step audit chain, the same event log shape — only the per-step transformation changes.
 
 ## Audit chain in detail
 

@@ -6,6 +6,11 @@ fiber <branch>`), branch-aware compile (`onto compile run --branch <name>`),
 and the cartesian-lift proposal (`onto branch lift`) are open follow-ups —
 see *Future Work*. All helpers live under `src/runtime/fibration/`.
 
+Rigor classification: [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md)
+§3.8 — T2 for `computeBranchFiber` (partition + sub-graph closure
+tested), T3 for `describeCartesianLift` (cartesian property is
+interpretation, not proof; no universal-property test yet).
+
 This module models Ontology branches as a **Grothendieck fibration** over the
 base category of operations. It is a pure, additive view: nothing here mutates
 state, emits events, or persists artefacts. The library exists so that future

@@ -7,9 +7,23 @@
 
 ## 1. Motivation
 
-The mathematical canon states: *prompts act as rewrite rules that expand subgraphs*. Today, `run prompt` and `run context` produce text. That text is opaque, ungoverned, and never crosses the boundary into `.ontology` because of the invariant **"models may speak; only explicit graph commands may mutate the network"**.
+`run prompt` and `run context` produce text. Without a proposal system,
+that text is opaque, ungoverned, and never crosses the boundary into
+`.ontology` because of the invariant **"models may speak; only explicit
+graph commands may mutate the network"**.
 
-The proposal system is the formal interface between the two halves. A proposal is a *typed, hashed, time-stamped candidate mutation* derived from a model run. It separates three operations that today are conflated:
+The proposal system is the interface between the two halves. A proposal
+is a *typed, hashed, time-stamped candidate mutation with full
+provenance back to the model run that generated it.* It separates three
+operations that without proposals would be conflated:
+
+> Note: earlier drafts framed this as *prompts as rewrite rules* per
+> axiom 4 of the canon. That framing is generous — a rewrite rule has
+> form `LHS → RHS` with pattern matching; a proposal carries a typed
+> candidate mutation, not a rewrite pattern. See
+> [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §4.2 for the
+> classification (T2 — operationally a typed-mutation pipeline with
+> provenance; not a rewrite system).
 
 1. **Generation** — what the model produced.
 2. **Validation** — whether the candidate respects the local presheaf and the global poset.

@@ -1,11 +1,13 @@
 # Rules as Subobjects: a Topos-style Predicate Algebra
 
-> Status: additive. The existing `intent-validator.ts` and `gluing.ts` are
-> unchanged and continue to ship. This document describes a new layer in
-> `src/runtime/topos/` that lifts a node's `requires` / `provides` / `forbids`
-> declarations into a first-class, composable predicate algebra. A follow-up
-> PR may rebuild the validator on top of this algebra; this PR only adds the
-> machinery.
+> Status: shipped + integrated. `src/runtime/topos/` provides the predicate
+> algebra; `src/runtime/context/intent-validator.ts` is now ported onto it
+> (its three rules — gluing ok, candidate non-empty, FORBID phrase scan —
+> compile to predicates that fold via `allOf` and evaluate against an
+> `EvaluationContext`). `gluing.ts` remains unchanged and continues to feed
+> the validator's `glued` input. Rigor classification:
+> [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §3.9 (T1 for the
+> algebra, T2 for the validator port).
 
 ## 1. Why a topos?
 
@@ -250,6 +252,10 @@ of `providedTokens` over the known token universe.
 - A general "internal language" that mirrors the topos's own logic. We are
   sketching the operational core; a future PR can introduce quantifiers
   ranging over neighborhoods.
-- A rewrite of `intent-validator.ts`. That validator currently checks
-  candidate text against `FORBID:` constraints and operates after gluing.
-  Porting it onto this algebra is a follow-up task.
+- An open-world `validateIntent` API. The validator port to this algebra
+  has shipped, but `buildEvaluationContext` always classifies every
+  synthetic token, so the public surface stays Boolean. The lower-level
+  `compileValidationPredicate(input)` returns the raw `Predicate`; callers
+  that want three-valued reasoning can evaluate it against a partial
+  context themselves. An `openWorld?: boolean` flag on `validateIntent`
+  is straightforward to add when a real caller needs it.
