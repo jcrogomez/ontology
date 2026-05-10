@@ -34,8 +34,11 @@ describe("Observability System Full Flow", () => {
 
     const inspectRes = runCli(tmpDir, ["inspect"]);
     expect(inspectRes.status).toBe(0);
-    expect(inspectRes.stdout).toContain("Nodes:");
-    expect(inspectRes.stdout).toContain("Network kernel initialized.");
+    // The card uses key/value pairs without trailing colons in the visual
+    // rewrite; "Nodes" appears as the row label, "Network kernel initialized"
+    // appears as a status line (period optional).
+    expect(inspectRes.stdout).toContain("Nodes");
+    expect(inspectRes.stdout).toContain("Network kernel initialized");
 
     const inspectJsonRes = runCli(tmpDir, ["inspect", "--json"]);
     expect(inspectJsonRes.status).toBe(0);
@@ -59,7 +62,7 @@ describe("Observability System Full Flow", () => {
 
     const eventsTailRes = runCli(tmpDir, ["events", "tail"]);
     expect(eventsTailRes.status).toBe(0);
-    expect(eventsTailRes.stdout).toContain("Sequence");
+    expect(eventsTailRes.stdout).toMatch(/Seq(uence)?/);
     expect(eventsTailRes.stdout).toContain("system_init");
 
     const eventsTailJsonRes = runCli(tmpDir, ["events", "tail", "--json"]);

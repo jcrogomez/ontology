@@ -142,10 +142,10 @@ describe('Node Observability Commands', () => {
     const logCalls = vi.mocked(console.log).mock.calls;
     const outputString = logCalls.map(args => args.join(' ')).join('\n');
 
-    // Test that 'definition' and 'draft' are not glued together
-    expect(outputString).toMatch(/definition\s+draft/);
-    // Test that 'draft' and 'domain' are not glued together
-    expect(outputString).toMatch(/draft\s+domain/);
+    // After the visual rewrite columns are: ID Kind Level Status Manifestation Label.
+    // Verify adjacent columns are separated by whitespace, not concatenated.
+    expect(outputString).toMatch(/definition\s+domain/);
+    expect(outputString).toMatch(/domain\s+draft/);
   });
 
   it('nodeListCommand json returns { nodes: [...] }', async () => {
@@ -172,15 +172,20 @@ describe('Node Observability Commands', () => {
   it('nodeShowCommand prints canon after init', async () => {
     await nodeShowCommand("node_0000_canon");
 
-    expect(console.log).toHaveBeenCalledWith(expect.stringContaining("=== ONTOLOGY NODE ==="));
-    expect(console.log).toHaveBeenCalledWith(expect.stringContaining("ID:            node_0000_canon"));
-    expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Label:         Ontology Mathematical Canon"));
-    expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Kind:          canon"));
-    expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Status:        frozen"));
-    expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Provides:"));
-    expect(console.log).toHaveBeenCalledWith(expect.stringContaining("- MathematicalCanon"));
-    expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Rules:"));
-    expect(console.log).not.toHaveBeenCalledWith(expect.stringContaining("1. 1. Ontology is a typed"));
+    // After the visual rewrite the output is a single Unicode-framed card
+    // emitted via one `console.log` call. Assert the semantically-load-bearing
+    // strings are present, not the legacy column padding.
+    const allLogs = vi.mocked(console.log).mock.calls.map(c => c.join(' ')).join('\n');
+    expect(allLogs).toContain("node_0000_canon");
+    expect(allLogs).toContain("Ontology Mathematical Canon");
+    expect(allLogs).toContain("canon");
+    expect(allLogs).toContain("frozen");
+    expect(allLogs).toContain("Provides");
+    expect(allLogs).toContain("- MathematicalCanon");
+    expect(allLogs).toContain("Rules");
+    // Canon rules in the card must not carry a double "1. 1." prefix —
+    // node show strips the leading "N." from each rule before printing.
+    expect(allLogs).not.toMatch(/1\.\s+1\.\s+Ontology is a typed/);
   });
 
   it('nodeShowCommand json returns { node: ... }', async () => {

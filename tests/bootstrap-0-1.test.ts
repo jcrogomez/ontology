@@ -189,6 +189,9 @@ describe('Bootstrap 0.1 Smoke Tests', () => {
     expect(output).toContain('Ontology Mathematical Canon');
     expect(output).toContain('Nodes');
     expect(output).toContain('Events');
-    expect(output).toContain('Compilation not enabled yet');
+    // Bootstrap 0.8 shipped the compiler; Bootstrap 0.9 added per-node model
+    // routing. The legacy "not enabled yet" string is gone — assert the
+    // post-0.8 affirmative status line instead.
+    expect(output).toContain('Compilation enabled');
   });
 });

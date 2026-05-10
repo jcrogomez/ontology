@@ -12,6 +12,8 @@ import { assertOntologyProject, loadEdges, loadNodes } from "../../core/project/
 import type { OntologyNode } from "../../schemas/ontology.js";
 import { QueryShapeSchema, type QueryShape } from "../../runtime/query/types.js";
 import { queryNodes } from "../../runtime/query/representable.js";
+import { renderTable } from "../../core/render/table.js";
+import { bold, dim, byKind, byLevel, byStatus, statusGlyph } from "../../core/render/style.js";
 
 export interface QueryCommandOptions {
   shape?: string;
@@ -113,39 +115,23 @@ export function resolveShape(options: QueryCommandOptions): QueryShape {
   return parsed.data;
 }
 
-// Pretty-table column widths. Matches the look of `onto node list` so the
-// two outputs are visually consistent.
-const ID_PAD = 22;
-const KIND_PAD = 14;
-const ABSTRACTION_PAD = 14;
-const STATUS_PAD = 12;
-
 function printPretty(matches: OntologyNode[], shape: QueryShape): void {
-  console.log("=== ONTOLOGY QUERY (representable) ===");
-  console.log(`Shape:    ${describeShape(shape)}`);
-  console.log(`Matches:  ${matches.length}`);
+  console.log(bold("=== ONTOLOGY QUERY (representable) ==="));
+  console.log(`${dim("Shape:")}   ${describeShape(shape)}`);
+  console.log(`${dim("Matches:")} ${matches.length === 0 ? dim("0") : String(matches.length)}`);
   console.log("");
   if (matches.length === 0) {
-    console.log("(no node satisfies the shape)");
+    console.log(dim("(no node satisfies the shape)"));
     return;
   }
-  console.log(
-    "ID".padEnd(ID_PAD) +
-    "Kind".padEnd(KIND_PAD) +
-    "Abstraction".padEnd(ABSTRACTION_PAD) +
-    "Status".padEnd(STATUS_PAD) +
-    "Label",
-  );
-  for (const n of matches) {
-    const label = n.label.length > 60 ? n.label.slice(0, 57) + "..." : n.label;
-    console.log(
-      n.id.padEnd(ID_PAD) +
-      n.kind.padEnd(KIND_PAD) +
-      n.coordinates.abstraction.padEnd(ABSTRACTION_PAD) +
-      n.status.padEnd(STATUS_PAD) +
-      label,
-    );
-  }
+  console.log(renderTable<OntologyNode>(matches, [
+    { header: "", render: (r) => statusGlyph((r as OntologyNode).status) },
+    { header: "ID",          render: (r) => (r as OntologyNode).id },
+    { header: "Kind",        render: (r) => byKind((r as OntologyNode).kind) },
+    { header: "Level",       render: (r) => byLevel((r as OntologyNode).coordinates.abstraction) },
+    { header: "Status",      render: (r) => byStatus((r as OntologyNode).status) },
+    { header: "Label",       render: (r) => (r as OntologyNode).label, maxWidth: 50 },
+  ]));
 }
 
 // Compact human-readable rendering of the active shape, useful in the
