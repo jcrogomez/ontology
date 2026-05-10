@@ -102,8 +102,21 @@ alone would not catch.
 `edgeTypes` narrows which edge types contribute. Behaviour matches the CLI's
 `--include-edges --edge-types <list>` exactly.
 
-The linker is a pure programmatic API today; future PRs may expose it via
-CLI or wire it into Walker v1's validation mode.
+The linker now has two surfaces:
+
+- **`onto link <nodeId> --candidate <text>` CLI** (post-Bootstrap 0.9): wraps
+  `semanticLink()` and renders the gluing matrix + validation block + edge
+  proposal suggestions for unsatisfied requirements as a single card. See
+  `docs/CLI_COMMANDS.md` for the full surface.
+- **Walker `:link-analysis` action**: defaults the candidate to
+  `focal.prompt.raw` so the analysis is reachable without typing a
+  candidate. Renders into the unified info panel. See
+  `docs/WALKER_INTERFACE.md`.
+
+Both surfaces are read-only; edge suggestions are printed as
+copy-pasteable `onto propose link …` commands rather than auto-staged
+proposals — that keeps "models may speak; only explicit graph commands
+may mutate" honest at the linker layer.
 
 *Planned modes:*
 - `compare` — collect contexts from divergent branches and format side-by-side

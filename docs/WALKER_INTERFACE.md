@@ -219,6 +219,21 @@ Walker v1 ships in three slices:
 - The same helper backs `onto compile plan <nodeId> [--json]` so scripts and the TUI agree on the order.
 - Read-only. The actual compiler ships in Bootstrap 0.8.
 
+### v1.x — `:link-analysis` (post-0.9)
+
+A read-only walker action that mirrors `onto link <nodeId>` from inside
+the TUI. Wraps `semanticLink()` with the focal cell as target and the
+focal's own `prompt.raw` as the default candidate (the question becomes
+*"does my own prompt satisfy my context contract?"*). Renders into the
+unified info panel (yellow border when there are missing requirements,
+red when validation fails outright, green when clean). Sections:
+validation summary, requires (with provider attribution), provides,
+forbids (with violators), and a list of edge proposal suggestions. Each
+suggestion is a copy-pasteable `onto propose link …` command — the
+walker never auto-creates proposals. Read-only; dismiss with
+`:clearinfo`. Helper: `src/walker/actions/link-analysis-from-walker.ts`,
+shared with the CLI via `src/runtime/context/edge-suggester.ts`.
+
 ## 10. v2 scope
 
 Walker v2:

@@ -35,6 +35,7 @@ import { validateFromWalker } from "./actions/validate-from-walker.js";
 import { branchListFromWalker } from "./actions/branch-list-from-walker.js";
 import { contextFromWalker } from "./actions/context-from-walker.js";
 import { queryFromWalker } from "./actions/query-from-walker.js";
+import { linkAnalysisFromWalker } from "./actions/link-analysis-from-walker.js";
 import { linkFromWalker } from "./actions/link-from-walker.js";
 import { InfoPanel, type InfoPanelState } from "./layout/info-panel.js";
 import { parseProviderArgs } from "./state/parse-provider-args.js";
@@ -93,10 +94,12 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
   const [pendingCompile, setPendingCompile] = useState<{ provider: LlmProvider; model?: string; ollamaHost?: string; runtimeCheck?: boolean } | null>(null);
 
   // Unified info panel for read-only commands (:validate, :branch list,
-  // :query, :context). One slot at a time; :clearinfo dismisses any
-  // active variant. Each command builds its result synchronously, so no
-  // pending sentinel is needed.
+  // :query, :context, :link-analysis). One slot at a time; :clearinfo
+  // dismisses any active variant. Most commands build their result
+  // synchronously; `:link-analysis` is async (semanticLink) and uses
+  // the pendingLinkAnalysis sentinel below to stay interactive.
   const [infoState, setInfoState] = useState<InfoPanelState>({ kind: "idle" });
+  const [pendingLinkAnalysis, setPendingLinkAnalysis] = useState<{ focalId: string } | null>(null);
 
   const neighborhood = useMemo<FocalNeighborhood | { error: string }>(() => {
     try {
@@ -167,6 +170,27 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingRun]);
+
+  // Async dispatcher for `:link-analysis`. Mirrors the :run pattern.
+  // The action wraps semanticLink (async by signature) and computes
+  // edge suggestions; the panel renders into its "in-flight" state by
+  // way of a transient message, then replaces it with the final
+  // analysis when the promise resolves.
+  useEffect(() => {
+    if (!pendingLinkAnalysis) return;
+    let cancelled = false;
+    (async () => {
+      const result = await linkAnalysisFromWalker(pendingLinkAnalysis.focalId, cwd);
+      if (cancelled) return;
+      setInfoState({ kind: "link-analysis", result });
+      if (!result.ok) setMessage(result.message ?? "link-analysis failed");
+      setPendingLinkAnalysis(null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingLinkAnalysis]);
 
   // Async dispatcher for `:compile`. Mirrors the :run pattern.
   useEffect(() => {
@@ -329,7 +353,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       return;
     }
     if (cmd === "help") {
-      setMessage("i edit · :propose · :link --to <id> --type <edgeType> · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :clear{run,plan,compile,info,draft} · :q");
+      setMessage("i edit · :propose · :link --to <id> --type <edgeType> · :link-analysis · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :clear{run,plan,compile,info,draft} · :q");
       return;
     }
     if (cmd === "propose") {
@@ -486,6 +510,22 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       const result = contextFromWalker(focalId, cwd);
       setInfoState({ kind: "context", result, focalId });
       if (!result.ok) setMessage(result.message ?? "context assembly failed");
+      return;
+    }
+    // :link-analysis — semantic-linker analysis against the focal cell.
+    // Defaults the candidate to focal.prompt.raw (the question becomes
+    // "does my own prompt satisfy my context contract?"). Surfaces the
+    // requires/provides/forbids matrix and any edge proposal
+    // suggestions for unsatisfied requirements. Read-only; for a
+    // different candidate, run `onto link <focalId> --candidate ...`
+    // from a shell.
+    if (cmd === "link-analysis") {
+      if ("error" in neighborhood) {
+        setMessage("cannot run link-analysis: focal node failed to load");
+        return;
+      }
+      setMessage("running link-analysis…");
+      setPendingLinkAnalysis({ focalId });
       return;
     }
     // :query [--kind X] [--has-incoming refines] [--provides spec] ...

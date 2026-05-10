@@ -20,6 +20,7 @@ import { walkCommand } from "./commands/walk.js";
 import { graphNeighborsCommand } from "./commands/graph/neighbors.js";
 import { graphPathCommand } from "./commands/graph/path.js";
 import { graphSubgraphCommand } from "./commands/graph/subgraph.js";
+import { linkCommand } from "./commands/link/index.js";
 import { proposeNodeCommand } from "./commands/proposal/propose-node.js";
 import { proposeLinkCommand } from "./commands/proposal/propose-link.js";
 import { compilePlanCommand } from "./commands/compile/plan.js";
@@ -439,6 +440,27 @@ graph
       await graphSubgraphCommand(id, options);
     } catch (err: unknown) {
       console.error(`✖ Error extracting subgraph: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("link <id>")
+  .description(
+    "Run the semantic linker against a candidate response: gluing matrix + intent validation + edge proposal suggestions. Read-only.",
+  )
+  .option("--candidate <text>", "Candidate response text to validate against the focal's context")
+  .option("--candidate-file <path>", "Read the candidate from a file (alternative to --candidate)")
+  .option("--branch <branch>", "Override the active branch when assembling the focal's context")
+  .option("--include-edges", "Project typed edges incident to the focal/ancestors into the gluing pool")
+  .option("--edge-types <types>", "Comma-separated edge types to include (requires --include-edges)")
+  .option("--no-suggest-edges", "Disable the edge proposal suggester")
+  .option("--json", "Output results in JSON format")
+  .action(async (id, options) => {
+    try {
+      await linkCommand(id, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during link: ${errorMessage(err)}`);
       process.exit(1);
     }
   });

@@ -43,6 +43,7 @@ Read [`examples/hello-world/README.md`](examples/hello-world/README.md) for the 
 | `onto run prompt / run context` | Dispatch a prompt to a model. Persist with `--persist`. Wrap the run as a proposal with `--as-proposal`. |
 | `onto runs list / show / verify` | Audit persisted run records. Every byte is content-addressed. |
 | `onto graph neighbors / path / subgraph` | Read-only traversal queries over the typed graph. |
+| **`onto link <nodeId> --candidate <text>`** | **Run the semantic linker: gluing matrix + intent validation + edge proposal suggestions for missing requirements. Read-only.** |
 | `onto propose node / link` | Stage a typed candidate mutation without touching the graph. |
 | `onto proposal list / show / apply / reject` | Lifecycle the candidate. `apply` re-validates `parentHash`/endpoint hashes and stales on divergence. |
 | **`onto compile plan <id>`** | **Preview the topological compile order rooted at a node. Read-only.** |
