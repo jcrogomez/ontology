@@ -210,6 +210,8 @@ Bootstrap 0.9 (post-validator-port).
   - `:plan` (alias `:compile-plan`) computes the topological compile plan rooted at the focal and renders it in a green panel below the focal cell. Each step lists the node id and the count of dependency edges it resolves; the focal is marked `*`. A cycle in the closure renders the panel in red with the unresolved set.
   - `:clearplan` dismisses the panel.
   - Read-only: no artifact written, no event emitted. The actual compiler ships in Bootstrap 0.8.
+- **v1.x — graph-view (post-0.9):**
+  - `:graph view [depth]` renders the focal's k-hop subgraph as a structured panel with three buckets — Upstream (`↑`), Downstream (`↓`), Lateral (`↔`) — each row colored by abstraction-level matching `POSET_COLORS`, plus up to 4 connecting edges per row. Default depth 2, capped at 5. Reuses `extractSubgraph` so the slice membership matches `onto graph subgraph` exactly. Read-only; dismiss with `:clearinfo`. This is the terminal-first answer to the "Visual DAG Studio" follow-up — see `docs/WALKER_INTERFACE.md`.
 - **Notes:** Requires an interactive TTY. See `docs/WALKER_INTERFACE.md`.
 
 ### `propose link` *(post-Bootstrap 0.5, PR #96)*

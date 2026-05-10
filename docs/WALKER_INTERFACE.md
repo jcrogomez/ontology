@@ -219,6 +219,33 @@ Walker v1 ships in three slices:
 - The same helper backs `onto compile plan <nodeId> [--json]` so scripts and the TUI agree on the order.
 - Read-only. The actual compiler ships in Bootstrap 0.8.
 
+### v1.x — `:graph view [depth]` (post-0.9)
+
+A read-only walker action that renders the focal node's k-hop subgraph
+as a structured panel, sharing the same `extractSubgraph` helper that
+backs `onto graph subgraph`. The default depth is 2; `:graph view 3`
+expands further (capped at 5 — beyond that the panel becomes a hairball
+that defeats inspection).
+
+The render is *structural*, not pictorial: no boxes-and-lines ASCII
+art. Three buckets — **Upstream** (`↑`, nodes reachable from the focal
+via incoming edges), **Downstream** (`↓`, outgoing), and **Lateral**
+(`↔`, slice members reachable from neither direction) — each lists its
+nodes with the focal-relative arrow, the abstraction-level color
+matching `POSET_COLORS`, the `kind/abstraction` tag dimmed, and the
+truncated label. A second dimmed line per row enumerates up to 4
+incident edges (`→ depends_on node_X`-style). Buckets cap at 15 rows
+each; a `…N more node(s) hidden` hint appears when the slice is
+larger.
+
+Deterministic — two runs over the same `.ontology/` produce
+byte-identical output. Implemented by
+`src/walker/actions/graph-view-from-walker.ts`; the parser lives at
+`src/walker/state/parse-graph-view-args.ts`. This is the terminal-first
+answer to the "Visual DAG Studio" follow-up — keeps the project to a
+single surface (Ink/TUI) and avoids forking into a web codebase.
+Dismiss with `:clearinfo`.
+
 ### v1.x — `:link-analysis` (post-0.9)
 
 A read-only walker action that mirrors `onto link <nodeId>` from inside
