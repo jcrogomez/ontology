@@ -94,8 +94,11 @@ All three obey the three monad laws (left identity, right identity,
 associativity). `bindWithLog` concatenates logs even when the inner effect
 fails.
 
-The compiler does *not* yet use the library — that integration is the next
-milestone. See [`EFFECT_MONAD.md`](EFFECT_MONAD.md).
+`compileNode` runs on top of `EffectWithLog` (PR #115): the dispatch /
+write / parse-validate / runtime-check pipeline is `bindWithLog`-chained
+and the top-level `try/catch` is gone. The walker-side `runFromWalker` is
+still on the legacy try/catch path — porting it is open follow-up work.
+See [`EFFECT_MONAD.md`](EFFECT_MONAD.md).
 
 ### 8.2 Representable functor / Yoneda — `src/runtime/query/`
 

@@ -176,7 +176,7 @@ are the highest-priority hardening item — see
   any mode other than `strict`.
 - **No `onto branch` CLI.** Branch fibration is a programmatic
   library + a single Walker action (`:branch list`).
-- **No `onto link <id>` CLI.** Semantic linker is programmatic only.
+- **`onto link <nodeId> --candidate <text>`** is the read-only CLI surface for the semantic linker (gluing matrix + intent validation + edge proposal suggestions). Proposal staging stays manual via `onto propose link` — the linker never auto-mutates. See [`CLI_COMMANDS.md`](CLI_COMMANDS.md) `link <nodeId>`.
 - **No replay command.** Events are logged for audit; state is loaded
   from `state.json` directly, not reconstructed from the log.
 - **No web UI / Visual DAG Studio.** Long-term roadmap item only.
