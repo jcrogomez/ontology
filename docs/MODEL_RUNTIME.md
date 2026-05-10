@@ -23,7 +23,20 @@ Regardless of the provider used, **provider execution must never mutate `.ontolo
 
 ### Provider: mock
 
-The `mock` provider is a crucial component of the Bootstrap runtime. It acts as a strictly deterministic, pure-function adapter that simulates model execution without external dependencies. It is heavily utilized during CI and deterministic validations. The mock provider never performs network calls and returns hardcoded, structurally valid outputs depending on the inputs provided.
+The `mock` provider is a strictly deterministic, pure-function adapter
+that simulates model execution without external dependencies. It is
+heavily utilised during CI and deterministic validations. It never
+performs network calls.
+
+For most tasks the mock returns a `[mock:...]`-prefixed echo of the
+prompt. For `task: code_sketch` the mock returns the prompt **verbatim**,
+which is what makes mock-driven compilation a useful degenerate case
+of axiom 6 — the leaf node's `prompt.raw` becomes the artifact
+byte-for-byte. See [`COMPILER.md`](COMPILER.md) §"The mock provider as
+the identity functor (on one task)" and
+[`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §4.3 for the rigor
+classification (T3 — the identity-functor framing is honest only on
+the `code_sketch` slice).
 
 ### Provider: ollama (Isolated Adapter)
 

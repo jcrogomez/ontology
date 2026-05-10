@@ -173,17 +173,18 @@ the value or aborts. Tests assert this behavior explicitly in
 BEFORE a failing inner effect" and "accumulates logs even when a later
 step fails").
 
-## Out of scope for this PR
+## What was out of scope for the original PR — and what landed since
 
-- **No compiler integration.** `src/runtime/compile/**` is unchanged.
-- **No async.** `Effect` is a synchronous `() => Result<…>`. A future
-  iteration may add `AsyncEffect = () => Promise<Result<…>>` on the same
-  shape — adopting the same laws — without breaking the synchronous
-  surface. We deliberately avoided introducing `Promise` here so the
-  laws stay easy to reason about and check.
-- **No public adoption guidance.** The next milestone replaces the
-  compiler's ad-hoc try/catch + result fields with this library, and
-  updates `docs/COMPILER.md` accordingly.
+- **Compiler integration.** Shipped in PR #115: `compileNode` is built
+  on `EffectWithLog`. The dispatch / write / language-validate /
+  runtime-check pipeline is `bindWithLog`-chained; the top-level
+  `try/catch` retired. Partial diagnostics survive failure.
+- **Async.** Shipped as `async.ts`. `AsyncEffect<T, E> = () =>
+  Promise<Result<T, E>>` adopts the same laws under the
+  Promise-thenable lift. See `tests/runtime/effects/async.test.ts`.
+- **Public adoption guidance.** `compileNode` is the worked reference
+  example. `runFromWalker` is still on the legacy try/catch path —
+  porting it is the open follow-up tracked in `ROADMAP.md`.
 
 ## File map
 
@@ -191,10 +192,14 @@ step fails").
 src/runtime/effects/
   result.ts   — Result<T, E> + bind/map/mapErr/traverse/sequence
   io.ts       — Effect<T, E> + EffectWithLog<T, E> + log helpers
+  async.ts    — AsyncEffect<T, E> = () => Promise<Result<T, E>>; same
+                shape as Effect, lifted into Promise. Adopted by callers
+                that need async dispatch under the same monad surface.
   laws.ts     — re-exports + pure/fail aliases + law commentary
   index.ts    — public surface (callers import from here)
 
 tests/runtime/effects/
   result.test.ts — Result laws + traverse/sequence behavior
   io.test.ts     — Effect & EffectWithLog laws + log-on-failure tests
+  async.test.ts  — AsyncEffect parity with Effect under the same laws
 ```

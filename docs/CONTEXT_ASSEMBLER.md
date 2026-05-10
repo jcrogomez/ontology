@@ -6,7 +6,16 @@ The Context Assembler solves the problem of deterministic, localized prompt asse
 
 *Ontology is a typed, temporal, directed graph enriched with a partial order of abstraction, where prompts act as rewrite rules that expand subgraphs, context is assigned locally as a presheaf over graph neighborhoods, and compilation is a structure-preserving functor from the category of intention to the category of executable artifacts.*
 
-However, in this phase, the system only implements deterministic context assembly; it does not implement rewrite rules, the SemanticLinker, or the final compiler.
+As of Bootstrap 0.9 (post-validator-port): deterministic context
+assembly, edge-aware projection, presheaf gluing, and intent
+validation (built on the topos predicate algebra) are all in place.
+PromptAST recognises three line-anchored markers and emits a
+deduplicated AST consumed by `compileNode` — but no module yet
+rewrites the body based on the markers (axiom 4 is structural, not
+yet a rewrite system; see
+[`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §2.4). The
+compiler ships and produces auditable artifacts. The semantic linker
+is a programmatic API; an `onto link <id>` CLI is on the roadmap.
 
 ## Why the LLM Does Not Resolve Topology
 
@@ -31,9 +40,13 @@ Collects contexts from divergent branches or conflicting states and formats them
 ### propose
 A speculative mode that attempts to assemble context even when explicit paths are missing, using heuristics to suggest possible connections.
 
-## Strict Mode in This Phase
+## Mode coverage today
 
-In the current implementation phase, **only `strict` mode is implemented**. The system relies entirely on absolute determinism. Compare and propose modes are reserved for future architectural expansions.
+**Only `strict` mode is implemented.** `assembleContext` rejects any
+other mode (`src/runtime/context/assembler.ts:16`). `compare` and
+`propose` are aspirational — see
+[`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §4.5 — and remain
+on the roadmap.
 
 ## Failure Cases
 
@@ -96,10 +109,12 @@ CLI or wire it into Walker v1's validation mode.
 - `compare` — collect contexts from divergent branches and format side-by-side
 - `propose` — speculative assembly when paths are missing
 - `neighborhood slicing` — query the graph by depth bound
-- PromptAST integration — prompts as rewrite rules over the assembled subgraph
+- PromptAST rewriting — `@expand: <nodeId>` resolves and substitutes the
+  referenced node's compiled artifact into the body. Today the marker is
+  parsed and exposed as metadata only; no module rewrites the body.
 
 ## Future Extensions
 
-Future phases will introduce the `compare` and `propose` modes, integrating
-deeper with the PromptAST to allow models to act as rewrite rules that
-explicitly expand subgraphs based on the assembled context.
+Future phases would introduce the `compare` and `propose` modes, and
+extend PromptAST so `@expand:` actually rewrites the prompt body. Both
+are roadmap items; neither is in the code today.

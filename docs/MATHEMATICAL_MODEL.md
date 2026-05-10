@@ -8,6 +8,11 @@
 > functors / Yoneda, fibrations, and a topos-style subobject classifier** —
 > onto concrete modules under `src/runtime/effects/`, `src/runtime/query/`,
 > `src/runtime/fibration/`, and `src/runtime/topos/` respectively.
+>
+> Every claim made here is also classified by rigor in
+> [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) (strictly implemented /
+> operationally implemented / useful analogy / aspirational). When this doc
+> says *"X is a Y"*, the claims map says *how literally* you should read it.
 
 ## 1. Typed Directed Multigraph
 
@@ -33,15 +38,32 @@
 ## 4. Prompt Rewriting
 
 - Prompts are not inert text.
-- Future phases will parse prompts into ASTs.
-- Prompt functions may expand compact intentions into subgraphs.
-- Bootstrap 0.1 does not implement rewriting yet, but the schema leaves space for it.
+- **Implemented (Bootstrap 0.7, partial).** `parsePromptAST(raw)` recognises
+  three line-anchored markers (`@requires:`, `@provides:`, `@expand:`),
+  strips them from the prompt body, and emits a deduplicated `PromptAST`
+  consumed by `compileNode`. See `src/runtime/prompt/parse.ts`.
+- **Not yet implemented:** *rewriting itself*. The AST exposes the markers
+  as structured metadata, but no module yet expands `@expand: <nodeId>` by
+  substituting the referenced node's compiled artifact into the body. The
+  current axiom-4 surface is therefore "a structural marker contract", not
+  a rewrite system. `MATHEMATICAL_CLAIMS.md` §2.4 classifies this as T2
+  (operational) for the AST and T3 (analogy) for the rewrite-rule framing.
 
 ## 5. Context Presheaf
 
 - Each node declares requires, provides, forbids and optional context.
 - Context is local to graph neighborhoods.
-- Future validation will attempt to glue local contexts into a globally consistent state.
+- **Implemented.** `assembleContext` (parent path + edge neighbors),
+  `glueFragments` (presheaf merge with conflict reporting), and
+  `validateIntent` (now compositional over the topos predicate algebra,
+  see §8.4) form the strict-mode pipeline. Edge-aware extension via
+  `--include-edges` brings typed neighbors into the gluing pool.
+- **Not yet pinned:** the *presheaf restriction law* — `F(N') ⊂ F(N)` for
+  `N' ⊂ N`. The structure is presheaf-shaped operationally; the law has
+  no test. `MATHEMATICAL_CLAIMS.md` §2.5 classifies this as T2.
+- The `compare` and `propose` modes that earlier drafts of this axiom
+  promised are not implemented; the assembler rejects any mode other
+  than `strict`. They remain on the roadmap.
 
 ## 6. Compiler Functor
 
@@ -97,9 +119,19 @@ Read-only library; CLI surface is future work. See
 Rules (`requires` / `provides` / `forbids`) lift into a composable predicate
 algebra over a three-valued Ω = `"true" | "false" | "unknown"`. The "unknown"
 value reflects partial information in a graph still under construction; the
-evaluator is monotone wrt information refinement. The existing
-`intent-validator.ts` is unchanged; this is the algebra a follow-up port
-would build on. See [`RULES_TOPOS.md`](RULES_TOPOS.md).
+evaluator is monotone wrt information refinement.
+`intent-validator.ts` is now built on this algebra: each of its three checks
+(gluing ok, candidate non-empty, FORBID phrases) compiles to a `Predicate`
+and they fold via `allOf`. The high-level `IntentValidationResult` contract
+is preserved; the `verdict: Omega` field exposes the underlying three-valued
+result. See [`RULES_TOPOS.md`](RULES_TOPOS.md) for the algebra and
+`src/runtime/context/intent-validator.ts` for the port.
+
+We are *not* a topos in the strict sense: `omegaImplies` is the Kleene
+material implication `¬a ∨ b`, not the Heyting implication of a frame Ω.
+`MATHEMATICAL_CLAIMS.md` §3.9 spells out which parts of this story are T1
+(the algebra), which are T2 (the validator port), and what would be needed
+to lift either further.
 
 ```text
 ┌─────────────────────────────────────────────┐

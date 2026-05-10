@@ -12,6 +12,14 @@ modules that already ship — and pins where each concept lives in source.
 It is the doc to read after `ONTOLOGY_CANON.md` and `MATHEMATICAL_MODEL.md`
 when you want to understand *why* the architecture looks the way it does.
 
+> **Honesty check.** Some of the boxes below describe operationally-true
+> correspondences (the code does the thing, the categorical name fits) but
+> are not pinned by tests of the corresponding law. A few are explicit
+> analogies. [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) classifies
+> every claim into one of four tiers (strict / operational / analogy /
+> aspirational) with file citations. Read it alongside this map to know
+> *how literally* each correspondence holds.
+
 ---
 
 ## 1. The picture in one diagram
@@ -272,8 +280,18 @@ Predicate constructors: `pAnd`, `pOr`, `pNot`, `pImplies`, `allOf`, `anyOf`,
 predicate via `compileNodeRules(node, neighborhood)`, and
 `evaluatePredicate(p, ctx)` returns Ω.
 
-Status: additive. The existing `intent-validator.ts` and `gluing.ts` are
-unchanged. A follow-up may rebuild the validator on top of this algebra.
+**Status: shipped + integrated.** `intent-validator.ts` is now built on
+this algebra: its three checks (gluing ok, candidate non-empty, FORBID
+phrase scan) compile to predicates that fold via `allOf`, evaluated
+against an `EvaluationContext` synthesised from the input. The
+`IntentValidationResult` contract is preserved (`ok`, `score`,
+`violations`, `warnings`); a new `verdict: Omega` field exposes the
+underlying three-valued result. Closed-world by default — every synthetic
+token is classified — so externally observable behaviour stays Boolean.
+
+We are *not* a topos in the strict sense: `omegaImplies` is the Kleene
+material implication, not the Heyting implication of a frame Ω.
+`MATHEMATICAL_CLAIMS.md` §3.9 calls this out explicitly.
 
 Full design in [`docs/RULES_TOPOS.md`](docs/RULES_TOPOS.md).
 
@@ -292,7 +310,7 @@ Full design in [`docs/RULES_TOPOS.md`](docs/RULES_TOPOS.md).
 | Monad (Result / Effect)       | ✅ library shipped, ✅ `compileNode` on `EffectWithLog` (PR #115) | `src/runtime/effects/`                    |
 | Representable / Yoneda query  | ✅ shipped (CLI + walker `:query`)                | `src/runtime/query/`, `src/commands/query/` |
 | Fibration (branches)          | ✅ library shipped, walker `:branch list`, **`onto branch` CLI TODO** | `src/runtime/fibration/`                  |
-| Topos / Ω predicate algebra   | ✅ library shipped, **validator port TODO**       | `src/runtime/topos/`                      |
+| Topos / Ω predicate algebra   | ✅ library shipped, ✅ validator ported onto algebra | `src/runtime/topos/`, `src/runtime/context/intent-validator.ts` |
 
 ---
 
@@ -301,16 +319,18 @@ Full design in [`docs/RULES_TOPOS.md`](docs/RULES_TOPOS.md).
 - ✅ **Compiler refactor onto `EffectWithLog`** (PR #115) — every step
   accumulates logs even when failing, errors propagate via `bindWithLog`
   instead of `try/catch`.
+- ✅ **Validator port onto topos algebra** — `intent-validator.ts` is now
+  built on `compileValidationPredicate` + `evaluatePredicate`. Three-valued
+  internally; closed-world, two-valued externally; `result.verdict` exposes
+  the underlying Ω. See [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md)
+  §3.9 for the rigor classification.
 - 🟡 **Branch-aware compile** — `onto compile run --branch feature/x` walks
   the fiber, not the global graph. `computeBranchFiber` is in place; only the
   CLI wiring is missing. Then a real natural transformation `merge` can
   relate two fibers.
-- **`onto branch lift <nodeId> --to feature/x`** — turns the read-only
+- 🟡 **`onto branch lift <nodeId> --to feature/x`** — turns the read-only
   `describeCartesianLift` into a proposal.
-- **Validator port to topos algebra** — replace the imperative loop in
-  `intent-validator.ts` with `evaluatePredicate(compileNodeRules(node, …))`,
-  giving rules first-class composition (`pAnd`, `pImplies`, …).
-- **`onto query` extensions** — negation in shapes (`!hasIncoming`), exact
+- 🟡 **`onto query` extensions** — negation in shapes (`!hasIncoming`), exact
   edge profiles, multi-shape OR queries.
 
 Each of these items has a one-line entry in [`docs/ROADMAP.md`](docs/ROADMAP.md).

@@ -67,12 +67,18 @@ runtime libraries with proven laws, see [`CATEGORICAL_VISION.md`](CATEGORICAL_VI
 - ✅ Topos predicate algebra — three-valued Ω = `true | false | unknown`,
   composable rule predicates (`pAnd`, `pOr`, `pImplies`, …),
   `compileNodeRules` lifts a node's `requires` / `provides` / `forbids` into
-  a single predicate. Additive: `intent-validator.ts` unchanged. A
-  follow-up may port the validator onto this algebra.
-  `src/runtime/topos/`. See [`RULES_TOPOS.md`](RULES_TOPOS.md).
+  a single predicate. **`intent-validator.ts` ported onto the algebra
+  (post-0.9):** its three rules compile to predicates that fold via
+  `allOf`; the closed-world reduction preserves the existing two-valued
+  contract; `result.verdict ∈ Ω` exposes the underlying three-valued
+  result. `src/runtime/topos/`, `src/runtime/context/intent-validator.ts`.
+  See [`RULES_TOPOS.md`](RULES_TOPOS.md) and
+  [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §3.9.
 
 Follow-ups unlocked by Bootstrap 0.9:
 - ✅ Compiler refactor onto `EffectWithLog` (PR #115).
+- ✅ Validator port onto the topos algebra (`intent-validator.ts` is now
+  built on `compileValidationPredicate` + `evaluatePredicate`).
 - 🟡 Branch-aware compile (`onto compile run --branch feature/x` walks one
   fiber, not the whole graph). `computeBranchFiber` is in place; only the
   CLI wiring is missing.
@@ -80,7 +86,6 @@ Follow-ups unlocked by Bootstrap 0.9:
   programmatic fibration API to the CLI.
 - 🟡 `onto branch lift <nodeId> --to feature/x` — turn the read-only
   `describeCartesianLift` into an `edge_create` / `node_create` proposal.
-- 🟡 Validator port: rebuild `intent-validator.ts` on top of the topos algebra.
 - 🟡 `onto query` extensions: negation in shapes, exact edge profiles, multi-shape OR.
 
 Other open follow-ups:
@@ -97,80 +102,74 @@ At this stage, Ontology is a verified network kernel, a node editor, a proposal 
 
 **Known limitations:**
 - Branch fibration has no `onto` CLI surface yet — only walker `:branch list`. Branch-aware compile is a follow-up.
-- Topos predicate algebra is library-only; the validator port is pending.
+- Validator port (post-0.9) is closed-world by default: `result.verdict` is observable as Ω, but `result.ok` collapses to Boolean; an `openWorld?: boolean` flag on `validateIntent` would expose three-valued behaviour to callers.
 - Semantic linker is exposed only as a programmatic API (`semanticLink()`).
 - `runFromWalker` is still on the legacy try/catch path; the `EffectWithLog` refactor covers `compileNode` only.
 - `state.json` and `events.jsonl` writes are not crash-atomic — a SIGKILL or out-of-disk mid-write can truncate the file. The single-writer assumption (CLI single-shot) is unchanged; concurrent invocations from multiple processes are not lock-protected.
+- Several rhetorical claims in the docs (limit/colimit framing of compile-plan, "rewrite rule" framing of proposals, "shadow" metaphor of compiled code) are useful intuition but not pinned by tests. See [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) for the full ledger.
 
-## Next Phases
+## Bootstrap history
 
-The roadmap outlines a progressive build-up towards a fully functioning semantic compiler and visual editor.
+Each Bootstrap is a milestone. Anything below is shipped; the unshipped
+work is in [Open follow-ups](#open-follow-ups).
 
-### Bootstrap 0.3: Edges and Graph Queries
-- Implement typed semantic relations (edges) between nodes.
-- Introduce foundational graph traversal and querying capabilities.
+| Bootstrap | Theme | Shipped (concretely) |
+| --- | --- | --- |
+| 0.1 | Network kernel | `onto init` / `validate` / `inspect`; canon node; `events.jsonl`; `state.json`; cryptographic hashing. |
+| 0.2 | Node editor | `onto node create` (typed level + kind, Zod-validated, hashed). |
+| 0.3 | Edges + graph queries | Typed multigraph (18 edge types); `onto node link`; foundational traversal helpers. |
+| 0.4 | Walker v0 + poset + run persistence | Read-only Walker (color by abstraction, presheaf-overlap underlining); refinement-family poset enforcement; content-addressed runs (`--persist`). |
+| 0.5 | Proposal system (PRs #92–#95) + `propose link` (PR #96) | Full lifecycle (`pending → applied | rejected | staled`); `parentHash` / endpoint-hash re-validation; `run prompt --as-proposal` / `run context --as-proposal`; `node_create` and `edge_create` mutation variants. |
+| 0.6 | Map + slice + Walker v1 (PRs #97–#101) | Edge-aware semantic linker; graph query CLI (`onto graph neighbors / path / subgraph`); Walker v1 edit / `:propose` / `:run` / `:plan`. |
+| 0.7 | PromptAST (PR #113) | `parsePromptAST(raw)` recognises `@requires:` / `@provides:` / `@expand:` markers and emits a deduplicated AST consumed by `compileNode`. Axiom 4 made structural (parser, not yet rewriter — see [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §2.4). |
+| 0.8 | Hello World compiler (PR #102) | `onto compile run` walks the topological plan, dispatches per node, writes manifestation-aware artifacts; full `artifact → compilation_run → run → prompt → node` audit chain. Mock = identity functor on `task: code_sketch`. |
+| 0.9 | Categorical extensions + compiler hardening (PRs #103–#115) | Four additive runtime libraries (Yoneda query / effect monad / branch fibration / topos predicate algebra); compiler hardening (code-fence stripping, language parse-check, refinement-parent threading, `model.ref` routing, XML system prompt, `--runtime-check`, `contradicts`/`supersedes`); Walker hardening (`:validate`, `:branch list`, `:context`, `:query`, `:compile --runtime-check`); `compileNode` ported onto `EffectWithLog`. |
+| post-0.9 | Validator port onto topos algebra | `intent-validator.ts` is now built on `compileValidationPredicate` + `evaluatePredicate`; `result.verdict ∈ Ω` exposed; closed-world reduction preserves the existing two-valued contract. See [`RULES_TOPOS.md`](RULES_TOPOS.md) and [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §3.9. |
 
-### Bootstrap 0.4: Assets, Models, and Processors
-- Integrate real external models (e.g., real Ollama integration).
-- Define processors and handlers for multimodal assets.
-
-### Bootstrap 0.5: Presets and Stack Nodes
-- Introduce predefined stack configurations and standard node presets to bootstrap projects faster.
-
-### Bootstrap 0.4: Walker v0 + Poset Enforcement
-- Walker v0: focal-cell terminal interface, color by abstraction level, cross-node concept underlining, arrow + TAB/T/B/M navigation. Read-only. See `docs/WALKER_INTERFACE.md`.
-- Poset enforcement: validator rejects edges whose direction violates the partial order.
-
-### Bootstrap 0.5: Proposal System
-
-In progress, shipped as a chain of small PRs:
-
-- **PR #92** ✓ — Schema, storage, `onto propose node`, `proposal_created` event. Pending status only.
-- **PR #93** ✓ — `onto proposal list / show / reject` + `proposal_rejected` event with old/new hash audit chain.
-- **PR #94** ✓ — `onto proposal apply` (with `--dry-run`), `parentHash` re-validation, stale detection, `proposal_applied` / `proposal_staled` events. The proposal lifecycle is now total and replayable end to end.
-- **PR #95** ✓ — `run prompt --as-proposal` and `run context --as-proposal`: model runs become typed candidate proposals in one CLI invocation, with `source.runId` populated from the persisted run record. The audit chain `run_persisted → proposal_created → node_created → proposal_applied` is complete.
-
-See `docs/PROPOSAL_SYSTEM.md` for the full design.
-
-(Run persistence shipped early as part of Bootstrap 0.4 because it is a small, low-risk prerequisite that unblocks both proposal provenance and the walker's `:run` mode.)
-
-### Bootstrap 0.6: Map and Slice + Walker v1 ✓
-- Graph query CLI (`graph neighbors`, `graph path`, `graph subgraph`). PR #98.
-- Walker v1: edit mode, `:propose`, `:run`, `:plan`. PRs #99 / #100 / #101.
-
-### Bootstrap 0.7: PromptAST ✓
-- Parse natural language prompts into structural Abstract Syntax Trees (AST) as formal rewrite rules. Shipped in PR #113: `parsePromptAST(raw)` recognises `@requires:` / `@provides:` / `@expand:` markers, strips them from the prompt body, and emits a deduplicated `PromptAST` consumed by `compileNode`.
-
-### Bootstrap 0.8: Compiler + Hello World ✓
-- Compiler v0: `onto compile run <nodeId>` walks the topological plan from `computeCompilePlan` and produces artifacts at `.ontology/artifacts/generated/`. Each step emits `run_persisted` and `compilation_run` events; the artifact path is anchored in the temporal log.
-- Manifestation-aware extension: artifacts pick file extensions from `coordinates.manifestation` and `technical.language` (e.g., `manifestation: code` + `language: python` → `.py`).
-- Walker integration: `:compile [provider]` from inside the TUI renders the result panel with each step's artifact path.
-- Hello-world fixture: `npm run example:hello-world` builds canon → ... → leaf, compiles, and runs the produced Python script.
-- PR #102. See `docs/COMPILER.md`.
-
-### Bootstrap 0.9: Categorical Extensions + Compiler Hardening ✓
-- Categorical extensions (PR #111): four additive runtime libraries land together — Yoneda query, effect monad, branch fibration, topos predicate algebra. Each ships with proven laws or property tests. See `docs/CATEGORICAL_VISION.md` for the nine-concept map.
-- Compiler hardening (PRs #103-#105, #108-#110, #112): code-fence stripping, language parse-check after every artifact write, refinement-parent context threading, per-node `model.ref` routing, system-prompt format leak fix, optional `--runtime-check`, and `contradicts` / `supersedes` plan semantics.
-- Walker hardening (PRs #106, #114): `--model` / `--ollama-host` on `:run` and `:compile`; `:validate`, `:branch list`, `:context`, `:query`, `:compile --runtime-check`.
-- Compiler refactor onto `EffectWithLog` (PR #115): `compileNode` is no longer a top-level try/catch; failures bubble through `bindWithLog` and partial diagnostics survive.
+Per-PR detail lives in [`RELEASE_NOTES.md`](RELEASE_NOTES.md).
 
 ---
 
-## Future Capabilities (Planned / Not Yet Implemented)
+## Open follow-ups
 
-The following components are strictly **planned** and **do not yet exist** in the current architecture. They represent the long-term vision of Ontology as a complete ecosystem.
+Each item below is unshipped. Tagged 🟡 (active candidate for the next
+Bootstrap) or 🔵 (longer-term / shape still to be decided).
 
-### SemanticLinker
-*(Edge-aware Implemented / CLI surface Planned)*
-A dynamic linking system designed to automatically resolve and bind context, dependencies, and interfaces across the semantic network during the compilation functor process. Today it is exposed only as the programmatic `semanticLink()` API; future work adds a CLI surface (`onto link <nodeId>`) and runs the linker between compile steps.
-
-### Branch Fibration CLI
-*(Library + Walker surface Implemented / `onto branch` CLI Planned)*
-The fibration library ships in PR #111 with `listBranches`, `computeBranchFiber`, `describeCartesianLift`. Walker `:branch list` lands in PR #114. Open: `onto branch list`, `onto branch fiber <branch>` (read-only), `onto compile run --branch <name>` (walk one fiber), and `onto branch lift <nodeId> --to <branch>` (turn the read-only `describeCartesianLift` into a proposal).
-
-### Topos Validator Port
-*(Library Implemented / Validator Port Planned)*
-`compileNodeRules` and `evaluatePredicate` are in place. Open: rebuild `intent-validator.ts` on the predicate algebra so rules compose first-class via `pAnd` / `pImplies` / etc. instead of imperative loops.
+- 🟡 **Atomic writes + advisory lock** on `events.jsonl`, `state.json`,
+  and `~/.config/ontology/projects.json`. Closes the largest crash-safety
+  gap; promotes axiom 2 from T2 to T1 in the claims map.
+- 🟡 **`onto branch` CLI surface** — `onto branch list`, `onto branch
+  fiber <name>` (read-only), then `onto compile run --branch <name>`
+  (walk one fiber), then `onto branch lift <nodeId> --to <branch>` (turn
+  `describeCartesianLift` into a proposal).
+- 🟡 **`onto link <nodeId>` CLI** — surface the programmatic
+  `semanticLink()` API.
+- 🟡 **Validator open-world mode** — add an `openWorld?: boolean` flag
+  on `validateIntent` so callers can observe `verdict === "unknown"`
+  directly instead of only via the lower-level
+  `compileValidationPredicate` helper.
+- 🟡 **`onto query` extensions** — negation in shapes (`!hasIncoming`),
+  exact edge profiles, multi-shape OR queries.
+- 🟡 **`run prompt --as-proposal` for `edge_create` targets** — the
+  discriminated-union mutation schema already supports it; the
+  model-driven candidate edge is the missing piece.
+- 🟡 **`runFromWalker` port onto `EffectWithLog`** — compiler-side is
+  done; walker-side is still on the legacy try/catch path.
+- 🔵 **Branch-merge proposals** — natural transformation between two
+  fibers. Library-level work; needs a `BranchMergeProposal` shape and a
+  unified validation pipeline. See `BRANCH_FIBRATION.md` §Future Work.
+- 🔵 **Walker v2** — proposal review pane; plane / time / branch /
+  manifestation rotation. See `WALKER_INTERFACE.md` §10.
+- 🔵 **node_update with auto-branch (Bootstrap 0.10)** — open design
+  question: when branch X is created from main, do existing nodes
+  duplicate, project via overlay, or only materialise on touch? Resolve
+  in a design note before any code.
+- 🔵 **Visual DAG Studio** — web-based UI projecting the walker into
+  2D. Long-term; depends on the CLI surface stabilising.
+- 🔵 **Rigor improvements identified by [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §6** —
+  presheaf-restriction test, artifact-category for the compiler functor,
+  cartesian-lift universal-property test, `onto replay`, etc. Each is
+  bite-sized and lifts a specific claim from one tier to the next.
 
 ### Visual DAG Studio
 *(Planned / Not yet implemented)*
