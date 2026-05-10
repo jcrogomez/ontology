@@ -91,7 +91,10 @@ Follow-ups unlocked by Bootstrap 0.9:
 Other open follow-ups:
 - 🟡 `run prompt --as-proposal` with `edge_create` target (the discriminated-union
   mutation schema already supports it; the model-driven candidate edge is the gap).
-- 🟡 CLI surface for the semantic linker (`onto link <nodeId>`).
+- ✅ CLI surface for the semantic linker — `onto link <nodeId> --candidate <text>`
+  (post-0.9). Wraps `semanticLink()` and surfaces the gluing matrix +
+  validation block + edge proposal suggestions. Walker `:link-analysis`
+  mirrors the surface using `focal.prompt.raw` as the default candidate.
 - 🟡 Walker v2 (plane / time / branch / manifestation rotation, proposal-review pane).
 - 🟡 Visual DAG Studio (web-based UI).
 - 🟡 `runFromWalker` port onto `EffectWithLog` (compiler-side already done in PR #115).
@@ -125,6 +128,7 @@ work is in [Open follow-ups](#open-follow-ups).
 | 0.8 | Hello World compiler (PR #102) | `onto compile run` walks the topological plan, dispatches per node, writes manifestation-aware artifacts; full `artifact → compilation_run → run → prompt → node` audit chain. Mock = identity functor on `task: code_sketch`. |
 | 0.9 | Categorical extensions + compiler hardening (PRs #103–#115) | Four additive runtime libraries (Yoneda query / effect monad / branch fibration / topos predicate algebra); compiler hardening (code-fence stripping, language parse-check, refinement-parent threading, `model.ref` routing, XML system prompt, `--runtime-check`, `contradicts`/`supersedes`); Walker hardening (`:validate`, `:branch list`, `:context`, `:query`, `:compile --runtime-check`); `compileNode` ported onto `EffectWithLog`. |
 | post-0.9 | Validator port onto topos algebra | `intent-validator.ts` is now built on `compileValidationPredicate` + `evaluatePredicate`; `result.verdict ∈ Ω` exposed; closed-world reduction preserves the existing two-valued contract. See [`RULES_TOPOS.md`](RULES_TOPOS.md) and [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §3.9. |
+| post-0.9 | Semantic linker CLI | `onto link <nodeId> --candidate <text>` wraps `semanticLink()`: gluing matrix + `validateIntent` block + edge proposal suggestions for missing requirements (per provider, parallel rows for `depends_on` and `uses_token`). Walker `:link-analysis` mirrors the surface using `focal.prompt.raw` as the default candidate. Read-only: suggestions are copy-pasteable `onto propose link` commands. See [`CLI_COMMANDS.md`](CLI_COMMANDS.md) `link <nodeId>`. |
 
 Per-PR detail lives in [`RELEASE_NOTES.md`](RELEASE_NOTES.md).
 
@@ -142,8 +146,6 @@ Bootstrap) or 🔵 (longer-term / shape still to be decided).
   fiber <name>` (read-only), then `onto compile run --branch <name>`
   (walk one fiber), then `onto branch lift <nodeId> --to <branch>` (turn
   `describeCartesianLift` into a proposal).
-- 🟡 **`onto link <nodeId>` CLI** — surface the programmatic
-  `semanticLink()` API.
 - 🟡 **Validator open-world mode** — add an `openWorld?: boolean` flag
   on `validateIntent` so callers can observe `verdict === "unknown"`
   directly instead of only via the lower-level

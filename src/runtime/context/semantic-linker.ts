@@ -1,6 +1,6 @@
 import { assembleContext } from "./assembler.js";
-import { buildFragment } from "./presheaf.js";
-import { glueFragments } from "./gluing.js";
+import { buildFragment, type ContextFragment } from "./presheaf.js";
+import { glueFragments, type GluingConflict } from "./gluing.js";
 import { validateIntent } from "./intent-validator.js";
 import { OntologyRuntimeError } from "../errors.js";
 import { LlmProviderSchema, type OntologyEdge } from "../../schemas/ontology.js";
@@ -37,13 +37,19 @@ export interface SemanticLinkInput {
 export interface SemanticLinkResult {
   ok: boolean;
   contextNodeIds: string[];
-  conflicts: unknown[];
+  conflicts: GluingConflict[];
   validation: {
     ok: boolean;
     score: number;
     violations: string[];
     warnings: string[];
   };
+  // The presheaf fragments that fed gluing, in the same order as
+  // `contextNodeIds`. Exposed so callers (notably `onto link`) can
+  // build a per-token requires/provides/forbids matrix without
+  // re-loading and re-fragmenting the context. Pure data; cheap to
+  // include.
+  fragments: ContextFragment[];
   // Populated only when includeEdges was true. Carries the edges that
   // contributed to the gluing and the neighbor node ids brought in via
   // those edges. Callers that need to surface "which edges informed this
@@ -108,7 +114,8 @@ export async function semanticLink(input: SemanticLinkInput): Promise<SemanticLi
     ok,
     contextNodeIds: assembled.nodes.map(node => node.id),
     conflicts: glued.conflicts,
-    validation
+    validation,
+    fragments,
   };
 
   if (assembled.edgeContext) {

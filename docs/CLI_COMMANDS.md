@@ -280,6 +280,20 @@ Bootstrap 0.9 (post-validator-port).
   - `mutation_failed` — the underlying graph mutation threw
 - **Audit chain:** the resulting mutation event (`node_created` or `edge_created`) carries `sourceProposalId` in its payload; the `proposal_applied` event carries `resultingNodeId` (or `resultingEdgeId`), `resultingEventId`, `oldHash`, and `newHash`. An audit can trace any node or edge back to the proposal that produced it, and to the model run that generated the proposal.
 
+### `link <nodeId>` *(post-Bootstrap 0.9)*
+
+- **Purpose:** Run the semantic linker against a candidate response: assemble the focal's context, glue the presheaf fragments, validate the candidate via `validateIntent`, and surface the per-token requires/provides/forbids matrix plus edge proposal suggestions for any unsatisfied requirements. Read-only — no graph mutation, no model dispatch, no proposal creation.
+- **Required:** exactly one of `--candidate <text>` or `--candidate-file <path>`. The linker validates the candidate against the focal's contract; without one there is nothing to validate.
+- **Optional:** `--branch <name>` (override active branch), `--include-edges` + `--edge-types <list>` (project typed edges into the gluing pool — same semantics as `context assemble --include-edges`), `--no-suggest-edges` (suppress the suggester), `--json`.
+- **Examples:**
+  - `npm run dev -- link node_0042 --candidate "draft response that should satisfy the focal context"`
+  - `npm run dev -- link node_0042 --candidate-file ./response.txt --include-edges`
+  - `npm run dev -- link node_0042 --candidate "..." --json | jq '.suggestions'`
+- **Output (human):** a single LINK card with sections — `Validation` (ok / score / violations / warnings from `validateIntent`), `Requires (N)` (per token: `✓` if a node in scope provides it, `✖` otherwise, with the providers listed), `Provides (N)` (the focal's own provides), `Forbids (N)` (per token: `✖` if a node in scope provides it as a violation), `Relevant Neighbors (N)` (one-hop incident edges), and `Suggested edge proposals (N)` when the suggester finds providers in the wider graph for unsatisfied requires. Each suggestion is a copy-pasteable `onto propose link --from … --to … --type … --rationale …` command.
+- **Output (JSON):** `{ ok, focal, branch, contextNodeIds, validation, requires[], provides[], forbids[], neighbors[], conflicts[], suggestions[] }`. Each suggestion carries `{from, to, type, satisfies, rationale, command}`.
+- **Edge suggestions:** for each unsatisfied requirement, the suggester finds nodes in the same branch whose `provides` would resolve the token, and emits one suggestion per provider per edge type (defaults to two parallel rows: `depends_on` and `uses_token`). Suggestions skip (a) the focal itself, (b) nodes on a different branch, and (c) edges that already exist with the same `(from, to, type)` tuple. The user picks which (if any) to stage via `onto propose link`; the linker never auto-creates proposals.
+- **Notes:** Same kernel helper backs the walker's `:link-analysis` action, which defaults the candidate to `focal.prompt.raw` so the action is usable without typing a candidate.
+
 ### Model Observability
 - `onto model doctor`
 - `onto model doctor --json`
@@ -301,8 +315,6 @@ roadmap lives in [`ROADMAP.md`](ROADMAP.md) §"Open follow-ups".
 - **`onto branch lift <nodeId> --to <branch>`** — turn the read-only
   `describeCartesianLift` into an `edge_create` / `node_create`
   proposal.
-- **`onto link <focalId>`** — CLI surface for the programmatic
-  `semanticLink({ includeEdges: true })`.
 - **`run prompt --as-proposal` with `edge_create` target** — the
   discriminated-union mutation schema already supports it; the
   model-driven candidate edge is the missing piece.
