@@ -36,6 +36,8 @@ import { branchListFromWalker } from "./actions/branch-list-from-walker.js";
 import { contextFromWalker } from "./actions/context-from-walker.js";
 import { queryFromWalker } from "./actions/query-from-walker.js";
 import { linkAnalysisFromWalker } from "./actions/link-analysis-from-walker.js";
+import { graphViewFromWalker } from "./actions/graph-view-from-walker.js";
+import { parseGraphViewArgs } from "./state/parse-graph-view-args.js";
 import { linkFromWalker } from "./actions/link-from-walker.js";
 import { InfoPanel, type InfoPanelState } from "./layout/info-panel.js";
 import { parseProviderArgs } from "./state/parse-provider-args.js";
@@ -353,7 +355,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       return;
     }
     if (cmd === "help") {
-      setMessage("i edit · :propose · :link --to <id> --type <edgeType> · :link-analysis · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :clear{run,plan,compile,info,draft} · :q");
+      setMessage("i edit · :propose · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :clear{run,plan,compile,info,draft} · :q");
       return;
     }
     if (cmd === "propose") {
@@ -510,6 +512,26 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       const result = contextFromWalker(focalId, cwd);
       setInfoState({ kind: "context", result, focalId });
       if (!result.ok) setMessage(result.message ?? "context assembly failed");
+      return;
+    }
+    // :graph view [depth] — render the focal's k-hop subgraph as a
+    // structured panel. Read-only; synchronous (extractSubgraph is pure
+    // over the on-disk edges + nodes). Wraps `extractSubgraph` from the
+    // traversal helpers so the walker and the CLI's `onto graph subgraph`
+    // agree on the slice membership; the only difference is presentation.
+    if (cmd === "graph view" || cmd.startsWith("graph view")) {
+      if ("error" in neighborhood) {
+        setMessage("cannot render graph view: focal node failed to load");
+        return;
+      }
+      const parsed = parseGraphViewArgs(cmd.slice("graph view".length));
+      if (!parsed.ok) {
+        setMessage(parsed.message);
+        return;
+      }
+      const result = graphViewFromWalker(focalId, { depth: parsed.depth, cwd });
+      setInfoState({ kind: "graph-view", result });
+      if (!result.ok) setMessage(result.message ?? "graph view failed");
       return;
     }
     // :link-analysis — semantic-linker analysis against the focal cell.

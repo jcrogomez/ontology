@@ -5,10 +5,12 @@ import type { BranchListResult } from "../actions/branch-list-from-walker.js";
 import type { QueryFromWalkerResult } from "../actions/query-from-walker.js";
 import type { ContextFromWalkerResult } from "../actions/context-from-walker.js";
 import type { LinkAnalysisFromWalkerResult } from "../actions/link-analysis-from-walker.js";
+import type { GraphViewResult, GraphViewNodeRow } from "../actions/graph-view-from-walker.js";
+import { POSET_COLORS } from "../theme/colors.js";
 
 // Unified info panel for read-only walker commands that produce a small,
 // inspectable result: `:validate`, `:branch list`, `:query`, `:context`,
-// `:link-analysis`.
+// `:link-analysis`, `:graph view`.
 //
 // One panel instead of N: each command's result is structurally distinct
 // but rendering needs are the same — a heading, a body, a dismiss hint.
@@ -22,7 +24,8 @@ export type InfoPanelState =
   | { kind: "branches"; result: BranchListResult }
   | { kind: "query"; result: QueryFromWalkerResult; shapeSummary: string }
   | { kind: "context"; result: ContextFromWalkerResult; focalId: string }
-  | { kind: "link-analysis"; result: LinkAnalysisFromWalkerResult };
+  | { kind: "link-analysis"; result: LinkAnalysisFromWalkerResult }
+  | { kind: "graph-view"; result: GraphViewResult };
 
 export interface InfoPanelProps {
   state: InfoPanelState;
@@ -37,7 +40,9 @@ export function InfoPanel({ state }: InfoPanelProps): React.ReactElement | null 
     ? "yellow"
     : state.kind === "link-analysis" && !state.result.ok
     ? "red"
-    : state.kind === "query" || state.kind === "branches"
+    : state.kind === "graph-view" && !state.result.ok
+    ? "red"
+    : state.kind === "query" || state.kind === "branches" || state.kind === "graph-view"
     ? "yellow"
     : "blue";
 
@@ -161,86 +166,178 @@ function renderBody(state: Exclude<InfoPanelState, { kind: "idle" }>): React.Rea
     );
   }
 
-  // link-analysis
+  if (state.kind === "link-analysis") {
+    const { result } = state;
+    if (!result.ok) {
+      return (
+        <>
+          <Text bold color="red">LINK-ANALYSIS — error</Text>
+          <Text>{result.message ?? "(no detail)"}</Text>
+        </>
+      );
+    }
+    const requires = result.requires ?? [];
+    const provides = result.provides ?? [];
+    const forbids = result.forbids ?? [];
+    const suggestions = result.suggestions ?? [];
+    const validation = result.validation;
+    const missingCount = requires.filter((r) => !r.satisfied).length;
+    const violatedCount = forbids.filter((f) => f.violated).length;
+    const headerColor = missingCount > 0 || violatedCount > 0 || (validation && !validation.ok) ? "yellow" : "green";
+    return (
+      <>
+        <Text bold color={headerColor}>
+          LINK-ANALYSIS — {result.focalId}
+          {validation && (validation.ok ? " · ✔ valid" : ` · ✖ ${validation.violations.length} violation(s)`)}
+        </Text>
+        <Text dimColor>
+          candidate = focal.prompt.raw — context {result.contextNodeIds?.length ?? 0} node(s)
+        </Text>
+        {requires.length > 0 && (
+          <Box marginTop={1} flexDirection="column">
+            <Text bold>Requires ({requires.length}, {missingCount} missing)</Text>
+            {requires.slice(0, 8).map((r, i) => (
+              <Text key={i}>
+                {r.satisfied ? "  ✓ " : "  ✖ "}
+                {r.token}
+                {r.satisfied && r.providers.length > 0 ? ` ← ${r.providers.join(", ")}` : ""}
+              </Text>
+            ))}
+            {requires.length > 8 && (
+              <Text dimColor>  ...and {requires.length - 8} more</Text>
+            )}
+          </Box>
+        )}
+        {provides.length > 0 && (
+          <Box marginTop={1} flexDirection="column">
+            <Text bold>Provides ({provides.length})</Text>
+            {provides.slice(0, 8).map((token, i) => (
+              <Text key={i}>  → {token}</Text>
+            ))}
+            {provides.length > 8 && (
+              <Text dimColor>  ...and {provides.length - 8} more</Text>
+            )}
+          </Box>
+        )}
+        {forbids.length > 0 && (
+          <Box marginTop={1} flexDirection="column">
+            <Text bold>Forbids ({forbids.length}, {violatedCount} violated)</Text>
+            {forbids.slice(0, 6).map((f, i) => (
+              <Text key={i}>
+                {f.violated ? "  ✖ " : "  ✓ "}
+                {f.token}
+                {f.violated ? ` (provided by ${f.violators.join(", ")})` : ""}
+              </Text>
+            ))}
+          </Box>
+        )}
+        {suggestions.length > 0 && (
+          <Box marginTop={1} flexDirection="column">
+            <Text bold color="yellow">Suggested edge proposals ({suggestions.length})</Text>
+            <Text dimColor>  No graph mutation. Run the listed commands.</Text>
+            {suggestions.slice(0, 6).map((s, i) => (
+              <Box key={i} flexDirection="column">
+                <Text>  • <Text color="yellow">{s.type}</Text> → {s.to} <Text dimColor>(satisfies {s.satisfies.join(", ")})</Text></Text>
+                <Text dimColor>      onto propose link --from {s.from} --to {s.to} --type {s.type} --rationale "satisfies {s.satisfies.join(", ")}"</Text>
+              </Box>
+            ))}
+            {suggestions.length > 6 && (
+              <Text dimColor>  ...and {suggestions.length - 6} more</Text>
+            )}
+          </Box>
+        )}
+      </>
+    );
+  }
+
+  // graph-view
   const { result } = state;
   if (!result.ok) {
     return (
       <>
-        <Text bold color="red">LINK-ANALYSIS — error</Text>
+        <Text bold color="red">GRAPH VIEW — error</Text>
         <Text>{result.message ?? "(no detail)"}</Text>
       </>
     );
   }
-  const requires = result.requires ?? [];
-  const provides = result.provides ?? [];
-  const forbids = result.forbids ?? [];
-  const suggestions = result.suggestions ?? [];
-  const validation = result.validation;
-  const missingCount = requires.filter((r) => !r.satisfied).length;
-  const violatedCount = forbids.filter((f) => f.violated).length;
-  const headerColor = missingCount > 0 || violatedCount > 0 || (validation && !validation.ok) ? "yellow" : "green";
+  const focal = result.focal!;
+  const upstream = result.upstream ?? [];
+  const downstream = result.downstream ?? [];
+  const lateral = result.lateral ?? [];
+  const totalNodes = result.totalNodes ?? 0;
+  const totalEdges = result.totalEdges ?? 0;
+  const renderedCount = 1 + upstream.length + downstream.length + lateral.length;
   return (
     <>
-      <Text bold color={headerColor}>
-        LINK-ANALYSIS — {result.focalId}
-        {validation && (validation.ok ? " · ✔ valid" : ` · ✖ ${validation.violations.length} violation(s)`)}
+      <Text bold color="yellow">
+        GRAPH VIEW — {focal.id} (depth {result.depth})
       </Text>
       <Text dimColor>
-        candidate = focal.prompt.raw — context {result.contextNodeIds?.length ?? 0} node(s)
+        slice: {totalNodes} node(s), {totalEdges} edge(s)
+        {renderedCount < totalNodes ? ` · showing ${renderedCount}` : ""}
       </Text>
-      {requires.length > 0 && (
+      {upstream.length > 0 && (
         <Box marginTop={1} flexDirection="column">
-          <Text bold>Requires ({requires.length}, {missingCount} missing)</Text>
-          {requires.slice(0, 8).map((r, i) => (
-            <Text key={i}>
-              {r.satisfied ? "  ✓ " : "  ✖ "}
-              {r.token}
-              {r.satisfied && r.providers.length > 0 ? ` ← ${r.providers.join(", ")}` : ""}
-            </Text>
-          ))}
-          {requires.length > 8 && (
-            <Text dimColor>  ...and {requires.length - 8} more</Text>
-          )}
+          <Text bold>↑ Upstream ({upstream.length})</Text>
+          {upstream.map((row) => <GraphViewRow key={row.id} row={row} arrow="↑" />)}
         </Box>
       )}
-      {provides.length > 0 && (
+      <Box marginTop={1} flexDirection="column">
+        <Text bold color={POSET_COLORS[focal.abstraction]}>
+          ★ {focal.id} <Text dimColor>{focal.kind}/{focal.abstraction}</Text>
+          {focal.label ? ` — ${focal.label}` : ""}
+        </Text>
+      </Box>
+      {downstream.length > 0 && (
         <Box marginTop={1} flexDirection="column">
-          <Text bold>Provides ({provides.length})</Text>
-          {provides.slice(0, 8).map((token, i) => (
-            <Text key={i}>  → {token}</Text>
-          ))}
-          {provides.length > 8 && (
-            <Text dimColor>  ...and {provides.length - 8} more</Text>
-          )}
+          <Text bold>↓ Downstream ({downstream.length})</Text>
+          {downstream.map((row) => <GraphViewRow key={row.id} row={row} arrow="↓" />)}
         </Box>
       )}
-      {forbids.length > 0 && (
+      {lateral.length > 0 && (
         <Box marginTop={1} flexDirection="column">
-          <Text bold>Forbids ({forbids.length}, {violatedCount} violated)</Text>
-          {forbids.slice(0, 6).map((f, i) => (
-            <Text key={i}>
-              {f.violated ? "  ✖ " : "  ✓ "}
-              {f.token}
-              {f.violated ? ` (provided by ${f.violators.join(", ")})` : ""}
-            </Text>
-          ))}
+          <Text bold>↔ Lateral ({lateral.length})</Text>
+          {lateral.map((row) => <GraphViewRow key={row.id} row={row} arrow="↔" />)}
         </Box>
       )}
-      {suggestions.length > 0 && (
-        <Box marginTop={1} flexDirection="column">
-          <Text bold color="yellow">Suggested edge proposals ({suggestions.length})</Text>
-          <Text dimColor>  No graph mutation. Run the listed commands.</Text>
-          {suggestions.slice(0, 6).map((s, i) => (
-            <Box key={i} flexDirection="column">
-              <Text>  • <Text color="yellow">{s.type}</Text> → {s.to} <Text dimColor>(satisfies {s.satisfies.join(", ")})</Text></Text>
-              <Text dimColor>      onto propose link --from {s.from} --to {s.to} --type {s.type} --rationale "satisfies {s.satisfies.join(", ")}"</Text>
-            </Box>
-          ))}
-          {suggestions.length > 6 && (
-            <Text dimColor>  ...and {suggestions.length - 6} more</Text>
-          )}
+      {renderedCount < totalNodes && (
+        <Box marginTop={1}>
+          <Text dimColor>
+            ...{totalNodes - renderedCount} more node(s) hidden — drop depth or use `onto graph subgraph` to explore further.
+          </Text>
         </Box>
       )}
     </>
   );
+}
+
+// Single row in the graph-view buckets. Renders the node id colored by
+// its abstraction level, the kind/abstraction tag dimmed, and up to 4
+// connecting edges as a compact second line. The arrow argument
+// disambiguates the bucket visually so a user scanning a long panel can
+// tell upstream from downstream from lateral at a glance.
+function GraphViewRow({ row, arrow }: { row: GraphViewNodeRow; arrow: string }): React.ReactElement {
+  const indent = "  ".repeat(Math.max(0, row.depth));
+  const colorName = POSET_COLORS[row.abstraction];
+  return (
+    <Box flexDirection="column">
+      <Text>
+        {indent}{arrow} <Text color={colorName}>{row.id}</Text>{" "}
+        <Text dimColor>{row.kind}/{row.abstraction}</Text>
+        {row.label ? <Text> — {truncate(row.label, 40)}</Text> : null}
+      </Text>
+      {row.connectingEdges.length > 0 && (
+        <Text dimColor>
+          {indent}    {row.connectingEdges.map((e, i) => (
+            <Text key={i}>{i > 0 ? " · " : ""}{e.direction === "out" ? "→" : "←"} {e.type} {e.otherEnd}</Text>
+          ))}
+        </Text>
+      )}
+    </Box>
+  );
+}
+
+function truncate(s: string, max: number): string {
+  if (s.length <= max) return s;
+  return s.slice(0, max - 1) + "…";
 }

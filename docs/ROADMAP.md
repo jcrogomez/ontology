@@ -96,7 +96,7 @@ Other open follow-ups:
   validation block + edge proposal suggestions. Walker `:link-analysis`
   mirrors the surface using `focal.prompt.raw` as the default candidate.
 - 🟡 Walker v2 (plane / time / branch / manifestation rotation, proposal-review pane).
-- 🟡 Visual DAG Studio (web-based UI).
+- ✅ Visual DAG Studio (terminal-first) — `:graph view [depth]` walker action; web variant deferred.
 - 🟡 `runFromWalker` port onto `EffectWithLog` (compiler-side already done in PR #115).
 - 🟡 Atomic `state.json` writes (write-to-temp + rename) and advisory lock for
   multi-process safety.
@@ -166,13 +166,22 @@ Bootstrap) or 🔵 (longer-term / shape still to be decided).
   question: when branch X is created from main, do existing nodes
   duplicate, project via overlay, or only materialise on touch? Resolve
   in a design note before any code.
-- 🔵 **Visual DAG Studio** — web-based UI projecting the walker into
-  2D. Long-term; depends on the CLI surface stabilising.
+- ✅ **Visual DAG Studio (terminal-first)** — `:graph view [depth]` walker
+  action renders the focal's k-hop subgraph as a structured panel with
+  upstream/downstream/lateral buckets, abstraction-level coloring, and
+  per-row connecting edges. Reuses `extractSubgraph` so it agrees with
+  `onto graph subgraph` on slice membership. See
+  `WALKER_INTERFACE.md`.
+- 🔵 **Web-based Visual DAG Studio** — projecting the walker into 2D.
+  Deferred until the CLI surface stabilises further; the terminal
+  `:graph view` covers the inspection-not-decoration goal for now.
 - 🔵 **Rigor improvements identified by [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §6** —
   presheaf-restriction test, artifact-category for the compiler functor,
   cartesian-lift universal-property test, `onto replay`, etc. Each is
   bite-sized and lifts a specific claim from one tier to the next.
 
 ### Visual DAG Studio
-*(Planned / Not yet implemented)*
-A visual, web-based, multidimensional interface to interact with, query, and edit the `.ontology` graph in real-time, moving beyond the current terminal-first CLI implementation.
+*(Terminal-first variant Implemented / Web variant Planned)*
+The terminal-first variant ships as the walker action `:graph view [depth]` (post-0.9): structured Upstream/Downstream/Lateral buckets with abstraction-level coloring and per-row connecting edges, sharing the `extractSubgraph` helper that backs `onto graph subgraph`. See `WALKER_INTERFACE.md`.
+
+The web variant — a 2D, mouse-driven projection of the same graph with live updates — is deferred until the CLI surface stabilises further. The shape that would make sense first is a static SPA reading `.ontology/` snapshots, with the artifact-trace audit chain as the lead feature (no other tool has it). Edits, proposal staging, and live-update WebSocket pipelines are non-goals for v0.
