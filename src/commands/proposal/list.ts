@@ -1,5 +1,7 @@
 import { listProposals } from "../../core/proposals/persist.js";
 import { ProposalStatusSchema, type Proposal } from "../../schemas/ontology.js";
+import { renderTable } from "../../core/render/table.js";
+import { bold, dim, byStatus, statusGlyph, color } from "../../core/render/style.js";
 
 export interface ProposalListOptions {
   status?: string;
@@ -33,15 +35,19 @@ export async function proposalListCommand(options: ProposalListOptions): Promise
     return;
   }
 
-  console.log("=== ONTOLOGY PROPOSALS ===");
+  console.log(bold("=== ONTOLOGY PROPOSALS ==="));
   if (filtered.length === 0) {
-    console.log(filter ? `(no proposals with status="${filter}")` : "(no proposals)");
+    console.log(dim(filter ? `(no proposals with status="${filter}")` : "(no proposals)"));
     return;
   }
-  console.log(`Count: ${filtered.length}`);
+  console.log(dim(`${filtered.length} proposal${filtered.length === 1 ? "" : "s"}`));
   console.log("");
-  for (const p of filtered) {
-    const created = new Date(p.createdAt * 1000).toISOString();
-    console.log(`${p.id}  ${p.status.padEnd(10)}  ${p.mutation.kind.padEnd(14)}  ${created}`);
-  }
+
+  console.log(renderTable<Proposal>(filtered, [
+    { header: "", render: (r) => statusGlyph((r as Proposal).status) },
+    { header: "Proposal ID",  render: (r) => (r as Proposal).id },
+    { header: "Status",       render: (r) => byStatus((r as Proposal).status) },
+    { header: "Mutation",     render: (r) => color((r as Proposal).mutation.kind, "magenta") },
+    { header: "Created",      render: (r) => dim(new Date((r as Proposal).createdAt * 1000).toISOString()) },
+  ]));
 }

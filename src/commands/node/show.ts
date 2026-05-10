@@ -1,4 +1,6 @@
 import { assertOntologyProject, loadNodeById } from "../../core/project/load.js";
+import { box, kvLines } from "../../core/render/box.js";
+import { bold, dim, byKind, byLevel, byStatus, byManifestation, color } from "../../core/render/style.js";
 
 export async function nodeShowCommand(id: string, options: { json?: boolean } = {}): Promise<void> {
   assertOntologyProject();
@@ -14,50 +16,51 @@ export async function nodeShowCommand(id: string, options: { json?: boolean } = 
     return;
   }
 
-  console.log("=== ONTOLOGY NODE ===\n");
-  console.log(`ID:            ${node.id}`);
-  console.log(`Label:         ${node.label}`);
-  console.log(`Kind:          ${node.kind}`);
-  console.log(`Status:        ${node.status}`);
-  console.log(`Abstraction:   ${node.coordinates.abstraction}`);
-  console.log(`Plane:         ${node.coordinates.plane}`);
-  console.log(`Manifestation: ${node.coordinates.manifestation}`);
-  console.log(`Time:          ${node.coordinates.time}`);
-  console.log(`Branch:        ${node.coordinates.branch}`);
-  console.log(`Frozen:        ${node.integrity.frozen}`);
-  console.log(`Hash:          ${node.integrity.hash}\n`);
+  const identity = kvLines([
+    ["ID",            node.id],
+    ["Label",         node.label],
+    ["Kind",          byKind(node.kind)],
+    ["Status",        byStatus(node.status)],
+    ["Abstraction",   byLevel(node.coordinates.abstraction)],
+    ["Plane",         color(node.coordinates.plane, "cyan")],
+    ["Manifestation", byManifestation(node.coordinates.manifestation)],
+    ["Time",          String(node.coordinates.time)],
+    ["Branch",        color(node.coordinates.branch, "cyan")],
+    ["Frozen",        node.integrity.frozen ? color("yes", "yellow") : dim("no")],
+    ["Hash",          dim(node.integrity.hash)],
+  ]);
 
-  console.log("Context:");
-
-  const printContextList = (title: string, list: any[]) => {
-    console.log(`  ${title}:`);
-    if (list.length === 0) {
-      console.log("    none");
-    } else {
-      for (const item of list) {
-        if (item.key) {
-           console.log(`    - ${item.key}`);
-        } else if (item.source) {
-           console.log(`    - ${item.source}`);
-        } else {
-           console.log(`    - ${JSON.stringify(item)}`);
-        }
-      }
+  const renderContextList = (title: string, list: ReadonlyArray<unknown>): string[] => {
+    if (list.length === 0) return [`${bold(title)}: ${dim("none")}`];
+    const lines = [`${bold(title)}:`];
+    for (const item of list) {
+      const obj = item as Record<string, unknown>;
+      const key = (obj.key as string | undefined) ?? (obj.source as string | undefined);
+      lines.push(`  ${color("-", "gray")} ${key ?? JSON.stringify(item)}`);
     }
+    return lines;
   };
 
-  printContextList("Provides", node.context.provides);
-  printContextList("Requires", node.context.requires);
-  printContextList("Forbids", node.context.forbids);
-  printContextList("Optional", node.context.optional);
+  const contextLines = [
+    bold("Context"),
+    ...renderContextList("Provides", node.context.provides).map((l) => `  ${l}`),
+    ...renderContextList("Requires", node.context.requires).map((l) => `  ${l}`),
+    ...renderContextList("Forbids", node.context.forbids).map((l) => `  ${l}`),
+    ...renderContextList("Optional", node.context.optional).map((l) => `  ${l}`),
+  ];
 
-  console.log("\nRules:");
+  const rulesLines: string[] = [bold("Rules")];
   if (node.rules.length === 0) {
-    console.log("  none");
+    rulesLines.push(`  ${dim("none")}`);
   } else {
     node.rules.forEach((rule, idx) => {
       const cleanRule = rule.replace(/^\d+\.\s*/, "");
-      console.log(`  ${idx + 1}. ${cleanRule}`);
+      rulesLines.push(`  ${dim(`${idx + 1}.`)} ${cleanRule}`);
     });
   }
+
+  console.log(box(
+    [...identity, null, ...contextLines, null, ...rulesLines],
+    { title: bold(`NODE  ${node.id}`), footer: dim(node.integrity.hash.slice(0, 16)) },
+  ));
 }

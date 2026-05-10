@@ -55,8 +55,12 @@ describe("CLI Observability", () => {
     it("onto inspect outputs canon without numeric prefix", () => {
       const result = runCli(tmpDir, ["inspect"]);
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain("Canon:");
-      expect(result.stdout).not.toMatch(/Canon:\n\s*\d+\.\s/);
+      // The card frame includes "Canon" (with or without trailing colon
+      // depending on the visual layer). What matters is the rule itself
+      // appears and is not prefixed with a "1. " counter.
+      expect(result.stdout).toContain("Canon");
+      expect(result.stdout).toMatch(/Ontology is a typed, temporal, directed graph/);
+      expect(result.stdout).not.toMatch(/Canon[:\s]+1\.\s/);
     });
 
     it("onto node list works after init", () => {
@@ -79,8 +83,8 @@ describe("CLI Observability", () => {
     it("onto node show node_0000_canon works after init", () => {
       const result = runCli(tmpDir, ["node", "show", "node_0000_canon"]);
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain("ID:");
       expect(result.stdout).toContain("node_0000_canon");
+      expect(result.stdout).toContain("Ontology Mathematical Canon");
       // Human readable rules output should not contain double prefix '1. 1. '
       expect(result.stdout).not.toMatch(/1\. 1\./);
     });
@@ -97,7 +101,8 @@ describe("CLI Observability", () => {
     it("onto events tail works after init", () => {
       const result = runCli(tmpDir, ["events", "tail"]);
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain("Sequence");
+      // Events table header is "Seq" (compact) since the visual rewrite.
+      expect(result.stdout).toMatch(/Seq(uence)?/);
       expect(result.stdout).toContain("system_init");
     });
 

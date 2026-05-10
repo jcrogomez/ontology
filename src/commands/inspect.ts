@@ -3,6 +3,8 @@ import * as path from "node:path";
 import { getOntologyPaths } from "../core/project/paths.js";
 import { loadState, loadNodeById, loadEvents, loadEdges, loadModelsRegistry, loadProcessorsRegistry } from "../core/project/load.js";
 import type { OntologyNode } from "../schemas/ontology.js";
+import { box, kvLines } from "../core/render/box.js";
+import { bold, dim, byLevel, color } from "../core/render/style.js";
 
 // Inspect is observational only. It must never mutate the network.
 
@@ -88,25 +90,33 @@ export async function inspectCommand(options: { json?: boolean } = {}): Promise<
     return;
   }
 
-  console.log(`=== ONTOLOGY PROJECT INSPECT ===
+  const summary = kvLines([
+    ["Project",     state.projectName],
+    ["Schema",      state.schemaVersion],
+    ["Branch",      color(state.activeBranch, "cyan")],
+    ["Root node",   `${state.rootNodeId}  ${dim(rootNode.label)}`],
+    ["Root level",  byLevel(rootNode.coordinates.abstraction)],
+    ["Nodes",       String(state.nodeCount)],
+    ["Edges",       String(edges.length)],
+    ["Events",      String(events.length)],
+    ["Models",      String(modelsRegistry.models.length)],
+    ["Processors",  String(processorsRegistry.processors.length)],
+  ]);
 
-Project:        ${state.projectName}
-Schema:         ${state.schemaVersion}
-Branch:         ${state.activeBranch}
-Root node:      ${state.rootNodeId}
-Root label:     ${rootNode.label}
-Nodes:          ${state.nodeCount}
-Edges:          ${edges.length}
-Events:         ${events.length}
-Models:         ${modelsRegistry.models.length}
-Processors:     ${processorsRegistry.processors.length}
+  const canonSection = [
+    bold("Canon"),
+    `  ${canonDisplay}`,
+  ];
 
-Canon:
-  ${canonDisplay}
+  const statusSection = [
+    bold("Status"),
+    `  ${color("●", "green")} Network kernel initialized`,
+    `  ${color("●", "green")} Integrity validation available`,
+    `  ${color("●", "green")} Compilation enabled (onto compile run)`,
+  ];
 
-Status:
-  Network kernel initialized.
-  Integrity validation available.
-  Compilation not enabled yet.
-`);
+  console.log(box(
+    [...summary, null, ...canonSection, null, ...statusSection],
+    { title: bold("ONTOLOGY PROJECT INSPECT") },
+  ));
 }

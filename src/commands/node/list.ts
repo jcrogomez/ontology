@@ -1,4 +1,7 @@
 import { assertOntologyProject, loadNodes } from "../../core/project/load.js";
+import type { OntologyNode } from "../../schemas/ontology.js";
+import { renderTable } from "../../core/render/table.js";
+import { byKind, byLevel, byManifestation, byStatus, statusGlyph, dim, bold } from "../../core/render/style.js";
 
 export async function nodeListCommand(options: { json?: boolean } = {}): Promise<void> {
   assertOntologyProject();
@@ -20,31 +23,17 @@ export async function nodeListCommand(options: { json?: boolean } = {}): Promise
     return;
   }
 
-  // ID                 Kind       Status     Abstraction   Plane       Label
-  const idPad = 22;
-  const kindPad = 16;
-  const statusPad = 12;
-  const abstractionPad = 16;
-  const planePad = 14;
+  console.log(bold("=== ONTOLOGY NODES ==="));
+  console.log(dim(`${nodes.length} node${nodes.length === 1 ? "" : "s"}`));
+  console.log("");
 
-  console.log("=== ONTOLOGY NODES ===");
-  console.log(
-    "ID".padEnd(idPad) +
-    "Kind".padEnd(kindPad) +
-    "Status".padEnd(statusPad) +
-    "Abstraction".padEnd(abstractionPad) +
-    "Plane".padEnd(planePad) +
-    "Label"
-  );
-
-  for (const n of nodes) {
-    console.log(
-      n.id.padEnd(idPad) +
-      n.kind.padEnd(kindPad) +
-      n.status.padEnd(statusPad) +
-      n.coordinates.abstraction.padEnd(abstractionPad) +
-      n.coordinates.plane.padEnd(planePad) +
-      n.label
-    );
-  }
+  console.log(renderTable<OntologyNode>(nodes, [
+    { header: "", render: (r) => statusGlyph((r as OntologyNode).status) },
+    { header: "ID", render: (r) => (r as OntologyNode).id },
+    { header: "Kind", render: (r) => byKind((r as OntologyNode).kind) },
+    { header: "Level", render: (r) => byLevel((r as OntologyNode).coordinates.abstraction) },
+    { header: "Status", render: (r) => byStatus((r as OntologyNode).status) },
+    { header: "Manifestation", render: (r) => byManifestation((r as OntologyNode).coordinates.manifestation) },
+    { header: "Label", render: (r) => (r as OntologyNode).label, maxWidth: 40 },
+  ]));
 }
