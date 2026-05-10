@@ -106,7 +106,7 @@ At this stage, Ontology is a verified network kernel, a node editor, a proposal 
 **Known limitations:**
 - Branch fibration has no `onto` CLI surface yet — only walker `:branch list`. Branch-aware compile is a follow-up.
 - Validator port (post-0.9) is closed-world by default: `result.verdict` is observable as Ω, but `result.ok` collapses to Boolean; an `openWorld?: boolean` flag on `validateIntent` would expose three-valued behaviour to callers.
-- Semantic linker is exposed only as a programmatic API (`semanticLink()`).
+- Semantic linker has a read-only CLI (`onto link <nodeId>`); proposal-mutation flow stays manual through `onto propose link`.
 - `runFromWalker` is still on the legacy try/catch path; the `EffectWithLog` refactor covers `compileNode` only.
 - `state.json` and `events.jsonl` writes are not crash-atomic — a SIGKILL or out-of-disk mid-write can truncate the file. The single-writer assumption (CLI single-shot) is unchanged; concurrent invocations from multiple processes are not lock-protected.
 - Several rhetorical claims in the docs (limit/colimit framing of compile-plan, "rewrite rule" framing of proposals, "shadow" metaphor of compiled code) are useful intuition but not pinned by tests. See [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) for the full ledger.

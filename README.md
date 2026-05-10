@@ -76,7 +76,7 @@ compilation (topological plan run, model dispatch, artifact written)
 file on disk (auditable: artifact → event → run → prompt hash → node)
 ```
 
-Every step is recorded in the append-only `events.jsonl`. Every artifact ties back to a `compilation_run` event. The chain is replayable in either direction.
+Every step is recorded in the append-only `events.jsonl`. Every artifact ties back to a `compilation_run` event. The chain is auditable in either direction (`onto runs verify`, `onto events tail`, `onto runs show`). Replay-as-rebuild — reconstructing `state.json` from the events log — is roadmap, not shipped; today state is loaded from `state.json` directly. See [`MATHEMATICAL_CLAIMS.md`](docs/MATHEMATICAL_CLAIMS.md) §4.4 for the rigor classification.
 
 ## Why this exists
 
@@ -142,7 +142,7 @@ If you want to **contribute or extend**:
 | 2. Temporal log | append-only `events.jsonl` with hash chain |
 | 3. Abstraction poset | enforced at `node link` and `validate` for the refinement family |
 | 4. Prompts as rewrite rules | `parsePromptAST` lifts `@requires:` / `@provides:` / `@expand:` markers into a structured `PromptAST`; `compileNode` consumes the parsed body |
-| 5. Presheaf context | `assembleContext`, `glueFragments`, `validateIntent`, edge-aware `semanticLink` |
+| 5. Presheaf context | `assembleContext`, `glueFragments`, `validateIntent` (built on the topos predicate algebra), edge-aware `semanticLink` (CLI: `onto link <nodeId>`) |
 | 6. Compiler functor | `onto compile run` walks the topological plan; refinement-parent context threading, per-node `model.ref` routing through the registry, language parse-check on every artifact, optional `--runtime-check` execution, and a top-level `EffectWithLog` retire the legacy try/catch tower |
 | 7. Code as compiled shadow | every artifact under `.ontology/artifacts/generated/` ties back through events to nodes; code-fence stripping + parse validation enforce structural fidelity |
 

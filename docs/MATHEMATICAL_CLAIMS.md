@@ -16,9 +16,11 @@ must appear here, classified honestly. If a doc *suggests* the analogy
 without claiming the formal correspondence, it should still appear
 here under tier T2 or T3.
 
-The audit was last refreshed on **2026-05-10** against commit
-`feat/cli-visual-cards-and-colors` (the validator port). Whenever code
-or docs change, this map should be re-verified.
+The audit was last refreshed on **2026-05-10** against `main` after the
+post-0.9 changes landed: the validator port onto the topos algebra
+(PR #119), the semantic linker CLI + `:link-analysis` walker action
+(PR #120), and the walker `:graph view [depth]` action (PR #121).
+Whenever code or docs change, this map should be re-verified.
 
 ---
 
