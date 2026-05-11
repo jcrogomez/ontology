@@ -148,6 +148,39 @@ describe("onto link", () => {
     expect(result.stderr).toContain("mutually exclusive");
   });
 
+  it("rejects a --candidate-file that contains binary data (NUL byte)", () => {
+    bootstrapState(cwd, { nodeCount: 2 });
+    writeNode(cwd, mkCanon());
+    writeNode(cwd, mkFocal());
+
+    // Synthetic PNG header: classic binary fingerprint with a NUL byte
+    // in the second slot. fs.readFileSync(..., "utf8") silently turns
+    // this into a garbage string rather than throwing, so the guard
+    // has to inspect the decoded content.
+    const binPath = path.join(cwd, "candidate.png");
+    fs.writeFileSync(binPath, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x1a, 0x0a]));
+
+    const result = runCli(cwd, ["link", "node_focal", "--candidate-file", binPath]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("must be a readable UTF-8 text file");
+    expect(result.stderr).toContain("binary data");
+  });
+
+  it("--json on a binary --candidate-file emits ok:false rather than running the linker", () => {
+    bootstrapState(cwd, { nodeCount: 2 });
+    writeNode(cwd, mkCanon());
+    writeNode(cwd, mkFocal());
+
+    const binPath = path.join(cwd, "candidate.bin");
+    fs.writeFileSync(binPath, Buffer.from([0x00, 0x00, 0x00]));
+
+    const result = runCli(cwd, ["link", "node_focal", "--candidate-file", binPath, "--json"]);
+    expect(result.status).toBe(1);
+    const parsed = JSON.parse(result.stdout);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toContain("binary data");
+  });
+
   it("fails on missing focal node", () => {
     bootstrapState(cwd, { nodeCount: 1 });
     writeNode(cwd, mkCanon());

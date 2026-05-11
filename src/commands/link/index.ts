@@ -82,6 +82,19 @@ export async function linkCommand(focalId: string, options: LinkCommandOptions):
       fail(`Failed to read --candidate-file: ${errorMessage(err)}`, isJson);
       return;
     }
+    // Binary-content guard. fs.readFileSync(..., "utf8") does not throw on
+    // binary input — it silently returns a string of garbled bytes plus
+    // U+FFFD replacements, which the semantic linker would then try to
+    // analyse as prose. A NUL byte is a high-precision signal of binary
+    // content (legitimate UTF-8 text essentially never contains U+0000),
+    // so surface an actionable error before any LLM work is wasted.
+    if (candidateText.includes("\u0000")) {
+      fail(
+        `--candidate-file must be a readable UTF-8 text file — ${options.candidateFile} contains binary data.`,
+        isJson,
+      );
+      return;
+    }
   } else {
     fail(
       `onto link requires a candidate. Pass --candidate "<text>" or --candidate-file <path>.`,
