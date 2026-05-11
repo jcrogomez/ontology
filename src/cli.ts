@@ -20,6 +20,8 @@ import { walkCommand } from "./commands/walk.js";
 import { graphNeighborsCommand } from "./commands/graph/neighbors.js";
 import { graphPathCommand } from "./commands/graph/path.js";
 import { graphSubgraphCommand } from "./commands/graph/subgraph.js";
+import { branchListCommand } from "./commands/branch/list.js";
+import { branchFiberCommand } from "./commands/branch/fiber.js";
 import { linkCommand } from "./commands/link/index.js";
 import { proposeNodeCommand } from "./commands/proposal/propose-node.js";
 import { proposeLinkCommand } from "./commands/proposal/propose-link.js";
@@ -440,6 +442,36 @@ graph
       await graphSubgraphCommand(id, options);
     } catch (err: unknown) {
       console.error(`✖ Error extracting subgraph: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+const branch = program
+  .command("branch")
+  .description("Read-only views over Grothendieck fibers of the typed graph (list, fiber).");
+
+branch
+  .command("list")
+  .description("List the distinct branches present in the project, with per-branch node counts.")
+  .option("--json", "Output results in JSON format")
+  .action(async (options) => {
+    try {
+      await branchListCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error listing branches: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+branch
+  .command("fiber <name>")
+  .description("Render the fiber over a branch: the induced subgraph of nodes and edges on that branch.")
+  .option("--json", "Output results in JSON format")
+  .action(async (name, options) => {
+    try {
+      await branchFiberCommand(name, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error rendering branch fiber: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
