@@ -179,7 +179,21 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 - **Why T1 for the algebra:** truth tables exhausted, monotonicity tested, parity-with-gluing pinned by an exhaustive sweep over a small token universe.
 - **Why T2 for the validator port:** the validator is now compositional and three-valued internally, but the externally-observable behaviour is closed-world (every synthetic token is classified by `buildEvaluationContext`). The Ω verdict is exposed via `result.verdict`, but the high-level `result.ok` collapses to Boolean. We *can* see "unknown" via the lower-level helpers; we don't yet *use* it from any caller.
 - **Why we are **not** a topos:** `omegaImplies` is the Kleene material implication `¬a ∨ b`, not the Heyting implication of a frame Ω. We don't compute inside any presheaf topos; Ω is just a three-element set with operations. `RULES_TOPOS.md` §1 and §7 admit this directly — keep that disclaimer.
-- **Rigor improvement:** add a property test that `evaluatePredicate(p, ctx)` over the closed-world reduction agrees with a hand-rolled Boolean evaluator for the same `p` (parity contract for the validator's domain, not just for `compileNodeRules`). And, when a real caller materialises that wants three-valued verdicts, expose an `openWorld?: boolean` flag on `validateIntent` rather than only via the lower-level helpers — that uplifts the validator port to T1.
+- **Rigor improvement:** add a property test that `evaluatePredicate(p, ctx)` over the closed-world reduction agrees with a hand-rolled Boolean evaluator for the same `p` (parity contract for the validator's domain, not just for `compileNodeRules`). And, when a real caller materialises that wants three-valued verdicts, expose an `openWorld?: boolean` flag on `validateIntent` rather than only via the lower-level helpers — that uplifts the validator port to T1. **Update 2026-05-11:** `openWorld` shipped at commit `c835509`; the validator now exposes the three-valued verdict end-to-end through `semanticLink` and `validateIntent`. The validator port is on a T1 path; only the closed-world parity property test remains.
+
+### 3.10 Compile adjoint (Project Legend)
+
+- **Tier:** T4 (aspirational) → planned T2 (operationally implemented) after Phase ε.
+- **Code:** **none yet.** Forward functor $F\colon \mathcal{I} \to \mathcal{C}$ ships at `src/runtime/compile/compile-node.ts` + `compile-plan-runner.ts`. The proposed approximate left adjoint $G\colon \mathcal{C} \to \mathcal{I}$ — implemented as `onto ingest <path>` — is the subject of [`PROJECT_LEGEND.md`](PROJECT_LEGEND.md). Pre-foundation work (the plasticity primitives) shipped at commit `e847417`; the Legend infrastructure layers (1–7 in PROJECT_LEGEND.md §5) are pending.
+- **The claim, formally.** There exists a probabilistic functor $G$ and a natural transformation $\eta\colon \mathrm{id}_{\mathcal{C}} \Rightarrow F \circ G$ such that for a measurable subcategory $\mathcal{C}_{\text{faithful}} \subseteq \mathcal{C}$,
+
+  $$d\bigl(c,\, F(G(c))\bigr) < \varepsilon \quad \forall c \in \mathcal{C}_{\text{faithful}},$$
+
+  where $d$ is LoC-churn distance and $\varepsilon \approx 0.3$. The complement $\mathcal{C}_{\text{resistant}}$ is the intent-resistant subcategory: code carrying irreducible implementation detail (escape-hatched via `node.literal`) or code whose intent does not compress.
+- **Why T4 today:** $G$ is not implemented. The forward functor passes the §1 gate (the validator now refuses outputs that violate the focal's contract — commit `1a8a4c3`), which is the *necessary precondition* for the adjunction claim, but not the adjunction itself.
+- **Path to T2:** Phase ε in PROJECT_LEGEND.md — run Legend's ingest + verification on the Ontology repo itself and report quantified $\varepsilon$ on the measured subcategories. Once Phase ε ships, this entry upgrades to T2 with a citation to the report file (`docs/LEGEND_RUN_<date>.md`).
+- **Path to T1:** Phase ζ — a property test that, for a small fixed test repo, `verify-homeomorphism` returns the same verdict map deterministically across runs. The non-determinism of $F$ (LLM temperature) means we cannot pin every artifact byte-equal; the verdict map per node *is* deterministic at `temperature = 0` and that is what gets pinned.
+- **Why this is the load-bearing T4 of the next chapter.** Every category-theoretic claim in the project to date has been either a single-direction functor (T1/T2) or an internal monad (T1). An **adjoint pair** with measured tolerance is qualitatively stronger; it is the standard structure category theory uses to relate two categories, and constructing one operationally is what distinguishes "rhetorical category theory in a README" from "operational category theory in a tool". Project Legend is the move from the former to the latter.
 
 ---
 
@@ -233,6 +247,29 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 - **Tier:** T4 (aspirational).
 - **Code:** none — only the read-only `describeCartesianLift` exists.
 - **Rigor improvement:** keep it in `BRANCH_FIBRATION.md` §Future Work and `CATEGORICAL_VISION.md` §2.3 only; do not advertise it as "shipped".
+
+### 4.8 Inspector triangle (translator natural transformation)
+
+- **Tier:** T4 (aspirational), planned T2 after Phase δ of Project Legend.
+- **Code:** none — see [`PROJECT_LEGEND.md`](PROJECT_LEGEND.md) §3.
+- **The claim, formally.** There exists a natural transformation $\tau\colon \mathrm{intent} \Rightarrow \mathrm{prose}$ (LLM-mediated, one call per node, cached as `node.translator`) such that the triangle
+
+  $$\mathrm{intent} \xrightarrow{F} \mathrm{code} \xrightarrow{\sigma} \mathrm{prose}$$
+
+  factors through $\tau$ up to $\varepsilon$ — i.e., the translator of the intent and the LLM-described code are equivalent under a paragraph-similarity metric. The economic claim attached: $\tau$ is *cheaper* than $\sigma \circ F$ because the intent is shorter than the code and the translator runs once per node lifetime rather than per inspection.
+- **Path to T2:** Phase δ ships `onto node inspect <id>` + the caching schema field; report measured agreement between $\tau$ and $\sigma \circ F$ on a sample of nodes.
+
+### 4.9 Open-Prompt protocol
+
+- **Tier:** T4 (aspirational).
+- **Code:** none — see [`PROJECT_LEGEND.md`](PROJECT_LEGEND.md) §4.
+- **The claim, formally.** Given an organisation $O$ publishing $(\mathsf{N}_O, \sigma_O(\mathsf{N}_O), \mathsf{events}_O)$ where $\sigma_O$ is a digital signature over a Merkle root of node hashes, any third party can verify
+  1. Audit-chain integrity (events form a hash-prepended chain);
+  2. Intent-source consistency (every emitted artefact passes `validateIntent` against $\mathsf{N}_O$);
+  3. Lineage (each `compilation_run` event references a node and a runId that re-verifies under `onto runs verify`).
+
+  The protocol gives a third party verifiable answers about what code runs *without* exposing the code itself — a trust-transparency layer between open-source and proprietary self-attestation.
+- **Path to T2:** Phase ζ ships `onto sign`, `onto verify-published`, `onto replay --against`. Out of scope for Legend v1; recorded here so the formal claim is named and tier-classified.
 
 ---
 
