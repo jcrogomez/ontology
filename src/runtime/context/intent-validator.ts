@@ -55,6 +55,21 @@ export interface IntentValidationInput {
     provider: LlmProvider;
     model: string;
   };
+  /**
+   * When true, the EvaluationContext is built leniently: a forbid phrase
+   * that does not syntactically appear in the candidate text is left
+   * *unclassified* rather than asserted to be absent. The atom evaluator
+   * then returns "unknown" for that rule and the verdict can fold to
+   * "unknown" via the Heyting-algebra meet — which is exactly what
+   * callers who want to distinguish "decisively rejected" from "could
+   * not decide" need.
+   *
+   * Closed-world (default) preserves the legacy two-valued contract: every
+   * forbid token is provided or denied, and verdict ∈ {"true","false"}.
+   * The `ok` field is unchanged in both modes — `ok === (verdict ===
+   * "true")` — so existing two-valued callers see no behaviour change.
+   */
+  openWorld?: boolean;
 }
 
 export interface IntentValidationResult {
@@ -99,10 +114,19 @@ function extractForbiddenPhrases(constraints: readonly string[]): string[] {
 }
 
 /**
- * Build the closed-world `EvaluationContext` that the validator's predicate
- * runs against. Every synthetic token is either provided or denied — there
- * is no third state — which is what makes the validator's externally
- * observable behaviour two-valued.
+ * Build the `EvaluationContext` that the validator's predicate runs
+ * against. Two modes:
+ *
+ *   • Closed-world (default): every synthetic token is either provided or
+ *     denied — there is no third state — which is what makes the
+ *     validator's externally observable behaviour two-valued.
+ *   • Open-world (`openWorld: true`): a forbid token whose phrase does
+ *     not appear in the candidate text is left out of both sets, so the
+ *     atom evaluator returns "unknown" instead of "true". The conjunction
+ *     can then fold to "unknown", letting callers distinguish "phrase
+ *     definitely absent in this artefact" from "phrase not seen, but
+ *     unobservable channels exist". The structural truths (gluing_ok,
+ *     candidate_nonempty) remain decidable in both modes.
  *
  * Exposed for tests and for callers that want to evaluate a custom predicate
  * against the same context as `validateIntent`.
@@ -110,6 +134,7 @@ function extractForbiddenPhrases(constraints: readonly string[]): string[] {
 export function buildEvaluationContext(input: IntentValidationInput): EvaluationContext {
   const provided = new Set<string>();
   const denied = new Set<string>();
+  const openWorld = input.openWorld === true;
 
   if (input.glued.ok) provided.add(TOKEN_GLUING_OK);
   else denied.add(TOKEN_GLUING_OK);
@@ -122,9 +147,15 @@ export function buildEvaluationContext(input: IntentValidationInput): Evaluation
     // A phrase token is "provided" iff the phrase appears in the candidate
     // text. The validator predicate uses `atomForbids` over these tokens, so
     // "provided" → predicate is false (phrase present) and "denied" →
-    // predicate is true (phrase absent).
-    if (input.candidate.text.includes(phrase)) provided.add(token);
-    else denied.add(token);
+    // predicate is true (phrase absent). In open-world mode the absent
+    // branch leaves the token unclassified — the atom evaluator returns
+    // "unknown" and the conjunction folds accordingly.
+    if (input.candidate.text.includes(phrase)) {
+      provided.add(token);
+    } else if (!openWorld) {
+      denied.add(token);
+    }
+    // else: open-world + phrase absent → token stays unclassified.
   }
 
   return { providedTokens: provided, deniedTokens: denied };

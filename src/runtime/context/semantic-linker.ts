@@ -4,6 +4,7 @@ import { glueFragments, type GluingConflict } from "./gluing.js";
 import { validateIntent } from "./intent-validator.js";
 import { OntologyRuntimeError } from "../errors.js";
 import { LlmProviderSchema, type OntologyEdge } from "../../schemas/ontology.js";
+import type { Omega } from "../topos/index.js";
 
 // Semantic linker: the programmatic counterpart to `run context --validate`.
 // Walks the focal node's local neighborhood, glues the presheaf fragments,
@@ -32,6 +33,12 @@ export interface SemanticLinkInput {
   // for callers that walked only the parent path.
   includeEdges?: boolean;
   edgeTypes?: OntologyEdge["type"][];
+  // Pass-through to validateIntent: when true, forbid phrases that do not
+  // appear in the candidate text are left unclassified instead of denied,
+  // so the resulting `validation.verdict` can be "unknown" rather than
+  // collapsing to "true". The legacy boolean `validation.ok` is unchanged
+  // — callers that already read it see the same closed-world projection.
+  openWorld?: boolean;
 }
 
 export interface SemanticLinkResult {
@@ -43,6 +50,12 @@ export interface SemanticLinkResult {
     score: number;
     violations: string[];
     warnings: string[];
+    // Three-valued verdict from the underlying predicate evaluation.
+    // Under the default closed-world build this is always "true" or
+    // "false" and tracks `ok` exactly. With `openWorld: true` it can
+    // additionally be "unknown" — useful for callers that want to render
+    // "decisively rejected" differently from "could not decide".
+    verdict: Omega;
   };
   // The presheaf fragments that fed gluing, in the same order as
   // `contextNodeIds`. Exposed so callers (notably `onto link`) can
@@ -105,7 +118,8 @@ export async function semanticLink(input: SemanticLinkInput): Promise<SemanticLi
       text: input.candidate.text,
       provider: providerResult.data,
       model: input.candidate.model
-    }
+    },
+    openWorld: input.openWorld,
   });
 
   const ok = glued.ok && validation.ok;

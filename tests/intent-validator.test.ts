@@ -213,7 +213,9 @@ describe("Intent Validator", () => {
       // Sanity check the closed-world reduction: under the standard build
       // every rule's predicate evaluates to a definite verdict. This is
       // what guarantees that `validateIntent` never returns
-      // verdict === "unknown" today, even though the algebra supports it.
+      // verdict === "unknown" by default, even though the algebra supports
+      // it. The open-world flag below explicitly opts into the "unknown"
+      // path for forbid rules.
       const input = {
         assembled: {
           ...baseAssembled,
@@ -228,6 +230,104 @@ describe("Intent Validator", () => {
         const v = evaluatePredicate(rule.predicate, ctx);
         expect(v === "true" || v === "false").toBe(true);
       }
+    });
+  });
+
+  describe("open-world mode (openWorld: true)", () => {
+    it("a forbid phrase that does not appear in the candidate yields verdict 'unknown' (not 'true')", () => {
+      // Closed-world: phrase absent → forbid rule passes → verdict 'true'.
+      // Open-world: phrase absent → forbid token is unclassified → atom is
+      // 'unknown' → conjunction is 'unknown'. The whole point of the flag
+      // is to distinguish "syntactically absent" from "semantically safe".
+      const input = {
+        assembled: {
+          ...baseAssembled,
+          constraints: ["FORBID: mutate .ontology"],
+        },
+        glued: baseGlued,
+        candidate: { ...baseCandidate, text: "totally clean prose, no forbidden phrase here" },
+        openWorld: true,
+      };
+      const result = validateIntent(input);
+      expect(result.verdict).toBe("unknown");
+      // ok stays the deterministic two-valued projection — callers that
+      // never read `verdict` see "not OK" rather than a silent pass.
+      expect(result.ok).toBe(false);
+      // No violations: nothing is decisively wrong. Score is unchanged.
+      expect(result.violations).toEqual([]);
+      expect(result.score).toBe(1.0);
+      // The undecided rule surfaces as a warning so the caller can render
+      // an "uncertain" marker next to it.
+      expect(result.warnings.some((w) => w.includes("Undecided validator rule: forbid:mutate .ontology"))).toBe(true);
+    });
+
+    it("a forbid phrase that DOES appear is still a decisive 'false' in open-world mode", () => {
+      // Open-world doesn't downgrade decisive failures — only absences.
+      const input = {
+        assembled: {
+          ...baseAssembled,
+          constraints: ["FORBID: mutate .ontology"],
+        },
+        glued: baseGlued,
+        candidate: { ...baseCandidate, text: "I will mutate .ontology now" },
+        openWorld: true,
+      };
+      const result = validateIntent(input);
+      expect(result.verdict).toBe("false");
+      expect(result.ok).toBe(false);
+      expect(result.violations).toContain("Forbidden phrase found: mutate .ontology");
+    });
+
+    it("gluing failure is still a decisive 'false' (structural rules stay classified)", () => {
+      // Open-world only relaxes the closed-world default for forbid phrases.
+      // Decidable structural rules (gluing, non-empty candidate) keep their
+      // two-valued behaviour regardless of the flag.
+      const result = validateIntent({
+        assembled: baseAssembled,
+        glued: { ...baseGlued, ok: false, conflicts: [{ type: "branch", message: "x" }] },
+        candidate: baseCandidate,
+        openWorld: true,
+      });
+      expect(result.verdict).toBe("false");
+      expect(result.ok).toBe(false);
+    });
+
+    it("opt-out by default — omitting openWorld preserves the closed-world contract", () => {
+      // Same input as the first open-world case but without the flag. The
+      // verdict must collapse back to 'true' under the legacy semantics.
+      const input = {
+        assembled: {
+          ...baseAssembled,
+          constraints: ["FORBID: mutate .ontology"],
+        },
+        glued: baseGlued,
+        candidate: { ...baseCandidate, text: "totally clean prose, no forbidden phrase here" },
+      };
+      const result = validateIntent(input);
+      expect(result.verdict).toBe("true");
+      expect(result.ok).toBe(true);
+      expect(result.warnings.every((w) => !w.includes("Undecided"))).toBe(true);
+    });
+
+    it("the open-world EvaluationContext leaves absent-forbid tokens unclassified", () => {
+      // Direct inspection of the context's two sets. The structural tokens
+      // remain decidable; only the forbid token whose phrase is absent
+      // disappears from both sets.
+      const input = {
+        assembled: {
+          ...baseAssembled,
+          constraints: ["FORBID: alpha", "FORBID: beta"],
+        },
+        glued: baseGlued,
+        candidate: { ...baseCandidate, text: "contains alpha but not the other" },
+        openWorld: true,
+      };
+      const ctx = buildEvaluationContext(input);
+      // alpha appears → provided.
+      expect(ctx.providedTokens.has("__validator__:forbid_phrase:alpha")).toBe(true);
+      // beta is absent → in open-world mode, neither provided nor denied.
+      expect(ctx.providedTokens.has("__validator__:forbid_phrase:beta")).toBe(false);
+      expect(ctx.deniedTokens.has("__validator__:forbid_phrase:beta")).toBe(false);
     });
   });
 });
