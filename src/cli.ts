@@ -9,6 +9,7 @@ import { createNodeCommand } from "./commands/node/create.js";
 import { nodeListCommand } from "./commands/node/list.js";
 import { nodeShowCommand } from "./commands/node/show.js";
 import { nodeLinkCommand } from "./commands/node/link.js";
+import { nodeUpdateCommand } from "./commands/node/update.js";
 import { eventsTailCommand } from "./commands/events/tail.js";
 import { contextAssembleCommand } from "./commands/context/assemble.js";
 import { runPromptCommand } from "./commands/run/prompt.js";
@@ -202,6 +203,29 @@ node
         console.log(JSON.stringify({ ok: false, error: errorMessage(err) }));
       } else {
         console.error(`✖ Error linking nodes: ${errorMessage(err)}`);
+      }
+      process.exit(1);
+    }
+  });
+
+node
+  .command("update <id>")
+  .description("Edit a node in place: prompt / label / rules / contract tokens. Re-hashes and emits a node_updated event with old and new hashes. Fields not passed are preserved verbatim; passing an empty string clears that field.")
+  .option("--prompt <prompt>", "New prompt text (replaces node.prompt.raw and the source_prompt input).")
+  .option("--label <label>", "New label.")
+  .option("--rules <rules>", "Pipe-separated rule strings; replaces node.rules wholesale. Pass --rules \"\" to clear.")
+  .option("--requires <tokens>", "Comma-separated tokens; replaces context.requires wholesale. Pass --requires \"\" to clear.")
+  .option("--provides <tokens>", "Comma-separated tokens; replaces context.provides wholesale. Pass --provides \"\" to clear.")
+  .option("--forbids <tokens>", "Comma-separated tokens; replaces context.forbids wholesale. Pass --forbids \"\" to clear.")
+  .option("--json", "Output results in JSON format")
+  .action(async (id, options) => {
+    try {
+      await nodeUpdateCommand(id, options);
+    } catch (err: unknown) {
+      if (options.json) {
+        console.log(JSON.stringify({ ok: false, error: errorMessage(err) }));
+      } else {
+        console.error(`✖ Error updating node: ${errorMessage(err)}`);
       }
       process.exit(1);
     }
