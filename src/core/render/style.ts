@@ -61,9 +61,20 @@ const COLOR_CODES: Record<string, string> = {
 export type NamedColor = keyof typeof COLOR_CODES;
 
 // True when ANSI escapes should actually appear in the output. Honors NO_COLOR
-// and the absence of a TTY. Re-evaluated on every call so tests can monkey-
-// patch the environment between cases.
+// and the absence of a TTY. The result is memoised on first call so high-
+// volume callers (e.g. an `events tail` over 1000 rows × 5 cells) do not
+// pay an env-lookup + TTY syscall per cell. Tests that flip the underlying
+// environment variables between cases must call `resetColorCache()` to
+// invalidate the memo.
+let cachedColorsEnabled: boolean | null = null;
+
 export function colorsEnabled(): boolean {
+  if (cachedColorsEnabled !== null) return cachedColorsEnabled;
+  cachedColorsEnabled = computeColorsEnabled();
+  return cachedColorsEnabled;
+}
+
+function computeColorsEnabled(): boolean {
   if (process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== "") {
     return false;
   }
@@ -71,6 +82,13 @@ export function colorsEnabled(): boolean {
     return true;
   }
   return Boolean(process.stdout && process.stdout.isTTY);
+}
+
+// Invalidate the memo. Tests that toggle NO_COLOR / FORCE_COLOR between
+// cases must call this so the next colorsEnabled() picks up the change.
+// Production code never needs to call it.
+export function resetColorCache(): void {
+  cachedColorsEnabled = null;
 }
 
 function wrap(code: string, text: string): string {

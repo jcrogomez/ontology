@@ -13,6 +13,7 @@ import {
 } from "../src/core/render/style.js";
 import { box, kvLines } from "../src/core/render/box.js";
 import { renderTable } from "../src/core/render/table.js";
+import { resetColorCache } from "../src/core/render/style.js";
 
 let originalNoColor: string | undefined;
 let originalForceColor: string | undefined;
@@ -22,6 +23,7 @@ beforeEach(() => {
   originalForceColor = process.env.FORCE_COLOR;
   process.env.FORCE_COLOR = "1"; // ensure ANSI even when test runner is non-TTY
   delete process.env.NO_COLOR;
+  resetColorCache(); // invalidate memo so this case's env wins
 });
 
 afterEach(() => {
@@ -29,6 +31,7 @@ afterEach(() => {
   else process.env.NO_COLOR = originalNoColor;
   if (originalForceColor === undefined) delete process.env.FORCE_COLOR;
   else process.env.FORCE_COLOR = originalForceColor;
+  resetColorCache();
 });
 
 describe("style.ts", () => {
@@ -42,6 +45,7 @@ describe("style.ts", () => {
   it("color() degrades to raw text when NO_COLOR is set", () => {
     process.env.NO_COLOR = "1";
     delete process.env.FORCE_COLOR;
+    resetColorCache(); // invalidate the memo so the new env wins
     expect(color("hello", "red")).toBe("hello");
   });
 
