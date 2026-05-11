@@ -1,6 +1,6 @@
 import type { OntologyNode, OntologyEdge } from "../../schemas/ontology.js";
 import type { LlmProvider } from "../llm/types.js";
-import { loadEdges, loadNodeById, loadModelsRegistry } from "../../core/project/load.js";
+import { loadEdges, loadNodes, loadModelsRegistry } from "../../core/project/load.js";
 import { computeCompilePlan, type CompilePlan } from "../graph/compile-plan.js";
 import { compileNode, type CompileNodeResult } from "./compile-node.js";
 import type { WriteArtifactResult } from "./artifact-writer.js";
@@ -94,13 +94,21 @@ export async function runCompilePlan(options: CompilePlanRunOptions): Promise<Co
   // inherits_from, ...) are NOT threaded into system today — they participate
   // in topological order but not in the per-node refinement context. The
   // full closure remains traceable via events.jsonl + run records.
+  //
+  // Pre-load every node referenced by the plan into a single map. The
+  // previous shape called loadNodeById per step AND once per refinement
+  // parent inside collectUpstream, producing O(steps × parents) disk
+  // reads on large plans; with the map both sites become hash lookups.
+  const allNodes = loadNodes(cwd);
+  const nodeById = new Map<string, OntologyNode>(allNodes.map((n) => [n.id, n]));
+
   const steps: CompilePlanStepResult[] = [];
   const compiledResponses: Map<string, string> = new Map();
   const refinementParents = buildRefinementParentsIndex(edges);
   let focalArtifact: WriteArtifactResult | undefined;
 
   for (const step of plan.steps) {
-    const node: OntologyNode | null = loadNodeById(step.nodeId, cwd);
+    const node = nodeById.get(step.nodeId);
     if (!node) {
       return {
         ok: false,
@@ -112,7 +120,7 @@ export async function runCompilePlan(options: CompilePlanRunOptions): Promise<Co
       };
     }
 
-    const upstream = collectUpstream(step.nodeId, refinementParents, compiledResponses, cwd);
+    const upstream = collectUpstream(step.nodeId, refinementParents, compiledResponses, nodeById);
 
     const stepResult: CompileNodeResult = await compileNode({
       node,
@@ -195,19 +203,21 @@ function buildRefinementParentsIndex(edges: OntologyEdge[]): Map<string, string[
 // Build the upstream context for a step from its refinement parents'
 // compiled responses. Skips parents that have not been compiled in this run
 // (defensive: shouldn't happen because the plan emits parents before
-// children, but a missing entry shouldn't crash the compile).
+// children, but a missing entry shouldn't crash the compile). Parent
+// records are resolved from the pre-loaded node map rather than re-read
+// per call — the runner owns the load to keep the inner loop allocation-free.
 function collectUpstream(
   nodeId: string,
   refinementParents: Map<string, string[]>,
   compiledResponses: Map<string, string>,
-  cwd: string,
+  nodeById: Map<string, OntologyNode>,
 ): UpstreamContextItem[] {
   const parents = refinementParents.get(nodeId) ?? [];
   const items: UpstreamContextItem[] = [];
   for (const parentId of parents) {
     const text = compiledResponses.get(parentId);
     if (text === undefined) continue;
-    const parent = loadNodeById(parentId, cwd);
+    const parent = nodeById.get(parentId);
     items.push({
       nodeId: parentId,
       level: parent?.coordinates.abstraction,

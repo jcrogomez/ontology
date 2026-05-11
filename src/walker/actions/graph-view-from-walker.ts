@@ -25,7 +25,7 @@
 // upstream-above / downstream-below without having to re-traverse.
 
 import type { OntologyEdge, OntologyNode } from "../../schemas/ontology.js";
-import { loadEdges, loadNodeById } from "../../core/project/load.js";
+import { loadEdges, loadNodeById, loadNodes } from "../../core/project/load.js";
 import { extractSubgraph } from "../../runtime/graph/traversal.js";
 
 export interface GraphViewNodeRow {
@@ -109,19 +109,21 @@ export function graphViewFromWalker(
   const upstreamDistance = directedBfsDistance(focalId, sliceEdges, "in", sliceNodeIds);
   const downstreamDistance = directedBfsDistance(focalId, sliceEdges, "out", sliceNodeIds);
 
-  // Pre-load every node we need (by id). Nodes that fail to load are
-  // tracked separately so the renderer can distinguish "node hidden by
-  // depth cap" from "node could not be loaded" — the previous code
-  // silently dropped corrupt records and the cap-truncation hint
-  // mis-attributed the missing rows to the cap.
+  // Pre-load the project's nodes once and resolve slice members from the
+  // resulting map. The previous shape did one loadNodeById per slice
+  // member, which was O(slice) disk reads per :graph view; loadNodes does
+  // a single directory scan and we trade those reads for hash-map lookups.
+  // A slice member that does not appear in the map (file deleted, race
+  // with `node remove`) is tracked in skippedNodeIds so the renderer can
+  // distinguish "hidden by depth cap" from "could not be loaded".
+  const allNodes = loadNodes(cwd);
+  const allNodesById = new Map<string, OntologyNode>(
+    allNodes.map((n) => [n.id, n]),
+  );
   const nodeById = new Map<string, OntologyNode>();
   const skippedNodeIds: string[] = [];
   for (const id of slice.nodeIds) {
-    if (id === focalId) {
-      nodeById.set(id, focalNode);
-      continue;
-    }
-    const n = loadNodeById(id, cwd);
+    const n = id === focalId ? focalNode : allNodesById.get(id);
     if (n) nodeById.set(id, n);
     else skippedNodeIds.push(id);
   }
