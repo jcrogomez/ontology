@@ -13,17 +13,25 @@ import {
 } from "../src/core/render/style.js";
 import { box, kvLines } from "../src/core/render/box.js";
 import { renderTable } from "../src/core/render/table.js";
-import { resetColorCache } from "../src/core/render/style.js";
+import { resetColorCache, resetUnicodeCache, unicodeEnabled } from "../src/core/render/style.js";
 
 let originalNoColor: string | undefined;
 let originalForceColor: string | undefined;
 
+let originalNoUnicode: string | undefined;
+let originalTerm: string | undefined;
+
 beforeEach(() => {
   originalNoColor = process.env.NO_COLOR;
   originalForceColor = process.env.FORCE_COLOR;
+  originalNoUnicode = process.env.NO_UNICODE;
+  originalTerm = process.env.TERM;
   process.env.FORCE_COLOR = "1"; // ensure ANSI even when test runner is non-TTY
   delete process.env.NO_COLOR;
-  resetColorCache(); // invalidate memo so this case's env wins
+  delete process.env.NO_UNICODE;
+  // Leave TERM alone unless a specific test clears it.
+  resetColorCache(); // invalidate memos so this case's env wins
+  resetUnicodeCache();
 });
 
 afterEach(() => {
@@ -31,7 +39,12 @@ afterEach(() => {
   else process.env.NO_COLOR = originalNoColor;
   if (originalForceColor === undefined) delete process.env.FORCE_COLOR;
   else process.env.FORCE_COLOR = originalForceColor;
+  if (originalNoUnicode === undefined) delete process.env.NO_UNICODE;
+  else process.env.NO_UNICODE = originalNoUnicode;
+  if (originalTerm === undefined) delete process.env.TERM;
+  else process.env.TERM = originalTerm;
   resetColorCache();
+  resetUnicodeCache();
 });
 
 describe("style.ts", () => {
@@ -125,6 +138,42 @@ describe("box.ts", () => {
     expect(plain.split("\n")[0]).toContain("MY CARD");
   });
 
+  it("uses Unicode borders even when colour is disabled (NO_COLOR alone is not a Unicode-disable signal)", () => {
+    // This is the §3.8 contract: CI logs that strip ANSI escapes typically
+    // still render Unicode just fine. The box helper should gate borders
+    // on unicodeEnabled() — not colorsEnabled() — so NO_COLOR alone
+    // preserves the readable shape.
+    process.env.NO_COLOR = "1";
+    delete process.env.FORCE_COLOR;
+    resetColorCache();
+    resetUnicodeCache();
+    const out = box(["hello"]);
+    const plain = stripAnsi(out);
+    expect(plain).toContain("┌");
+    expect(plain).toContain("┘");
+    // And colour is suppressed inside the cell.
+    expect(out).not.toContain("\x1b[");
+  });
+
+  it("falls back to ASCII frame when NO_UNICODE is set", () => {
+    process.env.NO_UNICODE = "1";
+    resetUnicodeCache();
+    const out = box(["hello"]);
+    const plain = stripAnsi(out);
+    expect(plain).not.toContain("┌");
+    expect(plain).toContain("+");
+    expect(plain).toMatch(/\+-+\+/);
+  });
+
+  it("falls back to ASCII frame when TERM=dumb", () => {
+    process.env.TERM = "dumb";
+    resetUnicodeCache();
+    const out = box(["hello"]);
+    const plain = stripAnsi(out);
+    expect(plain).not.toContain("┌");
+    expect(plain).toContain("+");
+  });
+
   it("kvLines pads keys so values align", () => {
     const lines = kvLines([
       ["short", "v1"],
@@ -136,6 +185,36 @@ describe("box.ts", () => {
     const v1Idx = stripped[0]!.indexOf("v1");
     const v2Idx = stripped[1]!.indexOf("v2");
     expect(v1Idx).toBe(v2Idx);
+  });
+});
+
+describe("unicodeEnabled() — independent of colorsEnabled()", () => {
+  it("defaults to true when no opt-out is set", () => {
+    delete process.env.NO_UNICODE;
+    delete process.env.TERM;
+    resetUnicodeCache();
+    expect(unicodeEnabled()).toBe(true);
+  });
+
+  it("returns false when NO_UNICODE is set", () => {
+    process.env.NO_UNICODE = "1";
+    resetUnicodeCache();
+    expect(unicodeEnabled()).toBe(false);
+  });
+
+  it("returns false when TERM=dumb", () => {
+    delete process.env.NO_UNICODE;
+    process.env.TERM = "dumb";
+    resetUnicodeCache();
+    expect(unicodeEnabled()).toBe(false);
+  });
+
+  it("ignores NO_COLOR — Unicode and colour are independent signals", () => {
+    process.env.NO_COLOR = "1";
+    delete process.env.NO_UNICODE;
+    resetColorCache();
+    resetUnicodeCache();
+    expect(unicodeEnabled()).toBe(true);
   });
 });
 

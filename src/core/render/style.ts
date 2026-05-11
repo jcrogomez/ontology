@@ -91,6 +91,38 @@ export function resetColorCache(): void {
   cachedColorsEnabled = null;
 }
 
+// True when the renderer may emit non-ASCII glyphs (Unicode box-drawing,
+// the focal-marker star, ellipses). Independent of colorsEnabled() — most
+// CI log viewers strip ANSI but render Unicode just fine, and conflating
+// the two downgrades cards to coarse ASCII the moment NO_COLOR is set.
+//
+// Heuristic: opt-out via NO_UNICODE=1 (or TERM=dumb, which legitimately
+// signals a non-Unicode-capable terminal). Otherwise on by default —
+// modern terminals and CI handle Unicode.
+let cachedUnicodeEnabled: boolean | null = null;
+
+export function unicodeEnabled(): boolean {
+  if (cachedUnicodeEnabled !== null) return cachedUnicodeEnabled;
+  cachedUnicodeEnabled = computeUnicodeEnabled();
+  return cachedUnicodeEnabled;
+}
+
+function computeUnicodeEnabled(): boolean {
+  if (process.env.NO_UNICODE !== undefined && process.env.NO_UNICODE !== "") {
+    return false;
+  }
+  if (process.env.TERM === "dumb") {
+    return false;
+  }
+  return true;
+}
+
+// Symmetric to resetColorCache. Tests that toggle NO_UNICODE / TERM
+// between cases must call this before the next unicodeEnabled() lookup.
+export function resetUnicodeCache(): void {
+  cachedUnicodeEnabled = null;
+}
+
 function wrap(code: string, text: string): string {
   if (!colorsEnabled()) return text;
   return `${code}${text}${ANSI.reset}`;

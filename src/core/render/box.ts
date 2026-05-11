@@ -6,7 +6,7 @@
 // colored cells don't break alignment. ASCII fallback (NO_COLOR) keeps
 // the same shape, just with a coarser look.
 
-import { stripAnsi, visibleWidth, dim, bold, colorsEnabled } from "./style.js";
+import { stripAnsi, visibleWidth, dim, bold, unicodeEnabled } from "./style.js";
 
 const CHARS_UNICODE = {
   topLeft: "┌",
@@ -37,10 +37,12 @@ const CHARS_ASCII = {
 };
 
 function chars(): typeof CHARS_UNICODE {
-  // Drop to ASCII fallback when colors are off, since both signals usually
-  // travel together (terminal that strips ANSI often strips Unicode boxes
-  // too in legacy contexts; CI logs strip both).
-  return colorsEnabled() ? CHARS_UNICODE : CHARS_ASCII;
+  // Gate on unicodeEnabled() rather than colorsEnabled(). The previous
+  // shape conflated the two: CI logs running with NO_COLOR=1 lost the
+  // Unicode borders even though their viewer renders them fine, and a
+  // legitimate dumb-terminal opt-out had to use the colour switch as a
+  // proxy. unicodeEnabled() has its own NO_UNICODE / TERM=dumb signals.
+  return unicodeEnabled() ? CHARS_UNICODE : CHARS_ASCII;
 }
 
 export interface BoxOptions {
