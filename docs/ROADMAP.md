@@ -1,8 +1,28 @@
 # Ontology Roadmap
 
-## Current State: Bootstrap 0.9 — Categorical Extensions + Compiler Hardening (`0.3.0-alpha.0`)
+## Current State: post-0.9 — Plasticity Layer + Legend Foundation (`0.3.0-alpha.0`)
 
-Ontology has reached **Bootstrap 0.9**. The seven axioms of the canon all run concrete code (axiom 4 is now structural via `parsePromptAST`), and four additive categorical extensions (Yoneda query, effect monad, branch fibration, topos predicate algebra) ship as runtime libraries with first-line CLI / Walker surfaces. The compiler is hardened end-to-end: code-fence stripping, language parse-check on every artifact, optional `--runtime-check`, refinement-parent context threading, per-node `model.ref` routing, and a top-level `EffectWithLog` that retires the legacy try/catch tower. `computeCompilePlan` rejects `contradicts` and halts BFS on `supersedes`, so contradictions surface as failures.
+Ontology has reached **post-Bootstrap 0.9** with the **plasticity layer** in
+place. The seven axioms of the canon all run concrete code (axiom 4 is now
+structural via `parsePromptAST`), and four additive categorical extensions
+(Yoneda query, effect monad, branch fibration, topos predicate algebra)
+ship as runtime libraries with full CLI / Walker surfaces. Iteration
+primitives — `node update`, `node remove`, `edge update`, `edge remove`,
+contract flags on `node create`, validator gate on `compile run` — closed
+the loop the iterative workflow was missing. **All milestone-review items
+§3.1 through §3.15 are resolved** (some closed as no-op when the bug was
+not present in current code; tests pin every invariant). The compiler is
+hardened end-to-end: code-fence stripping, language parse-check + intent
+gate on every artifact, optional `--runtime-check`, refinement-parent
+context threading + structured contract in the system prompt, per-node
+`model.ref` routing, and a top-level `EffectWithLog` that retires the
+legacy try/catch tower across both compile *and* `runFromWalker`.
+`computeCompilePlan` rejects `contradicts` and halts BFS on `supersedes`
+(transitively, pinned by test). The next chapter is
+**[Project Legend](PROJECT_LEGEND.md)** — the inverse direction of the
+compile functor: `onto ingest <path>` lifts existing source into an
+intent network, verifies the homeomorphism $F \circ G \approx \mathrm{id}$
+on a measured subcategory, and reports the intent-resistant complement.
 
 ## Near-term tactical roadmap
 
@@ -75,41 +95,115 @@ runtime libraries with proven laws, see [`CATEGORICAL_VISION.md`](CATEGORICAL_VI
   See [`RULES_TOPOS.md`](RULES_TOPOS.md) and
   [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §3.9.
 
-Follow-ups unlocked by Bootstrap 0.9:
+Follow-ups unlocked by Bootstrap 0.9 (all shipped):
 - ✅ Compiler refactor onto `EffectWithLog` (PR #115).
 - ✅ Validator port onto the topos algebra (`intent-validator.ts` is now
   built on `compileValidationPredicate` + `evaluatePredicate`).
-- 🟡 Branch-aware compile (`onto compile run --branch feature/x` walks one
-  fiber, not the whole graph). `computeBranchFiber` is in place; only the
-  CLI wiring is missing.
-- 🟡 `onto branch list` and `onto branch fiber <branch>` — surface the
-  programmatic fibration API to the CLI.
-- 🟡 `onto branch lift <nodeId> --to feature/x` — turn the read-only
+- ✅ Branch-aware compile (`onto compile run --branch <name>` walks one
+  fiber). `5f97e18`.
+- ✅ `onto branch list` and `onto branch fiber <name>` — read-only CLI
+  surfaces over the fibration library. `c7c062a`.
+- ✅ Atomic writes for `state.json`, `events.jsonl`, registry — `writeJson`
+  now uses temp + rename; corrupt-mid-write leaves the original intact.
+  `17022e9`.
+- 🟡 `onto branch lift <nodeId> --to <branch>` — turn the read-only
   `describeCartesianLift` into an `edge_create` / `node_create` proposal.
+  Depends on the BRANCH_MODEL.md decision (Option C recommended).
 - 🟡 `onto query` extensions: negation in shapes, exact edge profiles, multi-shape OR.
 
-Other open follow-ups:
-- 🟡 `run prompt --as-proposal` with `edge_create` target (the discriminated-union
-  mutation schema already supports it; the model-driven candidate edge is the gap).
-- ✅ CLI surface for the semantic linker — `onto link <nodeId> --candidate <text>`
+Plasticity layer (closed today — pre-foundation for Project Legend):
+- ✅ §1 `compile run` gate with `validateIntent` — semantic gate aborts
+  compile on FORBID violation before runtime-check. `1a8a4c3`.
+- ✅ §2 `onto node create --requires/--provides/--forbids/--rules` flags —
+  contract declarable at create time, no JSON edit required. `fc94700`.
+- ✅ §3 `assembleContext` surfaces the structured contract per node in
+  the LLM prompt (not only the prose `rules`). `3023bdc`.
+- ✅ §4 `onto node update <id>` — edit prompt / label / rules / contract
+  tokens in place; re-hash; emit `node_updated` with old/new hashes.
+  `dfbefa9`. **The plasticity primitive.**
+- ✅ §5 `onto node remove <id>` — refuses if any edge references the node;
+  emits `node_removed`. `e847417`.
+- ✅ §6 `onto edge remove <edgeId>` + `onto edge update <edgeId> --type`
+  — atomic edges.jsonl rewrite; `edge_removed` / `edge_updated` events
+  with old/new hashes. `e847417`.
+
+Hardening sweep (all milestone-review items §3.1–§3.15 closed):
+- ✅ §3.1 ANSI leak in `truncateVisible`. `cb616ef`.
+- ✅ §3.2 atomic `writeJson`. `17022e9`.
+- ✅ §3.3 `runtime-check` SIGTERM-slack scaling. `809b948`.
+- ✅ §3.4/§3.5 registry path-first + `state.json` liveness check. `82e2a30`.
+- ✅ §3.6 `eventTypeColor` negative-first ordering. `8078bb2`.
+- ✅ §3.7 `colorsEnabled()` memoization with reset hook. `57fd9e5`.
+- ✅ §3.8 `unicodeEnabled()` separation. `96823cc`.
+- ✅ §3.9 `runFromWalker` ported onto `EffectWithLog`. `6dc2268`.
+- ✅ §3.10 `computeCompilePlan` supersedes transitive pin. `b109547`.
+- ✅ §3.11 + §3.12 batched node loads. `0e933a2`.
+- ✅ §3.13 binary-file guard on `--candidate-file`. `14ecc51`.
+- ✅ §3.14 `:graph view` skipped-count separated from cap-truncation. `f1384be`.
+- ✅ §3.15 edge-suggester dedup invariant pin (the bug was not present;
+  pinned to prevent regressions). `5fedf4a`.
+
+Open follow-ups:
+- ✅ CLI surface for the semantic linker — `onto link <nodeId>`
   (post-0.9). Wraps `semanticLink()` and surfaces the gluing matrix +
-  validation block + edge proposal suggestions. Walker `:link-analysis`
-  mirrors the surface using `focal.prompt.raw` as the default candidate.
-- 🟡 Walker v2 (plane / time / branch / manifestation rotation, proposal-review pane).
-- ✅ Visual DAG Studio (terminal-first) — `:graph view [depth]` walker action; web variant deferred.
-- 🟡 `runFromWalker` port onto `EffectWithLog` (compiler-side already done in PR #115).
-- 🟡 Atomic `state.json` writes (write-to-temp + rename) and advisory lock for
-  multi-process safety.
+  validation block + edge proposal suggestions.
+- ✅ Visual DAG Studio (terminal-first) — `:graph view [depth]` walker
+  action; web variant deferred.
+- ✅ Validator open-world mode — `openWorld?: boolean` flag on
+  `validateIntent`; verdict exposed end-to-end through `semanticLink`.
+  `c835509`.
+- 🟡 `run prompt --as-proposal` with `edge_create` target (the
+  discriminated-union mutation schema already supports it; the
+  model-driven candidate edge is the gap).
+- 🟡 Walker v2 (plane / time / branch / manifestation rotation,
+  proposal-review pane).
+- 🟡 Advisory lock under `.ontology/.lock` for multi-process safety
+  (atomic writes are done; concurrent-writer protection still missing).
 
-At this stage, Ontology is a verified network kernel, a node editor, a proposal system, an interactive walker, a compiler that produces auditable runnable artifacts with structural validation, and a categorical layer (Yoneda query, effect monad, fibration, topos) that future work can build on.
+At this stage, Ontology is a verified network kernel with mutable iteration semantics (plasticity layer in place), a proposal system, an interactive walker, a compiler with a semantic gate that produces auditable runnable artifacts, branch-aware compile via Grothendieck fibers, and a categorical layer (Yoneda query, effect monad, fibration, topos) that future work — most notably **Project Legend** — builds directly on top of.
 
-**Known limitations:**
-- Branch fibration has no `onto` CLI surface yet — only walker `:branch list`. Branch-aware compile is a follow-up.
-- Validator port (post-0.9) is closed-world by default: `result.verdict` is observable as Ω, but `result.ok` collapses to Boolean; an `openWorld?: boolean` flag on `validateIntent` would expose three-valued behaviour to callers.
-- Semantic linker has a read-only CLI (`onto link <nodeId>`); proposal-mutation flow stays manual through `onto propose link`.
-- `runFromWalker` is still on the legacy try/catch path; the `EffectWithLog` refactor covers `compileNode` only.
-- `state.json` and `events.jsonl` writes are not crash-atomic — a SIGKILL or out-of-disk mid-write can truncate the file. The single-writer assumption (CLI single-shot) is unchanged; concurrent invocations from multiple processes are not lock-protected.
-- Several rhetorical claims in the docs (limit/colimit framing of compile-plan, "rewrite rule" framing of proposals, "shadow" metaphor of compiled code) are useful intuition but not pinned by tests. See [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) for the full ledger.
+## The next chapter: Project Legend
+
+**[`docs/PROJECT_LEGEND.md`](PROJECT_LEGEND.md)** is the design for the
+inverse direction of the compile functor: lift existing source code into
+the intent layer, verify the homeomorphism $F \circ G \approx
+\mathrm{id}$ on a measured subcategory, and report the intent-resistant
+complement. The Inspector / Lupa primitive (one LLM call per node
+lifetime, cached as `node.translator`) keeps the resulting network
+human-readable. The Open-Prompt protocol turns the signed intent +
+audit chain into a trust-transparency layer that lets organisations
+publish what they run without exposing source.
+
+Phase plan (estimates from PROJECT_LEGEND.md §6):
+
+| Phase | Content | Status | Est. hours |
+|---|---|---|---|
+| α | Pre-foundation gaps §1–§6 (plasticity layer) | ✅ shipped | — |
+| β | Layer 1 (multi-file compile + `--target`), 2 (`node.literal`), 5 (path fibration) | 🟡 next | ~8–10 |
+| γ | Layer 3 (static edge inference, TS-first) + Layer 7 (`onto ingest <path>`) | pending | ~6–8 |
+| δ | Layer 4 (Inspector / translator) + Layer 6 (verification + report) | pending | ~6–8 |
+| ε | Self-ingestion — Legend run on the Ontology repo itself | pending | ~6–10 |
+| ζ | Release + Open-Prompt seeds (sign, verify-published, replay) | pending | ~3–5 |
+
+**Known limitations (as of plasticity layer completion):**
+- Semantic linker has a read-only CLI (`onto link <nodeId>`);
+  proposal-mutation flow still requires the manual
+  `onto propose link` → `onto proposal apply` two-step.
+- Concurrent multi-process writes are not lock-protected. The writes
+  themselves are crash-atomic (temp + rename), but a SIGKILL between
+  two cooperating CLI invocations could still leave inconsistent
+  state. Advisory lock under `.ontology/.lock` is the next hardening
+  item.
+- BRANCH_MODEL.md (Option A/B/C decision) is recommended (Option C —
+  lazy materialisation) but not user-confirmed. Required before any
+  cross-branch `node_update` propagation lands.
+- `Walker v2` (proposal review pane, plane/time/branch/manifestation
+  rotation) remains unshipped. The existing Walker is functional but
+  basic.
+- Several rhetorical claims in the docs are useful intuition but not
+  pinned by tests. See [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md)
+  for the full ledger — Project Legend's adjoint claim (§3.10) is
+  currently classified T4 and lifts to T2 after Phase ε.
 
 ## Bootstrap history
 
@@ -128,60 +222,92 @@ work is in [Open follow-ups](#open-follow-ups).
 | 0.8 | Hello World compiler (PR #102) | `onto compile run` walks the topological plan, dispatches per node, writes manifestation-aware artifacts; full `artifact → compilation_run → run → prompt → node` audit chain. Mock = identity functor on `task: code_sketch`. |
 | 0.9 | Categorical extensions + compiler hardening (PRs #103–#115) | Four additive runtime libraries (Yoneda query / effect monad / branch fibration / topos predicate algebra); compiler hardening (code-fence stripping, language parse-check, refinement-parent threading, `model.ref` routing, XML system prompt, `--runtime-check`, `contradicts`/`supersedes`); Walker hardening (`:validate`, `:branch list`, `:context`, `:query`, `:compile --runtime-check`); `compileNode` ported onto `EffectWithLog`. |
 | post-0.9 | Validator port onto topos algebra | `intent-validator.ts` is now built on `compileValidationPredicate` + `evaluatePredicate`; `result.verdict ∈ Ω` exposed; closed-world reduction preserves the existing two-valued contract. See [`RULES_TOPOS.md`](RULES_TOPOS.md) and [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §3.9. |
-| post-0.9 | Semantic linker CLI | `onto link <nodeId> --candidate <text>` wraps `semanticLink()`: gluing matrix + `validateIntent` block + edge proposal suggestions for missing requirements (per provider, parallel rows for `depends_on` and `uses_token`). Walker `:link-analysis` mirrors the surface using `focal.prompt.raw` as the default candidate. Read-only: suggestions are copy-pasteable `onto propose link` commands. See [`CLI_COMMANDS.md`](CLI_COMMANDS.md) `link <nodeId>`. |
+| post-0.9 | Semantic linker CLI | `onto link <nodeId> --candidate <text>` wraps `semanticLink()`: gluing matrix + `validateIntent` block + edge proposal suggestions for missing requirements (per provider, parallel rows for `depends_on` and `uses_token`). Walker `:link-analysis` mirrors the surface using `focal.prompt.raw` as the default candidate. Read-only: suggestions are copy-pasteable `onto propose link` commands. |
+| post-0.9 | `:graph view` walker action | `:graph view [depth]` renders the focal's k-hop subgraph as a structured panel (upstream / downstream / lateral buckets, abstraction-level coloring, per-row connecting edges). Reuses `extractSubgraph`. Closes the Visual DAG Studio terminal-first roadmap item. |
+| post-0.9 | `onto branch list` + `onto branch fiber <name>` | Read-only CLI surfaces over the fibration library. `branch list` enumerates branches with per-branch node counts; `branch fiber <name>` renders the induced subgraph (nodes + edges intra-branch). Errors on unknown branch with `Known branches:` hint. |
+| post-0.9 | Plasticity layer (gaps §1–§6 of pre-Legend foundation) | `compile run` gates on `validateIntent` (semantic gate before runtime-check); `onto node create` accepts `--requires/--provides/--forbids/--rules` flags; `assembleContext` surfaces the structured contract per node in the LLM prompt; `onto node update <id>` edits prompt / label / rules / contract in place with `node_updated` event; `onto node remove <id>` deletes (refuses with edge guard); `onto edge remove/update <id>` for symmetric edge ops. Schema additions: `node_removed`, `edge_updated` event types. |
+| post-0.9 | Hardening sweep (§3.1–§3.15) | ANSI leak fix, atomic `writeJson`, runtime-check slack scaling, registry foot-guns, eventType ordering, memoised colorsEnabled, separated unicodeEnabled, batched node loads in compile + graph-view, binary-file guard, supersedes transitive pin, edge-suggester invariant pin, skipped-count separated from cap-truncation, `runFromWalker` ported onto `EffectWithLog`. |
+| post-0.9 | `onto compile run --branch <name>` | Restrict the compile plan to a single Grothendieck fiber. Refuses with `focal_off_branch` if the focal lives on a different branch; refuses with `missing_branch` if the name is unknown. |
+| post-0.9 | Validator open-world mode | `openWorld?: boolean` on `validateIntent`; the three-valued verdict (true/false/unknown) is now observable end-to-end through `semanticLink.validation.verdict`. Closed-world remains the default (backward compatible). |
+| post-0.9 | Project Legend foundation | [`PROJECT_LEGEND.md`](PROJECT_LEGEND.md) design document. Mathematical-claims registry updated with §3.10 (compile adjoint), §4.8 (Inspector triangle), §4.9 (Open-Prompt protocol), all T4 with explicit paths to T2 after the respective phases ship. |
 
 Per-PR detail lives in [`RELEASE_NOTES.md`](RELEASE_NOTES.md).
 
 ---
 
-## Open follow-ups
+## Open follow-ups (canonical, kept in sync with the headline status above)
 
 Each item below is unshipped. Tagged 🟡 (active candidate for the next
-Bootstrap) or 🔵 (longer-term / shape still to be decided).
+Bootstrap) or 🔵 (longer-term / shape still to be decided). Items
+shipped today have been promoted out of this list and into the
+Bootstrap history table above.
 
-- 🟡 **Atomic writes + advisory lock** on `events.jsonl`, `state.json`,
-  and `~/.config/ontology/projects.json`. Closes the largest crash-safety
-  gap; promotes axiom 2 from T2 to T1 in the claims map.
-- 🟡 **`onto branch` CLI surface** — `onto branch list`, `onto branch
-  fiber <name>` (read-only), then `onto compile run --branch <name>`
-  (walk one fiber), then `onto branch lift <nodeId> --to <branch>` (turn
-  `describeCartesianLift` into a proposal).
-- 🟡 **Validator open-world mode** — add an `openWorld?: boolean` flag
-  on `validateIntent` so callers can observe `verdict === "unknown"`
-  directly instead of only via the lower-level
-  `compileValidationPredicate` helper.
+**Immediate (Phase β of Project Legend):**
+- 🟡 **`onto compile run-batch`** — compile every artifact node in a plan
+  in one call; needed before `onto verify-homeomorphism` scales.
+- 🟡 **`onto compile run --target <path>`** — write the generated artifact
+  to its real source path, not only to `.ontology/artifacts/generated/`.
+- 🟡 **`node.literal?: string` escape hatch** — preserve verbatim content
+  for irreducible specificity (regexes, magic constants, license
+  headers); compile pipeline emits literal instead of dispatching.
+- 🟡 **Path fibration helpers** — `computeFiberBy(input, projection)`
+  generalises `computeBranchFiber` to arbitrary projections; the path
+  fibration (files-under-a-directory) is the first concrete use.
+
+**Project Legend core (Phases γ–ε):**
+- 🟡 **`onto ingest <path>`** — the inverse compile, file by file.
+- 🟡 **Static analysis edge inference (TS first)** — parse imports /
+  exports to emit `depends_on` / `uses_token` edges without an LLM call.
+- 🟡 **`onto node inspect <id>`** — Inspector / Lupa primitive; per-node
+  `translator` cached as a node schema field.
+- 🟡 **`onto verify-homeomorphism <id>` + batch report** — compile +
+  diff for a given node or the whole project; reports
+  ε-equivalent / divergent / unrecoverable.
+
+**Plasticity follow-ups:**
+- 🟡 **Advisory lock under `.ontology/.lock`** for multi-process safety.
+  Atomic writes are done; concurrent-writer protection is the next step.
+- 🟡 **`onto branch lift <nodeId> --to <branch>`** — turn the read-only
+  `describeCartesianLift` into an `edge_create` / `node_create`
+  proposal. Depends on the BRANCH_MODEL.md decision (Option C
+  recommended).
 - 🟡 **`onto query` extensions** — negation in shapes (`!hasIncoming`),
   exact edge profiles, multi-shape OR queries.
 - 🟡 **`run prompt --as-proposal` for `edge_create` targets** — the
   discriminated-union mutation schema already supports it; the
   model-driven candidate edge is the missing piece.
-- 🟡 **`runFromWalker` port onto `EffectWithLog`** — compiler-side is
-  done; walker-side is still on the legacy try/catch path.
+
+**Project Legend stretch (Phase ζ / Open-Prompt):**
+- 🔵 **`onto sign <branch>`** — Merkle root over nodes + events, signed
+  with the org's private key.
+- 🔵 **`onto verify-published <signed-artefact>`** — re-walk the audit
+  chain, validate signatures.
+- 🔵 **`onto replay --against <intent-artefact>`** — run an output
+  stream against a published intent network, surface any artefact that
+  would have failed the validator.
+
+**Longer-term:**
 - 🔵 **Branch-merge proposals** — natural transformation between two
   fibers. Library-level work; needs a `BranchMergeProposal` shape and a
   unified validation pipeline. See `BRANCH_FIBRATION.md` §Future Work.
 - 🔵 **Walker v2** — proposal review pane; plane / time / branch /
   manifestation rotation. See `WALKER_INTERFACE.md` §10.
-- 🔵 **node_update with auto-branch (Bootstrap 0.10)** — open design
-  question: when branch X is created from main, do existing nodes
-  duplicate, project via overlay, or only materialise on touch? Resolve
-  in a design note before any code.
-- ✅ **Visual DAG Studio (terminal-first)** — `:graph view [depth]` walker
-  action renders the focal's k-hop subgraph as a structured panel with
-  upstream/downstream/lateral buckets, abstraction-level coloring, and
-  per-row connecting edges. Reuses `extractSubgraph` so it agrees with
-  `onto graph subgraph` on slice membership. See
-  `WALKER_INTERFACE.md`.
+- 🔵 **Bootstrap 0.10 — `node_update` across branches** — requires
+  the BRANCH_MODEL.md decision (Option C recommended). The per-branch
+  `node_update` itself is shipped; cross-branch propagation is the gap.
 - 🔵 **Web-based Visual DAG Studio** — projecting the walker into 2D.
   Deferred until the CLI surface stabilises further; the terminal
   `:graph view` covers the inspection-not-decoration goal for now.
-- 🔵 **Rigor improvements identified by [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §6** —
-  presheaf-restriction test, artifact-category for the compiler functor,
-  cartesian-lift universal-property test, `onto replay`, etc. Each is
-  bite-sized and lifts a specific claim from one tier to the next.
+- 🔵 **Rigor improvements** identified by
+  [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) — presheaf-restriction
+  test, artifact-category for the compiler functor, cartesian-lift
+  universal-property test, `onto replay`, etc. Each is bite-sized and
+  lifts a specific claim from one tier to the next.
 
-### Visual DAG Studio
-*(Terminal-first variant Implemented / Web variant Planned)*
-The terminal-first variant ships as the walker action `:graph view [depth]` (post-0.9): structured Upstream/Downstream/Lateral buckets with abstraction-level coloring and per-row connecting edges, sharing the `extractSubgraph` helper that backs `onto graph subgraph`. See `WALKER_INTERFACE.md`.
+---
 
-The web variant — a 2D, mouse-driven projection of the same graph with live updates — is deferred until the CLI surface stabilises further. The shape that would make sense first is a static SPA reading `.ontology/` snapshots, with the artifact-trace audit chain as the lead feature (no other tool has it). Edits, proposal staging, and live-update WebSocket pipelines are non-goals for v0.
+*This roadmap is kept in sync with `main` after every commit that
+ships a new surface or closes a follow-up. Stale items move to the
+Bootstrap history table; new items land here under their phase
+heading. Last refresh: 2026-05-11, after the plasticity layer +
+PROJECT_LEGEND.md landed (commits `3023bdc` through `5f15c8b`).*
