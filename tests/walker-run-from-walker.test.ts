@@ -83,4 +83,50 @@ describe("runFromWalker", () => {
     if (result.ok) return;
     expect(result.message.toLowerCase()).toContain("failed to assemble context");
   });
+
+  it("populates the log with a breadcrumb per executed step on the happy path", async () => {
+    const focal = loadNodeById("node_0000_canon", tempDir)!;
+    const result = await runFromWalker({ focal, cwd: tempDir });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const messages = result.log.map((e) => e.message);
+    // First-run path runs all four steps. Step labels follow the
+    // "<step>: <detail>" convention used by every EffectWithLog wrapper
+    // in this action.
+    expect(messages.some((m) => m.startsWith("assembleContext: ok"))).toBe(true);
+    expect(messages.some((m) => m.startsWith("cacheLookup: miss"))).toBe(true);
+    expect(messages.some((m) => m.startsWith("dispatch[provider="))).toBe(true);
+    expect(messages.some((m) => m.startsWith("createPersistedRun: ok"))).toBe(true);
+    // No error-level entries on a happy run.
+    expect(result.log.every((e) => e.level === "info")).toBe(true);
+  });
+
+  it("emits a cacheLookup: hit breadcrumb on the second invocation and skips dispatch", async () => {
+    const focal = loadNodeById("node_0000_canon", tempDir)!;
+    await runFromWalker({ focal, cwd: tempDir });
+    const second = await runFromWalker({ focal, cwd: tempDir });
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    const messages = second.log.map((e) => e.message);
+    expect(messages.some((m) => m.startsWith("cacheLookup: hit"))).toBe(true);
+    // Cache short-circuits before dispatch, so no dispatch/persist
+    // breadcrumbs should appear on a cache-hit run.
+    expect(messages.some((m) => m.startsWith("dispatch["))).toBe(false);
+    expect(messages.some((m) => m.startsWith("createPersistedRun:"))).toBe(false);
+  });
+
+  it("preserves the failing step's error breadcrumb when the run aborts", async () => {
+    // Same fixture as the deleted-focal test above, but checking that the
+    // diagnostic record contains a structured error entry the UI could
+    // surface, rather than only the public message string.
+    runCli(tempDir, ["node", "create", "--level", "domain", "--kind", "entity", "--prompt", "tmp"]);
+    const focal = loadNodeById("node_0001", tempDir)!;
+    fs.unlinkSync(path.join(tempDir, ".ontology/nodes/node_0001.json"));
+    const result = await runFromWalker({ focal, cwd: tempDir });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const errorEntries = result.log.filter((e) => e.level === "error");
+    expect(errorEntries.length).toBeGreaterThan(0);
+    expect(errorEntries[0]!.message).toContain("assembleContext: failed");
+  });
 });
