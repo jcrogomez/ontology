@@ -122,6 +122,31 @@ describe("suggestEdgeProposals", () => {
     expect(suggestions[0]!.type).toBe("uses_token");
   });
 
+  it("dedup index is built unconditionally — empty existingEdges does not bypass the filter", () => {
+    // Regression pin: a previous code shape gated the index build on
+    // `existingEdges.length > 0`, which meant callers passing [] would
+    // skip the dedup branch even if they later expected it to run. The
+    // current code uses an unconditional for-of, so an empty array
+    // produces the same outcome as a populated one with no overlap.
+    const providerA = mkNode("nodeA", { provides: ["token1"] });
+    const withEmpty = suggestEdgeProposals({
+      focalNode: focal,
+      missingRequirements: ["token1"],
+      allNodes: [focal, providerA],
+      existingEdges: [],
+    });
+    const withUnrelated = suggestEdgeProposals({
+      focalNode: focal,
+      missingRequirements: ["token1"],
+      allNodes: [focal, providerA],
+      // An edge that doesn't collide with any (to, type) we'd suggest
+      // must produce exactly the same suggestion set as the empty case.
+      existingEdges: [mkEdge("focal", "nodeXYZ", "depends_on")],
+    });
+    expect(withEmpty).toEqual(withUnrelated);
+    expect(withEmpty.map((s) => s.type).sort()).toEqual(["depends_on", "uses_token"]);
+  });
+
   it("respects maxProvidersPerToken — caps a popular token's provider list", () => {
     const providers = Array.from({ length: 10 }, (_, i) =>
       mkNode(`node${String(i).padStart(2, "0")}`, { provides: ["popular"] }),
