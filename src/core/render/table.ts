@@ -38,12 +38,14 @@ function truncateVisible(s: string, max: number): string {
   let out = "";
   let visible = 0;
   let i = 0;
+  let copiedAnsi = false;
   while (i < s.length && visible < max - 1) {
     if (s[i] === "\x1b") {
       // copy the whole escape sequence
       const m = s.slice(i).match(/^\x1b\[[0-9;]*m/);
       if (m) {
         out += m[0];
+        copiedAnsi = true;
         i += m[0].length;
         continue;
       }
@@ -52,7 +54,10 @@ function truncateVisible(s: string, max: number): string {
     visible++;
     i++;
   }
-  return out + "…";
+  // If we copied any escape, the matching reset may lie past the
+  // truncation boundary — append \x1b[0m so the ellipsis and downstream
+  // cells don't inherit the open color.
+  return out + "…" + (copiedAnsi ? "\x1b[0m" : "");
 }
 
 function pad(text: string, totalVisibleWidth: number, align: "left" | "right"): string {

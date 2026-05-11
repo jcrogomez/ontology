@@ -173,6 +173,24 @@ describe("table.ts", () => {
     expect(dataRow).toContain("…");
   });
 
+  it("resets color after truncating a colored cell", () => {
+    // Cell opens a green attribute; the matching reset lies past the
+    // truncation boundary. Without the fix, the ellipsis and the next
+    // cell's gutter inherit the open color.
+    const colored = "\x1b[32mreally long colored text\x1b[0m";
+    const out = renderTable(
+      [{ v: colored, next: "plain" }],
+      [
+        { header: "V", render: (r) => (r as { v: string }).v, maxWidth: 10 },
+        { header: "N", render: (r) => (r as { next: string }).next },
+      ],
+    );
+    const dataRow = out.split("\n")[2]!;
+    // The truncated cell must end with a reset before the gutter spaces.
+    const truncatedSegment = dataRow.split("\x1b[0m")[0]! + "\x1b[0m";
+    expect(truncatedSegment).toMatch(/…\x1b\[0m$/);
+  });
+
   it("aligns colored cells using visible width", () => {
     const out = renderTable(
       [{ k: "draft" }, { k: "valid" }],
