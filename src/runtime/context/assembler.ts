@@ -162,6 +162,31 @@ export function assembleContext(input: ContextAssemblyInput, cwd = process.cwd()
     promptBuilder.push(`- ${node.id} :: ${node.label}`);
   }
   promptBuilder.push(``);
+
+  // Structured contract — the requires/provides/forbids tokens that the
+  // linker enforces post-generation. Surface them here so the LLM can see
+  // the same contract the validator will judge it against, not only the
+  // FORBID prose strings already covered by `Constraints:`. Nodes with an
+  // empty contract are skipped to keep the prompt compact. The focal is
+  // marked with `[target]` so the LLM knows whose contract it is producing.
+  const contractLines: string[] = [];
+  for (const node of nodes) {
+    const provides = (node.context?.provides ?? []).map((p) => p.key);
+    const requires = (node.context?.requires ?? []).map((r) => r.source);
+    const forbids = (node.context?.forbids ?? []).map((f) => f.source);
+    if (provides.length === 0 && requires.length === 0 && forbids.length === 0) continue;
+    const marker = node.id === targetNodeId ? " [target]" : "";
+    contractLines.push(`- ${node.id}${marker}:`);
+    if (provides.length > 0) contractLines.push(`    provides: ${provides.join(", ")}`);
+    if (requires.length > 0) contractLines.push(`    requires: ${requires.join(", ")}`);
+    if (forbids.length > 0) contractLines.push(`    forbids:  ${forbids.join(", ")}`);
+  }
+  if (contractLines.length > 0) {
+    promptBuilder.push(`Contract (structured intent — enforced post-generation by the validator):`);
+    promptBuilder.push(...contractLines);
+    promptBuilder.push(``);
+  }
+
   promptBuilder.push(`Target Prompt:\n${targetNode.prompt.raw || ""}`);
 
   const result: ContextAssemblyOutput = {

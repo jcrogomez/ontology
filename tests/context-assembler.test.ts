@@ -294,6 +294,34 @@ describe("Context Assembler", () => {
     expect(result.prompt).toContain("Target Prompt:\nTarget prompt");
   });
 
+  it("emits a Contract section with structured requires/provides/forbids for nodes that have them", () => {
+    // Patch the target node to carry a real contract so the assembler has
+    // something to surface to the LLM beyond the prose `rules`.
+    const targetPath = path.join(cwd, ".ontology", "nodes", "node_0002_target.json");
+    const target = JSON.parse(fs.readFileSync(targetPath, "utf-8"));
+    target.context = {
+      requires: [{ source: "habit_logs_jsonl", nodeType: "rule" }],
+      provides: [{ key: "log_endpoint", nodeType: "rule" }],
+      forbids: [{ source: "deploys_as_service", nodeType: "rule" }],
+      optional: [],
+    };
+    fs.writeFileSync(targetPath, JSON.stringify(target));
+
+    const result = assembleContext({ targetNodeId: "node_0002_target", mode: "strict" }, cwd);
+    expect(result.prompt).toContain("Contract (structured intent");
+    // Target node is marked with [target] so the LLM knows whose contract it owns.
+    expect(result.prompt).toContain("- node_0002_target [target]:");
+    expect(result.prompt).toContain("provides: log_endpoint");
+    expect(result.prompt).toContain("requires: habit_logs_jsonl");
+    expect(result.prompt).toContain("forbids:  deploys_as_service");
+  });
+
+  it("skips the Contract section entirely when no node in the path has structured intent", () => {
+    // Default fixture has empty requires/provides/forbids on every node.
+    const result = assembleContext({ targetNodeId: "node_0002_target", mode: "strict" }, cwd);
+    expect(result.prompt).not.toContain("Contract (structured intent");
+  });
+
   it("fails when target node does not exist", () => {
     expect(() => {
       assembleContext({ targetNodeId: "node_missing", mode: "strict" }, cwd);
