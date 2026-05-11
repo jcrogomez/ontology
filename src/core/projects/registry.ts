@@ -114,19 +114,52 @@ export function touchProject(absPath: string): ProjectRegistry {
   return registry;
 }
 
+// Thrown by forgetProject when the argument is a name that matches more
+// than one entry. The caller can inspect `matches` to render the
+// conflicting paths and prompt the user to re-run with an absolute path.
+export class AmbiguousProjectNameError extends Error {
+  public readonly projectName: string;
+  public readonly matches: ReadonlyArray<ProjectRegistryEntry>;
+  constructor(projectName: string, matches: ReadonlyArray<ProjectRegistryEntry>) {
+    super(
+      `Multiple projects named "${projectName}" are registered — re-run with an absolute path to disambiguate.`,
+    );
+    this.name = "AmbiguousProjectNameError";
+    this.projectName = projectName;
+    this.matches = matches;
+  }
+}
+
 // Drop a project from the registry. Does NOT delete the project itself —
-// only the registry entry. Accepts either an absolute path or a name; if
-// multiple projects share the same name, all matching entries are removed.
+// only the registry entry. Accepts either an absolute path or a name:
+//
+//   - Path-first: if the argument resolves to a path that matches an
+//     entry's `path`, exactly that entry is removed (even if other
+//     entries share its name).
+//   - Otherwise, name match: exactly one match → remove it; zero matches
+//     → no-op; two or more → throw AmbiguousProjectNameError so the
+//     caller can disambiguate, rather than silently deleting all of them.
 export function forgetProject(pathOrName: string): { removed: number; registry: ProjectRegistry } {
   const registry = loadProjectRegistry();
-  const before = registry.projects.length;
   const absCandidate = path.resolve(pathOrName);
-  registry.projects = registry.projects.filter(
-    (p) => p.path !== absCandidate && p.name !== pathOrName,
-  );
-  const removed = before - registry.projects.length;
-  if (removed > 0) saveProjectRegistry(registry);
-  return { removed, registry };
+
+  const pathMatchIdx = registry.projects.findIndex((p) => p.path === absCandidate);
+  if (pathMatchIdx >= 0) {
+    registry.projects.splice(pathMatchIdx, 1);
+    saveProjectRegistry(registry);
+    return { removed: 1, registry };
+  }
+
+  const nameMatches = registry.projects.filter((p) => p.name === pathOrName);
+  if (nameMatches.length === 0) {
+    return { removed: 0, registry };
+  }
+  if (nameMatches.length > 1) {
+    throw new AmbiguousProjectNameError(pathOrName, nameMatches);
+  }
+  registry.projects = registry.projects.filter((p) => p.name !== pathOrName);
+  saveProjectRegistry(registry);
+  return { removed: 1, registry };
 }
 
 // Sort projects by lastOpenedAt descending (most recent first). Returns a
@@ -137,16 +170,20 @@ export function projectsByRecency(registry: ProjectRegistry): ProjectRegistryEnt
   );
 }
 
-// Filter the registry to entries whose path still has a `.ontology/` dir.
-// Stale entries (project moved or deleted) are reported alongside the live
-// ones so the picker can render them differently.
+// Filter the registry to entries whose path still has a valid Ontology
+// project (`.ontology/` plus `state.json`). Stale entries are reported
+// alongside the live ones so the picker can render them differently. The
+// state.json check guards against hand-created or partially-deleted
+// `.ontology/` dirs that would crash `onto open` or silently re-init.
 export function partitionByLiveness(
   registry: ProjectRegistry,
 ): { live: ProjectRegistryEntry[]; stale: ProjectRegistryEntry[] } {
   const live: ProjectRegistryEntry[] = [];
   const stale: ProjectRegistryEntry[] = [];
   for (const entry of registry.projects) {
-    if (fs.existsSync(path.join(entry.path, ".ontology"))) {
+    const ontologyDir = path.join(entry.path, ".ontology");
+    const stateFile = path.join(ontologyDir, "state.json");
+    if (fs.existsSync(ontologyDir) && fs.existsSync(stateFile)) {
       live.push(entry);
     } else {
       stale.push(entry);

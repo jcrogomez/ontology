@@ -8,6 +8,7 @@ import {
   registerProject,
   touchProject,
   forgetProject,
+  AmbiguousProjectNameError,
   projectsByRecency,
   partitionByLiveness,
   getProjectRegistryPath,
@@ -116,20 +117,80 @@ describe("project registry", () => {
     }
   });
 
-  it("forgetProject removes by name (all matches)", () => {
+  it("forgetProject removes a unique name match", () => {
     const a = fs.mkdtempSync(path.join(os.tmpdir(), "onto-a-"));
     const b = fs.mkdtempSync(path.join(os.tmpdir(), "onto-b-"));
     try {
-      registerProject({ name: "duplicate", path: a });
-      registerProject({ name: "duplicate", path: b });
-      registerProject({ name: "keeper", path: fs.mkdtempSync(path.join(os.tmpdir(), "onto-c-")) });
-      const { removed, registry } = forgetProject("duplicate");
-      expect(removed).toBe(2);
+      registerProject({ name: "alpha", path: a });
+      registerProject({ name: "beta", path: b });
+      const { removed, registry } = forgetProject("alpha");
+      expect(removed).toBe(1);
       expect(registry.projects).toHaveLength(1);
-      expect(registry.projects[0]!.name).toBe("keeper");
+      expect(registry.projects[0]!.name).toBe("beta");
     } finally {
       fs.rmSync(a, { recursive: true, force: true });
       fs.rmSync(b, { recursive: true, force: true });
+    }
+  });
+
+  it("forgetProject throws AmbiguousProjectNameError on duplicate names", () => {
+    const a = fs.mkdtempSync(path.join(os.tmpdir(), "onto-a-"));
+    const b = fs.mkdtempSync(path.join(os.tmpdir(), "onto-b-"));
+    const c = fs.mkdtempSync(path.join(os.tmpdir(), "onto-c-"));
+    try {
+      registerProject({ name: "duplicate", path: a });
+      registerProject({ name: "duplicate", path: b });
+      registerProject({ name: "keeper", path: c });
+      expect(() => forgetProject("duplicate")).toThrow(AmbiguousProjectNameError);
+      try {
+        forgetProject("duplicate");
+      } catch (err) {
+        expect(err).toBeInstanceOf(AmbiguousProjectNameError);
+        const e = err as AmbiguousProjectNameError;
+        expect(e.projectName).toBe("duplicate");
+        expect(e.matches.map((m) => m.path).sort()).toEqual(
+          [path.resolve(a), path.resolve(b)].sort(),
+        );
+      }
+      // Registry must be untouched on ambiguity.
+      const reloaded = loadProjectRegistry();
+      expect(reloaded.projects).toHaveLength(3);
+    } finally {
+      fs.rmSync(a, { recursive: true, force: true });
+      fs.rmSync(b, { recursive: true, force: true });
+      fs.rmSync(c, { recursive: true, force: true });
+    }
+  });
+
+  it("forgetProject prefers a path match over a coincidental name match", () => {
+    // Two entries: one whose path is /<cwd>/conflict (matches path.resolve
+    // of a bare argument from cwd), another whose name is "conflict". The
+    // path match must win and only that entry is removed.
+    const cwd = process.cwd();
+    const pathHit = path.join(cwd, "conflict");
+    const otherDir = fs.mkdtempSync(path.join(os.tmpdir(), "onto-other-"));
+    try {
+      registerProject({ name: "by-path", path: pathHit });
+      registerProject({ name: "conflict", path: otherDir });
+      const { removed, registry } = forgetProject("conflict");
+      expect(removed).toBe(1);
+      expect(registry.projects).toHaveLength(1);
+      expect(registry.projects[0]!.name).toBe("conflict");
+      expect(registry.projects[0]!.path).toBe(path.resolve(otherDir));
+    } finally {
+      fs.rmSync(otherDir, { recursive: true, force: true });
+    }
+  });
+
+  it("forgetProject is a no-op when nothing matches", () => {
+    const a = fs.mkdtempSync(path.join(os.tmpdir(), "onto-a-"));
+    try {
+      registerProject({ name: "alpha", path: a });
+      const { removed, registry } = forgetProject("nonexistent");
+      expect(removed).toBe(0);
+      expect(registry.projects).toHaveLength(1);
+    } finally {
+      fs.rmSync(a, { recursive: true, force: true });
     }
   });
 
@@ -153,10 +214,11 @@ describe("project registry", () => {
     }
   });
 
-  it("partitionByLiveness separates entries with a real .ontology/ from those without", () => {
+  it("partitionByLiveness separates entries with a valid .ontology/state.json from those without", () => {
     const live = fs.mkdtempSync(path.join(os.tmpdir(), "onto-live-"));
     const stalePath = path.join(os.tmpdir(), "onto-stale-does-not-exist");
     fs.mkdirSync(path.join(live, ".ontology"));
+    fs.writeFileSync(path.join(live, ".ontology", "state.json"), "{}\n");
     try {
       const reg = ProjectRegistrySchema.parse({
         projects: [
@@ -171,6 +233,26 @@ describe("project registry", () => {
       expect(staleEntries[0]!.name).toBe("stale");
     } finally {
       fs.rmSync(live, { recursive: true, force: true });
+    }
+  });
+
+  it("partitionByLiveness treats .ontology/ without state.json as stale", () => {
+    // A hand-created `.ontology/` (or one whose state.json was deleted)
+    // is not a usable project — onto open would crash or silently re-init.
+    const shallow = fs.mkdtempSync(path.join(os.tmpdir(), "onto-shallow-"));
+    fs.mkdirSync(path.join(shallow, ".ontology"));
+    try {
+      const reg = ProjectRegistrySchema.parse({
+        projects: [
+          { name: "shallow", path: shallow, createdAt: "2026-01-01T00:00:00.000Z", lastOpenedAt: "2026-01-01T00:00:00.000Z" },
+        ],
+      });
+      const { live, stale } = partitionByLiveness(reg);
+      expect(live).toHaveLength(0);
+      expect(stale).toHaveLength(1);
+      expect(stale[0]!.name).toBe("shallow");
+    } finally {
+      fs.rmSync(shallow, { recursive: true, force: true });
     }
   });
 
