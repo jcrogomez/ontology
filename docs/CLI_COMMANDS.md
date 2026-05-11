@@ -53,6 +53,11 @@ Bootstrap 0.9 (post-validator-port).
 
 - **Purpose:** A semantic and temporal mutation that generates a new structured node in the intention network based on a text prompt.
 - **Example:** `npm run dev -- node create --level domain --kind entity --prompt "Harvest has seededQuantity, harvestedQuantity and status."`
+- **Contract flags (post-0.9):** declare the node's structured contract at creation time so the validator gate has something to enforce.
+  - `--requires "tok1,tok2"` — comma-separated tokens that land in `context.requires` (each tagged `nodeType: "declared"`).
+  - `--provides "tok1,tok2"` — same for `context.provides` (the canonical key form).
+  - `--forbids "tok1,tok2"` — same for `context.forbids`.
+  - `--rules "FORBID: x|REQUIRE: y"` — pipe-separated prose rules that land in `node.rules` (pipe rather than comma because rule text often contains commas).
 - **Files Touched:**
   - `.ontology/nodes/node_0001.json` (Creates the node file)
   - `.ontology/events.jsonl` (Appends a `node_created` event)
@@ -80,7 +85,45 @@ Bootstrap 0.9 (post-validator-port).
 - **Validation at link time:**
   - Self-loops (`from === to`) are rejected.
   - The four refinement-family edges (`refines`, `inherits_from`, `implements`, `belongs_to`) must climb the abstraction poset; an inversion (e.g. `canon refines domain`) is rejected with `✖ Edge type ... points against the abstraction poset`. Other edge types are direction-agnostic.
-- **What it does not do:** It does not delete or modify existing edges.
+- **What it does not do:** It does not delete or modify existing edges. Use `onto edge remove` / `onto edge update` for those (post-0.9).
+
+### `node update <id>` *(post-Bootstrap 0.9 — plasticity primitive)*
+
+- **Purpose:** Edit a node in place: prompt / label / rules / contract tokens. Re-hashes and emits a `node_updated` event with old and new hashes. Closes the iterative-refinement loop without forcing the supersedes ceremony.
+- **Example:** `npm run dev -- node update node_0001 --prompt "Refined intent" --requires "new_token"`
+- **Flags (all optional, at least one mutating flag required):**
+  - `--prompt <text>` — replaces `node.prompt.raw` and mirrors into the `source_prompt` input.
+  - `--label <text>` — replaces `node.label`.
+  - `--rules "a|b|c"` — replaces `node.rules` wholesale; pass `--rules ""` to clear.
+  - `--requires "t1,t2"` / `--provides "t1,t2"` / `--forbids "t1,t2"` — replaces the corresponding `context.*` array wholesale. Pass an empty string to clear.
+  - `--json` — machine-readable result.
+- **Files Touched:**
+  - `.ontology/nodes/<id>.json` (Rewritten with the new hash)
+  - `.ontology/events.jsonl` (Appends `node_updated` with `oldHash`, `newHash`)
+  - `.ontology/state.json` (Counter increment; `nodeCount` is NOT changed — it is the monotonic id seed)
+- **Errors:** `Node not found`, or refuses with "requires at least one mutating flag" if nothing was passed.
+- **What it does not do:** It does not change `id`, `coordinates`, or `graph.parentId` — the topology stays fixed. To re-parent a node, use `onto edge update`.
+
+### `node remove <id>` *(post-Bootstrap 0.9)*
+
+- **Purpose:** Delete a node's record from disk and append a `node_removed` event. The event log retains the full history (the node *existed* even if the file no longer does).
+- **Example:** `npm run dev -- node remove node_0042`
+- **Refuses with edge guard:** if any edge references the node (incoming or outgoing), the command lists the incident edges and asks the user to remove them first with `onto edge remove`. The deletion is rejected — silent removal would leave dangling refs in `edges.jsonl`.
+- **`--json`:** on the edge-guard error, emits `{ok: false, error, incidentEdges: [{edgeId, from, to, type}, ...]}` so scripts can resolve the dependency.
+- **state.nodeCount stays monotonic:** removed ids are never reused. The audit chain is the recovery surface.
+
+### `edge remove <edgeId>` *(post-Bootstrap 0.9)*
+
+- **Purpose:** Drop an edge by id. Rewrites `edges.jsonl` atomically (temp + rename) and appends an `edge_removed` event.
+- **Example:** `npm run dev -- edge remove edge_a1b2c3d4`
+- **Atomic write:** a SIGKILL mid-rewrite leaves the original `edges.jsonl` intact.
+
+### `edge update <edgeId>` *(post-Bootstrap 0.9)*
+
+- **Purpose:** Re-classify an edge's type in place. Re-hashes and emits an `edge_updated` event with old/new types and old/new hashes.
+- **Example:** `npm run dev -- edge update edge_a1b2c3d4 --type depends_on`
+- **Required:** `--type <newType>` — must be one of the `EdgeTypeSchema` enum values.
+- **Scope today:** type changes only. Endpoint mutations (`from` / `to`) are out of scope — they are semantically equivalent to "drop and re-link", and asking the user to do both operations explicitly keeps the event log unambiguous.
 
 ### `events tail`
 
@@ -175,11 +218,13 @@ Bootstrap 0.9 (post-validator-port).
 - **Edges considered:** `depends_on`, `inherits_from`, `refines`, `implements`, `uses_token`. Direction-agnostic edges (`documents`, `tests`, `validates_against`, runtime relations, etc.) do not affect plan order.
 - **Notes:** Same kernel helper backs `:plan` in the walker.
 
-### `compile run <nodeId>` *(Bootstrap 0.8)*
+### `compile run <nodeId>` *(Bootstrap 0.8, hardened post-0.9)*
 
 - **Purpose:** Walk the topological compile plan rooted at the focal and produce artifacts on disk. The structure-preserving functor of axiom 6 made concrete.
 - **Example:** `npm run dev -- compile run node_0005 --provider mock`
-- **Flags:** `--provider mock|ollama` (default `mock`), `--model <name>`, `--ollama-host <host>`, `--json`.
+- **Flags:** `--provider mock|ollama` (default `mock`), `--model <name>`, `--ollama-host <host>`, `--runtime-check`, `--runtime-check-timeout-ms <ms>`, `--branch <name>` (post-0.9 — restrict the plan to a single fiber), `--json`.
+- **Post-0.9 gate:** after parse-check + before runtime-check, every artifact passes through `validateIntent` against the focal's contract (`context.requires/provides/forbids` + `node.rules`). A decisive false verdict aborts the compile with `reason: "intent_failed"` and surfaces the violating clause; an `unknown` verdict (open-world callers) passes with a warning. The validator gate runs always — there is no opt-out flag — because a compile that violates its declared contract is by definition broken.
+- **`--branch <name>`:** restricts the compile plan to the Grothendieck fiber over `<name>`. Only intra-branch edges participate in the closure. Refuses with `missing_branch` (with a `Known branches: ...` hint) if the name is unknown, and with `focal_off_branch` if the focal lives on a different branch — silent retargeting would surprise CI users.
 - **Files Touched:**
   - `.ontology/runs/run_<id>.json` (one per step, content-addressed)
   - `.ontology/events.jsonl` (one `run_persisted` and one `compilation_run` per step)
@@ -285,7 +330,7 @@ Bootstrap 0.9 (post-validator-port).
 ### `link <nodeId>` *(post-Bootstrap 0.9)*
 
 - **Purpose:** Run the semantic linker against a candidate response: assemble the focal's context, glue the presheaf fragments, validate the candidate via `validateIntent`, and surface the per-token requires/provides/forbids matrix plus edge proposal suggestions for any unsatisfied requirements. Read-only — no graph mutation, no model dispatch, no proposal creation.
-- **Required:** exactly one of `--candidate <text>` or `--candidate-file <path>`. The linker validates the candidate against the focal's contract; without one there is nothing to validate.
+- **Required:** exactly one of `--candidate <text>` or `--candidate-file <path>`. The linker validates the candidate against the focal's contract; without one there is nothing to validate. **Binary guard (post-0.9):** if `--candidate-file` resolves to content containing a NUL byte, the command refuses with `must be a readable UTF-8 text file`. `fs.readFileSync(..., "utf8")` would otherwise pass a string of garbled bytes through to the semantic linker.
 - **Optional:** `--branch <name>` (override active branch), `--include-edges` + `--edge-types <list>` (project typed edges into the gluing pool — same semantics as `context assemble --include-edges`), `--no-suggest-edges` (suppress the suggester), `--json`.
 - **Examples:**
   - `npm run dev -- link node_0042 --candidate "draft response that should satisfy the focal context"`
@@ -295,6 +340,22 @@ Bootstrap 0.9 (post-validator-port).
 - **Output (JSON):** `{ ok, focal, branch, contextNodeIds, validation, requires[], provides[], forbids[], neighbors[], conflicts[], suggestions[] }`. Each suggestion carries `{from, to, type, satisfies, rationale, command}`.
 - **Edge suggestions:** for each unsatisfied requirement, the suggester finds nodes in the same branch whose `provides` would resolve the token, and emits one suggestion per provider per edge type (defaults to two parallel rows: `depends_on` and `uses_token`). Suggestions skip (a) the focal itself, (b) nodes on a different branch, and (c) edges that already exist with the same `(from, to, type)` tuple. The user picks which (if any) to stage via `onto propose link`; the linker never auto-creates proposals.
 - **Notes:** Same kernel helper backs the walker's `:link-analysis` action, which defaults the candidate to `focal.prompt.raw` so the action is usable without typing a candidate.
+
+### `branch list` *(post-Bootstrap 0.9)*
+
+- **Purpose:** Enumerate every distinct branch in the project, with per-branch node counts and total. Read-only wrap over `listBranches` from `src/runtime/fibration/`.
+- **Example:** `npm run dev -- branch list` (or `... --json`)
+- **Output (human):** `=== ONTOLOGY BRANCHES ===` header, summary line `Branches: N   Total nodes: M`, then one line per branch with its node count. Branches are sorted lexicographically.
+- **Output (JSON):** `{ branches: [{name, nodeCount}], totalNodes }`.
+- **Edges are NOT consulted:** a branch is defined by the existence of at least one node carrying that label. An edge whose endpoints both live on a branch already implies the branch's nodes are present.
+
+### `branch fiber <name>` *(post-Bootstrap 0.9)*
+
+- **Purpose:** Render the Grothendieck fiber `p^{-1}(name)` — the induced subgraph of nodes whose `coordinates.branch === name`, plus the edges whose both endpoints survive the node filter.
+- **Example:** `npm run dev -- branch fiber main`
+- **Errors:** refuses with `No such branch: "<name>"` and lists the known branches when the name is absent. Returns an empty fiber report (zero nodes / zero edges) only if the branch exists but is empty — never silently.
+- **Output (JSON):** `{ branch, size: {nodes, edges}, nodes: [id, ...], edges: [{edgeId, type, from, to}, ...] }`.
+- **What it does not do:** It does not mutate state, does not propose anything, does not run cartesian lifts. Read-only inspection of the fibration.
 
 ### Model Observability
 - `onto model doctor`
@@ -307,16 +368,35 @@ Bootstrap 0.9 (post-validator-port).
 ## Planned Commands
 
 The following commands are *Planned / Not yet implemented*. The full
-roadmap lives in [`ROADMAP.md`](ROADMAP.md) §"Open follow-ups".
+roadmap lives in [`ROADMAP.md`](ROADMAP.md) §"Open follow-ups", and
+the Project Legend phases are detailed in [`PROJECT_LEGEND.md`](PROJECT_LEGEND.md).
 
-- **`onto branch list`** / **`onto branch fiber <name>`** — read-only
-  surfaces over `listBranches` / `computeBranchFiber`. Library exists;
-  CLI wiring is pending.
-- **`onto compile run --branch <name>`** — walk one fiber instead of
-  the whole graph. Drops in on top of `computeBranchFiber`.
+**Phase β of Project Legend (next sprint):**
+- **`onto compile run-batch [--all-artifacts | --nodes <ids>]`** —
+  compile every artifact node in a plan in one invocation; needed before
+  `verify-homeomorphism` scales to a whole repo.
+- **`onto compile run --target <path>`** — write the generated artifact
+  directly to its target source path, not only to
+  `.ontology/artifacts/generated/`. Removes the manual paste step.
+- **`node.literal?: string`** schema field — preserves verbatim content
+  for irreducible specificity (regexes, magic constants, license
+  headers). The compile pipeline emits `literal` instead of dispatching
+  the LLM; the validator and runtime-check still apply.
+
+**Phase γ–δ of Project Legend:**
+- **`onto ingest <path>`** — extract intent from existing source.
+- **`onto node inspect <id>`** — Inspector / Lupa primitive; one LLM
+  call per node lifetime, cached as `node.translator`.
+- **`onto verify-homeomorphism <id>`** + batch report — measures the
+  round-trip diff between the source and the regenerated artifact.
+
+**Other:**
 - **`onto branch lift <nodeId> --to <branch>`** — turn the read-only
   `describeCartesianLift` into an `edge_create` / `node_create`
-  proposal.
+  proposal. Depends on the [`BRANCH_MODEL.md`](BRANCH_MODEL.md)
+  materialisation decision.
+- **`onto sign <branch>` / `onto verify-published` / `onto replay --against`** —
+  Open-Prompt protocol primitives. Phase ζ.
 - **`run prompt --as-proposal` with `edge_create` target** — the
   discriminated-union mutation schema already supports it; the
   model-driven candidate edge is the missing piece.

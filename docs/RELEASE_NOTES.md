@@ -63,13 +63,46 @@
 - **Validator port onto topos algebra (post-0.9):** `intent-validator.ts` is now built on the predicate algebra in `src/runtime/topos/`. Each of the three validator rules (gluing ok, candidate non-empty, FORBID phrase scan) compiles to a `Predicate`; they fold via `allOf` and evaluate against an `EvaluationContext` synthesised by `buildEvaluationContext`. The high-level `IntentValidationResult` contract is preserved (`ok`, `score`, `violations`, `warnings`); a new `verdict: Omega` field exposes the underlying three-valued result. Externally observable behaviour stays Boolean (closed-world reduction); the lower-level `compileValidationPredicate` helper allows callers to evaluate against a partial context if they want to observe `verdict === "unknown"` directly. See [`RULES_TOPOS.md`](RULES_TOPOS.md) and [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §3.9.
 - **Documentation audit (post-0.9):** new [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) classifies every mathematical claim in the project into four tiers (strictly implemented / operationally implemented / useful analogy / aspirational) with file citations and per-claim rigor improvements. Pure-legacy stubs (`BOOTSTRAP_0_1.md`, `BOOTSTRAP_0_2.md`, `LEGACY_AUDIT.md`, `NODE_CREATE.md`, `ACCEPTANCE_TESTS.md`, `PROJECT_DIAGRAM.md`) deleted; `MATHEMATICAL_MODEL.md`, `CATEGORICAL_VISION.md`, `RULES_TOPOS.md`, `ROADMAP.md`, `ARCHITECTURE.md`, `CONTEXT_ASSEMBLER.md`, `EFFECT_MONAD.md`, `PROPOSAL_SYSTEM.md`, `GETTING_STARTED.md`, `README.md` updated to reflect the current state (validator port done; rhetorical claims downgraded; references to the claims map added).
 
-### Known limitations
+### post-0.9: hardening sweep + plasticity layer + Project Legend foundation (2026-05-08 — 2026-05-11)
 
-- run context --include-edges does not yet support persistence-of-cached behavior across edge-types filter changes (works correctly; just noting the cache key includes the filter)
-- SemanticLinker is now exposed via `onto link <nodeId> --candidate <text>` (post-0.9) and walker `:link-analysis`. The closed-world reduction means `verdict === "unknown"` is observable only via the lower-level `compileValidationPredicate` helper; an `openWorld?: boolean` flag on `validateIntent` is the natural follow-up.
-- Poset enforcement covers refinement-family edges (`refines`, `inherits_from`, `implements`, `belongs_to`); other edges remain direction-agnostic
-- Branch fibration has no `onto` CLI surface yet — only walker `:branch list`. Branch-aware compile (`onto compile run --branch <name>`) and `onto branch lift` are open follow-ups.
-- Validator port (post-0.9) is closed-world by default: `result.verdict` is observable as Ω, but `result.ok` collapses to Boolean. An `openWorld?: boolean` flag on `validateIntent` would expose the three-valued behaviour to callers.
-- `runFromWalker` is still on the legacy try/catch path; the `EffectWithLog` refactor (PR #115) covers `compileNode` only for now.
-- `state.json` and `events.jsonl` writes are not crash-atomic — a SIGKILL or out-of-disk mid-write can leave a truncated file. The single-writer assumption still applies.
-- no Visual DAG Studio
+**Hardening sweep — milestone-review items §3.1–§3.15 all resolved:**
+- `cb616ef` §3.1 ANSI leak in `truncateVisible`: appended `\x1b[0m` after the ellipsis when any escape was copied, so a truncated coloured cell no longer bleeds colour into the next column.
+- `82e2a30` §3.4/§3.5 registry foot-guns: `forgetProject` now resolves path-first and refuses with `AmbiguousProjectNameError` instead of silently deleting every same-named entry; `partitionByLiveness` also requires `.ontology/state.json` (not just the directory).
+- `17022e9` §3.2 atomic `writeJson`: write to a temp file then rename. A SIGKILL or out-of-disk mid-write leaves the original file intact. Applies to `state.json`, `events.jsonl`, and `~/.config/ontology/projects.json`.
+- `809b948` §3.3 `runtime-check` SIGTERM-slack scaling: the previous 100 ms slack collapsed to zero at the 100 ms lower bound; cap is now `min(100, timeoutMs / 10)` so any SIGTERM at the boundary stops being misreported as a timeout.
+- `8078bb2` §3.6 `eventTypeColor` ordering: negative-outcome patterns (`_failed` / `_rejected` / `_staled`) checked before the `compilation_*` catch-all, so a future `compilation_failed` event renders red.
+- `5fedf4a` §3.15 edge-suggester dedup invariant pin: the bug the review reported was not present; the regression test pins the unconditional-dedup property.
+- `b109547` §3.10 `computeCompilePlan` transitive `supersedes` pin: when X supersedes Y and Y has its own downstream Z, both Y and Z are dropped from the closure. The test pins this so a future refactor cannot silently re-include the deprecated subtree.
+- `14ecc51` §3.13 `--candidate-file` binary guard: NUL-byte detection refuses binary input with `must be a readable UTF-8 text file` before the linker wastes work.
+- `f1384be` §3.14 `:graph view` skipped-count separation: `skippedNodeIds: string[]` returned alongside `totalNodes`; the renderer surfaces the two reasons (cap-truncation vs. unloadable) as separate dim trailer lines.
+- `57fd9e5` §3.7 memoize `colorsEnabled()`: cached on first call with an exported `resetColorCache()` for tests; high-volume callers (an `events tail` over thousands of rows) stop paying the env-lookup cost per cell.
+- `0e933a2` §3.11/§3.12 batch node loads: `compile-plan-runner` and `graph-view-from-walker` both pre-load nodes into a `Map<id, OntologyNode>` once and resolve from there; eliminates O(steps × parents) disk reads in compile and O(slice) reads in the walker.
+- `96823cc` §3.8 `unicodeEnabled()` separation: CI logs with `NO_COLOR=1` keep Unicode borders. New `NO_UNICODE` env var + `TERM=dumb` are the dedicated downgrade signals.
+- `6dc2268` §3.9 `runFromWalker` → `EffectWithLog`: each throwing step is now an effect with breadcrumbs; logs survive failure. The public result shape is unchanged; a new optional `log: readonly LogEntry[]` field is added for future TUI surfacing.
+
+**Feature follow-ups unlocked by Bootstrap 0.9 — all shipped:**
+- `c7c062a` `onto branch list` + `onto branch fiber <name>`: read-only CLI surfaces over `listBranches` / `computeBranchFiber`. `branch list` shows per-branch node counts and total; `branch fiber <name>` returns the induced subgraph with a `Known branches: ...` hint on miss. `--json` on both.
+- `5f97e18` `onto compile run --branch <name>`: restricts the compile plan to a single Grothendieck fiber. Refuses with `missing_branch` / `focal_off_branch` instead of silently retargeting. `computeBranchFiber` provides the edge subset; `computeCompilePlan` is pure over the resulting edges.
+- `c835509` Validator open-world mode: `openWorld?: boolean` on `IntentValidationInput` + `SemanticLinkInput`, with `validation.verdict ∈ Ω` exposed end-to-end through `semanticLink`. Closed-world preserved as default — `result.ok` semantics unchanged for legacy callers.
+
+**Plasticity layer — pre-foundation gaps §1–§6 (the iterative-refinement loop):**
+- `3023bdc` §3: `assembleContext` surfaces the structured per-node contract (`context.{requires,provides,forbids}`) in the LLM prompt under a new `Contract:` section, marking the focal with `[target]`. The LLM now sees the same contract the validator will judge it against.
+- `fc94700` §2: `onto node create` accepts `--requires "t1,t2"` / `--provides "t1,t2"` / `--forbids "t1,t2"` / `--rules "FORBID: x|REQUIRE: y"`. Tokens are tagged `nodeType: "declared"`. No more JSON hand-editing to declare a contract.
+- `1a8a4c3` §1: `compile run` now gates on `validateIntent` after parse-check, before runtime-check. A decisive false verdict aborts with `reason: "intent_failed"`; the violating clause surfaces in the error. `assembleContext` is pinned to the focal's branch so non-active-branch compiles do not fail spuriously.
+- `dfbefa9` §4: `onto node update <id> [--prompt|--label|--rules|--requires|--provides|--forbids]`. Edits in place, re-hashes, emits `node_updated` with `oldHash` / `newHash`. The plasticity primitive — refining a node's intent no longer requires the `propose v2 + supersedes` ceremony. Refuses no-op calls.
+- `e847417` §5 + §6: `onto node remove <id>` (refuses with edge guard listing incident edges); `onto edge remove <edgeId>` (atomic edges.jsonl rewrite + `edge_removed`); `onto edge update <edgeId> --type <newType>` (re-hashes + `edge_updated`). Schema gains `node_removed` and `edge_updated` event types. `state.nodeCount` stays monotonic — removed ids are never reused.
+
+**Project Legend foundation (docs):**
+- `c79faef` [`docs/BRANCH_MODEL.md`](BRANCH_MODEL.md): three-option design (eager duplicate / overlay / lazy-materialise) for cross-branch `node_update` in Bootstrap 0.10, with Option C recommended (lazy on touch — schema-consistent, math-consistent, O(1) at branch creation).
+- `5f15c8b` [`docs/PROJECT_LEGEND.md`](PROJECT_LEGEND.md): full design for the reverse compile direction. Mathematical content stated operationally with LaTeX (adjoint pair $F \dashv G$, sheaf condition over file paths, Yoneda made operational, path fibration, the homeomorphism verdict). Inspector / Lupa primitive (one LLM call per node lifetime, cached as `node.translator`). Open-Prompt protocol (signed intent + audit-chain replay as a trust-transparency layer). Phase plan α (shipped) → β → γ → δ → ε → ζ with hour estimates. Three new T4 claims registered in `MATHEMATICAL_CLAIMS.md` §3.10 / §4.8 / §4.9 with explicit paths to T2 as each phase ships.
+- `a15cd78` `docs/ROADMAP.md` refresh: post-0.9 + plasticity layer + Legend chapter in sync with reality.
+
+### Known limitations (post-0.9, after plasticity layer)
+
+- run context --include-edges cache key incorporates the filter (works correctly; noted for awareness).
+- Poset enforcement covers refinement-family edges (`refines`, `inherits_from`, `implements`, `belongs_to`); other edges remain direction-agnostic.
+- Semantic linker has a read-only CLI; the proposal-mutation path still requires the manual `onto propose link → onto proposal apply` two-step.
+- Atomic writes are in place; advisory lock under `.ontology/.lock` is the next hardening item for cooperating multi-process writers.
+- `BRANCH_MODEL.md` (Option C: lazy materialisation on touch) is recommended but not user-confirmed. Required before any cross-branch `node_update` propagation lands.
+- Walker v2 (proposal review pane, plane/time/branch/manifestation rotation) remains unshipped.
+- Project Legend's adjoint claim is currently T4. Phase ε self-ingestion delivers measured ε on the Ontology codebase itself; that is what upgrades the claim to T2.

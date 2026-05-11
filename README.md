@@ -126,15 +126,21 @@ For the four post-axiom categorical extensions:
 - [**Branch Fibration**](docs/BRANCH_FIBRATION.md) — branches as Grothendieck fibers over the event log.
 - [**Rules as Topos**](docs/RULES_TOPOS.md) — three-valued Ω predicate algebra over `requires` / `provides` / `forbids`.
 
+For the next chapter — **Project Legend** — the inverse direction of the compile functor:
+
+- [**Project Legend**](docs/PROJECT_LEGEND.md) — `onto ingest <path>` lifts existing source into the intent layer, verifies the homeomorphism $F \circ G \approx \mathrm{id}$ on a measured subcategory, and reports the intent-resistant complement. Includes the Inspector / Lupa primitive (one LLM call per node lifetime, cached as `node.translator`) and the Open-Prompt protocol (signed intent + audit-chain replay as a trust-transparency layer between open-source and proprietary self-attestation).
+- [**Branch Model**](docs/BRANCH_MODEL.md) — design decision (Option C: lazy materialisation on touch) that gates Bootstrap 0.10 / cross-branch `node_update`.
+
 If you want to **contribute or extend**:
 
-- [**Roadmap**](docs/ROADMAP.md) — what is implemented, what is planned, in which bootstrap.
+- [**Roadmap**](docs/ROADMAP.md) — what is implemented, what is planned, in which bootstrap; refreshed after every commit that ships a new surface.
 - [**RFCs**](docs) — `RUN_PERSISTENCE.md`, `PROPOSAL_SYSTEM.md`, `WALKER_INTERFACE.md`, `COMPILER.md`.
 - [**Release Notes**](docs/RELEASE_NOTES.md) — the running changelog.
+- [**Milestone reviews**](docs/reviews/) — daily snapshots that pair PR progress with a concrete bug list.
 
 ## Status
 
-**Bootstrap 0.9 — Categorical extensions + compiler hardening.** Version `0.3.0-alpha.0`. The seven axioms of the mathematical canon are running concrete code, including the previously textual axiom 4:
+**post-Bootstrap 0.9 — Plasticity layer + Legend foundation.** Version `0.3.0-alpha.0`. The seven axioms of the mathematical canon are running concrete code, including the previously textual axiom 4. The iteration primitives that the workflow needed — `node update`, `node remove`, `edge remove`, `edge update`, contract flags on `node create`, a `validateIntent` gate on every compile — are shipped, so the iterative loop (write intent → compile → validate → refine) is fluid instead of ceremonial. Branch-aware compile (`onto compile run --branch <name>`) and the branch fibration CLI (`onto branch list / fiber`) close the largest post-0.9 surface gaps. The next chapter is **[Project Legend](docs/PROJECT_LEGEND.md)** — the construction of an approximate left adjoint to the compile functor, plus the Open-Prompt protocol.
 
 | Axiom | Implementation |
 | --- | --- |
@@ -153,8 +159,8 @@ The four additive categorical extensions (`CATEGORICAL_VISION.md`) ship as runti
 | Extension | Library | Surface |
 | --- | --- | --- |
 | Yoneda query | `src/runtime/query/representable.ts` | `onto query` CLI, walker `:query` |
-| Effect monad | `src/runtime/effects/io.ts` | in concrete use inside `compileNode` |
-| Branch fibration | `src/runtime/fibration/branch-fiber.ts` | walker `:branch list` (no `onto branch` CLI yet) |
-| Topos predicate algebra | `src/runtime/topos/predicate.ts` | `intent-validator.ts` ported onto the algebra; verdict ∈ Ω exposed via `result.verdict` |
+| Effect monad | `src/runtime/effects/io.ts` | concrete use inside `compileNode` and `runFromWalker` (both post-0.9) |
+| Branch fibration | `src/runtime/fibration/branch-fiber.ts` | `onto branch list` / `onto branch fiber <name>` CLI, walker `:branch list`, and `onto compile run --branch <name>` for fiber-scoped compiles |
+| Topos predicate algebra | `src/runtime/topos/predicate.ts` | `intent-validator.ts` ported onto the algebra; `validateIntent({openWorld: true})` exposes the three-valued verdict end-to-end through `semanticLink` |
 
 Ontology is alpha-quality. The append-only log is single-writer (CLI single-shot); concurrent writes from multiple processes are not yet protected, and `state.json` writes are not yet atomic on crash. Everything else is meant to fail loudly and exit `1` rather than silently corrupt.
