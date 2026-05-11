@@ -3,14 +3,17 @@ import type { OntologyEvent } from "../../schemas/ontology.js";
 import { renderTable } from "../../core/render/table.js";
 import { bold, dim, color } from "../../core/render/style.js";
 
-// Map common event types to a colour family. Mutations get green, validation
-// or persistence orange-ish, system grey. Unknown types fall through plain.
-function eventTypeColor(t: string): string {
-  if (t.startsWith("compilation_") || t.endsWith("_persisted")) return color(t, "greenBright");
+// Map common event types to a colour family. Negative-outcome patterns are
+// checked first so they win against broader prefixes (e.g. a future
+// `compilation_failed` event should render red, not green just because it
+// starts with "compilation_"). Exported for unit-level testing of the
+// ordering invariant.
+export function eventTypeColor(t: string): string {
+  if (t.includes("_failed") || t.includes("_rejected") || t.includes("_staled")) return color(t, "red");
   if (t === "system_init") return color(t, "magenta");
   if (t.includes("_created") || t.includes("_added") || t.includes("_applied")) return color(t, "green");
-  if (t.includes("_failed") || t.includes("_rejected") || t.includes("_staled")) return color(t, "red");
   if (t.includes("_updated") || t.includes("_removed") || t.includes("_superseded")) return color(t, "yellow");
+  if (t.startsWith("compilation_") || t.endsWith("_persisted")) return color(t, "greenBright");
   return t;
 }
 
