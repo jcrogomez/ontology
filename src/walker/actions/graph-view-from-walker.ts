@@ -53,14 +53,22 @@ export interface GraphViewResult {
   // Populated when ok=true.
   focalId?: string;
   depth?: number;
-  // Total node count in the slice (including focal). Useful for the
-  // renderer's "showing X of Y" hint when the slice is capped.
+  // Total node count in the slice (including focal). Reflects the BFS
+  // slice size from extractSubgraph, not the renderable count — a node
+  // that appears in the slice but fails to load shows up in totalNodes
+  // and again in skippedNodeIds so the renderer can be honest about
+  // both numbers.
   totalNodes?: number;
   totalEdges?: number;
   focal?: GraphViewNodeRow;
   upstream?: GraphViewNodeRow[];
   downstream?: GraphViewNodeRow[];
   lateral?: GraphViewNodeRow[];
+  // Slice members whose JSON file failed to load. Sorted, deterministic.
+  // The renderer surfaces these as a dim trailer line so the user knows
+  // the panel reflects a partial view and which `onto validate` would
+  // flag. Empty array on a healthy project.
+  skippedNodeIds?: string[];
 }
 
 // Hard cap on rows the renderer is asked to draw. Beyond this the panel
@@ -102,10 +110,12 @@ export function graphViewFromWalker(
   const downstreamDistance = directedBfsDistance(focalId, sliceEdges, "out", sliceNodeIds);
 
   // Pre-load every node we need (by id). Nodes that fail to load are
-  // skipped silently — the slice came from a current edge list, so a
-  // missing node here would already have failed `validate`. We do not
-  // crash the panel because of one corrupt record.
+  // tracked separately so the renderer can distinguish "node hidden by
+  // depth cap" from "node could not be loaded" — the previous code
+  // silently dropped corrupt records and the cap-truncation hint
+  // mis-attributed the missing rows to the cap.
   const nodeById = new Map<string, OntologyNode>();
+  const skippedNodeIds: string[] = [];
   for (const id of slice.nodeIds) {
     if (id === focalId) {
       nodeById.set(id, focalNode);
@@ -113,7 +123,9 @@ export function graphViewFromWalker(
     }
     const n = loadNodeById(id, cwd);
     if (n) nodeById.set(id, n);
+    else skippedNodeIds.push(id);
   }
+  skippedNodeIds.sort();
 
   const focalRow: GraphViewNodeRow = {
     id: focalId,
@@ -190,6 +202,7 @@ export function graphViewFromWalker(
     upstream: upstream.slice(0, RENDER_CAP_PER_BUCKET),
     downstream: downstream.slice(0, RENDER_CAP_PER_BUCKET),
     lateral: lateral.slice(0, RENDER_CAP_PER_BUCKET),
+    skippedNodeIds,
   };
 }
 

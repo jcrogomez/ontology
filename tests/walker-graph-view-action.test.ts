@@ -125,4 +125,43 @@ describe("graphViewFromWalker", () => {
     const b = graphViewFromWalker("node_0001", { cwd });
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
+
+  it("skippedNodeIds is empty on a healthy project", () => {
+    runCli(cwd, ["node", "create", "--level", "domain", "--kind", "decision", "--prompt", "focal"]);
+    runCli(cwd, ["node", "create", "--level", "workflow", "--kind", "rule", "--prompt", "n2"]);
+    runCli(cwd, ["node", "link", "--from", "node_0001", "--to", "node_0002", "--type", "depends_on"]);
+
+    const r = graphViewFromWalker("node_0001", { cwd });
+    expect(r.ok).toBe(true);
+    expect(r.skippedNodeIds).toEqual([]);
+  });
+
+  it("reports skippedNodeIds when a slice member's node file is missing", () => {
+    // Build a project where node_0001 has an outgoing edge to node_0002.
+    // Then delete node_0002.json on disk. The edges log still references
+    // node_0002, so extractSubgraph pulls it into the slice, but the
+    // load loop cannot resolve it.
+    runCli(cwd, ["node", "create", "--level", "domain", "--kind", "decision", "--prompt", "focal"]);
+    runCli(cwd, ["node", "create", "--level", "workflow", "--kind", "rule", "--prompt", "victim"]);
+    runCli(cwd, ["node", "link", "--from", "node_0001", "--to", "node_0002", "--type", "depends_on"]);
+
+    const fs = require("node:fs") as typeof import("node:fs");
+    const path = require("node:path") as typeof import("node:path");
+    fs.unlinkSync(path.join(cwd, ".ontology", "nodes", "node_0002.json"));
+
+    const r = graphViewFromWalker("node_0001", { cwd });
+    expect(r.ok).toBe(true);
+    expect(r.skippedNodeIds).toEqual(["node_0002"]);
+    // node_0002 must NOT appear in any bucket — it could not be loaded.
+    const allBucketIds = [
+      ...(r.upstream ?? []),
+      ...(r.downstream ?? []),
+      ...(r.lateral ?? []),
+    ].map((row) => row.id);
+    expect(allBucketIds).not.toContain("node_0002");
+    // totalNodes still reflects the slice size, including the unloaded one,
+    // so the renderer can honestly say "slice: 2 node(s)" even though only
+    // one rendered.
+    expect(r.totalNodes).toBe(2);
+  });
 });

@@ -266,7 +266,13 @@ function renderBody(state: Exclude<InfoPanelState, { kind: "idle" }>): React.Rea
   const lateral = result.lateral ?? [];
   const totalNodes = result.totalNodes ?? 0;
   const totalEdges = result.totalEdges ?? 0;
+  const skipped = result.skippedNodeIds ?? [];
   const renderedCount = 1 + upstream.length + downstream.length + lateral.length;
+  // Honest accounting: hidden-by-cap is what's left over after we subtract
+  // both rendered rows and unloadable nodes from the slice size. Without
+  // the skipped subtraction the cap message would falsely take credit for
+  // rows that never had a chance to load in the first place.
+  const hiddenByCap = Math.max(0, totalNodes - renderedCount - skipped.length);
   return (
     <>
       <Text bold color="yellow">
@@ -274,7 +280,7 @@ function renderBody(state: Exclude<InfoPanelState, { kind: "idle" }>): React.Rea
       </Text>
       <Text dimColor>
         slice: {totalNodes} node(s), {totalEdges} edge(s)
-        {renderedCount < totalNodes ? ` · showing ${renderedCount}` : ""}
+        {hiddenByCap > 0 ? ` · showing ${renderedCount}` : ""}
       </Text>
       {upstream.length > 0 && (
         <Box marginTop={1} flexDirection="column">
@@ -300,10 +306,17 @@ function renderBody(state: Exclude<InfoPanelState, { kind: "idle" }>): React.Rea
           {lateral.map((row) => <GraphViewRow key={row.id} row={row} arrow="↔" />)}
         </Box>
       )}
-      {renderedCount < totalNodes && (
+      {hiddenByCap > 0 && (
         <Box marginTop={1}>
           <Text dimColor>
-            ...{totalNodes - renderedCount} more node(s) hidden — drop depth or use `onto graph subgraph` to explore further.
+            ...{hiddenByCap} more node(s) hidden — drop depth or use `onto graph subgraph` to explore further.
+          </Text>
+        </Box>
+      )}
+      {skipped.length > 0 && (
+        <Box marginTop={1}>
+          <Text dimColor>
+            {skipped.length} node(s) could not be loaded — run `onto validate` to inspect.
           </Text>
         </Box>
       )}
