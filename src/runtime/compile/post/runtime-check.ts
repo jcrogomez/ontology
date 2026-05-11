@@ -91,8 +91,14 @@ function execWithTimeout(spec: ExecSpec): RuntimeCheckResult {
   if (r.error && (r.error as NodeJS.ErrnoException).code === "ENOENT") {
     return { status: "skipped", reason: spec.notFoundMessage };
   }
-  // spawnSync sets r.signal to "SIGTERM" when timeout fires; r.status is null.
-  if (r.signal === "SIGTERM" && durationMs >= spec.timeoutMs - 100) {
+  // spawnSync sets r.signal to "SIGTERM" when timeout fires; r.status is
+  // null. Use elapsed time as corroborating evidence so other SIGTERM
+  // sources (Ctrl-C, OOM killer, parent kill) are not misreported as
+  // timeouts. The slack is capped at 100ms but never exceeds 10% of the
+  // budget — a fixed 100ms slack collapsed the threshold to 0 at the
+  // 100ms lower bound, making any SIGTERM look like a timeout there.
+  const timeoutSlackMs = Math.min(100, Math.floor(spec.timeoutMs * 0.1));
+  if (r.signal === "SIGTERM" && durationMs >= spec.timeoutMs - timeoutSlackMs) {
     return {
       status: "failed",
       message: `runtime exceeded ${spec.timeoutMs}ms timeout`,

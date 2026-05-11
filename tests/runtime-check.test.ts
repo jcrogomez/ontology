@@ -81,6 +81,22 @@ describe("runtimeCheck", () => {
       }
     });
 
+    it("does not misreport an early SIGTERM as a timeout at the 100ms boundary", () => {
+      // The child self-SIGTERMs at startup (durationMs ≈ ms, well below
+      // the new 10%-of-budget slack). Pre-fix the threshold collapsed to
+      // 0 at timeoutMs=100, so any SIGTERM landed in the "exceeded
+      // timeout" branch. Post-fix the slack is 10ms → threshold 90ms →
+      // the SIGTERM falls through to the generic failure branch.
+      const p = path.join(tmp, "selfkill.py");
+      fs.writeFileSync(p, "import os, signal\nos.kill(os.getpid(), signal.SIGTERM)\n");
+      const r = runtimeCheck({ absolutePath: p, language: "python", timeoutMs: 100 });
+      expect(r.status).toBe("failed");
+      if (r.status === "failed") {
+        expect(r.message).not.toMatch(/exceeded.*timeout/i);
+        expect(r.exitCode).toBeNull();
+      }
+    });
+
     it("clamps an absurdly large timeout into the safe range (does not hang on bad input)", () => {
       const p = path.join(tmp, "ok2.py");
       fs.writeFileSync(p, 'print("x")\n');
