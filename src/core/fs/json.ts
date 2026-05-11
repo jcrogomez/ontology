@@ -9,10 +9,27 @@ export function ensureDir(dir: string): void {
   }
 }
 
+// Crash-atomic JSON write: serialize to a sibling temp file, then rename
+// into place. POSIX rename is atomic when source and destination live on
+// the same filesystem (guaranteed here because the temp is in the parent
+// dir). A SIGKILL or out-of-disk mid-write leaves the original target
+// intact rather than truncating it. The orphan temp is unlinked on
+// rename failure so a crashed run doesn't litter the directory.
 export function writeJson(filePath: string, value: unknown): void {
   const dir = path.dirname(filePath);
   ensureDir(dir);
-  fs.writeFileSync(filePath, JSON.stringify(value, null, 2) + "\n", "utf-8");
+  const tmp = `${filePath}.tmp.${process.pid}`;
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(value, null, 2) + "\n", "utf-8");
+    fs.renameSync(tmp, filePath);
+  } catch (err) {
+    try {
+      fs.unlinkSync(tmp);
+    } catch {
+      // best-effort cleanup; ignore if the tmp wasn't created
+    }
+    throw err;
+  }
 }
 
 export function readJson<T>(filePath: string): T {
