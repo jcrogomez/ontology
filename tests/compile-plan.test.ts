@@ -267,5 +267,51 @@ describe("computeCompilePlan", () => {
       if (!plan.ok) return;
       expect(plan.warnings).toEqual([]);
     });
+
+    it("transitively drops Y's downstream when Y is superseded — closure walk never enters Y", () => {
+      // FOCAL → Y → Z chain via depends_on. X supersedes Y. The closure
+      // walk starts at FOCAL, sees outgoing depends_on Y, but the check
+      // refuses to push Y because Y is superseded. Z is reachable ONLY
+      // via Y, so Z is also dropped silently. The plan continues with
+      // FOCAL alone, and the warning surfaces Y for the user to clean.
+      //
+      // This is the exact "silently drop Y" semantic that COMPILER.md
+      // documents; pinning it here guards against a future refactor that
+      // would naively re-enable the transitive chain (which would mask
+      // the deprecation by quietly compiling against the deprecated
+      // node's deps).
+      const edges = [
+        edge("e1", "FOCAL", "Y", "depends_on"),
+        edge("e2", "Y", "Z", "depends_on"),
+        edge("e3", "X", "Y", "supersedes"),
+      ];
+      const plan = computeCompilePlan("FOCAL", edges);
+      expect(plan.ok).toBe(true);
+      if (!plan.ok) return;
+      expect(plan.closure).toEqual(["FOCAL"]);
+      expect(plan.closure).not.toContain("Y");
+      expect(plan.closure).not.toContain("Z");
+      expect(plan.steps.map((s) => s.nodeId)).toEqual(["FOCAL"]);
+      expect(plan.warnings).toEqual([
+        { kind: "superseded", successor: "X", predecessor: "Y" },
+      ]);
+    });
+
+    it("keeps Z when Z is also reachable via an alternative path not going through Y", () => {
+      // FOCAL → Y (superseded) and FOCAL → Z directly. Even though Y's
+      // dep on Z would also reach Z, the direct edge survives so Z stays
+      // in the closure. Y still drops; X still surfaces as a warning.
+      const edges = [
+        edge("e1", "FOCAL", "Y", "depends_on"),
+        edge("e2", "Y", "Z", "depends_on"),
+        edge("e3", "FOCAL", "Z", "depends_on"),
+        edge("e4", "X", "Y", "supersedes"),
+      ];
+      const plan = computeCompilePlan("FOCAL", edges);
+      expect(plan.ok).toBe(true);
+      if (!plan.ok) return;
+      expect(plan.closure.sort()).toEqual(["FOCAL", "Z"]);
+      expect(plan.steps.map((s) => s.nodeId)).toEqual(["Z", "FOCAL"]);
+    });
   });
 });
