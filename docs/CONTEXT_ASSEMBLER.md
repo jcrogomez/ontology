@@ -68,6 +68,48 @@ The SemanticLinker (a separate runtime module) layers presheaf gluing and
 intent validation on top of the assembler's output. The assembler stays
 pure; the linker is the validation hop.
 
+## The assembled prompt — structure
+
+The output of `assembleContext` is a string the LLM consumes. The structure (post-0.9, after the structured-contract patch) is:
+
+```
+ONTOLOGY CONTEXT PACKAGE
+Mode: strict
+Branch: <branch>
+Target: <focalId>
+
+Canon:
+<the canon prose>
+
+Constraints:
+1. <rule>
+2. <rule>
+...
+
+Path:
+- node_0000_canon :: <label>
+- ... :: <label>
+
+Contract (structured intent — enforced post-generation by the validator):
+- <nodeId> [target]:
+    provides: tok1, tok2
+    requires: tok3
+    forbids:  tok4
+- <nodeId>:
+    provides: ...
+
+Target Prompt:
+<focal.prompt.raw>
+```
+
+The **`Contract` section** (post-0.9, commit `3023bdc`) surfaces the structured `context.{requires, provides, forbids}` tokens of every node in the assembled path. The focal is marked with `[target]` so the LLM knows whose contract it is responsible for satisfying. Nodes with an empty contract are skipped to keep the prompt compact, and the whole section is omitted when no node carries any structured intent. This is what makes the validator's predicate gate honest: the LLM sees the same contract the validator will judge it against — not just the prose `rules`.
+
+Mathematically, the path's contract is a presheaf
+
+$$\mathcal{P}\colon \text{Path}^{\mathrm{op}} \longrightarrow \mathbf{Set}, \qquad \mathcal{P}(n) = \bigl(\,\mathrm{requires}(n),\;\mathrm{provides}(n),\;\mathrm{forbids}(n)\,\bigr),$$
+
+and `glueFragments` computes the colimit $\bigsqcup_n \mathcal{P}(n)$ that the linker then evaluates against the candidate response.
+
 ## CLI Surface
 
 *Implemented: strict mode, edge-aware assembly, presheaf/gluing validation*

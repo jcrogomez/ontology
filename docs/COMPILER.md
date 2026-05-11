@@ -120,16 +120,23 @@ The Bootstrap 0.8 v0 listed four gaps in this section. Three closed in 0.9:
 - **Upstream-output threading — shipped (PR #105).** The plan-runner threads each refinement parent's compiled response into the per-node `compileNode` call as `UpstreamContextItem[]`, and the system prompt renders them under XML `<context>` tags (PR #109 fixed an earlier format leak). Downstream nodes now actually see what their refinement parents produced.
 - **`contradicts` / `supersedes` semantics in the plan — shipped (PR #112).** `computeCompilePlan` rejects any plan whose closure contains a `contradicts` edge as a hard `CompilePlanError`, and halts BFS on `supersedes` with a `superseded` warning. Note the asymmetry: `contradicts` is loud (the plan errors out); `supersedes` is silent-by-design (the predecessor is dropped from the closure even when its successor is unreachable from the focal — that is the intended semantics of "this node has been replaced"). Tests should pin both behaviours.
 
-Per-artifact validation gates were also added in 0.9:
+Per-artifact validation gates were also added in 0.9, and the **semantic gate** landed post-0.9:
 
 - **Language parse-check (PR #104).** Every code artifact is parse-validated against the node's `technical.language` after write. Failures emit a `validate_failed` step and abort the plan. A deterministic, model-agnostic floor on artifact quality.
+- **Semantic gate via `validateIntent` (post-0.9, commit `1a8a4c3`).** After parse-check and before the optional runtime-check, every artifact is evaluated against the focal node's full contract — the union of `context.requires` / `context.provides` / `context.forbids` tokens and the FORBID/REQUIRE prose in `node.rules`. Formally, every compile step is now the composite
+  
+  $$F_n\;\colon\;\text{Intent}_n\;\xrightarrow{\;\text{dispatch}\;}\;\text{Artifact}_n\;\xrightarrow{\;\text{validateIntent}\;}\;\Omega_n,$$
+  
+  where $\Omega_n = \{\text{true}, \text{false}, \text{unknown}\}$ is the Heyting algebra defined in `runtime/topos/`. A `false` verdict aborts the compile with `reason: "intent_failed"` and surfaces the violated clause; an `unknown` verdict (open-world callers only) passes through with a warn-level breadcrumb so the audit log records the uncertainty. The gate runs always — there is no opt-out — because a compile that violates its declared contract is structurally invalid, not merely undesirable.
 - **Optional `--runtime-check` (PR #110).** `onto compile run --runtime-check` executes each artifact under a wall-clock timeout (default 5000 ms, max 60000 ms) and surfaces non-zero exits, signal kills, and timeouts as `runtime_failed` step records.
 - **Code-fence stripping (PR #103).** When `coordinates.manifestation === "code"`, the artifact-writer strips a leading/trailing markdown code fence so a model returning ```` ```python ... ``` ```` produces a runnable file.
 - **Per-node `model.ref` routing (PR #108).** Without `--provider` override, each node compiles via its own `technical.model.ref` resolved through the registry, so the per-step run record honestly reports which model produced which artifact.
+- **Branch-scoped compile (post-0.9, commit `5f97e18`).** `onto compile run <focal> --branch <name>` restricts the plan to the Grothendieck fiber $p^{-1}(\text{name})$, where $p\colon \mathcal{I} \to \mathcal{B}$ forgets the branch label. Only intra-fiber edges participate; cross-branch supersedes / refinement are inert; the focal must itself live on the branch (refused with `focal_off_branch` otherwise).
 
 ## What the compiler does not do (yet)
 
-- **`validateIntent` between steps.** Artifact-level validation (parse-check, optional runtime-check) is in place, but the deterministic intent validator does not yet run on each step's output to refuse advancing the plan when a candidate breaks the gluing.
-- **Branch-aware compile.** `computeBranchFiber` is in place (PR #111); `onto compile run --branch <name>` to walk one fiber instead of the whole graph is the open CLI gap.
+- **Multi-file orchestration.** `compileNode` produces one artifact per call; the plan-runner sequences them but does not support a `--target <path>` flag yet (artifacts always land in `.ontology/artifacts/generated/`). Adding a target path and a `compile run-batch` are Phase β of [Project Legend](PROJECT_LEGEND.md).
+- **`node.literal` escape hatch.** Some artifacts carry irreducible specificity (regexes, magic constants, license headers) that should be preserved verbatim rather than dispatched. The `node.literal?: string` schema field that the compile pipeline would emit literally is Phase β of Legend.
+- **Reverse direction (`onto ingest`).** Lifting existing source into the intent layer — the approximate left adjoint $G\colon \text{Code} \to \text{Intent}$ — is the entire subject of Project Legend, Phases γ–ε.
 
 These are explicit, documented gaps. They can be filled without changing the kernel surface — `compileNode` and `runCompilePlan` are the extension points.

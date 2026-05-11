@@ -85,72 +85,60 @@ the rest of the multigraph structure.
 
 ### 2.2 Functor — *axiom 6, the compiler functor*
 
-Compilation is a **structure-preserving functor** F : 𝓘 → 𝓐 from the category
-of *intentions* to the category of *artifacts*:
+Compilation is a **structure-preserving functor**
 
-- **Objects.** Each compilable node maps to one artifact under
-  `.ontology/artifacts/generated/`.
-- **Morphisms.** Hard-dependency edges in 𝓘 (`depends_on`, `inherits_from`,
-  `refines`, `implements`, `validates_against`, `belongs_to`) determine the
-  topological compile order in 𝓐.
-- **Identity / composition.** A leaf node compiled with the mock provider on
-  `task: code_sketch` returns its `prompt.raw` verbatim — that is F acting as
-  the identity functor on a degenerate object.
+$$F\;\colon\; \mathcal{I} \longrightarrow \mathcal{A}$$
 
-The implementation is [`src/runtime/compile/compile-plan-runner.ts`](src/runtime/compile/compile-plan-runner.ts)
-plus the planner [`src/runtime/graph/compile-plan.ts`](src/runtime/graph/compile-plan.ts)
-(Kahn's algorithm over the hard-dependency edge family).
+from the category of *intentions* to the category of *artifacts*:
+
+- **Objects.** Each compilable node $n \in \mathrm{Ob}(\mathcal{I})$ maps to one artifact $F(n)$ under `.ontology/artifacts/generated/`.
+- **Morphisms.** Hard-dependency edges in $\mathcal{I}$ (`depends_on`, `inherits_from`, `refines`, `implements`, `validates_against`, `belongs_to`) determine the topological compile order in $\mathcal{A}$.
+- **Identity / composition.** A leaf node compiled with the mock provider on `task: code_sketch` returns its `prompt.raw` verbatim — that is $F$ acting as the identity functor on a degenerate object.
+
+The implementation is [`src/runtime/compile/compile-plan-runner.ts`](../src/runtime/compile/compile-plan-runner.ts) plus the planner [`src/runtime/graph/compile-plan.ts`](../src/runtime/graph/compile-plan.ts) (Kahn's algorithm over the hard-dependency edge family).
+
+The **inverse direction** $G\colon \mathcal{A} \to \mathcal{I}$ is the central construction of [Project Legend](PROJECT_LEGEND.md) — an approximate left adjoint that lifts existing source into the intent layer. The operational adjunction $F \dashv G$ with measured $\varepsilon$ on the round-trip $F \circ G \approx \mathrm{id}_{\mathcal{A}}$ is `MATHEMATICAL_CLAIMS.md` §3.10.
 
 ### 2.3 Natural transformation — *between equivalent functors*
 
-A natural transformation η : F ⇒ G is a coherent family of morphisms
-{η_X : F(X) → G(X)} that commutes with the morphisms of the source category.
+A natural transformation $\eta\colon F \Rightarrow G$ is a coherent family of morphisms $\{\eta_X\colon F(X) \to G(X)\}_{X \in \mathrm{Ob}(\mathcal{C})}$ that commutes with the morphisms of the source category — i.e. for every $f\colon X \to Y$, the square
 
-In Ontology, the most natural place this concept will land is the
-**branch-merge proposal** (future work): given two compile functors that view
-the graph from two different branches, merging branches is a natural
-transformation between them. Today the structure is implicit in the proposal
-system ([`src/core/proposals/persist.ts`](src/core/proposals/persist.ts)) which
-already pins `parentHash` re-validation and stale detection — these are the
-coherence conditions a natural transformation must satisfy.
+$$\begin{array}{ccc} F(X) & \xrightarrow{\eta_X} & G(X) \\ {\scriptsize F(f)}\downarrow & & \downarrow{\scriptsize G(f)} \\ F(Y) & \xrightarrow{\eta_Y} & G(Y) \end{array}$$
 
-The branch fibration module ([§2.8](#28-fibration--branches-as-fibers))
-provides the read-only foundation that this future natural-transformation
-formalisation will build on.
+commutes.
+
+In Ontology, the most natural place this concept will land is the **branch-merge proposal** (future work): given two compile functors $F_b, F_{b'}\colon \mathcal{I} \to \mathcal{A}$ viewing the graph from two different branches $b, b'$, merging branches is a natural transformation $F_b \Rightarrow F_{b'}$ over the cartesian-lift functor. Today the structure is implicit in the proposal system ([`src/core/proposals/persist.ts`](../src/core/proposals/persist.ts)) which already pins `parentHash` re-validation and stale detection — these are the coherence conditions a natural transformation must satisfy.
+
+A second concrete natural transformation is the **Inspector triangle** (Project Legend §3): $\tau\colon \mathrm{intent} \Rightarrow \mathrm{prose}$ produces a per-node `translator` paragraph; combined with $F$ and the LLM-described-code map $\sigma$, it gives a (probabilistically) commuting square.
 
 ### 2.4 Limits / colimits — *via topological closure*
 
-Limits and colimits are universal cones into / out of a diagram. Today
-Ontology realises them in two places:
+Limits and colimits are universal cones into / out of a diagram. Today Ontology realises them in two places:
 
-- **Compile plan as a colimit.** `computeCompilePlan(focal)` returns the
-  topological closure of `focal` under hard-dependency edges. Read backward,
-  this is the colimit of all dependencies *into* `focal`.
-- **Context assembly as a limit.** `assembleContext(focal)` walks parents and
-  edge neighbours and glues their context fragments. Reading the gluing
-  ([`src/runtime/context/gluing.ts`](src/runtime/context/gluing.ts)) as a limit
-  in the presheaf topos is the formal interpretation of axiom 5.
+- **Compile plan as a colimit.** `computeCompilePlan(focal)` returns
+  
+  $$\mathrm{Plan}(n) \;=\; \mathrm{colim}\Bigl(\,\{m \in \mathcal{I} : m \to^{\,*}\, n \text{ along hard-deps}\}\,\Bigr),$$
+  
+  the topological closure of $n$ under hard-dependency edges.
+- **Context assembly as a limit / colimit.** `assembleContext(focal)` walks parents and edge neighbours and glues their context fragments. The gluing in [`src/runtime/context/gluing.ts`](../src/runtime/context/gluing.ts) is the colimit
+  
+  $$\mathrm{Glue}(n) \;=\; \bigsqcup_{m \in \mathrm{Nbhd}(n)} \mathcal{P}(m) \;\big/\; {\sim}$$
+  
+  in the presheaf category, where $\sim$ is the equaliser of overlapping requires / provides / forbids tokens.
 
-These are not labelled "limit" or "colimit" in the source today; the
-correspondence is a matter of how you read the existing functions.
+These are not labelled "limit" or "colimit" in the source today; the correspondence is a matter of how you read the existing functions.
 
 ### 2.5 Adjunction — *propose ⊣ apply (informal)*
 
-The proposal system has the *shape* of an adjunction: every node mutation
-factors through a typed candidate (`propose`) which is then either applied
-(`apply`) or rejected. The Hom-set bijection
+The proposal system has the *shape* of an adjunction: every node mutation factors through a typed candidate (`propose`) which is then either applied (`apply`) or rejected. The Hom-set bijection
 
-> Hom(propose(X), Y)  ≅  Hom(X, apply^{-1}(Y))
+$$\mathrm{Hom}_{\mathcal{C}}\bigl(\mathrm{propose}(X),\,Y\bigr) \;\cong\; \mathrm{Hom}_{\mathcal{D}}\bigl(X,\,\mathrm{apply}^{-1}(Y)\bigr)$$
 
-is not pinned formally yet, but the existing parentHash re-validation
-([`src/core/proposals/persist.ts`](src/core/proposals/persist.ts)) is exactly
-the coherence law a unit / counit pair would impose. Treat this as a
-*candidate* adjunction; formalising it cleanly is on the roadmap.
+is not pinned formally yet, but the existing parentHash re-validation ([`src/core/proposals/persist.ts`](../src/core/proposals/persist.ts)) is exactly the coherence law a unit / counit pair would impose. Treat this as a *candidate* adjunction; formalising it cleanly is on the roadmap.
 
-A second candidate adjunction worth flagging is
-**refine ⊣ project**: refinement-family edges climb the abstraction poset
-(refine: source → target with `level(source) ≤ level(target)`), and the
-"forget the refinement" projection is its right adjoint.
+A second candidate adjunction worth flagging is **refine ⊣ project**: refinement-family edges climb the abstraction poset (refine: $s \to t$ with $\mathrm{level}(s) \le_L \mathrm{level}(t)$), and the "forget the refinement" projection is its right adjoint.
+
+The **third and most important** candidate adjunction — and the only one with a concrete plan to make operational — is **Project Legend's $F \dashv G$**: the compile functor and its approximate inverse, with the round-trip homeomorphism $F \circ G \approx \mathrm{id}$ measured empirically. See [`PROJECT_LEGEND.md`](PROJECT_LEGEND.md) §2.1 and [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §3.10.
 
 ### 2.6 Monad — *Effect runtime, [src/runtime/effects/](src/runtime/effects/)*
 

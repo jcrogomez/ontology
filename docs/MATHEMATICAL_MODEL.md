@@ -16,24 +16,40 @@
 
 ## 1. Typed Directed Multigraph
 
+The network is a tuple
+
+$$G \;=\; (V,\; E,\; s,\; t,\; \tau_V,\; \tau_E)$$
+
+with $V$ the set of nodes, $E$ the set of edges, $s, t\colon E \to V$ the source / target maps, and $\tau_V \colon V \to \mathbf{NodeKind}$, $\tau_E \colon E \to \mathbf{EdgeType}$ the typing functions over finite type-token vocabularies.
+
 - Nodes are typed semantic objects.
 - Edges are typed semantic relations.
-- Multiple semantic relations may connect the same pair of nodes.
-- This is why Ontology is not a tree and not a flat prompt list.
+- Multiple semantic relations may connect the same pair of nodes — for distinct $e_1, e_2 \in E$ it is permitted that $s(e_1) = s(e_2)$ and $t(e_1) = t(e_2)$ provided $\tau_E(e_1) \ne \tau_E(e_2)$ (the multigraph property). This is why Ontology is not a tree and not a flat prompt list.
 
 ## 2. Temporal Event Log
 
+The log is a totally ordered injection
+
+$$\mathcal{L}\;\colon\; [\,0,\, N\,) \;\hookrightarrow\; \mathbf{Event},$$
+
+with hash-prepended chain integrity: each event carries `previousEventId` so the log forms a $\mathrm{SHA{-}256}$-anchored linked list.
+
 - Every mutation of the network is represented as an append-only event.
-- Time is not inferred from file modification timestamps.
-- Events make audit, replay and branching possible.
+- Time is not inferred from file modification timestamps; `coordinates.time` is the sequence index in $\mathcal{L}$.
+- Events make audit, replay, and branching possible.
 
 ## 3. Abstraction Poset
 
+Abstraction levels form a partial order
+
+$$(L,\,\le_L) \;=\; \{\text{canon},\,\text{project},\,\text{target},\,\text{stack},\,\text{architecture},\,\text{domain},\,\text{workflow},\,\text{interface},\,\text{unit},\,\text{token},\,\text{artifact}\}$$
+
+with the canonical chain `canon ≥ project ≥ … ≥ artifact`. Every node carries `coordinates.abstraction ∈ L`.
+
 - Nodes live in a partially ordered abstraction space.
-- Canon, project, target, stack, architecture, domain, workflow, interface, unit, token and artifact are abstraction coordinates, totally ordered top → bottom.
 - Higher abstraction nodes constrain lower abstraction nodes.
 - Lower nodes may refine but not mutate higher nodes.
-- The four refinement-family edges (`refines`, `inherits_from`, `implements`, `belongs_to`) carry direction semantics consistent with this axiom: they must climb toward more abstraction (source level ≤ target level in concreteness, i.e. source is at or below target in the poset). Inversions are rejected at link time and detected retroactively by `onto validate`. Other edge types remain direction-agnostic.
+- The four refinement-family edges (`refines`, `inherits_from`, `implements`, `belongs_to`) carry direction semantics consistent with this axiom: for any such edge $e$ with source $s(e)$ and target $t(e)$, we require $\mathrm{abstraction}(s(e)) \le_L \mathrm{abstraction}(t(e))$ — the edge must climb toward more abstraction. Inversions are rejected at link time and detected retroactively by `onto validate`. Other edge types remain direction-agnostic.
 
 ## 4. Prompt Rewriting
 
@@ -51,34 +67,62 @@
 
 ## 5. Context Presheaf
 
+Context is a presheaf on the graph:
+
+$$\mathcal{P}\;\colon\; \mathbf{Graph}^{\mathrm{op}} \longrightarrow \mathbf{Set},
+\qquad
+\mathcal{P}(n) \;=\; \bigl(\,\mathrm{requires}(n),\; \mathrm{provides}(n),\; \mathrm{forbids}(n),\; \mathrm{optional}(n)\,\bigr).$$
+
+The assembler collects sections over the neighborhood of the focal; `glueFragments` computes the colimit $\bigsqcup_n \mathcal{P}(n) / {\sim}$ (with conflict reporting at the equaliser); `validateIntent` evaluates a candidate response against the glued presheaf.
+
 - Each node declares requires, provides, forbids and optional context.
 - Context is local to graph neighborhoods.
 - **Implemented.** `assembleContext` (parent path + edge neighbors),
   `glueFragments` (presheaf merge with conflict reporting), and
   `validateIntent` (now compositional over the topos predicate algebra,
   see §8.4) form the strict-mode pipeline. Edge-aware extension via
-  `--include-edges` brings typed neighbors into the gluing pool.
-- **Not yet pinned:** the *presheaf restriction law* — `F(N') ⊂ F(N)` for
-  `N' ⊂ N`. The structure is presheaf-shaped operationally; the law has
-  no test. `MATHEMATICAL_CLAIMS.md` §2.5 classifies this as T2.
+  `--include-edges` brings typed neighbors into the gluing pool. The
+  structured contract is surfaced in the LLM prompt under a `Contract`
+  section so the model sees what the validator will judge it against
+  (post-0.9; see `docs/CONTEXT_ASSEMBLER.md`).
+- **Not yet pinned:** the *presheaf restriction law* — $\mathcal{P}(n') \subseteq \mathcal{P}(n)$ for $n' \subseteq n$. The structure is presheaf-shaped operationally; the law has no test. `MATHEMATICAL_CLAIMS.md` §2.5 classifies this as T2.
 - The `compare` and `propose` modes that earlier drafts of this axiom
   promised are not implemented; the assembler rejects any mode other
   than `strict`. They remain on the roadmap.
 
 ## 6. Compiler Functor
 
+Compilation is a functor
+
+$$F\;\colon\; \mathcal{I} \longrightarrow \mathcal{C}$$
+
+from the **intent category** $\mathcal{I}$ (objects: Ontology networks; morphisms: structure-preserving evolutions — `node_created`, `node_updated`, `edge_created`, `edge_updated`) to the **code category** $\mathcal{C}$ (objects: artifact files on disk; morphisms: refactors preserving module identity). The order is *derived* — the plan is computed by Kahn's algorithm over the hard-dependency edge family — not hand-coded.
+
+Post-0.9, every compile step is the composite
+
+$$F_n\;\colon\; n \;\xrightarrow{\text{dispatch}}\; A_n \;\xrightarrow{\text{validateIntent}}\; \Omega,$$
+
+so the functor refuses to step forward when the candidate $A_n$ would violate the focal's contract — see `docs/COMPILER.md` for the gate.
+
 - Compilation maps intention objects and semantic relations into executable artifact objects and relations.
 - Compilation must preserve structure.
 - Framework choice must come from target/stack nodes, not from hardcoded compiler assumptions.
-- **Implemented (Bootstrap 0.8).** `onto compile run <nodeId>` walks the topological plan computed by `computeCompilePlan` and dispatches each step's prompt against the configured provider. The order is *derived* from the graph (hard-dependency edges + Kahn's algorithm), not hand-coded; that is the structure-preserving property. See `docs/COMPILER.md` for the full implementation.
+- **Implemented (Bootstrap 0.8 + post-0.9 hardening).** `onto compile run <nodeId>` walks the topological plan and dispatches each step's prompt against the configured provider. The structure-preserving property is *derived* from the graph + Kahn's algorithm, not hand-coded.
 - The mock provider acts as the **identity functor** when `task: code_sketch` — it returns the prompt verbatim. This makes mock-driven compilation a degenerate but mathematically valid case of axiom 6, and is what powers the offline `npm run example:hello-world` demo.
+- **The inverse direction** $G\colon \mathcal{C} \to \mathcal{I}$ — extracting intent from existing code — is the subject of [Project Legend](PROJECT_LEGEND.md). It tests the operational adjunction $F \dashv G$ and measures the round-trip $F \circ G \approx \mathrm{id}$ on a quantified subcategory.
 
 ## 7. Code as Compiled Shadow
+
+For every artifact $a$ on disk, there exists a chain
+
+$$a \;\longleftarrow\; e_{\text{compilation\_run}} \;\longleftarrow\; r_{\text{PersistedRun}} \;\longleftarrow\; h_{\text{promptHash}} \;\longleftarrow\; n_{\text{node}},$$
+
+each arrow a stored back-reference, each hash content-addressed.
 
 - Code is not the source of truth.
 - Code is a generated artifact.
 - Generated artifacts must be traceable to nodes, edges, events and hashes.
-- **Implemented.** Every artifact under `.ontology/artifacts/generated/<nodeId>.<ext>` is anchored by a `compilation_run` event whose payload carries `nodeId`, `runId`, `cached`, and `artifactRelativePath`. The `runId` resolves to a content-addressed `PersistedRun` record whose `input.promptHash` ties back to the source node body. The audit chain `artifact → event → run → prompt hash → node` is replayable end-to-end.
+- **Implemented.** Every artifact under `.ontology/artifacts/generated/<nodeId>.<ext>` is anchored by a `compilation_run` event whose payload carries `nodeId`, `runId`, `cached`, and `artifactRelativePath`. The `runId` resolves to a content-addressed `PersistedRun` record whose `input.promptHash` ties back to the source node body. The audit chain $a \to e \to r \to h \to n$ is replayable end-to-end via `onto runs verify <runId>`.
 
 ## 8. Beyond the seven axioms — categorical extensions
 

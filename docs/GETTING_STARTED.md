@@ -52,14 +52,17 @@ Should print a brutalist summary: nodes, events, edges, and the first canon rule
 
 ## 2. Create your first nodes
 
-Nodes are typed semantic objects. They carry a `level` (where in the abstraction poset they live) and a `kind` (what shape of intention they represent).
+Nodes are typed semantic objects. They carry a `level` (where in the abstraction poset they live), a `kind` (what shape of intention they represent), and an optional **contract** — the structured `requires` / `provides` / `forbids` tokens the validator enforces against any output produced from this node.
 
 ```bash
 onto node create --level domain --kind entity \
-  --prompt "Harvest has seededQuantity, harvestedQuantity and status."
+  --prompt "Harvest has seededQuantity, harvestedQuantity and status." \
+  --provides "harvest_entity,stock_calculus"
 
 onto node create --level workflow --kind action \
-  --prompt "When a harvest is recorded, compute stock_delta and emit a stock event."
+  --prompt "When a harvest is recorded, compute stock_delta and emit a stock event." \
+  --requires "harvest_entity,stock_calculus" \
+  --rules "FORBID: writes to .ontology/nodes/"
 ```
 
 Each command:
@@ -67,12 +70,23 @@ Each command:
 - Appends a `node_created` event to `events.jsonl`.
 - Updates `state.json` counters.
 - Hashes the node body for integrity.
+- Declares the node's contract: `--provides` lands in `context.provides`, `--requires` in `context.requires`, `--forbids` in `context.forbids`, `--rules` in `node.rules`. The validator (`onto link`, the compile gate) enforces this contract against any LLM output produced for the node.
 
 ```bash
 onto node list
 ```
 
 Should show three nodes: the canon, plus the two you just created.
+
+**Iterating on a node** — if you want to refine a prompt or tighten a contract, you don't have to delete and recreate. Use `onto node update`:
+
+```bash
+onto node update node_0001 \
+  --prompt "Harvest has seededQuantity, harvestedQuantity, status, and a timestamp." \
+  --provides "harvest_entity,stock_calculus,harvest_timestamp"
+```
+
+The node is rewritten in place, re-hashed, and a `node_updated` event lands in the temporal log with both old and new hashes — the audit chain still shows exactly how the intent evolved.
 
 ---
 
@@ -220,6 +234,14 @@ hello world
 ```
 
 That's the canon's axiom 6 (compiler functor) running real code. The mock provider acts as the **identity functor** for `code_sketch` task — it returns the prompt verbatim — which makes this work offline. With Ollama, replace `--provider mock` with `--provider ollama --model llama3.1:8b` and supply a higher-level prompt; the compile pipeline is identical.
+
+**Semantic gate.** Every compile passes the generated artifact through `validateIntent` against the focal's contract before claiming success. Formally, the compile is the composite
+
+$$\text{Intent}\;\xrightarrow{\;F\;}\;\text{Artifact}\;\xrightarrow{\;\text{validateIntent}\;}\;\Omega,$$
+
+where $\Omega = \{\text{true}, \text{false}, \text{unknown}\}$. A `false` verdict aborts the compile with `reason: "intent_failed"` and surfaces which clause was violated — so you cannot ship an artifact that contradicts the contract you declared with `--requires` / `--provides` / `--forbids` / `--rules`. Try it: re-create the artifact node with `--rules "FORBID: hello"` and re-run the compile; the gate stops it with the violating phrase named in the error.
+
+**Branch-scoped compile.** If your project carries multiple branches, `onto compile run <focal> --branch <name>` restricts the plan to a single Grothendieck fiber — only edges whose both endpoints live on `<name>` participate. Cross-branch dependencies become inert under that flag, which is exactly what you want when one branch ships ahead of another.
 
 The shorter way to see all of this end-to-end is:
 

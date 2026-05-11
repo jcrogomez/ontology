@@ -31,6 +31,17 @@ operations that without proposals would be conflated:
 
 Without proposals, every model run either does nothing (current state) or becomes a hand-translated mutation by the user. The proposal system makes that translation a first-class, auditable artifact.
 
+### Direct mutation vs proposal — when to use which (post-0.9)
+
+After the plasticity layer landed, the user has **two** paths to mutate the network. They are deliberately different:
+
+| Path | Surface | When to use |
+|---|---|---|
+| **Direct** | `onto node update / remove`, `onto edge update / remove` | Single-actor iterative refinement. The user *is* the author; they want their edits to be a flat sequence of `node_updated` / `edge_updated` events, not a proposal chain. Fast feedback loop. |
+| **Proposal** | `onto propose node / link`, `onto proposal apply / reject` | Multi-actor or model-mediated authorship. The candidate originates from a model run, an external collaborator, or any flow where the author of the change and the approver are not the same person. The two-step `propose → apply` preserves that distinction in the audit log. |
+
+Both paths land in the same kernel — every event passes through hash verification, the validator gate, and the temporal log. The choice is **about the authorship model the user wants the audit chain to record**, not about whether the change is safe. Proposals are not "more careful direct edits"; they are typed candidates with provenance to a generator (a model run, another user, an ingest step). When the generator and the approver are the same person, a proposal is just ceremony.
+
 ## 2. Schema
 
 Proposals live in `.ontology/proposals/proposal_<id>.json`.

@@ -4,7 +4,28 @@
 > Models may speak. Only explicit graph commands may mutate the network.
 > Code is the compiled shadow of a valid semantic network.
 
-Ontology is a terminal-first system for building **a network of ideas that does not lose its mind** when an AI gets involved. Instead of letting prompts and outputs sprawl across chats, files, and notes, you connect intentions as typed nodes and edges in `.ontology/` — a kernel-verified intention network — and a compiler walks that network in topological order to produce executable artifacts. Every artifact is traceable to the proposal that birthed it, the model run that drafted it, the assembled context the model saw, and the hashes of the nodes and edges that authorized the compilation.
+## What this is
+
+Ontology is a terminal-first system for **versioning intent**, not just code. You connect intentions as typed nodes and edges in `.ontology/` — a kernel-verified intention network — and a compiler walks that network in topological order to produce executable artifacts.
+
+In one line of math, the system implements a structure-preserving functor
+
+$$F\colon \text{Intent} \longrightarrow \text{Code}$$
+
+with a semantic gate ($\text{validateIntent} \to \Omega$) that refuses to emit an artifact whose declared contract is violated. The inverse direction — **lifting existing code back into intent** — is the central work of [Project Legend](docs/PROJECT_LEGEND.md): the operational adjoint $G$ of $F$, with the round-trip $F \circ G \approx \mathrm{id}$ measured empirically.
+
+The point: a Ontology session generates code you can re-derive from a network you can read. The intent is the durable artifact; the code is the compiled shadow. Every artifact is traceable to the proposal that birthed it, the model run that drafted it, the assembled context the model saw, and the hashes of the nodes and edges that authorised the compilation.
+
+## Why this matters
+
+Two pains every team using LLM-assisted development feels today:
+
+1. **Bandwidth gap.** A session produces more code than a human can review with care.
+2. **Adoption wall.** The intent-first workflow works on greenfield projects; brownfield projects have no path in.
+
+Ontology addresses both. The forward direction (`onto compile run`) makes the intent the source of truth, so a session's diff is a small intent change, not a sprawl of generated files. Project Legend addresses the second: `onto ingest <path>` lifts existing source into the intent layer so the workflow applies to any codebase, not only new ones.
+
+Longer term, the **Open-Prompt protocol** (Legend Phase ζ) turns the signed intent + audit chain into a trust-transparency layer between fully open-source and proprietary self-attestation: an organisation publishes its intent and lets third parties verify that the running code respects that intent, without exposing the implementation.
 
 ## See it in 60 seconds
 
