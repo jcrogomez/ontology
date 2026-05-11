@@ -344,6 +344,65 @@ describe("onto compile run", () => {
     }
   });
 
+  it("intent gate aborts compile when the artifact violates a FORBID rule on the focal", () => {
+    // The mock LLM returns the prompt verbatim for task=code_sketch. So if
+    // the prompt contains a phrase that the focal's rules FORBID, the
+    // artifact will too — and the validator should catch it before the
+    // compile is allowed to claim success. This is the §1 gate in action.
+    const tmp2 = createTempProject();
+    try {
+      expect(runCli(tmp2, ["init"]).status).toBe(0);
+      expect(runCli(tmp2, ["node", "create", "--level", "domain", "--kind", "entity", "--prompt", "d"]).status).toBe(0);
+      expect(runCli(tmp2, [
+        "node", "create",
+        "--level", "artifact",
+        "--kind", "artifact",
+        "--manifestation", "code",
+        "--language", "python",
+        // The artifact's own prompt mentions a forbidden token — the mock
+        // will echo it verbatim, the validator will catch it.
+        "--prompt", "print('uses banned_phrase here')",
+        "--rules", "FORBID: banned_phrase",
+      ]).status).toBe(0);
+      runCli(tmp2, ["node", "link", "--from", "node_0001", "--to", "node_0000_canon", "--type", "refines"]);
+      runCli(tmp2, ["node", "link", "--from", "node_0002", "--to", "node_0001", "--type", "refines"]);
+      const r = runCli(tmp2, ["compile", "run", "node_0002", "--provider", "mock", "--json"]);
+      expect(r.status).toBe(1);
+      const parsed = JSON.parse(r.stdout);
+      expect(parsed.ok).toBe(false);
+      expect(parsed.reason).toBe("step_failed");
+      expect(parsed.error).toContain("Intent validation failed");
+      expect(parsed.error).toContain("banned_phrase");
+    } finally {
+      cleanupTempProject(tmp2);
+    }
+  });
+
+  it("intent gate passes a clean compile and surfaces no violations", () => {
+    const tmp2 = createTempProject();
+    try {
+      expect(runCli(tmp2, ["init"]).status).toBe(0);
+      expect(runCli(tmp2, ["node", "create", "--level", "domain", "--kind", "entity", "--prompt", "d"]).status).toBe(0);
+      expect(runCli(tmp2, [
+        "node", "create",
+        "--level", "artifact",
+        "--kind", "artifact",
+        "--manifestation", "code",
+        "--language", "python",
+        "--prompt", "print('clean output')",
+        "--rules", "FORBID: definitely_not_present",
+      ]).status).toBe(0);
+      runCli(tmp2, ["node", "link", "--from", "node_0001", "--to", "node_0000_canon", "--type", "refines"]);
+      runCli(tmp2, ["node", "link", "--from", "node_0002", "--to", "node_0001", "--type", "refines"]);
+      const r = runCli(tmp2, ["compile", "run", "node_0002", "--provider", "mock", "--json"]);
+      expect(r.status).toBe(0);
+      const parsed = JSON.parse(r.stdout);
+      expect(parsed.ok).toBe(true);
+    } finally {
+      cleanupTempProject(tmp2);
+    }
+  });
+
   it.runIf(PYTHON_AVAILABLE)("--runtime-check honors --runtime-check-timeout-ms and reports timeouts as runtime_failed", () => {
     const tmp2 = createTempProject();
     try {

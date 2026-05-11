@@ -10,6 +10,10 @@ import { writeArtifact, type WriteArtifactResult } from "./artifact-writer.js";
 import { extractCodeFence } from "./post/extract-code-fence.js";
 import { validateLanguage } from "./post/validate-language.js";
 import { runtimeCheck } from "./post/runtime-check.js";
+import { assembleContext } from "../context/assembler.js";
+import { buildFragment } from "../context/presheaf.js";
+import { glueFragments } from "../context/gluing.js";
+import { validateIntent } from "../context/intent-validator.js";
 import { parsePromptAST } from "../prompt/parse.js";
 import {
   buildUpstreamSystemPrompt,
@@ -108,6 +112,7 @@ export type CompileNodeFailureReason =
   | "persist_failed"
   | "write_failed"
   | "validate_failed"
+  | "intent_failed"
   | "runtime_failed"
   | "model_ref_unresolved";
 
@@ -440,6 +445,105 @@ function validateLanguageE(
   };
 }
 
+// (g.5) Semantic gate. After parse-check we evaluate the focal's
+// structured contract (context.{requires, provides, forbids} + the
+// FORBID prose from node.rules) against the artifact body via
+// `validateIntent`. A decisive false verdict aborts the compile with
+// reason="intent_failed" — the LLM produced something the linker would
+// also reject, no point letting it pass downstream. Unknown verdicts
+// (open-world mode in a future caller) pass with a warning so the
+// audit log records the uncertainty.
+//
+// Cost: one `assembleContext` + `glueFragments` per compile step. For
+// nodes with an empty contract the validator returns true trivially —
+// the work is small relative to the LLM dispatch that preceded it.
+function validateIntentE(
+  input: PostInput,
+  artifactContent: string,
+): EffectWithLog<void, CompileFailure> {
+  return () => {
+    try {
+      const cwd = input.options.cwd ?? process.cwd();
+      // Pin the assembly to the focal's own branch — assembleContext
+      // defaults to state.activeBranch, but compile-plan-runner can be
+      // invoked against a focal on a non-active branch (e.g. multi-branch
+      // CI flows, the --branch flag) and the default would falsely
+      // trigger a branch mismatch error before the validator even ran.
+      const assembled = assembleContext(
+        {
+          targetNodeId: input.options.node.id,
+          branch: input.options.node.coordinates.branch,
+          mode: "strict",
+        },
+        cwd,
+      );
+      const fragments = assembled.nodes.map(buildFragment);
+      const glued = glueFragments(fragments);
+      const validation = validateIntent({
+        assembled,
+        glued,
+        candidate: {
+          text: artifactContent,
+          provider: input.response.provider,
+          model: input.response.model,
+        },
+      });
+      if (validation.verdict === "true") {
+        return {
+          value: ok(undefined),
+          logs: [{
+            level: "info",
+            message: `validateIntent: ok (score=${validation.score})`,
+          }],
+        };
+      }
+      if (validation.verdict === "unknown") {
+        return {
+          value: ok(undefined),
+          logs: [{
+            level: "warn",
+            message: `validateIntent: unknown verdict — passing with ${validation.warnings.length} warning(s)`,
+            data: validation.warnings,
+          }],
+        };
+      }
+      // Decisive failure — surface the linker's violations as the failure
+      // message so the user (or the next iteration of the loop) sees
+      // exactly which clause of the contract was violated.
+      const summary = validation.violations.length > 0
+        ? validation.violations.join("; ")
+        : "no specific violation surfaced by the validator";
+      return {
+        value: err({
+          reason: "intent_failed",
+          message: `Intent validation failed (score=${validation.score}): ${summary}`,
+        }),
+        logs: [{
+          level: "error",
+          message: `validateIntent: failed (score=${validation.score})`,
+          data: validation.violations,
+        }],
+      };
+    } catch (raw) {
+      // assembleContext / glueFragments can throw on a malformed graph
+      // (missing ancestor, broken parent chain). Surface as intent_failed
+      // so the caller sees a single class of "the gate could not produce
+      // a verdict" rather than an unrelated stack.
+      return {
+        value: err({
+          reason: "intent_failed",
+          message: `Could not run intent validation: ${raw instanceof Error ? raw.message : String(raw)}`,
+        }),
+        logs: [{
+          level: "error",
+          message: "validateIntent: pre-check threw",
+          data: raw,
+        }],
+      };
+    }
+  };
+}
+
 // (h) Optional runtime check (opt-in via options.runtimeCheck).
 function runtimeCheckE(
   input: PostInput,
@@ -568,10 +672,13 @@ export async function compileNode(options: CompileNodeOptions): Promise<CompileN
       (artifact) => bindWithLog(
         validateLanguageE(postInput, artifact),
         () => bindWithLog(
-          runtimeCheckE(postInput, artifact),
+          validateIntentE(postInput, content),
           () => bindWithLog(
-            emitEventE(postInput, artifact),
-            (event) => pureWithLog({ artifact, event } as PostShape),
+            runtimeCheckE(postInput, artifact),
+            () => bindWithLog(
+              emitEventE(postInput, artifact),
+              (event) => pureWithLog({ artifact, event } as PostShape),
+            ),
           ),
         ),
       ),
