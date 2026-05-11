@@ -34,6 +34,18 @@ export interface CreateNodeOptions {
   // the artifact writer to pick the right extension when manifestation is
   // "code" or "test" (e.g., "python" → .py).
   language?: string;
+  // Optional structured contract tokens. These populate
+  // `context.{requires, provides, forbids}` — the same fields the linker
+  // enforces post-generation. Pass them at creation time so the user does
+  // not have to hand-edit JSON to declare an intent contract. Each token
+  // becomes a record with `nodeType: "declared"`, which the validator
+  // ignores; the linker only reads `key` / `source`.
+  requires?: string[];
+  provides?: string[];
+  forbids?: string[];
+  // Optional inline rules (FORBID:/REQUIRE: prose strings). Pass at create
+  // time so the user does not have to hand-edit JSON to add constraints.
+  rules?: string[];
   // Optional event metadata. Proposal apply records the source proposalId here
   // so the temporal log carries the back-reference from the resulting
   // node_created event to the proposal that triggered it.
@@ -82,16 +94,16 @@ export function createNode(options: CreateNodeOptions): { node: OntologyNode; ev
       post: []
     },
     context: {
-      requires: [],
-      provides: [],
-      forbids: [],
+      requires: (options.requires ?? []).map((source) => ({ source, nodeType: "declared" })),
+      provides: (options.provides ?? []).map((key) => ({ key, nodeType: "declared" })),
+      forbids: (options.forbids ?? []).map((source) => ({ source, nodeType: "declared" })),
       optional: []
     },
     graph: {
       parentId,
       orbitOf: null
     },
-    rules: [],
+    rules: options.rules ?? [],
     technical: options.language ? { language: options.language } : {},
     outputs: {
       files: []

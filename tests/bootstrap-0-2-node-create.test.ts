@@ -221,4 +221,76 @@ describe('Bootstrap 0.2 Node Create Tests', () => {
     expect(output).toContain('Hash mismatch');
     expect(output).toContain('node_0001');
   });
+
+  describe('contract flags', () => {
+    it('--requires / --provides / --forbids land in node.context with nodeType="declared"', () => {
+      runCli(tempDir, ['init']);
+      const r = runCli(tempDir, [
+        'node', 'create',
+        '--level', 'workflow',
+        '--kind', 'rule',
+        '--prompt', 'Append-only JSONL writes',
+        '--provides', 'log_endpoint,jsonl_path',
+        '--requires', 'habit_logs_jsonl',
+        '--forbids', 'database,cloud_service',
+      ]);
+      expect(r.status).toBe(0);
+      const node = JSON.parse(fs.readFileSync(path.join(tempDir, '.ontology', 'nodes', 'node_0001.json'), 'utf-8'));
+      expect(node.context.provides.map((p: { key: string }) => p.key).sort()).toEqual(['jsonl_path', 'log_endpoint']);
+      expect(node.context.requires.map((r: { source: string }) => r.source)).toEqual(['habit_logs_jsonl']);
+      expect(node.context.forbids.map((f: { source: string }) => f.source).sort()).toEqual(['cloud_service', 'database']);
+      // Every declared token carries nodeType="declared" to mark its provenance.
+      for (const p of node.context.provides) expect(p.nodeType).toBe('declared');
+      for (const r of node.context.requires) expect(r.nodeType).toBe('declared');
+      for (const f of node.context.forbids) expect(f.nodeType).toBe('declared');
+    });
+
+    it('--rules accepts pipe-separated rule strings', () => {
+      runCli(tempDir, ['init']);
+      const r = runCli(tempDir, [
+        'node', 'create',
+        '--level', 'workflow',
+        '--kind', 'rule',
+        '--prompt', 'Login handler',
+        '--rules', 'FORBID: console.log|FORBID: hard-coded secrets|REQUIRE: emits auth_attempted event',
+      ]);
+      expect(r.status).toBe(0);
+      const node = JSON.parse(fs.readFileSync(path.join(tempDir, '.ontology', 'nodes', 'node_0001.json'), 'utf-8'));
+      expect(node.rules).toEqual([
+        'FORBID: console.log',
+        'FORBID: hard-coded secrets',
+        'REQUIRE: emits auth_attempted event',
+      ]);
+    });
+
+    it('omitting the contract flags leaves context arrays empty (backward compatible)', () => {
+      runCli(tempDir, ['init']);
+      const r = runCli(tempDir, [
+        'node', 'create',
+        '--level', 'workflow',
+        '--kind', 'rule',
+        '--prompt', 'Plain node',
+      ]);
+      expect(r.status).toBe(0);
+      const node = JSON.parse(fs.readFileSync(path.join(tempDir, '.ontology', 'nodes', 'node_0001.json'), 'utf-8'));
+      expect(node.context.requires).toEqual([]);
+      expect(node.context.provides).toEqual([]);
+      expect(node.context.forbids).toEqual([]);
+      expect(node.rules).toEqual([]);
+    });
+
+    it('trims whitespace and drops empty tokens', () => {
+      runCli(tempDir, ['init']);
+      const r = runCli(tempDir, [
+        'node', 'create',
+        '--level', 'workflow',
+        '--kind', 'rule',
+        '--prompt', 'spacing test',
+        '--provides', '  alpha ,, beta,   ',
+      ]);
+      expect(r.status).toBe(0);
+      const node = JSON.parse(fs.readFileSync(path.join(tempDir, '.ontology', 'nodes', 'node_0001.json'), 'utf-8'));
+      expect(node.context.provides.map((p: { key: string }) => p.key)).toEqual(['alpha', 'beta']);
+    });
+  });
 });

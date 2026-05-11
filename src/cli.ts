@@ -152,6 +152,10 @@ node
   .option("--label <label>", "Optional label for the node.")
   .option("--manifestation <m>", "Manifestation: intent / ast / osl / code / test / build (default intent).")
   .option("--language <lang>", "Optional language tag (e.g., python, typescript) used by the compiler to pick the artifact extension.")
+  .option("--requires <tokens>", "Comma-separated tokens this node requires from its context (lands in context.requires).")
+  .option("--provides <tokens>", "Comma-separated tokens this node provides to its context (lands in context.provides).")
+  .option("--forbids <tokens>", "Comma-separated tokens this node forbids appearing in its outputs (lands in context.forbids).")
+  .option("--rules <rules>", "Pipe-separated rule strings, e.g. 'FORBID: console.log|REQUIRE: emits event' (lands in node.rules).")
   .action(async (options) => {
     await createNodeCommand(options);
   });

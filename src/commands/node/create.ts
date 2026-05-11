@@ -10,6 +10,23 @@ export interface NodeCreateCommandOptions {
   label?: string;
   manifestation?: string;
   language?: string;
+  // Comma-separated lists of structured contract tokens. Land in
+  // node.context.{requires, provides, forbids} so the validator and the
+  // assembled LLM prompt see them at link/compile time.
+  requires?: string;
+  provides?: string;
+  forbids?: string;
+  // Pipe-separated rules (FORBID:/REQUIRE: prose). Pipe rather than comma
+  // because rule text often contains commas.
+  rules?: string;
+}
+
+// Split a comma- or pipe-separated CLI argument into trimmed, non-empty
+// tokens. Returns undefined when the input itself is undefined so the
+// caller can distinguish "flag not passed" from "flag passed empty".
+function splitTokens(raw: string | undefined, separator: "," | "|"): string[] | undefined {
+  if (raw === undefined) return undefined;
+  return raw.split(separator).map((s) => s.trim()).filter((s) => s.length > 0);
 }
 
 export async function createNodeCommand(options: NodeCreateCommandOptions): Promise<void> {
@@ -48,6 +65,10 @@ export async function createNodeCommand(options: NodeCreateCommandOptions): Prom
       label: options.label,
       manifestation,
       language: options.language,
+      requires: splitTokens(options.requires, ","),
+      provides: splitTokens(options.provides, ","),
+      forbids: splitTokens(options.forbids, ","),
+      rules: splitTokens(options.rules, "|"),
     });
 
     console.log(`=== ONTOLOGY NODE CREATED ===
