@@ -10,6 +10,9 @@ import { nodeListCommand } from "./commands/node/list.js";
 import { nodeShowCommand } from "./commands/node/show.js";
 import { nodeLinkCommand } from "./commands/node/link.js";
 import { nodeUpdateCommand } from "./commands/node/update.js";
+import { nodeRemoveCommand } from "./commands/node/remove.js";
+import { edgeRemoveCommand } from "./commands/edge/remove.js";
+import { edgeUpdateCommand } from "./commands/edge/update.js";
 import { eventsTailCommand } from "./commands/events/tail.js";
 import { contextAssembleCommand } from "./commands/context/assemble.js";
 import { runPromptCommand } from "./commands/run/prompt.js";
@@ -226,6 +229,62 @@ node
         console.log(JSON.stringify({ ok: false, error: errorMessage(err) }));
       } else {
         console.error(`✖ Error updating node: ${errorMessage(err)}`);
+      }
+      process.exit(1);
+    }
+  });
+
+node
+  .command("remove <id>")
+  .description("Delete a node's record and emit a node_removed event. Refuses if any edge references the node — remove the edges first with onto edge remove.")
+  .option("--json", "Output results in JSON format")
+  .action(async (id, options) => {
+    try {
+      await nodeRemoveCommand(id, options);
+    } catch (err: unknown) {
+      if (options.json) {
+        console.log(JSON.stringify({ ok: false, error: errorMessage(err) }));
+      } else {
+        console.error(`✖ Error removing node: ${errorMessage(err)}`);
+      }
+      process.exit(1);
+    }
+  });
+
+const edge = program
+  .command("edge")
+  .description("Edit semantic edges: drop them or re-classify their type. Edge creation lives under `onto node link` (kept for legacy).");
+
+edge
+  .command("remove <edgeId>")
+  .description("Drop an edge by id. Emits an edge_removed event; rewrites edges.jsonl atomically.")
+  .option("--json", "Output results in JSON format")
+  .action(async (edgeId, options) => {
+    try {
+      await edgeRemoveCommand(edgeId, options);
+    } catch (err: unknown) {
+      if (options.json) {
+        console.log(JSON.stringify({ ok: false, error: errorMessage(err) }));
+      } else {
+        console.error(`✖ Error removing edge: ${errorMessage(err)}`);
+      }
+      process.exit(1);
+    }
+  });
+
+edge
+  .command("update <edgeId>")
+  .description("Re-classify an edge's type in place. Re-hashes and emits an edge_updated event with old and new types/hashes.")
+  .requiredOption("--type <newType>", "New edge type (one of the allowed EdgeType enum values).")
+  .option("--json", "Output results in JSON format")
+  .action(async (edgeId, options) => {
+    try {
+      await edgeUpdateCommand(edgeId, options);
+    } catch (err: unknown) {
+      if (options.json) {
+        console.log(JSON.stringify({ ok: false, error: errorMessage(err) }));
+      } else {
+        console.error(`✖ Error updating edge: ${errorMessage(err)}`);
       }
       process.exit(1);
     }
