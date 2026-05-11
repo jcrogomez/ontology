@@ -13,6 +13,11 @@ export interface CompileRunOptions {
   // operational consequences.
   runtimeCheck?: boolean;
   runtimeCheckTimeoutMs?: number;
+  // Restrict the compile to a single Grothendieck fiber. When set, the
+  // plan only walks edges whose endpoints both live on the named branch.
+  // The focal must itself be on the branch; otherwise the command exits
+  // 1 rather than silently retargeting.
+  branch?: string;
 }
 
 // `onto compile <nodeId>`
@@ -52,6 +57,7 @@ export async function compileRunCommand(focalId: string, options: CompileRunOpti
     ollamaHost: options.ollamaHost,
     runtimeCheck: options.runtimeCheck,
     runtimeCheckTimeoutMs: options.runtimeCheckTimeoutMs,
+    branch: options.branch,
   });
 
   if (!result.ok) {
@@ -101,6 +107,7 @@ export async function compileRunCommand(focalId: string, options: CompileRunOpti
 
   console.log(`=== ONTOLOGY COMPILE ===`);
   console.log(`Focal:     ${result.focalId}`);
+  if (options.branch) console.log(`Branch:    ${options.branch}`);
   console.log(`Provider:  ${provider ?? "per-node (model.ref)"}`);
   console.log(`Steps:     ${result.steps.length}`);
   console.log(``);

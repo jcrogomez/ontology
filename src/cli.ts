@@ -638,6 +638,7 @@ compile
   .option("--ollama-host <host>", "Host for Ollama provider")
   .option("--runtime-check", "After parse-check, execute the artifact (with timeout) and fail with runtime_failed on non-zero exit")
   .option("--runtime-check-timeout-ms <ms>", "Wall-clock timeout for the runtime check (default 5000, max 60000)", (v) => parseInt(v, 10))
+  .option("--branch <name>", "Restrict the compile to the Grothendieck fiber over <name>: only intra-branch edges participate in the plan, and the focal must itself live on that branch.")
   .option("--json", "Output results in JSON format")
   .action(async (id, options) => {
     try {

@@ -2,6 +2,7 @@ import type { OntologyNode, OntologyEdge } from "../../schemas/ontology.js";
 import type { LlmProvider } from "../llm/types.js";
 import { loadEdges, loadNodes, loadModelsRegistry } from "../../core/project/load.js";
 import { computeCompilePlan, type CompilePlan } from "../graph/compile-plan.js";
+import { computeBranchFiber, listBranches } from "../fibration/branch-fiber.js";
 import { compileNode, type CompileNodeResult } from "./compile-node.js";
 import type { WriteArtifactResult } from "./artifact-writer.js";
 import type { UpstreamContextItem } from "./upstream-context.js";
@@ -28,6 +29,14 @@ export interface CompilePlanRunOptions {
   // post parse-check; non-zero exit / timeout produces runtime_failed.
   runtimeCheck?: boolean;
   runtimeCheckTimeoutMs?: number;
+  // Restrict the plan to a single Grothendieck fiber. When set, only the
+  // edges whose both endpoints live on the named branch are considered;
+  // the closure walk cannot leak into another branch and the focal must
+  // itself be on the branch. Cross-branch supersedes / refinements are
+  // therefore inert under a branch-scoped compile, which is exactly the
+  // independence guarantee callers want when one branch ships ahead of
+  // another.
+  branch?: string;
 }
 
 export interface CompilePlanStepResult {
@@ -53,7 +62,12 @@ export type CompilePlanRunResult =
   | {
       ok: false;
       focalId: string;
-      reason: "plan_failed" | "missing_node" | "step_failed";
+      reason:
+        | "plan_failed"
+        | "missing_node"
+        | "step_failed"
+        | "missing_branch"
+        | "focal_off_branch";
       message: string;
       // When step_failed, partial successes that landed before the failure.
       completedSteps?: CompilePlanStepResult[];
@@ -64,8 +78,48 @@ export type CompilePlanRunResult =
 export async function runCompilePlan(options: CompilePlanRunOptions): Promise<CompilePlanRunResult> {
   const cwd = options.cwd ?? process.cwd();
 
+  // Branch-scoped compile: filter the edge universe to the requested
+  // fiber before the plan is computed. computeCompilePlan is pure over
+  // an `edges` array, so handing it the fiber's induced subgraph is the
+  // entire change — the closure walk, supersedes handling, and
+  // contradiction detection all stay verbatim. We resolve nodes here
+  // (rather than relying on edge endpoints) so we can validate that the
+  // focal is itself on the branch — silently retargeting would surprise
+  // anyone running `--branch` in CI.
+  let edges = loadEdges(cwd);
+  if (options.branch !== undefined) {
+    const nodes = loadNodes(cwd);
+    const known = listBranches({ nodes, edges: [] });
+    if (!known.includes(options.branch)) {
+      const hint = known.length > 0 ? ` Known branches: ${known.join(", ")}.` : "";
+      return {
+        ok: false,
+        focalId: options.focalId,
+        reason: "missing_branch",
+        message: `No such branch: "${options.branch}".${hint}`,
+      };
+    }
+    const focalNode = nodes.find((n) => n.id === options.focalId);
+    if (!focalNode) {
+      return {
+        ok: false,
+        focalId: options.focalId,
+        reason: "missing_node",
+        message: `Focal not found on disk: ${options.focalId}`,
+      };
+    }
+    if (focalNode.coordinates.branch !== options.branch) {
+      return {
+        ok: false,
+        focalId: options.focalId,
+        reason: "focal_off_branch",
+        message: `Focal ${options.focalId} lives on branch "${focalNode.coordinates.branch}", not "${options.branch}". Re-run without --branch or compile a focal that belongs to the requested fiber.`,
+      };
+    }
+    edges = computeBranchFiber({ nodes, edges }, options.branch).edges;
+  }
+
   // Compute the plan. Any cycle or missing-node failure surfaces here.
-  const edges = loadEdges(cwd);
   const plan = computeCompilePlan(options.focalId, edges);
   // Load the models registry once. compileNode needs it on the per-node
   // routing path (when no CLI provider override is in play); harmless to
