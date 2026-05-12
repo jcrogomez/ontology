@@ -54,6 +54,12 @@ export interface CreateNodeOptions {
   // runtime check still apply; the audit chain is preserved via a
   // synthetic persisted run with provider="literal".
   literal?: string;
+  // Optional source file paths this node descends from (Project
+  // Legend γ-5). Populates `outputs.files`. For an ingested node,
+  // the first entry is the path that was extracted; multi-file
+  // ingest may attach additional paths if a single intent spans
+  // multiple sources. Empty for hand-authored nodes.
+  sourceFiles?: string[];
   // Optional event metadata. Proposal apply records the source proposalId here
   // so the temporal log carries the back-reference from the resulting
   // node_created event to the proposal that triggered it.
@@ -115,7 +121,7 @@ export function createNode(options: CreateNodeOptions): { node: OntologyNode; ev
     technical: options.language ? { language: options.language } : {},
     ...(options.literal !== undefined ? { literal: options.literal } : {}),
     outputs: {
-      files: []
+      files: options.sourceFiles ?? []
     },
     validation: {
       errors: [],

@@ -486,7 +486,14 @@ const SKIP_DIRS = new Set([
   "coverage",
 ]);
 
-function collectTypeScriptFiles(rootDir: string): string[] {
+// Walk `rootDir` recursively and return absolute paths to every
+// `.ts` / `.tsx` file under it, skipping the conventional noise
+// directories (`node_modules`, `dist`, `.ontology`, `__tests__`,
+// `.git`, `coverage`). Exported so `onto ingest <directory>` (γ-5)
+// can reuse the same traversal as `inferEdgesFromDirectory`. Sorted
+// output ensures deterministic per-file proposal ordering across
+// runs.
+export function collectTypeScriptFiles(rootDir: string): string[] {
   const out: string[] = [];
   walk(rootDir);
   return out.sort();

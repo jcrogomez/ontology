@@ -430,6 +430,13 @@ export const ProposalNodeCreatePayloadSchema = z.object({
   // can flag a node as "pin verbatim" so apply creates it with
   // node.literal already set.
   literal: z.string().optional(),
+  // Source-file paths the proposed node descends from (Project Legend
+  // γ-5). For an `onto ingest <file>` proposal the array has one
+  // entry — the path that was extracted. For multi-file ingest, γ-6
+  // will resolve file-path edges back to node IDs by matching on
+  // `outputs.files[0]` after the proposals are applied. The field
+  // lands on the created node's `outputs.files`.
+  sourceFiles: z.array(z.string()).optional(),
 });
 
 // edge_create: propose adding a typed edge between two existing nodes.

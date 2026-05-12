@@ -781,8 +781,8 @@ compile
   });
 
 program
-  .command("ingest <file>")
-  .description("Project Legend γ-1: read a source file, dispatch a frontier LLM to extract its structured intent, and produce a node_create proposal. Defaults to provider=anthropic (requires ANTHROPIC_API_KEY). Use --dry-run to preview the extraction without committing.")
+  .command("ingest <path>")
+  .description("Project Legend γ-1 + γ-5: extract structured intent from source code. <path> may be a single file (produces one node_create proposal) or a directory (walks every .ts/.tsx, produces one proposal per file, also reports static-inferred cross-file edges via γ-4). Defaults to provider=anthropic (requires ANTHROPIC_API_KEY). Use --dry-run to preview without committing — load-bearing for iterating the extraction template at zero cost via the mock provider.")
   .option("--provider <provider>", "LLM provider override: anthropic (default), ollama, or mock.")
   .option("--model <model>", "Model override. For anthropic, defaults to claude-opus-4-7.")
   .option("--ollama-host <host>", "Host for Ollama provider.")

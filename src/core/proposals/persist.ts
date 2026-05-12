@@ -405,6 +405,7 @@ function applyNodeCreate(
       forbids: current.mutation.payload.forbids,
       rules: current.mutation.payload.rules,
       literal: current.mutation.payload.literal,
+      sourceFiles: current.mutation.payload.sourceFiles,
       eventMetadata: { sourceProposalId: id },
     });
   } catch (err: unknown) {

@@ -9,24 +9,42 @@ import {
 import { loadNodeById, loadState } from "../../core/project/load.js";
 import { createProposal } from "../../core/proposals/persist.js";
 import { dispatchLlmRequest } from "../../runtime/llm/dispatcher.js";
-import type { LlmProvider } from "../../runtime/llm/types.js";
+import type { LlmProvider, LlmResponse } from "../../runtime/llm/types.js";
+import {
+  collectTypeScriptFiles,
+  inferEdgesFromDirectory,
+} from "../../runtime/static/typescript.js";
 import { errorMessage } from "../../core/errors.js";
 
-// `onto ingest <file>` — Project Legend Phase γ-1 v0+.
+// `onto ingest <path>` — Project Legend Phase γ-1 + γ-5.
 //
-// Reads a single source file, dispatches a frontier LLM with an
-// extraction template, and produces a node_create proposal under the
-// canon parent. The proposal carries level/kind/prompt/label (the
-// fields the existing node_create payload supports); the richer
-// extracted intent — manifestation, language, requires/provides/
-// forbids, rules — is stored in provenance.rationale as JSON so the
-// user can apply the proposal and then patch with `onto node update`.
+// When <path> is a FILE: γ-1 single-file ingest. Dispatches a frontier
+// LLM with an extraction template against that file and produces one
+// node_create proposal under the canon parent (or --parent override).
 //
-// This is the smallest version that closes the round-trip: hash.ts →
-// ingest → proposal → apply → compile → diff. Subsequent iterations
-// can extend the proposal payload schema to carry the rich fields
-// directly (planned γ-3) and add static-edge inference (planned γ-2 of
-// the original Legend roadmap, now γ-3+ given the gamma renumber).
+// When <path> is a DIRECTORY: γ-5 multi-file ingest. Walks the
+// directory (skipping node_modules / dist / .ontology / __tests__ /
+// .git / coverage), runs the per-file extraction for every `.ts` /
+// `.tsx` file via the same helper, and emits one node_create proposal
+// per file. The proposal carries the file path in
+// `payload.sourceFiles[0]` so a future γ-6 (`onto graph infer-edges
+// --create-proposals`) can resolve the file-path edges that γ-4
+// (`onto graph infer-edges`) computes back to the applied node IDs.
+//
+// Both modes share:
+//   - Binary-byte guard (NUL rejects → no LLM dispatch)
+//   - System prompt with prompt caching (γ-0's Anthropic adapter
+//     tags it `cache_control: ephemeral`)
+//   - JSON output validated by ExtractionResultSchema (Zod)
+//   - --dry-run preview that prints the extraction without writing
+//     proposals — load-bearing for iterating the extraction template
+//     and for testing the directory walk without paying for the
+//     LLM dispatch.
+//
+// Costs of multi-file mode: ~$0.08 × N files at Opus 4.7 tier. The
+// dry-run flag exists specifically so the walk + extraction loop is
+// testable end-to-end against the mock provider without ever firing
+// the real API.
 
 // JSON the extractor returns. The schema is the contract between the
 // system prompt and the parser; if the LLM emits anything outside
@@ -35,9 +53,6 @@ const ExtractionResultSchema = z.object({
   label: z.string().min(1).max(256),
   level: AbstractionLevelSchema,
   kind: NodeKindSchema,
-  // Optional — the extractor MAY emit these. They land in
-  // provenance.rationale as JSON for the user to apply via
-  // `onto node update` after the proposal is accepted.
   manifestation: ManifestationSchema.optional(),
   language: z.string().optional(),
   prompt: z.string().min(1),
@@ -51,15 +66,18 @@ type ExtractionResult = z.infer<typeof ExtractionResultSchema>;
 
 export interface IngestCommandOptions {
   // LLM provider. Defaults to "anthropic" — γ-0's frontier route.
-  // mock = identity functor (the file content becomes the proposal's
-  // prompt verbatim; useful for plumbing tests, not real ingest).
+  // mock = identity functor (file content becomes the proposal's
+  // prompt; the mock returns the first JSON object embedded in the
+  // user prompt — see src/runtime/llm/mock.ts identity-functor
+  // extension for semantic_parse). Useful for plumbing tests.
   provider?: string;
   model?: string;
   ollamaHost?: string;
   parent?: string; // node id; defaults to root canon
   // Read-only preview: dispatch + parse + print, but do NOT create the
-  // proposal. Lets the user iterate the extraction prompt template
-  // without piling up rejected proposals on disk.
+  // proposal. Critical for iterating the extraction prompt template
+  // without piling up rejected proposals AND for testing γ-5 walks
+  // against the mock provider with zero LLM cost.
   dryRun?: boolean;
   json?: boolean;
 }
@@ -69,15 +87,10 @@ export interface IngestCommandOptions {
 // session reuse the cached prefix (~0.1× input cost on hits). On Opus
 // 4.7 the cache only activates above 4096 tokens; this prompt sits
 // well under that threshold today, which is fine — the cache turns on
-// automatically once the template grows.
-//
-// Style notes pulled from the manual calibration on hash.ts:
-//   - The LLM must emit a JSON object only, no preamble, no fence.
-//   - The intent text in `prompt` describes WHAT the file does and the
-//     invariants it preserves, not the literal code.
-//   - Requires/provides are tokens that other files in the codebase
-//     can match against — surface them as terse identifiers.
-//   - Rules are FORBID/REQUIRE prose strings (the existing convention).
+// automatically once the template grows. With γ-5 multi-file ingest,
+// every per-file call inside one `onto ingest <directory>` invocation
+// shares this system prompt, so once it crosses the threshold every
+// per-file call beyond the first will hit cache.
 const EXTRACTION_SYSTEM_PROMPT = `You are the extraction component of Ontology, a system that lifts existing source code into a typed intent graph. Given a single source file, you extract its INTENT — a structured description of what the file does and the invariants it preserves — that can later be re-compiled into code.
 
 Your output MUST be a single JSON object with these fields (no markdown fence, no preamble, no explanation outside the JSON):
@@ -113,66 +126,79 @@ Guidance:
 
 If any field is genuinely empty (e.g. a pure utility file with no external dependencies has empty requires), emit an empty array. Do not invent tokens.`;
 
-export async function ingestCommand(
-  filePath: string,
-  options: IngestCommandOptions,
-): Promise<void> {
-  // 1. Read the file + binary guard. Same shape as --candidate-file
-  // (commit 14ecc51) and --literal-file (β-2): a NUL byte inside
-  // utf-8-decoded content is the high-precision signal that the file
-  // is binary. Refuse upfront rather than send garbled bytes to the
-  // LLM and pay for the dispatch.
+// ── Pure library: extract intent from a single source file ──────────────────
+
+interface ExtractInputs {
+  filePath: string;
+  provider: LlmProvider;
+  model?: string;
+  ollamaHost?: string;
+}
+
+type ExtractResult =
+  | {
+      ok: true;
+      filePath: string;
+      cwdRelative: string;
+      extracted: ExtractionResult;
+      response: LlmResponse;
+    }
+  | {
+      ok: false;
+      filePath: string;
+      reason:
+        | "read_failed"
+        | "binary_content"
+        | "empty_file"
+        | "dispatch_failed"
+        | "invalid_json"
+        | "schema_failed";
+      message: string;
+    };
+
+// Reads, validates, dispatches, parses, returns. Pure with respect to
+// graph state — never writes proposals or events. γ-1 (single-file
+// ingest) and γ-5 (multi-file ingest) both compose over this.
+async function extractIntentFromFile(
+  inputs: ExtractInputs,
+): Promise<ExtractResult> {
+  const { filePath, provider, model, ollamaHost } = inputs;
+
+  // 1. Read + binary guard. NUL is the high-precision signal of
+  // binary content; let the user know up front rather than paying
+  // for an LLM round-trip on garbled bytes.
   let fileContent: string;
   try {
     fileContent = fs.readFileSync(filePath, "utf-8");
   } catch (err: unknown) {
-    failWith(`Could not read "${filePath}": ${errorMessage(err)}`, options.json);
-    return;
+    return {
+      ok: false,
+      filePath,
+      reason: "read_failed",
+      message: `Could not read "${filePath}": ${errorMessage(err)}`,
+    };
   }
   if (fileContent.includes("\u0000")) {
-    failWith(
-      `"${filePath}" appears to be a binary file (contains NUL bytes). onto ingest expects a UTF-8 text source file.`,
-      options.json,
-    );
-    return;
+    return {
+      ok: false,
+      filePath,
+      reason: "binary_content",
+      message: `"${filePath}" appears to be a binary file (contains NUL bytes).`,
+    };
   }
   if (fileContent.trim().length === 0) {
-    failWith(`"${filePath}" is empty; nothing to ingest.`, options.json);
-    return;
+    return {
+      ok: false,
+      filePath,
+      reason: "empty_file",
+      message: `"${filePath}" is empty; nothing to ingest.`,
+    };
   }
 
-  // 2. Resolve provider + parent. Provider default = anthropic (the
-  // frontier route from γ-0). Parent default = root canon.
-  let provider: LlmProvider | undefined;
-  if (options.provider !== undefined) {
-    if (
-      options.provider !== "mock" &&
-      options.provider !== "ollama" &&
-      options.provider !== "anthropic"
-    ) {
-      failWith(
-        `Unsupported provider: ${options.provider} (try mock, ollama, or anthropic)`,
-        options.json,
-      );
-      return;
-    }
-    provider = options.provider as LlmProvider;
-  } else {
-    provider = "anthropic";
-  }
-
-  const state = loadState();
-  const parentNodeId = options.parent ?? state.rootNodeId;
-  const parentNode = loadNodeById(parentNodeId);
-  if (!parentNode) {
-    failWith(`Parent node not found: ${parentNodeId}`, options.json);
-    return;
-  }
-
-  // 3. Build the user prompt. The system prompt (the extraction
-  // template) is the cached prefix; the per-file content sits in
-  // the user turn so each ingest call invalidates only the suffix.
-  const cwdRelative = path.relative(process.cwd(), path.resolve(filePath));
+  // 2. Build the user prompt. The system prompt is the cached prefix;
+  // per-file content sits in the user turn so each call only
+  // invalidates the suffix.
+  const cwdRelative = computeCwdRelative(filePath);
   const userPrompt = [
     `Source file: ${cwdRelative || filePath}`,
     `Language hint (from extension): ${guessLanguageHint(filePath)}`,
@@ -184,11 +210,8 @@ export async function ingestCommand(
     `Extract the structured intent for this file. Output JSON only.`,
   ].join("\n");
 
-  // 4. Dispatch. json=true tells the adapter to JSON.parse the response
-  // and surface it on response.json. Anthropic adapter falls through
-  // if the response is not valid JSON; we validate against the Zod
-  // schema next.
-  let response;
+  // 3. Dispatch.
+  let response: LlmResponse;
   try {
     response = await dispatchLlmRequest(
       {
@@ -197,83 +220,461 @@ export async function ingestCommand(
         system: EXTRACTION_SYSTEM_PROMPT,
         json: true,
       },
-      { provider, defaultModel: options.model, ollamaHost: options.ollamaHost },
+      { provider, defaultModel: model, ollamaHost },
     );
   } catch (err: unknown) {
-    failWith(`Dispatch failed: ${errorMessage(err)}`, options.json);
-    return;
+    return {
+      ok: false,
+      filePath,
+      reason: "dispatch_failed",
+      message: `Dispatch failed: ${errorMessage(err)}`,
+    };
   }
 
-  // 5. Parse + validate. The Anthropic adapter tries JSON.parse on
-  // request.json=true and exposes the result via response.json. We
-  // fall back to parsing response.text if .json is undefined (a model
-  // that returned a fenced JSON, for example — the parser caught it
-  // but the adapter's first attempt may have).
+  // 4. Parse + validate. Anthropic adapter exposes JSON.parse'd
+  // content on response.json when request.json=true. Fall back to
+  // parsing response.text manually for providers that don't
+  // pre-parse (and to strip a possible markdown fence).
   const candidate =
     response.json !== undefined
       ? response.json
       : tryParseJsonFromText(response.text);
   if (candidate === undefined) {
-    failWith(
-      `The extractor did not return valid JSON. Raw response:\n${response.text.slice(0, 500)}`,
-      options.json,
-    );
-    return;
+    return {
+      ok: false,
+      filePath,
+      reason: "invalid_json",
+      message: `The extractor did not return valid JSON. Raw response:\n${response.text.slice(0, 500)}`,
+    };
   }
   const parsed = ExtractionResultSchema.safeParse(candidate);
   if (!parsed.success) {
-    failWith(
-      `Extraction JSON failed validation: ${parsed.error.issues
+    return {
+      ok: false,
+      filePath,
+      reason: "schema_failed",
+      message: `Extraction JSON failed validation: ${parsed.error.issues
         .map((i) => `${i.path.join(".")}: ${i.message}`)
         .join("; ")}`,
-      options.json,
-    );
+    };
+  }
+  return {
+    ok: true,
+    filePath,
+    cwdRelative,
+    extracted: parsed.data,
+    response,
+  };
+}
+
+// ── Top-level command: route file vs directory ──────────────────────────────
+
+export async function ingestCommand(
+  pathArg: string,
+  options: IngestCommandOptions,
+): Promise<void> {
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(pathArg);
+  } catch (err: unknown) {
+    failWith(`Could not stat "${pathArg}": ${errorMessage(err)}`, options.json);
     return;
   }
-  const extracted = parsed.data;
 
-  // 6. Dry-run short-circuit. Print the structured extraction so the
-  // user can iterate the extraction template without piling up
-  // throwaway proposals.
-  if (options.dryRun) {
-    if (options.json) {
+  const provider = resolveProvider(options);
+  if (provider === undefined) return; // resolveProvider already failed.
+
+  const state = loadState();
+  const parentNodeId = options.parent ?? state.rootNodeId;
+  const parentNode = loadNodeById(parentNodeId);
+  if (!parentNode) {
+    failWith(`Parent node not found: ${parentNodeId}`, options.json);
+    return;
+  }
+
+  if (stat.isDirectory()) {
+    await runDirectoryIngest(pathArg, {
+      provider,
+      model: options.model,
+      ollamaHost: options.ollamaHost,
+      parentNodeId,
+      parentHash: parentNode.integrity.hash,
+      dryRun: !!options.dryRun,
+      json: !!options.json,
+    });
+    return;
+  }
+
+  await runSingleFileIngest(pathArg, {
+    provider,
+    model: options.model,
+    ollamaHost: options.ollamaHost,
+    parentNodeId,
+    parentHash: parentNode.integrity.hash,
+    dryRun: !!options.dryRun,
+    json: !!options.json,
+  });
+}
+
+function resolveProvider(options: IngestCommandOptions): LlmProvider | undefined {
+  if (options.provider === undefined) return "anthropic";
+  if (
+    options.provider !== "mock" &&
+    options.provider !== "ollama" &&
+    options.provider !== "anthropic"
+  ) {
+    failWith(
+      `Unsupported provider: ${options.provider} (try mock, ollama, or anthropic)`,
+      options.json,
+    );
+    return undefined;
+  }
+  return options.provider as LlmProvider;
+}
+
+// ── Single-file flow (γ-1) ──────────────────────────────────────────────────
+
+interface SingleFileOptions {
+  provider: LlmProvider;
+  model?: string;
+  ollamaHost?: string;
+  parentNodeId: string;
+  parentHash: string;
+  dryRun: boolean;
+  json: boolean;
+}
+
+async function runSingleFileIngest(
+  filePath: string,
+  opts: SingleFileOptions,
+): Promise<void> {
+  const result = await extractIntentFromFile({
+    filePath,
+    provider: opts.provider,
+    model: opts.model,
+    ollamaHost: opts.ollamaHost,
+  });
+  if (!result.ok) {
+    failWith(result.message, opts.json);
+    return;
+  }
+
+  if (opts.dryRun) {
+    if (opts.json) {
       console.log(
         JSON.stringify(
           {
             ok: true,
             dryRun: true,
-            extracted,
-            usage: response.usage,
-            model: response.model,
-            provider: response.provider,
+            extracted: result.extracted,
+            usage: result.response.usage,
+            model: result.response.model,
+            provider: result.response.provider,
           },
           null,
           2,
         ),
       );
     } else {
-      printExtraction(extracted, {
-        filePath: cwdRelative || filePath,
-        model: response.model,
-        provider: response.provider,
-        usage: response.usage,
+      printExtraction(result.extracted, {
+        filePath: result.cwdRelative || filePath,
+        model: result.response.model,
+        provider: result.response.provider,
+        usage: result.response.usage,
         committed: false,
       });
     }
     return;
   }
 
-  // 7. Create the proposal. The rich fields (manifestation, language,
-  // requires/provides/forbids, rules) ride on the payload directly
-  // since γ-3 extended ProposalNodeCreatePayloadSchema; applyNodeCreate
-  // threads them straight to createNode so a single
-  // `onto proposal apply` produces a complete node — no follow-up
-  // `onto node update --requires ... --provides ...` needed.
-  // provenance.rationale carries the extractor metadata only so the
-  // audit chain records WHO produced the proposal (which model, off
-  // which file).
+  const proposalResult = createNodeProposalForExtraction(
+    result.cwdRelative || filePath,
+    result.extracted,
+    result.response,
+    opts.parentNodeId,
+    opts.parentHash,
+  );
+  if (!proposalResult.ok) {
+    failWith(proposalResult.message, opts.json);
+    return;
+  }
+
+  if (opts.json) {
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          dryRun: false,
+          proposal: {
+            id: proposalResult.proposalId,
+            status: "pending",
+            mutationKind: "node_create",
+            hash: proposalResult.proposalHash,
+          },
+          event: { eventId: proposalResult.eventId, eventType: "proposal_created" },
+          extracted: result.extracted,
+          usage: result.response.usage,
+          model: result.response.model,
+          provider: result.response.provider,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
+  printExtraction(result.extracted, {
+    filePath: result.cwdRelative || filePath,
+    model: result.response.model,
+    provider: result.response.provider,
+    usage: result.response.usage,
+    committed: true,
+    proposalId: proposalResult.proposalId,
+  });
+}
+
+// ── Multi-file flow (γ-5) ───────────────────────────────────────────────────
+
+interface DirectoryOptions {
+  provider: LlmProvider;
+  model?: string;
+  ollamaHost?: string;
+  parentNodeId: string;
+  parentHash: string;
+  dryRun: boolean;
+  json: boolean;
+}
+
+interface PerFileSummary {
+  filePath: string;
+  cwdRelative: string;
+  ok: boolean;
+  reason?: string;
+  message?: string;
+  extracted?: ExtractionResult;
+  proposalId?: string;
+  tokensUsed?: number;
+}
+
+async function runDirectoryIngest(
+  dirPath: string,
+  opts: DirectoryOptions,
+): Promise<void> {
+  const absDir = path.resolve(dirPath);
+  const files = collectTypeScriptFiles(absDir);
+  if (files.length === 0) {
+    if (opts.json) {
+      console.log(
+        JSON.stringify(
+          {
+            ok: true,
+            dryRun: opts.dryRun,
+            rootDir: absDir,
+            fileCount: 0,
+            results: [],
+            edges: [],
+            message:
+              "No .ts/.tsx files found under the directory (after skipping node_modules / dist / .ontology / __tests__ / .git / coverage).",
+          },
+          null,
+          2,
+        ),
+      );
+    } else {
+      console.log(`=== ONTOLOGY INGEST — DIRECTORY ===`);
+      console.log(`Root:        ${dirPath}`);
+      console.log(`Files:       0`);
+      console.log(``);
+      console.log(`No .ts/.tsx files found under the directory.`);
+    }
+    return;
+  }
+
+  const results: PerFileSummary[] = [];
+  let totalTokens = 0;
+
+  // Walk sequentially rather than in parallel: cache hits on the
+  // shared system prompt accumulate (Anthropic prompt cache writes
+  // are visible only after the first response begins streaming, so
+  // a parallel fan-out pays the write multiple times). Sequential
+  // also keeps the audit log ordering deterministic.
+  for (const filePath of files) {
+    const cwdRelative = computeCwdRelative(filePath);
+    const extract = await extractIntentFromFile({
+      filePath,
+      provider: opts.provider,
+      model: opts.model,
+      ollamaHost: opts.ollamaHost,
+    });
+    if (!extract.ok) {
+      results.push({
+        filePath,
+        cwdRelative,
+        ok: false,
+        reason: extract.reason,
+        message: extract.message,
+      });
+      continue;
+    }
+
+    const tokensUsed = extract.response.usage?.totalTokens ?? 0;
+    totalTokens += tokensUsed;
+
+    if (opts.dryRun) {
+      results.push({
+        filePath,
+        cwdRelative,
+        ok: true,
+        extracted: extract.extracted,
+        tokensUsed,
+      });
+      continue;
+    }
+
+    const created = createNodeProposalForExtraction(
+      cwdRelative,
+      extract.extracted,
+      extract.response,
+      opts.parentNodeId,
+      opts.parentHash,
+    );
+    if (!created.ok) {
+      results.push({
+        filePath,
+        cwdRelative,
+        ok: false,
+        reason: "proposal_create_failed",
+        message: created.message,
+      });
+      continue;
+    }
+    results.push({
+      filePath,
+      cwdRelative,
+      ok: true,
+      extracted: extract.extracted,
+      proposalId: created.proposalId,
+      tokensUsed,
+    });
+  }
+
+  // Edge inference is pure static analysis — runs in milliseconds,
+  // no LLM cost, useful regardless of dry-run mode. γ-6 will turn
+  // this into edge_create proposals after the node proposals apply.
+  const inferredEdges = inferEdgesFromDirectory(absDir).map((e) => ({
+    fromFile: path.relative(absDir, e.fromFile),
+    toFile: path.relative(absDir, e.toFile),
+    type: e.type,
+    tokens: e.tokens,
+  }));
+
+  const okCount = results.filter((r) => r.ok).length;
+  const failedCount = results.length - okCount;
+
+  if (opts.json) {
+    console.log(
+      JSON.stringify(
+        {
+          ok: failedCount === 0,
+          dryRun: opts.dryRun,
+          rootDir: absDir,
+          fileCount: results.length,
+          okCount,
+          failedCount,
+          totalTokens,
+          results: results.map((r) => ({
+            filePath: r.cwdRelative,
+            ok: r.ok,
+            reason: r.reason,
+            message: r.message,
+            extracted: r.extracted,
+            proposalId: r.proposalId,
+            tokensUsed: r.tokensUsed,
+          })),
+          edges: inferredEdges,
+        },
+        null,
+        2,
+      ),
+    );
+    if (failedCount > 0 && failedCount === results.length) process.exit(1);
+    return;
+  }
+
+  console.log(`=== ONTOLOGY INGEST — DIRECTORY${opts.dryRun ? " (DRY RUN)" : ""} ===`);
+  console.log(`Root:           ${dirPath}`);
+  console.log(`Files scanned:  ${results.length}`);
+  console.log(`  ok:           ${okCount}`);
+  if (failedCount > 0) console.log(`  failed:       ${failedCount}`);
+  if (totalTokens > 0) console.log(`Tokens used:    ${totalTokens}`);
+  console.log(``);
+  for (const r of results) {
+    if (r.ok) {
+      const label = r.extracted?.label ?? "(no label)";
+      const proposalTag = r.proposalId ? `  →  ${r.proposalId}` : "";
+      console.log(` ✓ ${r.cwdRelative}  ${label}${proposalTag}`);
+    } else {
+      console.log(` ✖ ${r.cwdRelative}  ${r.reason}: ${r.message}`);
+    }
+  }
+  if (inferredEdges.length > 0) {
+    console.log(``);
+    console.log(`Inferred cross-file edges (γ-4 static analysis):`);
+    for (const edge of inferredEdges) {
+      const arrow = edge.type === "uses_token" ? "─type→" : "──→";
+      console.log(`  ${edge.fromFile}  ${arrow}  ${edge.toFile}`);
+    }
+    console.log(``);
+    console.log(
+      `These are file-path edges. After you apply the node proposals,`,
+    );
+    console.log(
+      `γ-6 (not yet implemented) will resolve them into edge_create`,
+    );
+    console.log(
+      `proposals by matching on outputs.files[0] of each created node.`,
+    );
+  }
+  if (!opts.dryRun && okCount > 0) {
+    console.log(``);
+    console.log(`Next:`);
+    console.log(`  onto proposal list                # review the ${okCount} proposals`);
+    console.log(`  # apply them individually with: onto proposal apply <id>`);
+  }
+  if (opts.dryRun) {
+    console.log(``);
+    console.log(`Dry run — no proposals created. Re-run without --dry-run to commit.`);
+  }
+  if (failedCount > 0 && failedCount === results.length) process.exit(1);
+}
+
+// ── Shared proposal-creation helper ─────────────────────────────────────────
+
+interface ProposalCreateOk {
+  ok: true;
+  proposalId: string;
+  proposalHash: string;
+  eventId: string;
+}
+interface ProposalCreateErr {
+  ok: false;
+  message: string;
+}
+
+function createNodeProposalForExtraction(
+  filePathRelative: string,
+  extracted: ExtractionResult,
+  response: LlmResponse,
+  parentNodeId: string,
+  parentHash: string,
+): ProposalCreateOk | ProposalCreateErr {
+  // provenance.rationale carries the extractor metadata only; the
+  // rich extracted fields live on the payload directly (γ-3).
+  // sourceFiles tracks the file path so γ-6 can resolve file-path
+  // edges back to node IDs after apply.
   const rationalePayload = {
-    extractedFrom: cwdRelative || filePath,
+    extractedFrom: filePathRelative,
     extractorModel: response.model,
     extractorProvider: response.provider,
   };
@@ -288,17 +689,15 @@ export async function ingestCommand(
           prompt: extracted.prompt,
           label: extracted.label,
           parentNodeId,
-          // Rich fields, all optional — only forwarded when the
-          // extractor actually emitted them. Falls back to createNode's
-          // defaults when absent.
           ...(extracted.manifestation !== undefined ? { manifestation: extracted.manifestation } : {}),
           ...(extracted.language !== undefined ? { language: extracted.language } : {}),
           ...(extracted.requires !== undefined ? { requires: extracted.requires } : {}),
           ...(extracted.provides !== undefined ? { provides: extracted.provides } : {}),
           ...(extracted.forbids !== undefined ? { forbids: extracted.forbids } : {}),
           ...(extracted.rules !== undefined ? { rules: extracted.rules } : {}),
+          sourceFiles: [filePathRelative],
         },
-        parentHash: parentNode.integrity.hash,
+        parentHash,
       },
       source: null,
       validation: null,
@@ -307,50 +706,43 @@ export async function ingestCommand(
         rationale: JSON.stringify(rationalePayload, null, 2),
       },
     });
-
-    if (options.json) {
-      console.log(
-        JSON.stringify(
-          {
-            ok: true,
-            dryRun: false,
-            proposal: {
-              id: proposal.id,
-              status: proposal.status,
-              mutationKind: proposal.mutation.kind,
-              hash: proposal.hash,
-            },
-            event: { eventId: event.eventId, eventType: event.eventType },
-            extracted,
-            usage: response.usage,
-            model: response.model,
-            provider: response.provider,
-          },
-          null,
-          2,
-        ),
-      );
-      return;
-    }
-
-    printExtraction(extracted, {
-      filePath: cwdRelative || filePath,
-      model: response.model,
-      provider: response.provider,
-      usage: response.usage,
-      committed: true,
+    return {
+      ok: true,
       proposalId: proposal.id,
-    });
+      proposalHash: proposal.hash,
+      eventId: event.eventId,
+    };
   } catch (err: unknown) {
-    failWith(`Failed to create proposal: ${errorMessage(err)}`, options.json);
+    return {
+      ok: false,
+      message: `Failed to create proposal: ${errorMessage(err)}`,
+    };
+  }
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+// Compute a cwd-relative path that survives macOS symlinks. `/tmp` →
+// `/private/tmp` and `/var` → `/private/var`; `process.cwd()` returns
+// the resolved form, but a user-supplied path arg may be the
+// unresolved one. Without normalisation, `path.relative` between the
+// two blows up into "../../../../../../var/…" and the resulting
+// sourceFiles entry is useless for downstream γ-6 edge resolution.
+// realpathSync on both ends gives a stable relative path.
+function computeCwdRelative(filePath: string): string {
+  try {
+    const cwdReal = fs.realpathSync(process.cwd());
+    const fileReal = fs.realpathSync(path.resolve(filePath));
+    return path.relative(cwdReal, fileReal);
+  } catch {
+    // Fall back to the un-resolved form if realpathSync misbehaves
+    // (rare; transient races on a temp tree). Better than crashing
+    // the whole ingest.
+    return path.relative(process.cwd(), path.resolve(filePath));
   }
 }
 
 function tryParseJsonFromText(text: string): unknown {
-  // Some models wrap the JSON in a code fence even when explicitly
-  // asked not to. Strip a leading ```json / ``` and trailing ``` if
-  // present, then JSON.parse. Returns undefined on any failure so the
-  // caller can render a clean error.
   const trimmed = text.trim();
   const fenceStripped = trimmed
     .replace(/^```(?:json)?\s*/i, "")
