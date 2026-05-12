@@ -403,6 +403,31 @@ Bootstrap 0.9 (post-validator-port).
 - **Failure modes:** binary-byte guard (NUL in a `--literal-file` or in the source file refuses upfront with a clear error); JSON-validation failure (the LLM returned something Zod's `ExtractionResultSchema` rejects); empty files; missing parent node. In directory mode, per-file failures don't abort the batch — they land in `results[]` with a `reason` and the walk continues.
 - **Provenance:** each proposal's `provenance.rationale` is a JSON blob with `{extractedFrom, extractorModel, extractorProvider}` so the audit chain records WHO produced the proposal off WHICH file. The rich extracted fields (manifestation / language / requires / provides / forbids / rules) ride on `payload.*` directly (γ-3); the source file path lands on `payload.sourceFiles[0]` (γ-5) so γ-6 can resolve file-path edges back to node IDs after apply.
 
+### `verify-homeomorphism [focal]` *(δ-2)*
+
+- **Purpose:** the **publishable measurement** for §3.10 (`F ∘ G ≈ id_Code modulo ε`). For each selected node, compile-back via the same provider chain, diff vs the original source on disk, classify with **two distances** (LoC delta + structural Jaccard over top-level declaration names). The γ-2 and Vibe-Reasoning calibrations both surfaced that LoC and behavior disagree — δ-2 reports both and folds them into a 2D verdict.
+- **Selectors (mutually exclusive):**
+  - Positional `<focal>` — verify one node.
+  - `--nodes id1,id2,...` — verify an explicit list.
+  - `--all-artifacts` — verify every node with `coordinates.manifestation === "code"`.
+- **Verdict labels:**
+  - `epsilon_equivalent` — both metrics pass (LoC < threshold AND Jaccard ≥ threshold).
+  - `divergent_loc` — LoC over threshold, structure ok. Usually means docstring drift or whitespace.
+  - `divergent_structural` — LoC ok, structure fails. Usually a rename or decomposition change.
+  - `divergent_both` — neither passes.
+  - `unrecoverable` — compile-back failed (no artifact to diff).
+- **Default thresholds:** `--loc-threshold 0.3 --jaccard-threshold 0.5`. Both tunable on the CLI.
+- **Flags:** `--provider`, `--model`, `--ollama-host`, `--max-tokens`, `--open-world` (default true for verify), `--no-open-world` (force closed-world), `--loc-threshold`, `--jaccard-threshold`, `--cost-estimate` (pre-flight, $0), `--dry-run` (skip compile-back, re-classify existing regen), `--json`.
+- **Examples:**
+  - `npm run dev -- verify-homeomorphism node_0001 --provider anthropic`
+  - `npm run dev -- verify-homeomorphism --all-artifacts --cost-estimate`
+  - `npm run dev -- verify-homeomorphism --nodes node_0001,node_0002 --provider anthropic --json`
+  - `npm run dev -- verify-homeomorphism --all-artifacts --dry-run --loc-threshold 0.2`
+- **Staging:** compile-back artifacts land under `.ontology/verify/<nodeId>.<ext>` (separate from `.ontology/artifacts/generated/` to avoid clobbering the audit-chain artifacts). Persistent — `--dry-run` re-uses existing stages.
+- **Output (human):** verdict counts + per-node line: `[tag] node_XXXX  loc=N% jac=M%  A→B lines  decl C→D`. For nodes whose declaration sets differ, lost-from-regen and added-by-regen lists surface up to 6 names each.
+- **Output (JSON):** `{ ok, report: { rootDir, thresholds, total, byVerdict: {epsilon_equivalent, divergent_loc, divergent_structural, divergent_both, unrecoverable}, results: [{nodeId, sourceFile, regenPath, ok, failure?, metrics?: {locDistance, structuralJaccard, originalLineCount, regenLineCount, originalDeclarations, regenDeclarations}, verdict, thresholds}] } }`.
+- **Cost:** roughly the same as ingest per file (one LLM dispatch per node). Pre-flight with `--cost-estimate` (no API call). For a 22-node sweep at Opus 4.7, expect ~$0.50–$1.00.
+
 ### Model Observability
 - `onto model doctor` — health probe per provider. With `ANTHROPIC_API_KEY` set, runs a `/v1/models` list as the auth check; without the key, surfaces `not configured` rather than failing. Reports `OLLAMA_HOST` and `ANTHROPIC_API_KEY` env-var status.
 - `onto model doctor --json`

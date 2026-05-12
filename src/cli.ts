@@ -41,6 +41,7 @@ import { proposalApplyCommand } from "./commands/proposal/apply.js";
 import { modelDoctorCommand } from "./commands/model/doctor.js";
 import { modelListCommand } from "./commands/model/list.js";
 import { registerQueryCommand } from "./commands/query/index.js";
+import { verifyHomeomorphismCommand } from "./commands/verify/homeomorphism.js";
 import { openCommand } from "./commands/open.js";
 import { projectsListCommand } from "./commands/projects/list.js";
 import { projectsForgetCommand } from "./commands/projects/forget.js";
@@ -807,5 +808,30 @@ program
   });
 
 registerQueryCommand(program);
+
+program
+  .command("verify-homeomorphism [focal]")
+  .description("Project Legend δ-2: compile-back each selected node, diff vs the original source on disk, classify with two distances (LoC + structural Jaccard over top-level declaration names). The publishable measurement for §3.10 in MATHEMATICAL_CLAIMS.md — F ∘ G ≈ id_Code modulo ε. Selectors: positional <focal> for one node, --nodes id1,id2,... for an explicit list, --all-artifacts for every node with coordinates.manifestation=code.")
+  .option("--all-artifacts", "Verify every node whose coordinates.manifestation is \"code\". Mutually exclusive with --nodes and a positional focal.")
+  .option("--nodes <ids>", "Comma-separated list of focal node ids to verify. Mutually exclusive with --all-artifacts and a positional focal.")
+  .option("--provider <provider>", "LLM provider override (mock, ollama, or anthropic). When omitted, each node compiles via its own model.ref.")
+  .option("--model <model>", "Model override (only meaningful with --provider).")
+  .option("--ollama-host <host>", "Host for Ollama provider.")
+  .option("--max-tokens <n>", "Override the LLM's max-output-tokens setting per compile-back (anthropic default 8192).", (v) => parseInt(v, 10))
+  .option("--open-world", "Open-world validation: unsatisfied 'requires' tokens degrade to warnings (default: true for verify, since ingest-derived contracts routinely reference external deps). Pass --no-open-world to enforce strict closed-world.")
+  .option("--no-open-world", "Disable the default open-world relaxation; use strict closed-world validation instead.")
+  .option("--loc-threshold <n>", "LoC distance below this counts as \"small\" for the verdict folder (default 0.3, range 0-1).", (v) => parseFloat(v))
+  .option("--jaccard-threshold <n>", "Structural Jaccard at or above this counts as \"similar\" (default 0.5, range 0-1).", (v) => parseFloat(v))
+  .option("--cost-estimate", "Pre-flight cost guard: walks the inputs, estimates compile-back cost, exits WITHOUT dispatching the LLM.")
+  .option("--dry-run", "Skip the compile-back dispatch entirely. Reads any existing regen under .ontology/verify/<nodeId>.<ext> and re-classifies with current thresholds. Useful for tuning thresholds without paying for new dispatches.")
+  .option("--json", "Output results in JSON format.")
+  .action(async (focal, options) => {
+    try {
+      await verifyHomeomorphismCommand(focal, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during verify-homeomorphism: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
 
 program.parse(process.argv);
