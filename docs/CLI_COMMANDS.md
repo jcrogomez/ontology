@@ -218,11 +218,13 @@ Bootstrap 0.9 (post-validator-port).
 - **Edges considered:** `depends_on`, `inherits_from`, `refines`, `implements`, `uses_token`. Direction-agnostic edges (`documents`, `tests`, `validates_against`, runtime relations, etc.) do not affect plan order.
 - **Notes:** Same kernel helper backs `:plan` in the walker.
 
-### `compile run <nodeId>` *(Bootstrap 0.8, hardened post-0.9)*
+### `compile run <nodeId>` *(Bootstrap 0.8, hardened post-0.9, β-1 + γ-0)*
 
 - **Purpose:** Walk the topological compile plan rooted at the focal and produce artifacts on disk. The structure-preserving functor of axiom 6 made concrete.
 - **Example:** `npm run dev -- compile run node_0005 --provider mock`
-- **Flags:** `--provider mock|ollama` (default `mock`), `--model <name>`, `--ollama-host <host>`, `--runtime-check`, `--runtime-check-timeout-ms <ms>`, `--branch <name>` (post-0.9 — restrict the plan to a single fiber), `--json`.
+- **Flags:** `--provider mock|ollama|anthropic` (default `mock`; γ-0 adds anthropic), `--model <name>`, `--ollama-host <host>`, `--runtime-check`, `--runtime-check-timeout-ms <ms>`, `--branch <name>` (post-0.9 — restrict the plan to a single fiber), `--target <path>` (β-1 — write the focal artifact to a user-pinned path; default still `.ontology/artifacts/generated/<nodeId>.<ext>`), `--force` (required to overwrite an existing `--target` file), `--json`.
+- **`--target <path>` (β-1):** redirects the focal step's artifact away from the default `.ontology/artifacts/generated/` tree to a user-pinned path. Relative paths resolve against cwd; missing parent directories are created. **Crash-atomic + clobber-gated:** writes go to a sibling `.tmp.<pid>` first; on every-validator-passed the file is renamed onto the final path. A failed validator (`validateLanguage` / `validateIntent` / `--runtime-check`) triggers a rollback — the staging file is unlinked and the user's pre-existing target survives untouched. Without `--force`, an existing target file fails the focal step with `reason: "target_exists"` before any bytes are written; with `--force`, the rename overwrites. Upstream steps continue to land under `generated/`.
+- **`--provider anthropic` (γ-0):** routes through the Anthropic adapter with system-prompt caching (`cache_control: ephemeral`). Reads `ANTHROPIC_API_KEY` from env. Default model is `claude-opus-4-7`; override with `--model`.
 - **Post-0.9 gate:** after parse-check + before runtime-check, every artifact passes through `validateIntent` against the focal's contract (`context.requires/provides/forbids` + `node.rules`). A decisive false verdict aborts the compile with `reason: "intent_failed"` and surfaces the violating clause; an `unknown` verdict (open-world callers) passes with a warning. The validator gate runs always — there is no opt-out flag — because a compile that violates its declared contract is by definition broken.
 - **`--branch <name>`:** restricts the compile plan to the Grothendieck fiber over `<name>`. Only intra-branch edges participate in the closure. Refuses with `missing_branch` (with a `Known branches: ...` hint) if the name is unknown, and with `focal_off_branch` if the focal lives on a different branch — silent retargeting would surprise CI users.
 - **Files Touched:**
@@ -357,8 +359,48 @@ Bootstrap 0.9 (post-validator-port).
 - **Output (JSON):** `{ branch, size: {nodes, edges}, nodes: [id, ...], edges: [{edgeId, type, from, to}, ...] }`.
 - **What it does not do:** It does not mutate state, does not propose anything, does not run cartesian lifts. Read-only inspection of the fibration.
 
+### `compile run-batch [--all-artifacts | --nodes <ids>]` *(β-1)*
+
+- **Purpose:** Compile many focals in a single invocation. Plans are computed per-focal but share the per-run persisted cache, so shared upstream walks across focals reuse the same content-addressed run records (no second LLM call on the second-and-later focal whose plan touches the same upstream node).
+- **Required:** exactly one of `--all-artifacts` (compile every node whose `coordinates.manifestation === "code"`) or `--nodes <id1,id2,...>` (comma-separated explicit list). Mutex.
+- **Optional:** `--provider mock|ollama|anthropic`, `--model <name>`, `--ollama-host <host>`, `--runtime-check`, `--runtime-check-timeout-ms <ms>`, `--branch <name>` (filters BOTH the focal list AND the per-plan walk to the named fiber), `--json`.
+- **Resolve-time gates (--nodes path only):**
+  - Non-code-manifestation focals are refused upfront with an actionable error rather than failing per-step inside the loop.
+  - Off-branch focals (when `--branch` is set) are refused upfront with the same shape.
+- **Failure policy:** continue past per-focal failures; aggregate per-focal results. Exit code 1 only when every focal failed (so a partial-success batch still surfaces a useful report). Two explicit booleans in the JSON output disambiguate: `allSucceeded` (every focal compiled) vs `anySucceeded` (at least one compiled); the top-level `ok` agrees with the exit code.
+
+### `graph infer-edges <dir>` *(γ-4 preview, γ-6 proposals)*
+
+- **Purpose (γ-4):** walk a TypeScript directory and report the import-derived edge graph — which file `depends_on` which (value imports) and which `uses_token` which (type-only `import type` statements). Pure static analysis via the TS compiler API; zero LLM cost; runs in milliseconds per file. Read-only.
+- **Purpose (γ-6, with `--create-proposals`):** in addition to the report, resolve each inferred edge to applied node IDs by matching `outputs.files[0]` on each endpoint, then emit one `edge_create` proposal per resolved pair. Skips edges whose endpoints are not yet on the graph (the user hasn't applied that file's ingest proposal yet — surfaced as `from_node_missing` / `to_node_missing` in the JSON report) and edges that already exist with the same `(from, to, type)` tuple — so γ-6 is idempotent.
+- **Example (preview):** `npm run dev -- graph infer-edges src/runtime/fibration`
+- **Example (γ-6):** `npm run dev -- graph infer-edges src/runtime/fibration --create-proposals --json`
+- **Output (human):** one line per edge in the form `from.ts  ──→  to.ts` (or `─type→` for `uses_token`), with the imported tokens listed underneath.
+- **Output (JSON, γ-6):** `{ ok, rootDir, edgeCount, createdCount, skippedCount, edges, proposals: [{proposalId, fromNodeId, toNodeId, type}], skipped: [{fromFile, toFile, type, reason, detail}] }`.
+- **Edge-type mapping:** `depends_on` for value imports (runtime); `uses_token` for type-only imports. Both are first-class `EdgeType` enum values; γ-6 puts each in `payload.type` on the `edge_create` proposal.
+- **Scope of γ-4 v0:** named imports, default imports, namespace imports, `import type`, named exports, default exports, re-exports. Out of scope: dynamic `import()`, CommonJS `require()`, triple-slash references. Only `.ts` / `.tsx` files are parsed — Python / other languages are skipped (a γ-7 follow-up can add per-language parsers; for those today, the multi-file edge graph is empty).
+- **Exit codes:** preview always exits 0. `--create-proposals` exits 0 unless every inferred edge was skipped AND there was at least one edge to process (almost always a sign the user forgot to run `onto proposal apply` first) — in that case exits 1 so CI / scripts notice. An empty walk (no edges at all) is always exit 0.
+
+### `ingest <path>` *(γ-1 single-file, γ-5 multi-file)*
+
+- **Purpose:** the **inverse** of the compile functor. Extract structured intent from existing source code and produce one `node_create` proposal per source file. With γ-3's rich proposal payload, `onto proposal apply` produces a complete node in a single step — no follow-up `onto node update --requires ... --provides ...` ceremony needed.
+- **Modes (auto-detected from `<path>`):**
+  - **File:** one proposal under the canon parent (or `--parent <nodeId>`).
+  - **Directory:** walks the tree (skipping `node_modules` / `dist` / `.ontology` / `__tests__` / `.git` / `coverage`); one proposal per `.ts` / `.tsx` file by default. Also reports static-inferred cross-file edges from γ-4 — those don't become proposals automatically, run `onto graph infer-edges <dir> --create-proposals` after `proposal apply` to materialise them (the multi-file cycle).
+- **Provider:** defaults to `anthropic` (γ-0 — requires `ANTHROPIC_API_KEY` in env). `--provider ollama` for the local model; `--provider mock` for plumbing tests (identity-functor — only works on files that embed a valid JSON extraction fixture).
+- **Cost:** ~$0.08 per file at Opus 4.7 tier; ~$0 with Ollama. The shared system prompt is tagged `cache_control: ephemeral` so per-file calls in the same session reuse the cached prefix once the prompt grows past Opus 4.7's 4096-token cacheable minimum.
+- **Flags:** `--provider`, `--model`, `--ollama-host`, `--parent <nodeId>` (default: project root canon), `--include <exts>` (directory mode only — comma-separated extensions; default `ts,tsx`. Use `--include py` for a Python project, `--include py,ts,tsx` for a mixed repo. Static-edge inference (γ-4) stays TS-only — non-TS ingests skip the cross-file edge report), `--dry-run` (preview the extraction without writing proposals — the load-bearing flag for iterating the extraction template and for testing with the mock provider at zero LLM cost), `--json`.
+- **Examples:**
+  - `npm run dev -- ingest src/core/integrity/hash.ts --dry-run`
+  - `npm run dev -- ingest src/runtime/fibration --provider anthropic --json`
+  - `npm run dev -- ingest path/to/python/project --provider ollama --include py`
+- **Output (JSON, file mode):** `{ ok, dryRun, proposal: {id, status, mutationKind, hash}, event, extracted, usage, model, provider }`.
+- **Output (JSON, directory mode):** `{ ok, dryRun, rootDir, fileCount, okCount, failedCount, totalTokens, results: [{filePath, ok, reason?, message?, extracted?, proposalId?, tokensUsed?}], edges: [γ-4 inferences] }`.
+- **Failure modes:** binary-byte guard (NUL in a `--literal-file` or in the source file refuses upfront with a clear error); JSON-validation failure (the LLM returned something Zod's `ExtractionResultSchema` rejects); empty files; missing parent node. In directory mode, per-file failures don't abort the batch — they land in `results[]` with a `reason` and the walk continues.
+- **Provenance:** each proposal's `provenance.rationale` is a JSON blob with `{extractedFrom, extractorModel, extractorProvider}` so the audit chain records WHO produced the proposal off WHICH file. The rich extracted fields (manifestation / language / requires / provides / forbids / rules) ride on `payload.*` directly (γ-3); the source file path lands on `payload.sourceFiles[0]` (γ-5) so γ-6 can resolve file-path edges back to node IDs after apply.
+
 ### Model Observability
-- `onto model doctor`
+- `onto model doctor` — health probe per provider. With `ANTHROPIC_API_KEY` set, runs a `/v1/models` list as the auth check; without the key, surfaces `not configured` rather than failing. Reports `OLLAMA_HOST` and `ANTHROPIC_API_KEY` env-var status.
 - `onto model doctor --json`
 - `onto model list`
 - `onto model list --json`
@@ -371,24 +413,37 @@ The following commands are *Planned / Not yet implemented*. The full
 roadmap lives in [`ROADMAP.md`](ROADMAP.md) §"Open follow-ups", and
 the Project Legend phases are detailed in [`PROJECT_LEGEND.md`](PROJECT_LEGEND.md).
 
-**Phase β of Project Legend (next sprint):**
-- **`onto compile run-batch [--all-artifacts | --nodes <ids>]`** —
-  compile every artifact node in a plan in one invocation; needed before
-  `verify-homeomorphism` scales to a whole repo.
-- **`onto compile run --target <path>`** — write the generated artifact
-  directly to its target source path, not only to
-  `.ontology/artifacts/generated/`. Removes the manual paste step.
-- **`node.literal?: string`** schema field — preserves verbatim content
-  for irreducible specificity (regexes, magic constants, license
-  headers). The compile pipeline emits `literal` instead of dispatching
-  the LLM; the validator and runtime-check still apply.
+**Project Legend Phase β** — **shipped 2026-05-11/12**. `compile
+run --target / --force`, `compile run-batch`, `node.literal`, path
+fibration helpers (`computeFiberBy`, `pathProjection`) — all merged.
+See the relevant sections above.
 
-**Phase γ–δ of Project Legend:**
-- **`onto ingest <path>`** — extract intent from existing source.
-- **`onto node inspect <id>`** — Inspector / Lupa primitive; one LLM
-  call per node lifetime, cached as `node.translator`.
-- **`onto verify-homeomorphism <id>`** + batch report — measures the
-  round-trip diff between the source and the regenerated artifact.
+**Project Legend Phase γ** — **partially shipped 2026-05-12**.
+- ✅ γ-0 Anthropic provider with prompt caching
+- ✅ γ-1 `onto ingest <file>`
+- ✅ γ-2 hash.ts calibration (5/5 ε-equivalent — `docs/legend/calibrations/HASH_TS_2026-05-12.md`)
+- ✅ γ-3 rich proposal payload (manifestation / language / contract / rules / literal / sourceFiles)
+- ✅ γ-4 static TS edge inference (`onto graph infer-edges`)
+- ✅ γ-5 `onto ingest <directory>` multi-file (with `--include` for non-TS codebases)
+- ✅ γ-6 `onto graph infer-edges --create-proposals` (edge proposals from γ-4 inferences)
+
+Remaining γ work:
+- 🟡 **γ-7+ static analysis for Python (and other languages)** — the
+  γ-4 parser is TS-first. A Python `import` walker would let `onto
+  ingest <python-dir>` produce a connected cross-file graph the same
+  way TS projects do today.
+
+**Project Legend Phase δ** — **not yet shipped.**
+- 🟡 **`onto node inspect <id>`** — Inspector / Lupa primitive; one
+  LLM call per node lifetime, cached as `node.translator`.
+- 🟡 **`onto verify-homeomorphism <id>`** + batch report — runs the
+  per-node round-trip diff automatically and aggregates the result
+  into a verdict map (`ε-equivalent` / `divergent` / `unrecoverable`).
+  Closes the manual compile-back-and-diff loop the
+  `VIBE_REASONING_PROCEDURE.md` runbook walks through by hand.
+
+**Project Legend Phase ε** — **not yet shipped.** Self-ingestion of
+the Ontology repo; the publishable adjunction-claim measurement.
 
 **Other:**
 - **`onto branch lift <nodeId> --to <branch>`** — turn the read-only

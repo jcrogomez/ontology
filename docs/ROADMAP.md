@@ -181,8 +181,8 @@ Phase plan (estimates from PROJECT_LEGEND.md §6):
 | α | Pre-foundation gaps §1–§6 (plasticity layer) | ✅ shipped | — |
 | β | Layer 1 (multi-file compile + `--target`), 2 (`node.literal`), 5 (path fibration) | ✅ shipped (incl. 2 post-merge fixes) | actual ~10 h |
 | γ | Layer 7 (`onto ingest <file>`) + Anthropic provider + rich proposal payload | ✅ γ-0 / γ-1 / γ-3 shipped 2026-05-12; γ-2 calibration on `hash.ts` 5/5 ε-equivalent (see [`legend/calibrations/HASH_TS_2026-05-12.md`](legend/calibrations/HASH_TS_2026-05-12.md)) | γ-0–3: ~4 h |
-| γ-4+ | Layer 3 (static edge inference, TS-first) + multi-file `onto ingest <directory>` | 🟡 next | ~4–6 h |
-| δ | Layer 4 (Inspector / translator) + Layer 6 (verification + report) | pending | ~6–8 h |
+| γ-4/5/6 | Layer 3 (TS-first static-edge inference) + `onto ingest <directory>` + `infer-edges --create-proposals` + walker AI indicator + `--include` flag | ✅ shipped 2026-05-12 (commits `62d8c86` / `a25ade9` / `9c16b9d` / `69424af` / `bc350ce`); Vibe-Reasoning runbook at [`legend/calibrations/VIBE_REASONING_PROCEDURE.md`](legend/calibrations/VIBE_REASONING_PROCEDURE.md) | actual ~6 h |
+| δ | Layer 4 (Inspector / translator) + Layer 6 (verification + report) | 🟡 next | ~6–8 h |
 | ε | Self-ingestion — Legend run on the Ontology repo itself | pending | ~6–10 h |
 | ζ | Release + Open-Prompt seeds (sign, verify-published, replay) | pending | ~3–5 h |
 
@@ -231,6 +231,8 @@ work is in [Open follow-ups](#open-follow-ups).
 | post-0.9 | `onto compile run --branch <name>` | Restrict the compile plan to a single Grothendieck fiber. Refuses with `focal_off_branch` if the focal lives on a different branch; refuses with `missing_branch` if the name is unknown. |
 | post-0.9 | Validator open-world mode | `openWorld?: boolean` on `validateIntent`; the three-valued verdict (true/false/unknown) is now observable end-to-end through `semanticLink.validation.verdict`. Closed-world remains the default (backward compatible). |
 | post-0.9 | Project Legend foundation | [`PROJECT_LEGEND.md`](PROJECT_LEGEND.md) design document. Mathematical-claims registry updated with §3.10 (compile adjoint), §4.8 (Inspector triangle), §4.9 (Open-Prompt protocol), all T4 with explicit paths to T2 after the respective phases ship. |
+| post-0.9 | Project Legend Phase β | `onto compile run-batch` + `compile run --target <path>` (β-1, `a09e1d7`); `node.literal` escape hatch (β-2, `04f730c`); `computeFiberBy(input, projection)` for path fibration (β-3, `881506a`); post-β review blockers — atomic write + clobber gate + binary guard (`157d367`); two-phase commit for `writeArtifact` so failed validator no longer clobbers `--target` (`2cbaa32`). |
+| post-0.9 | Project Legend Phase γ (extraction core) | γ-0 Anthropic provider with prompt caching, default `claude-opus-4-7` (`aad0fed`); γ-1 `onto ingest <file>` with `--dry-run` (`b670ca3`); γ-3 rich proposal payload — manifestation/language/requires/provides/forbids/rules/literal/sourceFiles on `node_create` (`7d50c91`); γ-4 TS-first static-edge inference + `onto graph infer-edges <dir>` preview (`62d8c86`); γ-5 `onto ingest <directory>` multi-file (`a25ade9`); γ-6 `infer-edges --create-proposals` for edge proposals against applied nodes (`9c16b9d`); walker AI provider status indicator (`69424af`); `--include` flag for non-TS source extensions + Vibe-Reasoning runbook (`bc350ce`). γ-2 calibration: 5/5 ε-equivalent on `hash.ts` with Opus 4.7 (commit `ac0a45f`, report at [`legend/calibrations/HASH_TS_2026-05-12.md`](legend/calibrations/HASH_TS_2026-05-12.md)). |
 
 Per-PR detail lives in [`RELEASE_NOTES.md`](RELEASE_NOTES.md).
 
@@ -243,44 +245,24 @@ Bootstrap) or 🔵 (longer-term / shape still to be decided). Items
 shipped today have been promoted out of this list and into the
 Bootstrap history table above.
 
-**Immediate (Phase β of Project Legend):**
-- 🟡 **`onto compile run-batch`** — compile every artifact node in a plan
-  in one call; needed before `onto verify-homeomorphism` scales.
-- 🟡 **`onto compile run --target <path>`** — write the generated artifact
-  to its real source path, not only to `.ontology/artifacts/generated/`.
-- 🟡 **`node.literal?: string` escape hatch** — preserve verbatim content
-  for irreducible specificity (regexes, magic constants, license
-  headers); compile pipeline emits literal instead of dispatching.
-- 🟡 **Path fibration helpers** — `computeFiberBy(input, projection)`
-  generalises `computeBranchFiber` to arbitrary projections; the path
-  fibration (files-under-a-directory) is the first concrete use.
-
-**Project Legend core (remaining γ + Phases δ–ε):**
-- ✅ **`onto ingest <file>`** — single-file inverse compile, shipped
-  2026-05-12 (`feat(ingest)` `b670ca3`). Reads a source file,
-  dispatches the extraction template (Anthropic provider with prompt
-  caching, `feat(llm)` `aad0fed`), produces a `node_create` proposal.
-  `--dry-run` for prompt iteration.
-- ✅ **Rich proposal payload** — `feat(proposals,ingest)` `7d50c91`.
-  Schema carries manifestation / language / requires / provides /
-  forbids / rules / literal as optional fields, so apply produces a
-  complete node in one step.
-- 🟡 **`onto ingest <directory>`** — multi-file ingest. Composes γ-1's
-  per-file flow with the path fibration (β-3, `computeFiberBy`) for
-  per-directory token vocabulary normalisation.
-- 🟡 **Static analysis edge inference (TS first)** — parse imports /
-  exports to emit `depends_on` / `uses_token` edges without an LLM
-  call. Required before multi-file ingest can produce a coherent
-  cross-file proposal batch.
-- 🟡 **`onto node inspect <id>`** — Inspector / Lupa primitive; per-node
-  `translator` cached as a node schema field.
+**Project Legend core (remaining δ–ε):**
+- 🟡 **`onto node inspect <id>`** — Inspector / Lupa primitive (Phase δ-1);
+  per-node `translator` cached as a node schema field. One LLM call
+  per node lifetime; subsequent inspects hit the cache.
 - 🟡 **`onto verify-homeomorphism <id>` + batch report** — compile +
   diff for a given node or the whole project; reports
-  ε-equivalent / divergent / unrecoverable. The γ-2 hash.ts
+  ε-equivalent / divergent / unrecoverable (Phase δ-2). The γ-2 hash.ts
   calibration suggests reporting **both** LoC distance and
   behaviour-aware distance per node — pure LoC over-estimates
   divergence when the regenerated file's deltas are docstrings, not
   semantics. See [`legend/calibrations/HASH_TS_2026-05-12.md`](legend/calibrations/HASH_TS_2026-05-12.md) for the data.
+- 🟡 **Self-ingestion on the Ontology repo** (Phase ε). Run Legend on
+  this codebase, measure $\varepsilon$ on the divergent set, upgrade
+  the §3.10 adjoint claim from T4 → T2 in
+  [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md). The
+  Vibe-Reasoning runbook
+  ([`legend/calibrations/VIBE_REASONING_PROCEDURE.md`](legend/calibrations/VIBE_REASONING_PROCEDURE.md))
+  is the smaller out-of-tree pilot before this lands.
 
 **Plasticity follow-ups:**
 - 🟡 **Advisory lock under `.ontology/.lock`** for multi-process safety.
@@ -327,8 +309,10 @@ Bootstrap history table above.
 *This roadmap is kept in sync with `main` after every commit that
 ships a new surface or closes a follow-up. Stale items move to the
 Bootstrap history table; new items land here under their phase
-heading. Last refresh: 2026-05-12, after Phase β shipped (β-1/β-2/
-β-3 + two post-merge fixes `157d367`/`2cbaa32`) and Phase γ partially
-shipped (γ-0/γ-1/γ-3 + γ-2 calibration: commits `aad0fed`,
-`b670ca3`, `7d50c91`, `caf16f4`; calibration report
-[`legend/calibrations/HASH_TS_2026-05-12.md`](legend/calibrations/HASH_TS_2026-05-12.md)).*
+heading. Last refresh: 2026-05-12, after Project Legend Phase γ
+completed end-to-end — γ-0 Anthropic provider, γ-1 single-file
+ingest, γ-2 calibration (5/5 on `hash.ts` with Opus 4.7), γ-3 rich
+proposal payload, γ-4 TS-first static-edge inference, γ-5 multi-file
+ingest, γ-6 edge_create proposals, walker AI indicator, `--include`
+flag for non-TS extensions. Phase δ (Inspector + verify-homeomorphism)
+is now the next active stream.*

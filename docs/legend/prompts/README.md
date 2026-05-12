@@ -49,8 +49,11 @@ branch and merge (or discard) at your leisure.
 | γ | γ-1 `onto ingest <file>` v0+ | **merged** (`b670ca3`) | implemented directly — single-file extraction with `--dry-run` |
 | γ | γ-3 rich proposal payload | **merged** (`7d50c91`) | implemented directly — schema extension so apply produces complete node in one step |
 | γ | γ-2 calibration on `hash.ts` (claude-opus-4-7) | **done 2026-05-12** | 5/5 ε-equivalent; full report [`docs/legend/calibrations/HASH_TS_2026-05-12.md`](../calibrations/HASH_TS_2026-05-12.md) |
-| γ | γ-4 static analysis edge inference (TS) | not yet | — |
-| γ | γ-5 `onto ingest <directory>` multi-file | not yet | — |
+| γ | γ-4 static analysis edge inference (TS) | **merged** (`62d8c86`) | implemented directly — TS compiler API, `inferEdgesFromDirectory()` + `onto graph infer-edges <dir>` preview |
+| γ | γ-5 `onto ingest <directory>` multi-file | **merged** (`a25ade9`) | implemented directly — per-file dispatch over `collectSourceFiles`; stores source path in `outputs.files[0]` for γ-6 |
+| γ | γ-6 `infer-edges --create-proposals` | **merged** (`9c16b9d`) | implemented directly — idempotent edge proposals against applied nodes; skips `from_node_missing` / `to_node_missing` / `cross_branch` / `edge_already_exists` |
+| — | walker AI provider status indicator | **merged** (`69424af`) | `detectAiProvider(env)` discriminated union; bar rendered above the focal cell |
+| — | `--include` flag + Vibe-Reasoning runbook | **merged** (`bc350ce`) | per-extension ingest list; calibration runbook at [`../calibrations/VIBE_REASONING_PROCEDURE.md`](../calibrations/VIBE_REASONING_PROCEDURE.md) |
 | δ | δ-1 onto node inspect (Inspector / Lupa) | not yet | — |
 | δ | δ-2 verify-homeomorphism + report | not yet | — |
 
@@ -83,7 +86,15 @@ round-trip semantically equivalent (5/5), vs 3/5 with the smaller
 `qwen2.5-coder:3b` baseline. The cost is ~$0.08 per single-file
 round-trip; latency ~70s.
 
-γ-4 (static-edge inference) and γ-5 (multi-file ingest) are the
-remaining streams before Phase ε can sweep the codebase. Whether they
-need agent-isolation prompt files (the original Phase β plan) depends
-on how invasive the changes feel — TBD when γ-4 starts.
+γ-4 (static-edge inference), γ-5 (multi-file ingest), and γ-6
+(edge_create proposals) all shipped directly on 2026-05-12 — each was
+small enough to keep in the main session. The walker AI provider
+indicator (`69424af`) and the `--include` flag + Vibe-Reasoning runbook
+(`bc350ce`) followed the same direct-implementation path.
+
+The remaining Project Legend streams are Phase δ (Inspector +
+verify-homeomorphism) and Phase ε (self-ingestion). δ-1 and δ-2 are the
+next candidates for written prompt briefs since they touch new surface
+area (node-schema field for the cached translator, a verification
+command with structured JSON output) rather than incremental additions
+to existing pipelines.

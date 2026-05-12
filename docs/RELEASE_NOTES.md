@@ -106,3 +106,44 @@
 - `BRANCH_MODEL.md` (Option C: lazy materialisation on touch) is recommended but not user-confirmed. Required before any cross-branch `node_update` propagation lands.
 - Walker v2 (proposal review pane, plane/time/branch/manifestation rotation) remains unshipped.
 - Project Legend's adjoint claim is currently T4. Phase ε self-ingestion delivers measured ε on the Ontology codebase itself; that is what upgrades the claim to T2.
+
+### post-0.9: Project Legend Phase β + γ — extraction core (2026-05-11 — 2026-05-12)
+
+**Phase β — multi-file compile + literal escape hatch + path fibration:**
+- `a09e1d7` **β-1 `compile run-batch` + `--target`:** new `onto compile run-batch <plan-spec>` runs the topological compile plan in one invocation; `compile run --target <path>` writes the generated artifact to its real source path instead of `.ontology/artifacts/generated/`. Required surface for any non-trivial multi-file compile.
+- `04f730c` **β-2 `node.literal` escape hatch:** optional `literal?: string` field on the node schema preserves verbatim content for irreducible specificity (regexes, magic constants, license headers). The compile pipeline short-circuits before LLM dispatch when `literal` is set — emits the literal directly through the same artifact-writer path so audit chain stays intact.
+- `881506a` **β-3 `computeFiberBy(input, projection)`:** generalises `computeBranchFiber` to arbitrary projections. The first concrete use is `pathProjection` (files-under-a-directory), unlocking the multi-file ingest plan for γ-5.
+
+**Post-β review hardening:**
+- `157d367` **Post-β review blockers (§4.1 / §4.2 / §4.6):** atomic artifact write (temp + rename — partial files no longer leak); `--target` clobber gate (refuse to overwrite existing files without `--force`, surfaced as `TargetExistsError`); binary-file guard on `--target` (NUL-byte detection before write).
+- `5da798c` **Post-β housekeeping:** `run-batch` polish (`--json` exit code consistency, plan-spec validation) + documentation drift fixes for the post-β command set.
+- `2cbaa32` **§0 two-phase commit for `writeArtifact`:** the calibration finding from β-2 — `writeArtifact` persisted before the validator ran, leaving rejected output at the user's `--target` path. `writeArtifactPending()` now stages to a temp path; the validator runs against the staged content; `commit()` only renames on validator pass, `rollback()` deletes the staged file on fail. Pipeline order in `compileNode`: project → stage → validate → commit → emit. Closure variable `pendingForCleanup` guarantees rollback even if an unexpected exception interrupts the pipeline.
+
+**Phase γ — extraction core (Project Legend inverse direction):**
+- `aad0fed` **γ-0 Anthropic provider with prompt caching:** new `src/runtime/llm/anthropic/adapter.ts` integrates `@anthropic-ai/sdk`. Default model `claude-opus-4-7`; reads `ANTHROPIC_API_KEY` from env (or via macOS Keychain). System prompts tagged `cache_control: ephemeral`. Adaptive thinking on by default; non-streaming. `LlmProviderSchema` extended with `"anthropic"` and `"literal"`.
+- `b670ca3` **γ-1 `onto ingest <file>` v0+:** reads a single source file, dispatches the structured extraction template, produces a `node_create` proposal. `--dry-run` for prompt iteration without writing. `extractIntentFromFile()` is exposed as a pure library function for reuse from the multi-file flow. JSON schema `ExtractionResultSchema` validates the LLM response; mock provider is extended to scan the prompt for the first balanced JSON object (identity functor) so γ-1 is testable without burning API.
+- `7d50c91` **γ-3 rich proposal payload:** `ProposalNodeCreatePayloadSchema` gains optional `manifestation` / `language` / `requires` / `provides` / `forbids` / `rules` / `literal` / `sourceFiles[]` fields. Pre-γ-3 the extracted contract lived in `provenance.rationale` and required a follow-up `onto node update`; now `onto proposal apply` produces a complete node in one step.
+- `caf16f4` **`compile run` / `run-batch` `--provider anthropic` gate fix:** both subcommands hardcoded a `mock|ollama` whitelist that rejected `anthropic`. Added `"anthropic"` to the gate. Caught during the γ-2 calibration run.
+- `ac0a45f` **γ-2 calibration writeup:** [`docs/legend/calibrations/HASH_TS_2026-05-12.md`](legend/calibrations/HASH_TS_2026-05-12.md). First end-to-end round-trip on `src/core/integrity/hash.ts` with `claude-opus-4-7` end-to-end: **5/5 semantically equivalent** (vs 3/5 for the β-2 `qwen2.5-coder:3b` baseline); ~$0.08 per round-trip; ~70s wall-clock. The two β-2 divergences (`hashContext` / `hashRun` reaching for non-canonical `JSON.stringify`) are correctly avoided at the γ-2 tier because the extracted `rules` field surfaces the load-bearing invariant ("REQUIRE: object hashing uses fast-json-stable-stringify"). Key finding for δ-2 verifier design: report **both** a LoC distance *and* a behaviour-aware distance per node — `hash.ts` is divergent under raw LoC but ε-equivalent by behaviour because divergence is concentrated in docstring density.
+- `62d8c86` **γ-4 static-edge inference (TS-first):** new `src/runtime/static/typescript.ts` uses the TypeScript compiler API to parse `import` / `export` declarations and emit `depends_on` / `uses_token` edges without an LLM call. `parseTypeScriptFile()`, `inferEdgesFromDirectory()`, and generic `collectSourceFiles(rootDir, extensions)` walker. New CLI: `onto graph infer-edges <dir>` previews inferred edges. Moved `typescript` from devDependencies to dependencies (runtime usage).
+- `a25ade9` **γ-5 `onto ingest <directory>` multi-file:** walks the tree, dispatches γ-1 per file. `parseIncludeFlag(--include)` for extension filtering; default is TS-only. The created proposal stores the source path under `outputs.files[0]` so γ-6 can build a file→node index after apply. `computeCwdRelative()` uses `fs.realpathSync` on both ends to normalise macOS `/tmp` → `/private/tmp` symlinks (the bug surfaced as `../../../var/folders/...` paths in test fixtures).
+- `9c16b9d` **γ-6 `infer-edges --create-proposals`:** turns the γ-4 preview into `edge_create` proposals. `resolveEdgesToProposals()` builds the file→node index from `outputs.files[0]` of already-applied node proposals. Idempotent: skips with explicit reasons — `from_node_missing`, `to_node_missing`, `cross_branch`, `edge_already_exists`. Closes the multi-file ingest cycle: γ-5 lands the nodes, γ-6 lands the edges.
+- `69424af` **Walker AI provider status indicator:** new bar above the focal cell, rendered by `detectAiProvider(env)` returning a discriminated union (`anthropic` | `ollama-cloud` | `ollama-local` | `none`). Priority: anthropic > ollama-cloud > ollama-local > none. Inserted after `IdentityBar` so the operator always knows which model the next `:run` / `:compile` / ingest dispatch will hit.
+- `bc350ce` **`--include` flag + Vibe-Reasoning runbook:** explicit extension list for non-TS source ingest (`onto ingest <dir> --include py,rb`). New [`docs/legend/calibrations/VIBE_REASONING_PROCEDURE.md`](legend/calibrations/VIBE_REASONING_PROCEDURE.md) documents the end-to-end test harness on https://github.com/Julius-Woo/Vibe-Reasoning.git (24 Python files): clone → init → dry-run → commit → apply → manual compile-back. Cost estimate: ~$2 Opus 4.7, $0 Ollama.
+
+**What is now possible:**
+
+- **Ingest a directory of source files** into a typed intent network with one CLI call:
+  `onto ingest <dir> --provider anthropic` produces N `node_create` proposals carrying the extracted contract (requires / provides / forbids / rules).
+- **Followed by `onto graph infer-edges <dir> --create-proposals`** to lift the static import graph into `depends_on` / `uses_token` proposals against the freshly applied nodes. Idempotent — safe to re-run.
+- **Round-trip on a small known-good file** (`hash.ts`) is **5/5 ε-equivalent** with a frontier model. This is the first empirical data point on the path to the Phase ε publishable claim.
+
+### Known limitations (post-Phase γ)
+
+All limitations from the previous section still apply, plus:
+
+- γ-4 static-edge inference is **TS-first only**. Python / Ruby / other languages will not produce `depends_on` edges until per-language parsers land (Phase δ or later).
+- γ-5 directory ingest is sequential per file (one LLM call each). No batching, no rate-limiter. Cost on a 100-file repo with `claude-opus-4-7` is ≈ $5 — verify with `--dry-run` first.
+- The Inspector / Lupa primitive (`onto node inspect`) is unshipped. Per-node translator caching as a node schema field is Phase δ-1.
+- `verify-homeomorphism` (Layer 6 / δ-2) is unshipped. The γ-2 calibration's "report both LoC and behaviour-aware distance" finding is a design note, not yet a command.
+- Self-ingestion on the Ontology codebase itself (Phase ε) is the gating step for upgrading the §3.10 adjoint claim from T4 → T2. Has not been run.

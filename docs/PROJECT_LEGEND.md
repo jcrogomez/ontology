@@ -7,9 +7,14 @@
 > functor; and the protocol layer that makes "what an organisation runs"
 > verifiable without exposing its source.
 
-Status: **design document, awaiting implementation start.** All pre-foundation
-work (Project Legend gaps §1–§6) is shipped on `main` as of commit
-[e847417]; the system is ready for Layer 1–5 below.
+Status: **Phases α + β + γ shipped on `main` (2026-05-12).** Pre-foundation
+plasticity (§1–§6), Layer 1 (`compile run-batch` + `--target`), Layer 2
+(`node.literal`), Layer 3 (TS-first static-edge inference), Layer 5
+(`computeFiberBy` + `pathProjection`), and Layer 7 (`onto ingest <file>`
+and `onto ingest <directory>` with rich-payload `node_create` proposals)
+are all live. γ-2 calibration on `src/core/integrity/hash.ts` with
+`claude-opus-4-7` end-to-end reads **5/5 ε-equivalent** (see §7.1). Phase
+δ (Inspector + verify-homeomorphism) is the next active stream.
 
 Companion reads:
 [`BRANCH_FIBRATION.md`](BRANCH_FIBRATION.md) · [`BRANCH_MODEL.md`](BRANCH_MODEL.md) ·
@@ -409,13 +414,13 @@ infrastructure stack sits on top:
 | Layer | Purpose | Status | LoC est. |
 |---|---|---|---|
 | 0 | Iteration plasticity (§1–§6) | **shipped** | — |
-| 1 | Multi-file orchestration (`compile run-batch`, `--target`) | pending | ~120 |
-| 2 | `node.literal` escape hatch + schema migration | pending | ~50 |
-| 3 | Static analysis edge inference (TS first, tree-sitter) | pending | ~150 |
-| 4 | `onto node inspect` (translator + cache) | pending | ~120 |
-| 5 | Path fibration helpers, `computeFiberBy` generalisation | pending | ~80 |
-| 6 | Verification framework (`verify-homeomorphism`, batch report) | pending | ~150 |
-| 7 | The `onto ingest <path>` command itself | pending | ~250 |
+| 1 | Multi-file orchestration (`compile run-batch`, `--target`) | **shipped** β-1 (`a09e1d7`) | ~120 |
+| 2 | `node.literal` escape hatch + schema migration | **shipped** β-2 (`04f730c`) | ~50 |
+| 3 | Static analysis edge inference (TS-first via TS compiler API) | **shipped** γ-4 (`62d8c86`) + γ-6 proposal flow (`9c16b9d`) | ~150 |
+| 4 | `onto node inspect` (translator + cache) | pending (Phase δ-1) | ~120 |
+| 5 | Path fibration helpers, `computeFiberBy` generalisation | **shipped** β-3 (`881506a`) | ~80 |
+| 6 | Verification framework (`verify-homeomorphism`, batch report) | pending (Phase δ-2) | ~150 |
+| 7 | The `onto ingest <path>` command itself | **shipped** γ-1 single-file (`b670ca3`) + γ-5 directory (`a25ade9`) | ~250 |
 | 8 | Open-Prompt signing + replay (out of scope for v1) | future | ~260 |
 
 ### Per-layer detail
@@ -480,7 +485,7 @@ landed two follow-ups: review blockers (`fix(compile,node)`
 `157d367`) and the two-phase commit safety property (`fix(compile)`
 `2cbaa32`).
 
-### Phase γ — extraction core (in progress)
+### Phase γ — extraction core (DONE, 2026-05-12)
 **Shipped 2026-05-12:**
 - γ-0: Anthropic provider with prompt caching (`feat(llm)` `aad0fed`).
   `claude-opus-4-7` is the default; the SDK reads
@@ -491,21 +496,39 @@ landed two follow-ups: review blockers (`fix(compile,node)`
   a `node_create` proposal. `--dry-run` for prompt iteration.
 - γ-3: rich proposal payload (`feat(proposals,ingest)` `7d50c91`).
   Schema now carries optional manifestation / language / requires
-  / provides / forbids / rules / literal so `onto proposal apply`
-  produces a complete node in one step.
+  / provides / forbids / rules / literal / sourceFiles so
+  `onto proposal apply` produces a complete node in one step.
 - γ-2: first end-to-end calibration on `src/core/integrity/hash.ts`
   with `claude-opus-4-7` end-to-end — 5/5 functions semantically
   equivalent, $0.08 per round-trip, 70s wall-clock. Full report:
   [`docs/legend/calibrations/HASH_TS_2026-05-12.md`](legend/calibrations/HASH_TS_2026-05-12.md).
-
-**Still pending (γ-4+):**
-- Static-edge inference (Layer 3, TS-first): parse `import` /
-  `export` to emit `depends_on` / `uses_token` edges without an
-  LLM call. Required before multi-file ingest.
-- Multi-file ingest (`onto ingest <directory>`): walks the tree,
-  fibrates by directory via `pathProjection`, dedupes token
-  vocabulary across the fiber. Composes γ-1's per-file flow with
-  the path fibration from β-3.
+- γ-4: static-edge inference (Layer 3, TS-first, `feat(static)`
+  `62d8c86`). New `src/runtime/static/typescript.ts` uses the
+  TypeScript compiler API to parse `import` / `export` declarations
+  and emit `depends_on` / `uses_token` edges without an LLM call.
+  Generic `collectSourceFiles(rootDir, extensions)` walker is the
+  shared substrate for γ-5. CLI: `onto graph infer-edges <dir>`.
+- γ-5: multi-file ingest (`onto ingest <directory>`, `feat(ingest)`
+  `a25ade9`). Walks the tree, dispatches γ-1 per file.
+  `parseIncludeFlag(--include)` for extension filtering (default TS).
+  Stores the per-file source path under `outputs.files[0]` so γ-6
+  can build the file→node index after apply. `computeCwdRelative()`
+  uses `fs.realpathSync` to normalise macOS `/tmp` → `/private/tmp`
+  symlinks.
+- γ-6: edge-creation proposals (`feat(graph)` `9c16b9d`).
+  `infer-edges --create-proposals` turns the γ-4 preview into
+  `edge_create` proposals against already-applied nodes.
+  Idempotent: skips `from_node_missing` / `to_node_missing` /
+  `cross_branch` / `edge_already_exists` with explicit reasons.
+- Walker AI provider indicator (`feat(walker)` `69424af`).
+  `detectAiProvider(env)` returns a discriminated union over
+  anthropic / ollama-cloud / ollama-local / none. Rendered above
+  the focal cell so the operator always knows which provider the
+  next dispatch will hit.
+- `--include` flag + Vibe-Reasoning runbook (`feat(ingest)` `bc350ce`).
+  Non-TS source extensions are now first-class for ingest; the
+  Vibe-Reasoning Python repo is the documented out-of-tree calibration
+  pilot ([`docs/legend/calibrations/VIBE_REASONING_PROCEDURE.md`](legend/calibrations/VIBE_REASONING_PROCEDURE.md)).
 
 ### Phase δ — verification + inspector (~6–8 h)
 Layer 4 (inspector) + Layer 6 (verification). After δ, the user can
@@ -633,25 +656,38 @@ Status as of 2026-05-12:
    JSON invariants. Result: Phase γ will pay off, but only with a
    frontier model and a structured extraction template — exactly
    what γ-0 / γ-1 / γ-3 deliver.
-4. **Phase γ (extraction core)** — **partially shipped, in progress.**
+4. **Phase γ (extraction core)** — **DONE.**
    γ-0 (Anthropic provider) + γ-1 (single-file `onto ingest`) +
-   γ-3 (rich proposal payload) merged. γ-2 calibration with
-   `claude-opus-4-7` end-to-end **passed at 5/5** on the same file
-   (see §7.1).
-   - Pending: static-edge inference (γ-4) and multi-file ingest
-     (γ-5), both required before Phase ε can sweep the codebase.
-5. **Phase δ** — verification + inspector. After γ.
-6. **Phase ε** — self-ingestion. The moment of truth. After γ-5.
+   γ-3 (rich proposal payload) + γ-2 calibration (5/5 ε-equivalent
+   on `hash.ts` with `claude-opus-4-7` end-to-end, see §7.1) +
+   γ-4 (TS-first static-edge inference) + γ-5 (`onto ingest
+   <directory>` multi-file) + γ-6 (`infer-edges --create-proposals`)
+   all merged. The walker now shows the active AI provider above
+   the focal cell, and `--include` accepts non-TS extensions for
+   the Vibe-Reasoning pilot. All prerequisites for Phase ε
+   (out-of-tree pilot + self-ingestion sweep) are in place.
+5. **Phase δ** — verification + inspector. **Next active stream.**
+   δ-1 = `onto node inspect <id>` (one LLM call per node lifetime,
+   cached as `node.translator`); δ-2 = `verify-homeomorphism`
+   reporting both LoC and behaviour-aware distance per node
+   (finding from §7.1).
+6. **Phase ε** — self-ingestion. The moment of truth. The
+   Vibe-Reasoning runbook ([`legend/calibrations/VIBE_REASONING_PROCEDURE.md`](legend/calibrations/VIBE_REASONING_PROCEDURE.md))
+   is the smaller out-of-tree pilot before self-ingestion lands.
 7. **Phase ζ** — release.
 
-The immediate next step: γ-4 (static-edge inference, TS-first).
-With it, `onto ingest <directory>` can walk a small TS project and
-emit a coherent proposal batch with cross-file `depends_on` edges —
-the prerequisite for the Phase ε measurement.
+The immediate next step: Phase δ — `onto node inspect` (δ-1), then
+the verification framework (δ-2). With δ in place, an ingested
+repo becomes interactively readable per node *and* automatically
+measurable per round-trip — together they close the path to the
+Phase ε publishable claim.
 
 ---
 
-*Document version: draft 2. Authored 2026-05-11; revised 2026-05-12
-to reflect Phase β + partial γ shipped (commits `2cbaa32`,
-`aad0fed`, `b670ca3`, `7d50c91`, `caf16f4`) and the first γ-2
-calibration data point.*
+*Document version: draft 3. Authored 2026-05-11; revised 2026-05-12
+to reflect Phase β + full Phase γ shipped (commits `a09e1d7`,
+`04f730c`, `881506a`, `157d367`, `5da798c`, `2cbaa32`, `aad0fed`,
+`b670ca3`, `7d50c91`, `caf16f4`, `ac0a45f`, `62d8c86`, `a25ade9`,
+`9c16b9d`, `69424af`, `bc350ce`) and the γ-2 calibration data
+point. Phase δ (Inspector + verify-homeomorphism) is the next
+active stream.*

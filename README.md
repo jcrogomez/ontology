@@ -57,21 +57,27 @@ Read [`examples/hello-world/README.md`](examples/hello-world/README.md) for the 
 | Verb | What it means |
 | --- | --- |
 | `onto init` | Create a fresh `.ontology/` kernel (state, events log, edges log, canon node). |
-| `onto node create` | Add a typed semantic node. Supports `--manifestation` and `--language` for compile-ready leaves. |
+| `onto node create` | Add a typed semantic node. Supports `--manifestation`, `--language`, `--requires`/`--provides`/`--forbids`, `--rules`, `--literal` for compile-ready leaves. |
+| `onto node update / remove` | Edit a node in place or delete it (refuses if any edge references the node). The plasticity primitives. |
 | `onto node link` | Connect two nodes with a typed edge. Refinement-family edges enforce the abstraction poset. |
+| `onto edge remove / update` | Symmetric primitives for edge mutation. |
 | `onto node list / show` | Inspect the network. |
 | `onto context assemble` | Compute a node's local context (parent path + edge neighbors). |
 | `onto run prompt / run context` | Dispatch a prompt to a model. Persist with `--persist`. Wrap the run as a proposal with `--as-proposal`. |
 | `onto runs list / show / verify` | Audit persisted run records. Every byte is content-addressed. |
 | `onto graph neighbors / path / subgraph` | Read-only traversal queries over the typed graph. |
-| **`onto link <nodeId> --candidate <text>`** | **Run the semantic linker: gluing matrix + intent validation + edge proposal suggestions for missing requirements. Read-only.** |
+| **`onto graph infer-edges <dir>`** | **Project Legend γ-4: parse TypeScript imports/exports and report the static `depends_on` / `uses_token` edge graph. With `--create-proposals` (γ-6), emits one `edge_create` proposal per inferred edge by matching `outputs.files[0]` on each endpoint. Pure static analysis — no LLM.** |
+| **`onto link <nodeId> --candidate <text>`** | Run the semantic linker: gluing matrix + intent validation + edge proposal suggestions for missing requirements. Read-only. |
+| **`onto ingest <path>`** | **Project Legend γ-1/γ-5: lift existing source into the intent layer. Accepts a single file (one node\_create proposal) or a directory (one per source file, plus a γ-4 static-edge inference report). Provider defaults to Anthropic; falls back to Ollama or mock. `--include py,ts,tsx` for non-TS codebases. `--dry-run` previews extraction without committing.** |
 | `onto propose node / link` | Stage a typed candidate mutation without touching the graph. |
 | `onto proposal list / show / apply / reject` | Lifecycle the candidate. `apply` re-validates `parentHash`/endpoint hashes and stales on divergence. |
-| **`onto compile plan <id>`** | **Preview the topological compile order rooted at a node. Read-only.** |
-| **`onto compile run <id>`** | **Compile the focal and its dependency closure. Writes artifacts. Emits `compilation_run` events.** |
-| **`onto query`** | **Yoneda search by Hom-profile. Find every node whose edges + context-contract + coordinates match a query shape.** |
-| `onto walk <id>` | The Walker: an interactive focal-cell terminal interface. Edit drafts, propose, run models, preview plans, compile — all from the TUI. |
-| `onto validate`, `onto inspect`, `onto events tail`, `onto model doctor`, `onto doctor` | Observability. |
+| **`onto compile plan <id>`** | Preview the topological compile order rooted at a node. Read-only. |
+| **`onto compile run <id>`** | Compile the focal and its dependency closure. `--target <path>` writes to a user-pinned source path (gated behind `--force`); `--branch <name>` restricts to one Grothendieck fiber. |
+| **`onto compile run-batch [--all-artifacts \| --nodes <ids>]`** | Compile many focals in one invocation. Shared upstream walks reuse the per-run cache. The prerequisite for Legend's verify-homeomorphism. |
+| **`onto query`** | Yoneda search by Hom-profile. Find every node whose edges + context-contract + coordinates match a query shape. |
+| `onto walk <id>` | The Walker: an interactive focal-cell terminal interface. Edit drafts, propose, run models, preview plans, compile — all from the TUI. **Shows which AI service is active (Anthropic / Ollama local / Ollama cloud / none → mock fallback) at the top of the focal cell.** |
+| `onto branch list / fiber` | Grothendieck-fiber views of the typed graph (read-only). |
+| `onto validate`, `onto inspect`, `onto events tail`, `onto model doctor`, `onto doctor` | Observability. `model doctor` reports per-provider availability and surfaces whether `ANTHROPIC_API_KEY` / `OLLAMA_HOST` are set. |
 
 The full surface is in [docs/CLI_COMMANDS.md](docs/CLI_COMMANDS.md).
 
@@ -147,9 +153,11 @@ For the four post-axiom categorical extensions:
 - [**Branch Fibration**](docs/BRANCH_FIBRATION.md) — branches as Grothendieck fibers over the event log.
 - [**Rules as Topos**](docs/RULES_TOPOS.md) — three-valued Ω predicate algebra over `requires` / `provides` / `forbids`.
 
-For the next chapter — **Project Legend** — the inverse direction of the compile functor:
+For **Project Legend** — the inverse direction of the compile functor, now partially operational:
 
-- [**Project Legend**](docs/PROJECT_LEGEND.md) — `onto ingest <path>` lifts existing source into the intent layer, verifies the homeomorphism $F \circ G \approx \mathrm{id}$ on a measured subcategory, and reports the intent-resistant complement. Includes the Inspector / Lupa primitive (one LLM call per node lifetime, cached as `node.translator`) and the Open-Prompt protocol (signed intent + audit-chain replay as a trust-transparency layer between open-source and proprietary self-attestation).
+- [**Project Legend**](docs/PROJECT_LEGEND.md) — design doc + phase plan. `onto ingest <path>` lifts existing source into the intent layer; γ-6 closes the multi-file cycle by translating static imports into `edge_create` proposals. Phases δ (Inspector + `verify-homeomorphism`) and ε (self-ingestion + measured adjunction tolerance) are next. Includes the Open-Prompt protocol (signed intent + audit-chain replay as a trust-transparency layer between open-source and proprietary self-attestation).
+- [**γ-2 hash.ts calibration**](docs/legend/calibrations/HASH_TS_2026-05-12.md) — first empirical data point. 5 / 5 functions ε-equivalent under F ∘ G with Claude Opus 4.7; the comparison-against-baseline `qwen2.5-coder:3b` writeup is in §6.
+- [**Vibe-Reasoning calibration procedure**](docs/legend/calibrations/VIBE_REASONING_PROCEDURE.md) — runbook for testing the full ingest cycle on an external Python codebase (24 files, Ollama-free or Anthropic ~$2 ceiling). Useful template for ingesting any non-TS codebase.
 - [**Branch Model**](docs/BRANCH_MODEL.md) — design decision (Option C: lazy materialisation on touch) that gates Bootstrap 0.10 / cross-branch `node_update`.
 
 If you want to **contribute or extend**:
@@ -161,7 +169,15 @@ If you want to **contribute or extend**:
 
 ## Status
 
-**post-Bootstrap 0.9 — Plasticity layer + Legend foundation.** Version `0.3.0-alpha.0`. The seven axioms of the mathematical canon are running concrete code, including the previously textual axiom 4. The iteration primitives that the workflow needed — `node update`, `node remove`, `edge remove`, `edge update`, contract flags on `node create`, a `validateIntent` gate on every compile — are shipped, so the iterative loop (write intent → compile → validate → refine) is fluid instead of ceremonial. Branch-aware compile (`onto compile run --branch <name>`) and the branch fibration CLI (`onto branch list / fiber`) close the largest post-0.9 surface gaps. The next chapter is **[Project Legend](docs/PROJECT_LEGEND.md)** — the construction of an approximate left adjoint to the compile functor, plus the Open-Prompt protocol.
+**Project Legend Phases β + γ shipped — auto-digest cycle is operational.** Version `0.3.0-alpha.0`. The seven axioms of the canon run concrete code, the plasticity layer is in place, and the forward + inverse functors of the compile adjunction are both implemented:
+
+- **Forward (F)** — `onto compile run` walks the topological plan and dispatches every node. `--target <path>` writes to user-pinned source paths (β-1, gated behind `--force` with a two-phase commit so a failed validator never clobbers the user's file); `node.literal` pins irreducible-specificity content verbatim (β-2); `compute­FiberBy(input, projection)` generalises the branch fibration to arbitrary projections, with `pathProjection` as the spatial analogue Legend needs (β-3).
+- **Inverse (G)** — `onto ingest <file|dir>` extracts structured intent via a frontier LLM (γ-0 Anthropic provider + prompt caching; γ-1 single-file; γ-5 multi-file with `--include` for non-TS codebases; γ-3 rich proposal payload so apply produces complete nodes in one step).
+- **Cross-file edges** — `onto graph infer-edges <dir>` parses TypeScript imports and reports `depends_on` / `uses_token` edges without an LLM (γ-4); `--create-proposals` resolves them to `edge_create` proposals after apply (γ-6), closing the multi-file cycle.
+- **First empirical data point** — γ-2 calibration on `src/core/integrity/hash.ts` with Claude Opus 4.7: 5 / 5 functions semantically equivalent under the F ∘ G round-trip, at ~$0.08 per file. Full report: [`docs/legend/calibrations/HASH_TS_2026-05-12.md`](docs/legend/calibrations/HASH_TS_2026-05-12.md).
+- **Walker AI indicator** — the focal-cell TUI shows which AI service is configured (`anthropic` / `ollama (local)` / `ollama (cloud)` / `none — mock fallback`) at the top of the panel, so a user knows at a glance which provider `:run` and `:compile` will route through.
+
+The remaining Legend work is δ (Inspector / Lupa + `onto verify-homeomorphism`) and ε (self-ingestion of the Ontology repo for the publishable adjunction claim). Branch-aware compile (`onto compile run --branch <name>`) and the branch fibration CLI (`onto branch list / fiber`) cover the temporal-fiber surface; the spatial path fibration helper is ready for ingest's per-directory token vocabulary normalisation when γ-7+ wires it in.
 
 | Axiom | Implementation |
 | --- | --- |
