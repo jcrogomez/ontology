@@ -39,7 +39,15 @@ import type {
 // `getFinalMessage()` back through the same response shape.
 
 const DEFAULT_MODEL = "claude-opus-4-7";
-const DEFAULT_MAX_TOKENS = 4096;
+// Bumped from 4096 → 8192 after the Vibe-Reasoning calibration found
+// that adaptive thinking on Opus 4.7 consumes a non-trivial share of
+// the output budget; files >~3KB (e.g. visualize_adaptive_strategy.py
+// at 11.8KB) regenerated to empty text when only 4096 was available.
+// Opus 4.7 supports up to 64K output, so 8192 is a comfortable
+// default that still bounds per-request spend (~$0.20 worst case at
+// the output rate). Callers that need more pass `request.maxTokens`
+// explicitly — see LlmRequest.maxTokens in types.ts.
+const DEFAULT_MAX_TOKENS = 8192;
 
 export interface AnthropicAdapterOptions {
   apiKey?: string;
@@ -127,7 +135,7 @@ export function createAnthropicAdapter(
       const t0 = performance.now();
       const response = await client.messages.create({
         model,
-        max_tokens: DEFAULT_MAX_TOKENS,
+        max_tokens: request.maxTokens ?? DEFAULT_MAX_TOKENS,
         ...(systemBlocks ? { system: systemBlocks } : {}),
         messages: [{ role: "user", content: request.prompt }],
         // Adaptive thinking + high effort: the recommended pairing for

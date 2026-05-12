@@ -34,6 +34,10 @@ export interface CompileRunOptions {
   // contract references external dependencies (stdlib, pip, npm)
   // that no other node provides — common for ingest-derived graphs.
   openWorld?: boolean;
+  // Override the LLM's max-output-tokens setting. Anthropic adapter
+  // defaults to 8192; large artifacts (>~3KB regenerated output)
+  // may need 16384+ once adaptive thinking consumes budget.
+  maxTokens?: number;
 }
 
 // `onto compile <nodeId>`
@@ -86,6 +90,7 @@ export async function compileRunCommand(focalId: string, options: CompileRunOpti
     targetPath: options.target,
     force: options.force,
     openWorld: options.openWorld,
+    maxTokens: options.maxTokens,
   });
 
   if (!result.ok) {

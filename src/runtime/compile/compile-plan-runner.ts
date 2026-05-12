@@ -55,6 +55,9 @@ export interface CompilePlanRunOptions {
   // upstream nodes carry external requires (stdlib / pip / npm) is
   // not gated by spurious "missing requirement" failures.
   openWorld?: boolean;
+  // Optional max-tokens passthrough — see CompileNodeOptions. Same
+  // value applied to every step in the plan.
+  maxTokens?: number;
 }
 
 export interface CompilePlanStepResult {
@@ -210,6 +213,7 @@ export async function runCompilePlan(options: CompilePlanRunOptions): Promise<Co
       targetPath: step.nodeId === options.focalId ? options.targetPath : undefined,
       force: step.nodeId === options.focalId ? options.force : undefined,
       openWorld: options.openWorld,
+      maxTokens: options.maxTokens,
     });
 
     if (!stepResult.ok) {

@@ -752,6 +752,7 @@ compile
   .option("--target <path>", "Write the focal's compiled artifact to <path> instead of .ontology/artifacts/generated/<nodeId>.<ext>. Relative paths resolve against cwd; missing parents are created. Upstream steps still land under generated/.")
   .option("--force", "Required to overwrite an existing file at --target. Without it, an existing target makes the focal step fail with reason=target_exists before any bytes are written.")
   .option("--open-world", "Open-world validation: unsatisfied 'requires' tokens degrade to warnings instead of hard failures. Use when the focal's contract references external dependencies (stdlib, pip, npm) that no other node provides — common for ingest-derived graphs (Project Legend γ-5).")
+  .option("--max-tokens <n>", "Override the LLM's max-output-tokens setting (anthropic default: 8192). Use for large artifacts that may need 16K+; the Vibe-Reasoning calibration found 4096 insufficient on files >~3KB once adaptive thinking eats budget.", (v) => parseInt(v, 10))
   .option("--json", "Output results in JSON format")
   .action(async (id, options) => {
     try {
@@ -773,6 +774,8 @@ compile
   .option("--runtime-check", "After parse-check, execute each artifact and fail its focal with runtime_failed on non-zero exit.")
   .option("--runtime-check-timeout-ms <ms>", "Wall-clock timeout for the runtime check (default 5000, max 60000).", (v) => parseInt(v, 10))
   .option("--branch <name>", "Restrict the batch to focals living on the named branch; the plan walk is fibre-scoped for each focal as well.")
+  .option("--open-world", "Open-world validation (same semantics as compile run --open-world). Applied uniformly to every step in every focal's plan.")
+  .option("--max-tokens <n>", "Override the LLM's max-output-tokens setting for every dispatch in the batch (anthropic default: 8192).", (v) => parseInt(v, 10))
   .option("--json", "Output results in JSON format")
   .action(async (options) => {
     try {

@@ -130,6 +130,11 @@ export interface CompileNodeOptions {
   // external by design. Closed-world (default) preserves the
   // strict gate for graph-internal contracts.
   openWorld?: boolean;
+  // Optional override of the LLM's max-output-tokens setting. When
+  // omitted, the adapter applies its own default (anthropic: 8192).
+  // Larger files surfaced by Project Legend's verify-homeomorphism
+  // flow may need 16K+ once adaptive thinking eats budget.
+  maxTokens?: number;
 }
 
 export type CompileNodeFailureReason =
@@ -328,6 +333,7 @@ function dispatchAndPersistE(
           prompt: prelude.promptForDispatch,
           ...(handle.resolvedModel ? { model: handle.resolvedModel } : {}),
           ...(prelude.systemPrompt ? { system: prelude.systemPrompt } : {}),
+          ...(options.maxTokens !== undefined ? { maxTokens: options.maxTokens } : {}),
         },
         { provider: handle.provider, defaultModel: handle.resolvedModel, ollamaHost: options.ollamaHost },
       ),

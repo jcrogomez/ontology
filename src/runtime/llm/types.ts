@@ -37,6 +37,12 @@ export interface LlmRequest {
   json?: boolean;
   schemaName?: string;
   metadata?: Record<string, unknown>;
+  // Optional maximum output tokens for the dispatch. When omitted,
+  // each adapter applies its own conservative default (anthropic:
+  // 8192). Set higher when the artifact may be large — Vibe-Reasoning
+  // calibration surfaced 4096 as insufficient for files >~3KB once
+  // adaptive thinking consumes part of the output budget.
+  maxTokens?: number;
 }
 
 export interface LlmUsage {

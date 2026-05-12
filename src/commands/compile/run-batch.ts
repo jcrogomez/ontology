@@ -15,6 +15,10 @@ export interface CompileRunBatchOptions {
   runtimeCheck?: boolean;
   runtimeCheckTimeoutMs?: number;
   branch?: string;
+  // Open-world validation passthrough — see compileRun for semantics.
+  openWorld?: boolean;
+  // Max-output-tokens override applied uniformly to every focal.
+  maxTokens?: number;
   json?: boolean;
 }
 
@@ -104,6 +108,8 @@ export async function compileRunBatchCommand(options: CompileRunBatchOptions): P
       runtimeCheck: options.runtimeCheck,
       runtimeCheckTimeoutMs: options.runtimeCheckTimeoutMs,
       branch: options.branch,
+      openWorld: options.openWorld,
+      maxTokens: options.maxTokens,
     });
     if (!r.ok) {
       results.push({
