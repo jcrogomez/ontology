@@ -58,8 +58,12 @@ export async function compileRunBatchCommand(options: CompileRunBatchOptions): P
 
   let provider: LlmProvider | undefined;
   if (options.provider !== undefined) {
-    if (options.provider !== "mock" && options.provider !== "ollama") {
-      failWith(`Unsupported provider: ${options.provider} (try mock or ollama)`, options.json);
+    if (
+      options.provider !== "mock" &&
+      options.provider !== "ollama" &&
+      options.provider !== "anthropic"
+    ) {
+      failWith(`Unsupported provider: ${options.provider} (try mock, ollama, or anthropic)`, options.json);
       return;
     }
     provider = options.provider as LlmProvider;
