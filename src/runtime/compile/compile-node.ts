@@ -6,7 +6,7 @@ import { resolveNodeModel } from "../llm/resolve-node-model.js";
 import type { LlmProvider, LlmTask } from "../llm/types.js";
 import { hashPrompt } from "../../core/integrity/hash.js";
 import { createPersistedRun, computeRunId, loadPersistedRun } from "../../core/runs/persist.js";
-import { writeArtifact, type WriteArtifactResult } from "./artifact-writer.js";
+import { writeArtifact, TargetExistsError, type WriteArtifactResult } from "./artifact-writer.js";
 import { extractCodeFence } from "./post/extract-code-fence.js";
 import { validateLanguage } from "./post/validate-language.js";
 import { runtimeCheck } from "./post/runtime-check.js";
@@ -111,12 +111,18 @@ export interface CompileNodeOptions {
   // writeArtifact unchanged; the rest of the pipeline (validate, runtime
   // check, emit event) operates on the resulting absolutePath.
   targetPath?: string;
+  // Required to overwrite an existing file at `targetPath`. Without
+  // this, writeArtifact throws TargetExistsError and the compile fails
+  // with reason="target_exists". Has no effect on the default
+  // generated/<nodeId>.<ext> path. See artifact-writer.ts for rationale.
+  force?: boolean;
 }
 
 export type CompileNodeFailureReason =
   | "dispatch_failed"
   | "persist_failed"
   | "write_failed"
+  | "target_exists"
   | "validate_failed"
   | "intent_failed"
   | "runtime_failed"
@@ -411,12 +417,27 @@ function writeArtifactE(
         content,
         cwd: input.options.cwd,
         targetPath: input.options.targetPath,
+        force: input.options.force,
       });
       return {
         value: ok(artifact),
         logs: [{ level: "info", message: `writeArtifact: ${artifact.relativePath} (${artifact.bytesWritten} bytes)` }],
       };
     } catch (raw: unknown) {
+      // TargetExistsError is a distinct failure mode: the artifact body
+      // is well-formed, the user just hasn't authorised overwrite. Map
+      // it to reason="target_exists" so a caller (CLI, walker) can
+      // present the clobber-gate message instead of a generic write
+      // failure.
+      if (raw instanceof TargetExistsError) {
+        return {
+          value: err({
+            reason: "target_exists",
+            message: raw.message,
+          }),
+          logs: [{ level: "error", message: `writeArtifact: refused (target exists: ${raw.target})` }],
+        };
+      }
       return {
         value: err({
           reason: "write_failed",

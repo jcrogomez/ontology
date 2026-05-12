@@ -24,6 +24,11 @@ export interface CompileRunOptions {
   // The Legend "regenerate this file from intent" loop is the primary
   // caller — upstream artifacts still land under generated/.
   target?: string;
+  // Required to overwrite an existing file at --target. Default-deny
+  // protects an interactive caller from silently destroying their
+  // work; Legend's verify-homeomorphism flow knows it wants overwrite
+  // and passes --force explicitly.
+  force?: boolean;
 }
 
 // `onto compile <nodeId>`
@@ -56,6 +61,11 @@ export async function compileRunCommand(focalId: string, options: CompileRunOpti
     return;
   }
 
+  if (options.force && options.target === undefined) {
+    failWith(`--force has no effect without --target. Pass --target <path> to redirect the focal artifact.`, options.json);
+    return;
+  }
+
   const result = await runCompilePlan({
     focalId,
     provider,
@@ -65,6 +75,7 @@ export async function compileRunCommand(focalId: string, options: CompileRunOpti
     runtimeCheckTimeoutMs: options.runtimeCheckTimeoutMs,
     branch: options.branch,
     targetPath: options.target,
+    force: options.force,
   });
 
   if (!result.ok) {

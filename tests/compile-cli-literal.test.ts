@@ -196,6 +196,28 @@ describe("onto node create --literal + compile", () => {
     expect(r.status).toBe(1);
     expect(r.stderr).toContain("mutually exclusive");
   });
+
+  it("rejects --literal-file with binary content (NUL byte)", () => {
+    // Mirror of the §3.13 fix (commit 14ecc51) applied to --literal-file.
+    // A file that contains a NUL byte is rejected before the node is
+    // created — silently storing a U+FFFD-replacement string in
+    // node.literal would corrupt the audit chain (hash + verbatim
+    // artifact emission).
+    const binaryPath = path.join(tempDir, "binary.bin");
+    fs.writeFileSync(binaryPath, Buffer.from([0x50, 0x4e, 0x47, 0x00, 0x01, 0x02]));
+    const r = runCli(tempDir, [
+      "node", "create",
+      "--level", "artifact", "--kind", "artifact",
+      "--manifestation", "code", "--language", "python",
+      "--prompt", "x",
+      "--literal-file", binaryPath,
+    ]);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("must be a readable UTF-8 text file");
+    expect(r.stderr).toContain("binary data");
+    // The node was not created — counts unchanged.
+    expect(fs.existsSync(path.join(tempDir, ".ontology/nodes/node_0002.json"))).toBe(false);
+  });
 });
 
 describe("onto node update --literal / --clear-literal", () => {
@@ -256,5 +278,20 @@ describe("onto node update --literal / --clear-literal", () => {
     expect(r.status).toBe(0);
     const parsed = JSON.parse(r.stdout);
     expect(parsed.ok).toBe(true);
+  });
+
+  it("rejects --literal-file with binary content (NUL byte) on update", () => {
+    const binaryPath = path.join(tempDir, "binary.bin");
+    fs.writeFileSync(binaryPath, Buffer.from([0x50, 0x4e, 0x47, 0x00, 0x01, 0x02]));
+    const before = JSON.parse(fs.readFileSync(path.join(tempDir, ".ontology/nodes/node_0002.json"), "utf-8"));
+    const r = runCli(tempDir, [
+      "node", "update", "node_0002",
+      "--literal-file", binaryPath,
+    ]);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("must be a readable UTF-8 text file");
+    // The node was not modified — hash unchanged on disk.
+    const after = JSON.parse(fs.readFileSync(path.join(tempDir, ".ontology/nodes/node_0002.json"), "utf-8"));
+    expect(after.integrity.hash).toBe(before.integrity.hash);
   });
 });

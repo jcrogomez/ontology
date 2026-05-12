@@ -77,6 +77,19 @@ export async function createNodeCommand(options: NodeCreateCommandOptions): Prom
       console.error(`✖ Could not read --literal-file "${options.literalFile}": ${errorMessage(err)}`);
       process.exit(1);
     }
+    // Binary-content guard. fs.readFileSync(..., "utf8") does not throw
+    // on binary input — it silently returns a string of garbled bytes
+    // plus U+FFFD replacements. node.literal is load-bearing (it
+    // participates in the node hash and propagates verbatim to the
+    // compiled artifact), so a binary file slipped in here would land
+    // a garbled artifact and break the audit chain. NUL is a
+    // high-precision signal of binary; legitimate UTF-8 text essentially
+    // never contains U+0000. Same pattern as the --candidate-file fix
+    // (commit 14ecc51).
+    if (literal.includes("\u0000")) {
+      console.error(`✖ --literal-file must be a readable UTF-8 text file — ${options.literalFile} contains binary data.`);
+      process.exit(1);
+    }
   }
 
   try {

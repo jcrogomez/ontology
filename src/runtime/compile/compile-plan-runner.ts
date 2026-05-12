@@ -45,6 +45,11 @@ export interface CompilePlanRunOptions {
   // upstream nodes remain in the generated/ tree where their identity
   // hash leads.
   targetPath?: string;
+  // Required to overwrite an existing file at `targetPath`. Forwarded
+  // to compileNode and ultimately to writeArtifact. Without it, an
+  // existing target file fails the focal step with
+  // reason="target_exists" before any bytes are written.
+  force?: boolean;
 }
 
 export interface CompilePlanStepResult {
@@ -198,6 +203,7 @@ export async function runCompilePlan(options: CompilePlanRunOptions): Promise<Co
       // to land in the default generated/ tree; mass-redirecting every
       // step would smash multiple artifacts onto a single path.
       targetPath: step.nodeId === options.focalId ? options.targetPath : undefined,
+      force: step.nodeId === options.focalId ? options.force : undefined,
     });
 
     if (!stepResult.ok) {

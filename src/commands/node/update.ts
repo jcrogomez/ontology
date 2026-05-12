@@ -72,6 +72,16 @@ export async function nodeUpdateCommand(
       failWith(`Could not read --literal-file "${options.literalFile}": ${errorMessage(err)}`, options.json);
       return;
     }
+    // Binary-content guard. Same shape as the --candidate-file fix
+    // (commit 14ecc51) and the create-side guard in
+    // src/commands/node/create.ts. NUL is a high-precision signal of
+    // binary content; legitimate UTF-8 text essentially never contains
+    // U+0000. node.literal is load-bearing (hashed, emitted verbatim),
+    // so a garbled body would silently corrupt the audit chain.
+    if (typeof literalArg === "string" && literalArg.includes("\u0000")) {
+      failWith(`--literal-file must be a readable UTF-8 text file — ${options.literalFile} contains binary data.`, options.json);
+      return;
+    }
   }
 
   try {
