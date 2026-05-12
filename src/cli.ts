@@ -543,7 +543,8 @@ graph
 
 graph
   .command("infer-edges <dir>")
-  .description("Project Legend γ-4: walk a TypeScript directory and print the import-derived edge graph (depends_on for value imports, uses_token for type imports). Pure static analysis — no LLM, no graph state mutated. Preview surface for the multi-file `onto ingest <directory>` (γ-5).")
+  .description("Project Legend γ-4 (preview) / γ-6 (proposals): walk a TypeScript directory and report the import-derived edges (depends_on for value imports, uses_token for type imports). Pure static analysis — no LLM. With --create-proposals, also emit one edge_create proposal per resolved edge by matching outputs.files[0] on each endpoint — the post-apply step of the multi-file ingest cycle.")
+  .option("--create-proposals", "γ-6: resolve each inferred edge to applied node IDs via outputs.files[0] and emit edge_create proposals. Skips edges whose endpoints are not yet on the graph and edges that already exist.")
   .option("--json", "Output results in JSON format")
   .action(async (dir, options) => {
     try {
