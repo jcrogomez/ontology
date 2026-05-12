@@ -117,7 +117,7 @@ Your output MUST be a single JSON object with these fields (no markdown fence, n
 {
   "label": "Short human-readable name (≤80 chars)",
   "level": "canon | project | target | stack | architecture | domain | workflow | interface | unit | token | artifact",
-  "kind": "rule | canon | entity | event | command | query | view | invariant | constraint | exception | artifact",
+  "kind": "canon | decision | rule | constraint | definition | entity | action | function | asset | view | component | token | artifact",
   "manifestation": "intent | ast | osl | code | test | build",
   "language": "typescript | python | rust | …",
   "prompt": "A 2-6 sentence description of what this file IMPLEMENTS and the invariants it preserves. Describe the SHAPE of the behavior, not the literal code. A future LLM, given only this prompt, should be able to regenerate something semantically equivalent.",
@@ -131,13 +131,13 @@ Guidance:
 
 - "level" is the abstraction tier. For most concrete source files (functions, modules, primitives) use "artifact" or "unit". "domain" / "workflow" are reserved for higher-level intents that orchestrate multiple files.
 
-- "kind" is the semantic role. "artifact" for compiled output, "rule" for pure functions / utilities, "entity" for data types, "command" for side-effectful actions, etc.
+- "kind" is the semantic role. Use "artifact" for compiled outputs and concrete code modules; "function" for pure functions / utilities; "entity" for data types and records; "action" for side-effectful operations; "rule" for invariants / business rules; "constraint" for schema-level restrictions; "view" for read models / projections; "component" for composite structural units. Stick to the enum exactly — invented values will fail schema validation.
 
 - "manifestation" reflects the form of the artifact. For TypeScript / Python / etc. source files, use "code". Use "test" for test files; "build" for build scripts; "intent" for prose-only nodes.
 
 - "prompt" is the load-bearing field. It must be precise enough that a frontier model, given ONLY this prompt + the declared context contract, can produce code that satisfies the same invariants. Avoid restating the syntax — describe WHAT the code preserves, what data shapes it manipulates, and what library functions it depends on (by name).
 
-- "requires" lists tokens this file CONSUMES from elsewhere in the codebase (imported functions / types / modules — extract the names). "provides" lists tokens this file EXPOSES (exported names that other files may consume).
+- "requires" lists tokens this file CONSUMES from OTHER FILES IN THIS PROJECT. Include only project-internal dependencies (e.g. a function imported from a sibling module under the same source tree). Do NOT include: stdlib modules (random, os, sys, math, time, itertools, json, etc.), external/pip-installed packages (numpy, matplotlib, requests, networkx, etc.), built-in identifiers (range, len, dict, list, etc.), or types from the typing module. If the file has no internal cross-file dependencies — common for self-contained scripts — emit an empty array. "provides" lists tokens this file EXPOSES (exported names that OTHER files in this project may consume); same exclusion rule for things only external code would ever reference.
 
 - "forbids" lists patterns that must NOT appear in the compiled output (e.g. "console.log", "debug_output", or library functions that would change semantics).
 

@@ -29,6 +29,11 @@ export interface CompileRunOptions {
   // work; Legend's verify-homeomorphism flow knows it wants overwrite
   // and passes --force explicitly.
   force?: boolean;
+  // Open-world validation: unsatisfied `requires` tokens produce a
+  // warning instead of a hard gate failure. Use when the focal's
+  // contract references external dependencies (stdlib, pip, npm)
+  // that no other node provides — common for ingest-derived graphs.
+  openWorld?: boolean;
 }
 
 // `onto compile <nodeId>`
@@ -80,6 +85,7 @@ export async function compileRunCommand(focalId: string, options: CompileRunOpti
     branch: options.branch,
     targetPath: options.target,
     force: options.force,
+    openWorld: options.openWorld,
   });
 
   if (!result.ok) {

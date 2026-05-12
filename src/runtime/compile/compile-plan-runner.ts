@@ -50,6 +50,11 @@ export interface CompilePlanRunOptions {
   // existing target file fails the focal step with
   // reason="target_exists" before any bytes are written.
   force?: boolean;
+  // Open-world validation passthrough — see CompileNodeOptions.
+  // Forwarded uniformly to every step in the plan so a plan whose
+  // upstream nodes carry external requires (stdlib / pip / npm) is
+  // not gated by spurious "missing requirement" failures.
+  openWorld?: boolean;
 }
 
 export interface CompilePlanStepResult {
@@ -204,6 +209,7 @@ export async function runCompilePlan(options: CompilePlanRunOptions): Promise<Co
       // step would smash multiple artifacts onto a single path.
       targetPath: step.nodeId === options.focalId ? options.targetPath : undefined,
       force: step.nodeId === options.focalId ? options.force : undefined,
+      openWorld: options.openWorld,
     });
 
     if (!stepResult.ok) {

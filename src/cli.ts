@@ -751,6 +751,7 @@ compile
   .option("--branch <name>", "Restrict the compile to the Grothendieck fiber over <name>: only intra-branch edges participate in the plan, and the focal must itself live on that branch.")
   .option("--target <path>", "Write the focal's compiled artifact to <path> instead of .ontology/artifacts/generated/<nodeId>.<ext>. Relative paths resolve against cwd; missing parents are created. Upstream steps still land under generated/.")
   .option("--force", "Required to overwrite an existing file at --target. Without it, an existing target makes the focal step fail with reason=target_exists before any bytes are written.")
+  .option("--open-world", "Open-world validation: unsatisfied 'requires' tokens degrade to warnings instead of hard failures. Use when the focal's contract references external dependencies (stdlib, pip, npm) that no other node provides — common for ingest-derived graphs (Project Legend γ-5).")
   .option("--json", "Output results in JSON format")
   .action(async (id, options) => {
     try {

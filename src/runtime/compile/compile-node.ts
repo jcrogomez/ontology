@@ -121,6 +121,15 @@ export interface CompileNodeOptions {
   // with reason="target_exists". Has no effect on the default
   // generated/<nodeId>.<ext> path. See artifact-writer.ts for rationale.
   force?: boolean;
+  // Open-world validation: unknown / unsatisfied `requires` tokens
+  // produce a `verdict: "unknown"` (warning) instead of a hard
+  // `intent_failed`. Use when the contract references external
+  // dependencies (stdlib modules, pip packages, npm packages) that
+  // no other node will ever provide — typical for ingest-derived
+  // graphs where `requires: random` or `requires: numpy` are
+  // external by design. Closed-world (default) preserves the
+  // strict gate for graph-internal contracts.
+  openWorld?: boolean;
 }
 
 export type CompileNodeFailureReason =
@@ -541,6 +550,7 @@ function validateIntentE(
           provider: input.response.provider,
           model: input.response.model,
         },
+        openWorld: input.options.openWorld === true,
       });
       if (validation.verdict === "true") {
         return {
