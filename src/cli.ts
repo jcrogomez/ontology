@@ -24,6 +24,7 @@ import { walkCommand } from "./commands/walk.js";
 import { graphNeighborsCommand } from "./commands/graph/neighbors.js";
 import { graphPathCommand } from "./commands/graph/path.js";
 import { graphSubgraphCommand } from "./commands/graph/subgraph.js";
+import { graphInferEdgesCommand } from "./commands/graph/infer-edges.js";
 import { branchListCommand } from "./commands/branch/list.js";
 import { branchFiberCommand } from "./commands/branch/fiber.js";
 import { linkCommand } from "./commands/link/index.js";
@@ -536,6 +537,19 @@ graph
       await graphSubgraphCommand(id, options);
     } catch (err: unknown) {
       console.error(`✖ Error extracting subgraph: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+graph
+  .command("infer-edges <dir>")
+  .description("Project Legend γ-4: walk a TypeScript directory and print the import-derived edge graph (depends_on for value imports, uses_token for type imports). Pure static analysis — no LLM, no graph state mutated. Preview surface for the multi-file `onto ingest <directory>` (γ-5).")
+  .option("--json", "Output results in JSON format")
+  .action(async (dir, options) => {
+    try {
+      await graphInferEdgesCommand(dir, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error inferring edges: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
