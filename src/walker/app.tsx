@@ -16,6 +16,7 @@ import {
 } from "./state/shared-tokens.js";
 import { POSET_COLORS, colorsEnabled } from "./theme/colors.js";
 import { IdentityBar } from "./layout/identity-bar.js";
+import { AiStatusBar } from "./layout/ai-status-bar.js";
 import { PromptSection } from "./layout/prompt-section.js";
 import { ConstraintsSection } from "./layout/constraints-section.js";
 import { RequiresProvidesSection } from "./layout/requires-provides-section.js";
@@ -592,6 +593,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={borderColor} paddingX={1}>
       <IdentityBar node={neighborhood.focal} hasDraft={hasDraft} />
+      <AiStatusBar />
       <PromptSection node={neighborhood.focal} />
       <ConstraintsSection node={neighborhood.focal} />
       <RequiresProvidesSection requires={requiresShared} provides={providesShared} />
