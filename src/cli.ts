@@ -32,6 +32,7 @@ import { proposeLinkCommand } from "./commands/proposal/propose-link.js";
 import { compilePlanCommand } from "./commands/compile/plan.js";
 import { compileRunCommand } from "./commands/compile/run.js";
 import { compileRunBatchCommand } from "./commands/compile/run-batch.js";
+import { ingestCommand } from "./commands/ingest/index.js";
 import { proposalListCommand } from "./commands/proposal/list.js";
 import { proposalShowCommand } from "./commands/proposal/show.js";
 import { proposalRejectCommand } from "./commands/proposal/reject.js";
@@ -761,6 +762,24 @@ compile
       await compileRunBatchCommand(options);
     } catch (err: unknown) {
       console.error(`✖ Error during compile run-batch: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("ingest <file>")
+  .description("Project Legend γ-1: read a source file, dispatch a frontier LLM to extract its structured intent, and produce a node_create proposal. Defaults to provider=anthropic (requires ANTHROPIC_API_KEY). Use --dry-run to preview the extraction without committing.")
+  .option("--provider <provider>", "LLM provider override: anthropic (default), ollama, or mock.")
+  .option("--model <model>", "Model override. For anthropic, defaults to claude-opus-4-7.")
+  .option("--ollama-host <host>", "Host for Ollama provider.")
+  .option("--parent <nodeId>", "Parent node id for the proposed node. Defaults to the project root canon.")
+  .option("--dry-run", "Dispatch + parse + print the extraction, but do NOT create a proposal. Use to iterate the extraction template without piling up rejected proposals.")
+  .option("--json", "Output results in JSON format.")
+  .action(async (file, options) => {
+    try {
+      await ingestCommand(file, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during ingest: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
