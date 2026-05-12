@@ -74,7 +74,16 @@ export async function compileRunBatchCommand(options: CompileRunBatchOptions): P
 
   if (focals.ids.length === 0) {
     if (options.json) {
-      console.log(JSON.stringify({ ok: true, focalCount: 0, results: [], message: focals.emptyReason }, null, 2));
+      console.log(JSON.stringify({
+        ok: true,
+        allSucceeded: true,
+        anySucceeded: false,
+        focalCount: 0,
+        okCount: 0,
+        failedCount: 0,
+        results: [],
+        message: focals.emptyReason,
+      }, null, 2));
     } else {
       console.log(`No focals matched. ${focals.emptyReason}`);
     }
@@ -114,10 +123,22 @@ export async function compileRunBatchCommand(options: CompileRunBatchOptions): P
 
   const okCount = results.filter((r) => r.ok).length;
   const failedCount = results.length - okCount;
+  // §4.5 — JSON booleans now agree with the exit code. `ok` ≡ "the CLI
+  // exited 0" (which is the continue-then-aggregate policy: any focal
+  // success is enough). `allSucceeded` and `anySucceeded` cover the
+  // two semantically distinct questions that downstream parsers
+  // actually ask. An empty batch trivially `allSucceeded` (no failures
+  // by vacuous truth), to keep `ok ⇔ exit 0` total over all inputs.
+  const allSucceeded = failedCount === 0;
+  const anySucceeded = okCount > 0;
 
   if (options.json) {
     console.log(JSON.stringify({
-      ok: failedCount < results.length,
+      // `ok` ⇔ exit code 0: empty batch passes vacuously, non-empty
+      // requires at least one success.
+      ok: results.length === 0 || anySucceeded,
+      allSucceeded,
+      anySucceeded,
       focalCount: results.length,
       okCount,
       failedCount,
@@ -153,18 +174,50 @@ function resolveFocals(
   allNodes: OntologyNode[],
 ): ResolvedFocals {
   if (options.nodes) {
-    const ids = options.nodes
-      .split(",")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+    const ids = dedupePreservingOrder(
+      options.nodes
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0),
+    );
     const byId = new Map(allNodes.map((n) => [n.id, n]));
     const missing = ids.filter((id) => !byId.has(id));
     if (missing.length > 0) {
       return { ok: false, message: `Unknown node id(s): ${missing.join(", ")}` };
     }
+    // Pre-resolve filters: surface an actionable error at the top of
+    // the batch rather than per-focal failures inside the loop.
+    //
+    // (§4.3) Non-code-manifestation focals can't produce an artifact —
+    // the compile plan would either fail with a generic error or
+    // emit something the user did not intend. Refuse upfront.
+    const nonCode = ids.filter(
+      (id) => byId.get(id)!.coordinates.manifestation !== "code",
+    );
+    if (nonCode.length > 0) {
+      return {
+        ok: false,
+        message: `Non-code-manifestation focals cannot be compiled: ${nonCode.join(", ")}. Pass nodes whose coordinates.manifestation === "code".`,
+      };
+    }
+    // (§4.4) When --branch is set, every --nodes focal must live on
+    // that branch. Otherwise the focal step inside runCompilePlan
+    // would fail with `focal_off_branch` per-focal — a worse user
+    // experience than catching it at resolve time.
+    if (options.branch !== undefined) {
+      const offBranch = ids.filter(
+        (id) => byId.get(id)!.coordinates.branch !== options.branch,
+      );
+      if (offBranch.length > 0) {
+        return {
+          ok: false,
+          message: `Focals off the requested branch "${options.branch}": ${offBranch.join(", ")}. Re-run without --branch or pass focals on that branch.`,
+        };
+      }
+    }
     return {
       ok: true,
-      ids: dedupePreservingOrder(ids),
+      ids,
       emptyReason: "(--nodes resolved to an empty list)",
     };
   }

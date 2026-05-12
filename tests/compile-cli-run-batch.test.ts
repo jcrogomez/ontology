@@ -169,10 +169,14 @@ describe("onto compile run-batch", () => {
       "--provider", "mock",
       "--json",
     ]);
-    // Partial success — overall ok is true, exit 0.
+    // Partial success — exit 0 and `ok: true`; the new explicit
+    // booleans (§4.5) distinguish the half-and-half case from a
+    // clean run.
     expect(r.status).toBe(0);
     const parsed = JSON.parse(r.stdout);
     expect(parsed.ok).toBe(true);
+    expect(parsed.allSucceeded).toBe(false);
+    expect(parsed.anySucceeded).toBe(true);
     expect(parsed.focalCount).toBe(3);
     expect(parsed.okCount).toBe(2);
     expect(parsed.failedCount).toBe(1);
@@ -210,6 +214,8 @@ describe("onto compile run-batch", () => {
       expect(r.status).toBe(1);
       const parsed = JSON.parse(r.stdout);
       expect(parsed.ok).toBe(false);
+      expect(parsed.allSucceeded).toBe(false);
+      expect(parsed.anySucceeded).toBe(false);
       expect(parsed.okCount).toBe(0);
       expect(parsed.failedCount).toBe(2);
     } finally {
@@ -232,8 +238,46 @@ describe("onto compile run-batch", () => {
       expect(r.status).toBe(0);
       const parsed = JSON.parse(r.stdout);
       expect(parsed.focalCount).toBe(0);
+      expect(parsed.ok).toBe(true);
+      // Empty batch is vacuously "all succeeded" — there's nothing
+      // that could have failed. The exit code and ok flag agree.
+      expect(parsed.allSucceeded).toBe(true);
+      expect(parsed.anySucceeded).toBe(false);
     } finally {
       cleanupTempProject(tmp2);
     }
+  });
+
+  it("--nodes rejects non-code-manifestation focals at resolve time (§4.3)", () => {
+    // node_0001 is the domain (manifestation=intent), not a code
+    // artifact. Passing it to --nodes used to surface inside the loop
+    // with a generic per-focal failure; resolveFocals now refuses
+    // upfront with an actionable message.
+    const r = runCli(tempDir, [
+      "compile", "run-batch",
+      "--nodes", "node_0001,node_0002",
+      "--provider", "mock",
+    ]);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("Non-code-manifestation focals");
+    expect(r.stderr).toContain("node_0001");
+    // The code-manifestation node mentioned in the list is NOT
+    // compiled — the batch refuses before any work starts.
+    expect(fs.existsSync(path.join(tempDir, ".ontology/artifacts/generated/node_0002.py"))).toBe(false);
+  });
+
+  it("--nodes + --branch rejects off-branch focals at resolve time (§4.4)", () => {
+    // All nodes in the fixture live on the default branch ("main").
+    // Passing --branch experimental rejects every focal upfront.
+    const r = runCli(tempDir, [
+      "compile", "run-batch",
+      "--nodes", "node_0002,node_0003",
+      "--branch", "experimental",
+      "--provider", "mock",
+    ]);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("Focals off the requested branch");
+    expect(r.stderr).toContain("experimental");
+    expect(r.stderr).toContain("node_0002");
   });
 });

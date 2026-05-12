@@ -112,6 +112,35 @@ describe("onto node create --literal + compile", () => {
     expect(after).toEqual(before);
   });
 
+  it("literal still runs through --runtime-check (literal pins dispatch, not validation)", () => {
+    // §4.8 — node.literal bypasses model dispatch but NOT any
+    // post-dispatch validator. A literal that crashes at runtime
+    // still fails the compile with reason="runtime_failed" when
+    // --runtime-check is on. Pin this in case a future refactor
+    // tries to "optimise" the literal path by skipping the gates.
+    runCli(tempDir, [
+      "node", "create",
+      "--level", "artifact", "--kind", "artifact",
+      "--manifestation", "code", "--language", "python",
+      "--prompt", "x",
+      "--literal", "import nonexistent_module_for_runtime_check_test",
+    ]);
+    runCli(tempDir, ["node", "link", "--from", "node_0002", "--to", "node_0001", "--type", "refines"]);
+    const r = runCli(tempDir, [
+      "compile", "run", "node_0002",
+      "--provider", "mock",
+      "--runtime-check",
+      "--json",
+    ]);
+    expect(r.status).toBe(1);
+    const parsed = JSON.parse(r.stdout);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.reason).toBe("step_failed");
+    const focalStep = parsed.completedSteps.find((s: any) => s.nodeId === "node_0002");
+    expect(focalStep).toBeDefined();
+    expect(focalStep.reason).toContain("runtime_failed");
+  });
+
   it("validator still runs against the literal — a forbid violation aborts the compile", () => {
     // The literal references the forbidden token; intent-validator should
     // reject the compile post-write even though no LLM was called.

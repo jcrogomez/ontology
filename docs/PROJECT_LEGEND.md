@@ -188,6 +188,36 @@ base; the path fibration is the *spatial* analogue. Both are
 Grothendieck fibrations and both are used by the same library code
 (`computeBranchFiber`, generalised to `computeFiberBy`).
 
+**Known limitations of the β-3 helper** (planned for resolution in
+Phase γ when ingest concretises the use cases):
+
+- *Single-output projection (§4.10).* `pathProjection(node)` reads
+  `node.outputs.files[0]` only. A node that emits both
+  `src/lib/a.ts` and `tests/lib/a.test.ts` lands in `src/lib` alone;
+  the test-file directory has no projector pulling the node in.
+  Phase γ's `onto ingest` will own the multi-output convention; when
+  it does, the projection can be tightened (or a sibling
+  `pathProjectionAll(node): string[]` can fan out one node into
+  every relevant fiber).
+- *Unprojected nodes are silent (§4.9).* `computeFiberBy(input,
+  projection)` excludes any node whose projection returns
+  `undefined`. The current return shape — `Map<T, FiberByLabel<T>>`
+  — gives callers no way to count or list those skipped nodes.
+  Legend's "find every artifact node missing an output path"
+  diagnostic needs exactly that signal; the planned solution is a
+  sibling helper `findUnprojected(input, projection):
+  OntologyNode[]` rather than enriching the partition return type
+  (keeps the canonical fiber shape pure).
+- *Cross-fiber edges are dropped (§4.11).* For both branch and path
+  fibrations, edges whose endpoints sit in different fibers fall out
+  of every fiber's `edges` array — the induced-subgraph rule that
+  makes the partition property hold. For the branch case this
+  matches existing semantics; for the path case, Legend's eventual
+  "show me inter-module dependencies" diagnostic will *want* those
+  dropped edges back. The planned companion helper is
+  `findCrossFiberEdges(input, projection): OntologyEdge[]`, also a
+  sibling rather than a change to `computeFiberBy`.
+
 ### 2.5 The homeomorphism verdict
 
 For each artifact node $n \in G(c)$, the verdict is computed as:
