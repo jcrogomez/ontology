@@ -472,16 +472,40 @@ pair-of-related-files to suggest semantic edges. End-of-run report.
 ### Phase α — foundation (DONE)
 Items §1–§6 from the pre-foundation review. `main` is here.
 
-### Phase β — pre-ingest infrastructure (~8–10 h)
-Layers 1 + 2 + 5. Multi-file compile, target path, literal escape,
-path fibration helpers. After β, the user can write nodes by hand and
-regenerate / diff a small project against its source.
+### Phase β — pre-ingest infrastructure (DONE, 2026-05-11)
+Layers 1 + 2 + 5. Multi-file compile (β-1: `onto compile run-batch` +
+`--target`), `node.literal` escape hatch (β-2), path fibration
+helpers (β-3: `computeFiberBy`, `pathProjection`). Post-merge review
+landed two follow-ups: review blockers (`fix(compile,node)`
+`157d367`) and the two-phase commit safety property (`fix(compile)`
+`2cbaa32`).
 
-### Phase γ — extraction core (~6–8 h)
-Layer 3 (static edges) + Layer 7 (ingest command itself, TS-only).
-After γ, `onto ingest path/to/small-ts-project` produces a network.
-Token normalisation via the path fibration. Output: a proposal
-batch the user can review with `onto proposal list / apply --all`.
+### Phase γ — extraction core (in progress)
+**Shipped 2026-05-12:**
+- γ-0: Anthropic provider with prompt caching (`feat(llm)` `aad0fed`).
+  `claude-opus-4-7` is the default; the SDK reads
+  `ANTHROPIC_API_KEY` from env. System prompts are tagged
+  `cache_control: ephemeral`.
+- γ-1: `onto ingest <file>` v0+ (`feat(ingest)` `b670ca3`). Reads a
+  single source file, dispatches the extraction template, produces
+  a `node_create` proposal. `--dry-run` for prompt iteration.
+- γ-3: rich proposal payload (`feat(proposals,ingest)` `7d50c91`).
+  Schema now carries optional manifestation / language / requires
+  / provides / forbids / rules / literal so `onto proposal apply`
+  produces a complete node in one step.
+- γ-2: first end-to-end calibration on `src/core/integrity/hash.ts`
+  with `claude-opus-4-7` end-to-end — 5/5 functions semantically
+  equivalent, $0.08 per round-trip, 70s wall-clock. Full report:
+  [`docs/legend/calibrations/HASH_TS_2026-05-12.md`](legend/calibrations/HASH_TS_2026-05-12.md).
+
+**Still pending (γ-4+):**
+- Static-edge inference (Layer 3, TS-first): parse `import` /
+  `export` to emit `depends_on` / `uses_token` edges without an
+  LLM call. Required before multi-file ingest.
+- Multi-file ingest (`onto ingest <directory>`): walks the tree,
+  fibrates by directory via `pathProjection`, dedupes token
+  vocabulary across the fiber. Composes γ-1's per-file flow with
+  the path fibration from β-3.
 
 ### Phase δ — verification + inspector (~6–8 h)
 Layer 4 (inspector) + Layer 6 (verification). After δ, the user can
@@ -522,6 +546,48 @@ Adjoint functor theorems are central to category theory; an
 operational adjoint with measured tolerance is the kind of artefact
 that builds bridges to the math literature.
 
+### 7.1 γ-2 calibration — first empirical data point (2026-05-12)
+
+After γ-0 (Anthropic provider), γ-1 (`onto ingest <file>` command),
+and γ-3 (rich proposal payload) landed, we ran the first end-to-end
+round-trip on `src/core/integrity/hash.ts` — a small, pure, single-
+file utility module of the kind the design hypothesises lives in
+$\mathcal{C}_{\text{faithful}}$. Full report:
+[`docs/legend/calibrations/HASH_TS_2026-05-12.md`](legend/calibrations/HASH_TS_2026-05-12.md).
+
+| Metric | Value | Notes |
+|---|---|---|
+| Model | `claude-opus-4-7` | frontier, via the Anthropic adapter (γ-0) |
+| Semantic equivalence | **5 / 5** functions | vs **3 / 5** for the β-2 `qwen2.5-coder:3b` baseline |
+| LoC-churn distance | $d \approx 1.2$ | divergent under the §2.5 metric (verbose-docstring direction) |
+| Cost | ~$0.08 per round-trip | extract $0.033 + compile $0.045 |
+| Wall-clock | ~70s | 11s extract + 58s compile |
+| Cache hit | 0% (initial) | system prompt 2024 < Opus 4.7's 4096-token cacheable minimum |
+
+The two β-2 divergences — `hashContext` and `hashRun` reaching for
+non-canonical `JSON.stringify` — are correctly avoided at the γ-2
+tier because the extracted intent surfaces the load-bearing invariant
+in `rules` ("REQUIRE: object hashing uses fast-json-stable-stringify
+… never JSON.stringify") and the forward compile honours it.
+
+This is **one data point** (n = 1) on the path to the Phase ε claim
+above. It is necessary-but-not-sufficient evidence: the pipeline
+works end-to-end on a non-trivial real file with a frontier model;
+it does not yet validate the adjunction claim at scale. Phase ε is
+where the publishable claim materialises.
+
+**One useful finding for Phase δ design.** The LoC-vs-semantic gap
+surfaced here (`hash.ts` ranks **divergent** under the §2.5 LoC
+metric but **ε-equivalent** by behaviour, because divergence is
+concentrated in docstring density rather than semantics) suggests
+`verify-homeomorphism` (Layer 6 / δ-2) should report **both** a LoC
+distance and a behaviour-aware distance per node. Pure LoC
+over-estimates intent divergence when the regenerated file makes a
+defensible architectural choice the original author elided. The two
+metrics together carry more signal than either alone — and the
+behaviour-aware one is cheap when an existing test suite exists for
+the target file.
+
 ---
 
 ## 8. Risks and open questions
@@ -558,24 +624,34 @@ that builds bridges to the math literature.
 
 ## 9. Sequencing and the immediate next step
 
-The user-approved sequence:
+Status as of 2026-05-12:
 
 1. **Pre-foundation §1–§6** — **DONE** ([e847417]).
-2. **Phase β** — Layers 1, 2, 5. Starting now. The immediate next
-   commit is Layer 1: `compile run-batch` + `--target <path>`.
-3. **Calibration pause** after β. With Layers 1 + 2 + 5 in place we
-   can do a manual proof-of-concept: take a single Ontology source
-   file, hand-write its intent node, compile to a target path, diff.
-   If the diff is small, we know Phase γ will pay off. If the diff is
-   large, we iterate on the extraction prompt format before spending
-   the γ work.
-4. **Phase γ** if calibration passes.
-5. **Phase δ**.
-6. **Phase ε** — self-ingestion. The moment of truth.
+2. **Phase β** — **DONE** (β-1/β-2/β-3 + the two post-merge review fixes; see §6).
+3. **β-2 manual calibration on `hash.ts` with `qwen2.5-coder:3b`** —
+   **DONE.** 3/5 semantic equivalence; two divergences on canonical-
+   JSON invariants. Result: Phase γ will pay off, but only with a
+   frontier model and a structured extraction template — exactly
+   what γ-0 / γ-1 / γ-3 deliver.
+4. **Phase γ (extraction core)** — **partially shipped, in progress.**
+   γ-0 (Anthropic provider) + γ-1 (single-file `onto ingest`) +
+   γ-3 (rich proposal payload) merged. γ-2 calibration with
+   `claude-opus-4-7` end-to-end **passed at 5/5** on the same file
+   (see §7.1).
+   - Pending: static-edge inference (γ-4) and multi-file ingest
+     (γ-5), both required before Phase ε can sweep the codebase.
+5. **Phase δ** — verification + inspector. After γ.
+6. **Phase ε** — self-ingestion. The moment of truth. After γ-5.
 7. **Phase ζ** — release.
+
+The immediate next step: γ-4 (static-edge inference, TS-first).
+With it, `onto ingest <directory>` can walk a small TS project and
+emit a coherent proposal batch with cross-file `depends_on` edges —
+the prerequisite for the Phase ε measurement.
 
 ---
 
-*Document version: draft 1. Authored 2026-05-11 against the Ontology
-state at commit `e847417`. To be re-versioned after Phase β lands —
-the layer estimates above will be replaced with measured numbers.*
+*Document version: draft 2. Authored 2026-05-11; revised 2026-05-12
+to reflect Phase β + partial γ shipped (commits `2cbaa32`,
+`aad0fed`, `b670ca3`, `7d50c91`, `caf16f4`) and the first γ-2
+calibration data point.*

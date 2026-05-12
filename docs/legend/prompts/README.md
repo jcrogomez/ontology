@@ -43,8 +43,14 @@ branch and merge (or discard) at your leisure.
 | β | β-2 `node.literal` escape hatch | **merged** (`04f730c`) | prompt not written — implemented directly on 2026-05-11 |
 | β | β-3 path fibration helpers | **merged** (`881506a`) | [`PHASE_BETA_3.md`](PHASE_BETA_3.md) |
 | — | post-β review blockers (atomic write, clobber gate, binary guard) | **merged** (`157d367`) | drove off the 2026-05-12 milestone review §4.1, §4.2, §4.6 |
-| γ | γ-1 onto ingest core | not yet | — |
-| γ | γ-2 static analysis edge inference (TS) | not yet | — |
+| — | β-2 calibration on `hash.ts` (qwen2.5-coder:3b) | **done 2026-05-11** | 3/5 ε-equivalent; informed γ-0 (frontier provider) and γ-3 (rich payload) |
+| — | two-phase commit safety property | **merged** (`2cbaa32`) | drove off the β-2 calibration §0 — failed validator must not clobber `--target` |
+| γ | γ-0 Anthropic provider with prompt caching | **merged** (`aad0fed`) | implemented directly — system prompt `cache_control: ephemeral`, default model `claude-opus-4-7` |
+| γ | γ-1 `onto ingest <file>` v0+ | **merged** (`b670ca3`) | implemented directly — single-file extraction with `--dry-run` |
+| γ | γ-3 rich proposal payload | **merged** (`7d50c91`) | implemented directly — schema extension so apply produces complete node in one step |
+| γ | γ-2 calibration on `hash.ts` (claude-opus-4-7) | **done 2026-05-12** | 5/5 ε-equivalent; full report [`docs/legend/calibrations/HASH_TS_2026-05-12.md`](../calibrations/HASH_TS_2026-05-12.md) |
+| γ | γ-4 static analysis edge inference (TS) | not yet | — |
+| γ | γ-5 `onto ingest <directory>` multi-file | not yet | — |
 | δ | δ-1 onto node inspect (Inspector / Lupa) | not yet | — |
 | δ | δ-2 verify-homeomorphism + report | not yet | — |
 
@@ -58,10 +64,26 @@ The original plan was to launch β-3 alone as a calibration data point,
 then write `PHASE_BETA_1.md` / `PHASE_BETA_2.md` once the agent-quality
 signal was known. In practice all three β phases landed in one night
 implemented directly (no isolated agent for β-1 / β-2), so those two
-prompts were never written. Phase γ may follow the same pattern or
-return to the worktree-isolation convention — TBD when γ starts.
+prompts were never written.
 
 The `PHASE_BETA_3.md` prompt's brief had one stale assumption
 (`outputs.files: { relativePath }[]`); the shipped implementation
 adapted to the current `outputs.files: string[]` schema. See the β-3
 commit message for the deviation note.
+
+## Notes on the γ phase
+
+γ-0 / γ-1 / γ-3 also shipped directly without prompt files, because
+the work was small enough to stay in the main session. The γ-2
+calibration on `hash.ts` is documented in detail at
+[`docs/legend/calibrations/HASH_TS_2026-05-12.md`](../calibrations/HASH_TS_2026-05-12.md).
+The headline data point: with `claude-opus-4-7` as both extractor and
+compiler, every function of `src/core/integrity/hash.ts` survives the
+round-trip semantically equivalent (5/5), vs 3/5 with the smaller
+`qwen2.5-coder:3b` baseline. The cost is ~$0.08 per single-file
+round-trip; latency ~70s.
+
+γ-4 (static-edge inference) and γ-5 (multi-file ingest) are the
+remaining streams before Phase ε can sweep the codebase. Whether they
+need agent-isolation prompt files (the original Phase β plan) depends
+on how invasive the changes feel — TBD when γ-4 starts.
