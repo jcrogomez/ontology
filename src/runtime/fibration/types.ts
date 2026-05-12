@@ -39,6 +39,23 @@ export interface BranchFiber {
   size: { nodes: number; edges: number };
 }
 
+// A FiberByLabel<T> is the generic shape `computeFiberBy` returns
+// (Project Legend Phase β-3). Mirrors BranchFiber but with the label
+// type parameterised so the same library powers both the temporal
+// branch fibration (T = string branch name) and the spatial path
+// fibration (T = string directory path). T must be usable as a Map
+// key — a plain string is the canonical case.
+//
+// `BranchFiber` stays as the named alias for the branch case (callers
+// import it directly today, and the `branch` field name reads better
+// in that context than the generic `label`).
+export interface FiberByLabel<T> {
+  label: T;
+  nodes: OntologyNode[];
+  edges: OntologyEdge[];
+  size: { nodes: number; edges: number };
+}
+
 // A BranchProjection is the result of `computeAllFibers`: the partition of
 // the graph into per-branch fibers. The base sequence — the unique sorted
 // list of branches that appear in the input — is surfaced explicitly so

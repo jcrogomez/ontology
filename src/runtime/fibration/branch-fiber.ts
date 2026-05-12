@@ -1,15 +1,25 @@
-// Pure helpers that compute branch fibers over the typed Ontology graph.
+// Pure helpers that compute fibers over the typed Ontology graph.
+//
+// This file hosts two related surfaces:
+//   1. The branch-specific fibration (the original, mathematical motivation
+//      below) — `computeBranchFiber`, `computeAllFibers`,
+//      `describeCartesianLift`, `listBranches`.
+//   2. The generic fiber helper `computeFiberBy(input, projection)` and
+//      its spatial instance `pathProjection`, added in Project Legend
+//      Phase β-3. The generic shape lets the same library power both the
+//      temporal branch fibration and the spatial path fibration (token
+//      vocabulary normalisation per directory; see PROJECT_LEGEND.md §2.4).
 //
 // Mathematical model — Grothendieck fibration:
 //   p: E → B
-//     B = the linear temporal log of events (the base category).
-//     E = events tagged with a branch label (the total category).
-//     p forgets the branch label.
-//   A *fiber* over a branch b is `p^{-1}(b)`: the subgraph of nodes and
-//   edges that carry `coordinates.branch === b`. Edges are filtered to the
-//   induced subgraph so the result is well-defined as a categorical
-//   morphism collection: every morphism in the fiber starts and ends in
-//   the fiber.
+//     B = the base category (a partition labelling — branches for the
+//     temporal fibration, directories for the path fibration).
+//     E = events / nodes tagged with a label in B (the total category).
+//     p forgets the label.
+//   A *fiber* over a label b is `p^{-1}(b)`: the subgraph of nodes and
+//   edges that carry that label. Edges are filtered to the induced
+//   subgraph so the result is well-defined as a categorical morphism
+//   collection: every morphism in the fiber starts and ends in the fiber.
 //   A *cartesian lift* of a base morphism `f: b → b'` at a node N is a
 //   re-labelled node N' over b' that agrees with N on all base-invariant
 //   data (kind, abstraction, manifestation, …). `describeCartesianLift`
@@ -19,11 +29,13 @@
 // (nodes, edges) so callers can compose them without committing to any
 // particular state-loading strategy.
 
+import * as path from "node:path";
 import type { OntologyNode, OntologyEdge } from "../../schemas/ontology.js";
 import type {
   BranchFiber,
   BranchProjection,
   CartesianLift,
+  FiberByLabel,
   FiberInput,
 } from "./types.js";
 
@@ -135,4 +147,91 @@ export function computeBranchFiberFromArrays(
   branch: string,
 ): BranchFiber {
   return computeBranchFiber({ nodes, edges }, branch);
+}
+
+// ── Generic fiber helper (Project Legend Phase β-3) ──────────────────────────
+//
+// `computeFiberBy(input, projection)` is the generalisation of
+// `computeBranchFiber` to an arbitrary `Node → label` projection. Returns a
+// Map keyed by the projection's distinct outputs; each fiber is the
+// induced subgraph (nodes whose projection equals the key, plus edges
+// whose endpoints both survive the filter for that key).
+//
+// A node whose projection returns `undefined` is excluded from every
+// fiber — this is the deliberate escape hatch for nodes that have no
+// natural label (e.g. an artifact node before its output file is set,
+// under the path projection).
+//
+// Partition property: the sum of `fiber.nodes.length` across the
+// returned map equals the number of nodes for which `projection`
+// returned a defined label. With every node labelled, that sum equals
+// `input.nodes.length` exactly — and `computeBranchFiber` is recovered
+// as the special case `projection = n => n.coordinates.branch`.
+export function computeFiberBy<T>(
+  input: FiberInput,
+  projection: (node: OntologyNode) => T | undefined,
+): Map<T, FiberByLabel<T>> {
+  // First pass: bucket nodes by their projected label.
+  const nodesByLabel = new Map<T, OntologyNode[]>();
+  const labelByNodeId = new Map<string, T>();
+  for (const node of input.nodes) {
+    const label = projection(node);
+    if (label === undefined) continue;
+    labelByNodeId.set(node.id, label);
+    const bucket = nodesByLabel.get(label);
+    if (bucket) bucket.push(node);
+    else nodesByLabel.set(label, [node]);
+  }
+
+  // Second pass: filter edges into their fiber. An edge belongs to label
+  // L iff *both* endpoints are labelled L. Cross-label edges are
+  // dropped from every fiber — the same induced-subgraph rule that
+  // makes `computeBranchFiber`'s partition property hold.
+  const edgesByLabel = new Map<T, OntologyEdge[]>();
+  for (const edge of input.edges) {
+    const fromLabel = labelByNodeId.get(edge.from);
+    if (fromLabel === undefined) continue;
+    const toLabel = labelByNodeId.get(edge.to);
+    if (toLabel === undefined) continue;
+    if (fromLabel !== toLabel) continue;
+    const bucket = edgesByLabel.get(fromLabel);
+    if (bucket) bucket.push(edge);
+    else edgesByLabel.set(fromLabel, [edge]);
+  }
+
+  // Materialise the fiber objects. Every label that appears in the node
+  // bucket gets an entry, even if no edge survived the filter (an
+  // isolated-node fiber is still a fiber).
+  const out = new Map<T, FiberByLabel<T>>();
+  for (const [label, nodes] of nodesByLabel) {
+    const edges = edgesByLabel.get(label) ?? [];
+    out.set(label, {
+      label,
+      nodes,
+      edges,
+      size: { nodes: nodes.length, edges: edges.length },
+    });
+  }
+  return out;
+}
+
+// Spatial projection. Returns the parent directory of a node's first
+// declared output file, normalised via `path.posix.dirname`. Returns
+// undefined when the node has no `outputs.files` entries or the first
+// entry is an empty string.
+//
+// Used by Project Legend's ingest pipeline to fiber the network by
+// file path so token vocabulary normalisation can suggest reusing
+// tokens that already exist within a directory fiber (PROJECT_LEGEND.md
+// §2.4). `outputs.files` is `string[]` today; if a future schema
+// migration enriches the shape, the projection can be tightened to
+// read whichever field carries the relative path.
+//
+// `path.posix` is intentional: artifact paths are stored
+// forward-slash regardless of host OS, so dirname must use POSIX
+// semantics for cross-platform stability.
+export function pathProjection(node: OntologyNode): string | undefined {
+  const first = node.outputs?.files?.[0];
+  if (typeof first !== "string" || first.length === 0) return undefined;
+  return path.posix.dirname(first);
 }

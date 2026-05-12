@@ -9,6 +9,7 @@ export type {
   BranchFiber,
   BranchProjection,
   CartesianLift,
+  FiberByLabel,
 } from "./types.js";
 
 export {
@@ -17,4 +18,6 @@ export {
   computeBranchFiberFromArrays,
   computeAllFibers,
   describeCartesianLift,
+  computeFiberBy,
+  pathProjection,
 } from "./branch-fiber.js";
