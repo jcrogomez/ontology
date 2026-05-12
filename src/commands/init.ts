@@ -180,6 +180,14 @@ export async function initCommand(options: InitOptions = {}): Promise<void> {
         multimodal: false,
         notes: "Default placeholder model for Network Kernel bootstrap.",
       }),
+      OntologyModelSchema.parse({
+        id: "anthropic_default",
+        provider: "anthropic",
+        name: "claude-opus-4-7",
+        temperature: 0,
+        multimodal: false,
+        notes: "Frontier model for Project Legend ingest and intent extraction. Requires ANTHROPIC_API_KEY in the environment.",
+      }),
     ],
   };
   writeJson(paths.modelsRegistryPath, modelsRegistry);

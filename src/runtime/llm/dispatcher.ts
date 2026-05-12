@@ -1,6 +1,7 @@
 import type { LlmProvider, LlmRequest, LlmResponse } from './types.js';
 import { createMockLlmAdapter } from './mock.js';
 import { createOllamaAdapter } from './ollama/adapter.js';
+import { createAnthropicAdapter } from './anthropic/adapter.js';
 
 export async function dispatchLlmRequest(
   request: LlmRequest,
@@ -8,11 +9,14 @@ export async function dispatchLlmRequest(
     provider?: LlmProvider;
     ollamaHost?: string;
     defaultModel?: string;
+    // Anthropic-specific override. When omitted the adapter reads
+    // ANTHROPIC_API_KEY from the environment (SDK default).
+    anthropicApiKey?: string;
   }
 ): Promise<LlmResponse> {
   const provider = options?.provider ?? 'mock';
 
-  if (provider === 'openai' || provider === 'anthropic' || provider === 'local') {
+  if (provider === 'openai' || provider === 'local') {
     throw new Error(`Unsupported LLM provider: ${provider}`);
   }
 
@@ -28,6 +32,14 @@ export async function dispatchLlmRequest(
     const adapter = createOllamaAdapter({
       host: options?.ollamaHost,
       defaultModel: options?.defaultModel
+    });
+    return adapter.generate(request);
+  }
+
+  if (provider === 'anthropic') {
+    const adapter = createAnthropicAdapter({
+      apiKey: options?.anthropicApiKey,
+      defaultModel: options?.defaultModel,
     });
     return adapter.generate(request);
   }

@@ -22,6 +22,7 @@
     "example:hello-world": "bash examples/hello-world/build.sh"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.95.2",
     "commander": "^13.1.0",
     "fast-json-stable-stringify": "^2.1.0",
     "ink": "^5.2.1",
