@@ -1,4 +1,5 @@
-import { updateNode } from "../../core/nodes/update-node.js";
+import * as fs from "node:fs";
+import { CLEAR_LITERAL, updateNode } from "../../core/nodes/update-node.js";
 import { errorMessage } from "../../core/errors.js";
 
 export interface NodeUpdateCommandOptions {
@@ -8,6 +9,13 @@ export interface NodeUpdateCommandOptions {
   requires?: string;
   provides?: string;
   forbids?: string;
+  // Literal escape hatch (Project Legend Phase β-2). --literal sets a
+  // new value (inline); --literal-file reads from disk; --clear-literal
+  // strips the field so the node returns to model-driven compile.
+  // The three are mutually exclusive.
+  literal?: string;
+  literalFile?: string;
+  clearLiteral?: boolean;
   json?: boolean;
 }
 
@@ -25,16 +33,45 @@ export async function nodeUpdateCommand(
   // Refuse a no-op call so the user does not silently emit an event with
   // identical old and new hashes — guides them toward passing at least one
   // mutating flag.
+  const literalFlagPassed =
+    options.literal !== undefined
+    || options.literalFile !== undefined
+    || options.clearLiteral === true;
   const nothingPassed =
     options.prompt === undefined
     && options.label === undefined
     && options.rules === undefined
     && options.requires === undefined
     && options.provides === undefined
-    && options.forbids === undefined;
+    && options.forbids === undefined
+    && !literalFlagPassed;
   if (nothingPassed) {
-    failWith(`onto node update requires at least one of --prompt / --label / --rules / --requires / --provides / --forbids.`, options.json);
+    failWith(`onto node update requires at least one of --prompt / --label / --rules / --requires / --provides / --forbids / --literal / --literal-file / --clear-literal.`, options.json);
     return;
+  }
+
+  // --literal / --literal-file / --clear-literal: at most one.
+  const literalFlagCount =
+    (options.literal !== undefined ? 1 : 0)
+    + (options.literalFile !== undefined ? 1 : 0)
+    + (options.clearLiteral === true ? 1 : 0);
+  if (literalFlagCount > 1) {
+    failWith(`--literal, --literal-file and --clear-literal are mutually exclusive; pick one`, options.json);
+    return;
+  }
+
+  let literalArg: string | typeof CLEAR_LITERAL | undefined;
+  if (options.clearLiteral === true) {
+    literalArg = CLEAR_LITERAL;
+  } else if (options.literal !== undefined) {
+    literalArg = options.literal;
+  } else if (options.literalFile !== undefined) {
+    try {
+      literalArg = fs.readFileSync(options.literalFile, "utf-8");
+    } catch (err: unknown) {
+      failWith(`Could not read --literal-file "${options.literalFile}": ${errorMessage(err)}`, options.json);
+      return;
+    }
   }
 
   try {
@@ -46,6 +83,7 @@ export async function nodeUpdateCommand(
       requires: splitTokens(options.requires, ","),
       provides: splitTokens(options.provides, ","),
       forbids: splitTokens(options.forbids, ","),
+      literal: literalArg,
     });
 
     if (options.json) {

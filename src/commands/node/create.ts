@@ -1,3 +1,4 @@
+import * as fs from "node:fs";
 import { createNode } from "../../core/nodes/create-node.js";
 import { AbstractionLevelSchema, ManifestationSchema, NodeKindSchema } from "../../schemas/ontology.js";
 import { errorMessage } from "../../core/errors.js";
@@ -19,6 +20,11 @@ export interface NodeCreateCommandOptions {
   // Pipe-separated rules (FORBID:/REQUIRE: prose). Pipe rather than comma
   // because rule text often contains commas.
   rules?: string;
+  // Literal escape hatch (Project Legend Phase β-2). Either pass the
+  // text inline with --literal or point at a file with --literal-file.
+  // Mutually exclusive. When set, compile bypasses model dispatch.
+  literal?: string;
+  literalFile?: string;
 }
 
 // Split a comma- or pipe-separated CLI argument into trimmed, non-empty
@@ -57,6 +63,22 @@ export async function createNodeCommand(options: NodeCreateCommandOptions): Prom
     manifestation = r.data;
   }
 
+  if (options.literal !== undefined && options.literalFile !== undefined) {
+    console.error(`✖ --literal and --literal-file are mutually exclusive; pick one`);
+    process.exit(1);
+  }
+  let literal: string | undefined;
+  if (options.literal !== undefined) {
+    literal = options.literal;
+  } else if (options.literalFile !== undefined) {
+    try {
+      literal = fs.readFileSync(options.literalFile, "utf-8");
+    } catch (err: unknown) {
+      console.error(`✖ Could not read --literal-file "${options.literalFile}": ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  }
+
   try {
     const { node, event } = createNode({
       level,
@@ -69,6 +91,7 @@ export async function createNodeCommand(options: NodeCreateCommandOptions): Prom
       provides: splitTokens(options.provides, ","),
       forbids: splitTokens(options.forbids, ","),
       rules: splitTokens(options.rules, "|"),
+      literal,
     });
 
     console.log(`=== ONTOLOGY NODE CREATED ===
@@ -79,7 +102,7 @@ Kind:          ${node.kind}
 Manifestation: ${node.coordinates.manifestation}
 Branch:        ${node.coordinates.branch}
 Parent:        ${node.graph.parentId}
-Event:         ${event.eventId}${node.technical.language ? `\nLanguage:      ${node.technical.language}` : ""}
+Event:         ${event.eventId}${node.technical.language ? `\nLanguage:      ${node.technical.language}` : ""}${node.literal !== undefined ? `\nLiteral:       ${node.literal.length} bytes (compile will emit verbatim, no model dispatch)` : ""}
 
 Next:
   onto node show ${node.id}

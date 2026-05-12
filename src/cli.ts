@@ -161,6 +161,8 @@ node
   .option("--provides <tokens>", "Comma-separated tokens this node provides to its context (lands in context.provides).")
   .option("--forbids <tokens>", "Comma-separated tokens this node forbids appearing in its outputs (lands in context.forbids).")
   .option("--rules <rules>", "Pipe-separated rule strings, e.g. 'FORBID: console.log|REQUIRE: emits event' (lands in node.rules).")
+  .option("--literal <text>", "Pin the compiled artifact body verbatim to <text>. Compile bypasses model dispatch and emits <text> directly; validator and runtime check still apply. Use for irreducible-specificity content (regexes, magic constants, license headers).")
+  .option("--literal-file <path>", "Same as --literal, but read the pinned body from a file. Mutually exclusive with --literal.")
   .action(async (options) => {
     await createNodeCommand(options);
   });
@@ -221,6 +223,9 @@ node
   .option("--requires <tokens>", "Comma-separated tokens; replaces context.requires wholesale. Pass --requires \"\" to clear.")
   .option("--provides <tokens>", "Comma-separated tokens; replaces context.provides wholesale. Pass --provides \"\" to clear.")
   .option("--forbids <tokens>", "Comma-separated tokens; replaces context.forbids wholesale. Pass --forbids \"\" to clear.")
+  .option("--literal <text>", "Set the literal escape hatch: compile emits <text> verbatim instead of dispatching the model. Replaces any existing literal.")
+  .option("--literal-file <path>", "Same as --literal, but read the pinned body from a file. Mutually exclusive with --literal.")
+  .option("--clear-literal", "Remove the literal escape hatch so the node returns to model-driven compile.")
   .option("--json", "Output results in JSON format")
   .action(async (id, options) => {
     try {

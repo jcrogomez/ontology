@@ -46,6 +46,14 @@ export interface CreateNodeOptions {
   // Optional inline rules (FORBID:/REQUIRE: prose strings). Pass at create
   // time so the user does not have to hand-edit JSON to add constraints.
   rules?: string[];
+  // Optional literal escape hatch (Project Legend Phase β-2). When set,
+  // the compile pipeline emits this text verbatim instead of dispatching
+  // the model. Use for irreducible-specificity content (a specific
+  // regex, a magic constant, a license header) where a model's
+  // probabilistic generation would only add risk. The validator and
+  // runtime check still apply; the audit chain is preserved via a
+  // synthetic persisted run with provider="literal".
+  literal?: string;
   // Optional event metadata. Proposal apply records the source proposalId here
   // so the temporal log carries the back-reference from the resulting
   // node_created event to the proposal that triggered it.
@@ -105,6 +113,7 @@ export function createNode(options: CreateNodeOptions): { node: OntologyNode; ev
     },
     rules: options.rules ?? [],
     technical: options.language ? { language: options.language } : {},
+    ...(options.literal !== undefined ? { literal: options.literal } : {}),
     outputs: {
       files: []
     },

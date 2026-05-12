@@ -364,10 +364,19 @@ interface PostInput {
 }
 
 // (e) Project the response text into the artifact body. For code nodes,
-// strip the markdown fence; otherwise pass through verbatim.
+// strip the markdown fence; otherwise pass through verbatim. Literal-
+// originated responses always pass through verbatim — the user pinned
+// the bytes, including any fences they wrote on purpose; extracting one
+// would silently re-shape their declared output.
 function projectArtifactE(input: PostInput): EffectWithLog<string, never> {
   return () => {
     const { options, response } = input;
+    if (options.node.literal !== undefined) {
+      return {
+        value: ok(response.text),
+        logs: [{ level: "info", message: "projectArtifact: pass-through (literal escape hatch)" }],
+      };
+    }
     if (options.node.coordinates.manifestation !== "code") {
       return {
         value: ok(response.text),
@@ -625,47 +634,150 @@ function emitEventE(
   };
 }
 
+// ── Literal short-circuit (Project Legend Phase β-2) ────────────────────────
+//
+// When a node carries `literal`, we synthesise the dispatch outcome
+// without calling any model. The persisted run is content-addressed on
+// the literal bytes (plus upstream contextHash, branch, target id), so
+// two byte-identical literals collapse to the same run id and a
+// re-compile is a cache hit. Synchronous end-to-end — no async path
+// needed since there is no IO to wait on.
+
+interface LiteralOutcome {
+  runId: string;
+  cached: boolean;
+  response: { text: string; provider: LlmProvider; model: string };
+}
+
+const LITERAL_MODEL_NAME = "literal";
+
+function runLiteralShortCircuit(
+  options: CompileNodeOptions,
+  literal: string,
+  cwd: string,
+): { value: ReturnType<typeof ok<LiteralOutcome>> | ReturnType<typeof err<CompileFailure>>; logs: LogEntry[] } {
+  const upstream = options.upstream ?? [];
+  const runInput: PersistedRunInput = {
+    // Hash the literal bytes as the prompt: the literal IS the prompt
+    // here (the identity functor between literal and output is the whole
+    // point). Including upstream contextHash means a literal whose
+    // refinement parents change still gets a fresh run id.
+    promptHash: hashPrompt(literal),
+    contextHash: hashUpstreamContext(upstream),
+    targetNodeId: options.node.id,
+    branch: options.node.coordinates.branch,
+    time: null,
+    task: COMPILE_TASK as string,
+    includeEdges: false,
+    edgeTypes: null,
+  };
+  const runModel: PersistedRunModel = {
+    provider: "literal",
+    model: LITERAL_MODEL_NAME,
+    host: null,
+  };
+  const expectedId = computeRunId(runInput, runModel);
+  const cachedRun = loadPersistedRun(expectedId, cwd);
+  if (cachedRun) {
+    return {
+      value: ok({
+        runId: cachedRun.id,
+        cached: true,
+        response: { text: cachedRun.output.text, provider: "literal", model: LITERAL_MODEL_NAME },
+      }),
+      logs: [{ level: "info", message: `literal: cache hit (runId=${cachedRun.id}, ${literal.length} bytes)` }],
+    };
+  }
+  try {
+    const persisted = createPersistedRun({
+      kind: "context",
+      input: runInput,
+      model: runModel,
+      output: { text: literal, parsed: null },
+      validation: null,
+      durationMs: 0,
+      cwd: options.cwd,
+    });
+    return {
+      value: ok({
+        runId: persisted.run.id,
+        cached: false,
+        response: { text: literal, provider: "literal", model: LITERAL_MODEL_NAME },
+      }),
+      logs: [{ level: "info", message: `literal: persisted (runId=${persisted.run.id}, ${literal.length} bytes)` }],
+    };
+  } catch (raw: unknown) {
+    return {
+      value: err({
+        reason: "persist_failed",
+        message: raw instanceof Error ? raw.message : String(raw),
+      }),
+      logs: [{ level: "error", message: "literal: persist failed", data: raw }],
+    };
+  }
+}
+
 // ── Top-level orchestration ─────────────────────────────────────────────────
 
 export async function compileNode(options: CompileNodeOptions): Promise<CompileNodeResult> {
   const cwd = options.cwd ?? process.cwd();
   const optionsWithCwd = { ...options, cwd };
 
-  // (1) Synchronous prelude: resolve model, build run envelope, check cache.
-  // Each sub-step's logs accumulate; an err short-circuits the rest.
-  const preludePipeline = bindWithLog(resolveModelE(optionsWithCwd), (handle) =>
-    bindWithLog(buildPreludeE(optionsWithCwd, handle), (prelude) =>
-      bindWithLog(checkCacheE(prelude, cwd), (cache) =>
-        pureWithLog({ handle, prelude, cache }))));
-  const preludeOutcome = runWithLog(preludePipeline);
-
-  if (preludeOutcome.value.tag === "err") {
-    return packageFailure(preludeOutcome.value.error, preludeOutcome.logs);
-  }
-
-  const { handle, prelude, cache } = preludeOutcome.value.value;
-  const accumulatedLogs: LogEntry[] = [...preludeOutcome.logs];
-
-  // (2) Async slice: cache hit short-circuits to the post-dispatch slice
-  // with a synthetic log entry; cache miss runs dispatch + persist.
   let runId: string;
   let cached: boolean;
   let response: { text: string; provider: LlmProvider; model: string };
+  const accumulatedLogs: LogEntry[] = [];
 
-  if (cache.kind === "hit") {
-    runId = cache.runId;
-    cached = true;
-    response = cache.response;
-    accumulatedLogs.push({ level: "info", message: "dispatch: skipped (cache hit)" });
-  } else {
-    const dispatchOutcome = await runAsyncWithLog(dispatchAndPersistE(optionsWithCwd, handle, prelude));
-    accumulatedLogs.push(...dispatchOutcome.logs);
-    if (dispatchOutcome.value.tag === "err") {
-      return packageFailure(dispatchOutcome.value.error, accumulatedLogs);
+  // (0) Literal escape hatch (Project Legend Phase β-2). When the node
+  // pins its output as `literal`, no model dispatch occurs: the literal
+  // is the response text. We still build a content-addressed persisted
+  // run (provider=literal, model=literal, promptHash over the literal
+  // bytes) so the audit chain — events.jsonl, runs/, artifact relativ
+  // path — has the same shape as an LLM-generated artifact. Two literal
+  // nodes whose text is byte-identical share a runId; a re-compile of
+  // the same literal is a cache hit.
+  if (options.node.literal !== undefined) {
+    const literalOutcome = runLiteralShortCircuit(optionsWithCwd, options.node.literal, cwd);
+    accumulatedLogs.push(...literalOutcome.logs);
+    if (literalOutcome.value.tag === "err") {
+      return packageFailure(literalOutcome.value.error, accumulatedLogs);
     }
-    runId = dispatchOutcome.value.value.runId;
-    cached = false;
-    response = dispatchOutcome.value.value.response;
+    runId = literalOutcome.value.value.runId;
+    cached = literalOutcome.value.value.cached;
+    response = literalOutcome.value.value.response;
+  } else {
+    // (1) Synchronous prelude: resolve model, build run envelope, check cache.
+    // Each sub-step's logs accumulate; an err short-circuits the rest.
+    const preludePipeline = bindWithLog(resolveModelE(optionsWithCwd), (handle) =>
+      bindWithLog(buildPreludeE(optionsWithCwd, handle), (prelude) =>
+        bindWithLog(checkCacheE(prelude, cwd), (cache) =>
+          pureWithLog({ handle, prelude, cache }))));
+    const preludeOutcome = runWithLog(preludePipeline);
+    accumulatedLogs.push(...preludeOutcome.logs);
+
+    if (preludeOutcome.value.tag === "err") {
+      return packageFailure(preludeOutcome.value.error, accumulatedLogs);
+    }
+
+    const { handle, prelude, cache } = preludeOutcome.value.value;
+
+    // (2) Async slice: cache hit short-circuits to the post-dispatch slice
+    // with a synthetic log entry; cache miss runs dispatch + persist.
+    if (cache.kind === "hit") {
+      runId = cache.runId;
+      cached = true;
+      response = cache.response;
+      accumulatedLogs.push({ level: "info", message: "dispatch: skipped (cache hit)" });
+    } else {
+      const dispatchOutcome = await runAsyncWithLog(dispatchAndPersistE(optionsWithCwd, handle, prelude));
+      accumulatedLogs.push(...dispatchOutcome.logs);
+      if (dispatchOutcome.value.tag === "err") {
+        return packageFailure(dispatchOutcome.value.error, accumulatedLogs);
+      }
+      runId = dispatchOutcome.value.value.runId;
+      cached = false;
+      response = dispatchOutcome.value.value.response;
+    }
   }
 
   // (3) Synchronous post-dispatch slice: project, write, validate, runtime

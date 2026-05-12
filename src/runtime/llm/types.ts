@@ -1,4 +1,4 @@
-export type LlmProvider = "mock" | "ollama" | "openai" | "anthropic" | "local";
+export type LlmProvider = "mock" | "ollama" | "openai" | "anthropic" | "local" | "literal";
 
 export type LlmTask =
   | "semantic_parse"

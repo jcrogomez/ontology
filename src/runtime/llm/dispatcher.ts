@@ -16,6 +16,14 @@ export async function dispatchLlmRequest(
     throw new Error(`Unsupported LLM provider: ${provider}`);
   }
 
+  // "literal" is the non-LLM escape hatch — compileNode short-circuits
+  // before reaching the dispatcher when a node has `literal` set, so we
+  // should never see it here. Surface the misuse loudly rather than
+  // silently passing the request to a generative provider.
+  if (provider === 'literal') {
+    throw new Error(`Cannot dispatch through the "literal" provider; compileNode is expected to bypass dispatch when node.literal is set`);
+  }
+
   if (provider === 'ollama') {
     const adapter = createOllamaAdapter({
       host: options?.ollamaHost,

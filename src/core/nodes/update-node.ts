@@ -36,11 +36,18 @@ export interface UpdateNodeOptions {
   requires?: string[];
   provides?: string[];
   forbids?: string[];
+  // Literal escape hatch toggle (Project Legend Phase β-2). Pass a
+  // string to set / replace; pass the sentinel CLEAR_LITERAL to
+  // explicitly remove the literal so the node returns to model-driven
+  // compile. Undefined preserves the existing value.
+  literal?: string | typeof CLEAR_LITERAL;
   cwd?: string;
   // Free-form metadata appended to the event payload — useful for
   // proposal-driven updates that want to record the source proposalId.
   eventMetadata?: Record<string, unknown>;
 }
+
+export const CLEAR_LITERAL: unique symbol = Symbol("CLEAR_LITERAL");
 
 export function updateNode(
   options: UpdateNodeOptions,
@@ -91,8 +98,13 @@ export function updateNode(
     frozen: existing.integrity.frozen,
     schemaVersion: existing.integrity.schemaVersion,
   };
-  const nodeWithoutHash = {
-    ...existing,
+  // literal toggle: CLEAR_LITERAL strips the field entirely; a string
+  // replaces; undefined preserves. We rebuild the spread so the field
+  // either appears or is absent — leaving `literal: undefined` would
+  // still serialise as `"literal": undefined` in some paths.
+  const { literal: _existingLiteral, ...withoutLiteral } = existing;
+  const nodeBase: Record<string, unknown> = {
+    ...withoutLiteral,
     label: options.label !== undefined ? options.label : existing.label,
     prompt: updatedPrompt,
     inputs: updatedInputs,
@@ -100,6 +112,14 @@ export function updateNode(
     context: updatedContext,
     integrity: integrityWithoutHash,
   };
+  if (options.literal === CLEAR_LITERAL) {
+    // drop literal entirely
+  } else if (typeof options.literal === "string") {
+    nodeBase.literal = options.literal;
+  } else if (existing.literal !== undefined) {
+    nodeBase.literal = existing.literal;
+  }
+  const nodeWithoutHash = nodeBase;
   const newHash = hashObject(nodeWithoutHash);
 
   const finalNode = OntologyNodeSchema.parse({

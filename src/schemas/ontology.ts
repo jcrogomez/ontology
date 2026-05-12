@@ -189,6 +189,14 @@ export const OntologyNodeSchema = z.object({
   }),
   rules: z.array(z.string()).default([]),
   technical: TechnicalDescriptorSchema,
+  // Literal escape hatch (Project Legend Phase β-2). When set, the compile
+  // pipeline emits this text verbatim instead of dispatching the model.
+  // Audit chain is preserved (a persisted run with provider="literal" is
+  // still written); validator and runtime check still apply. Used for
+  // irreducible-specificity content: a specific regex, a magic constant,
+  // a license header — anything where the model's probabilistic
+  // generation would only add risk.
+  literal: z.string().optional(),
   outputs: z.object({
     ast: z.unknown().optional(),
     osl: z.unknown().optional(),
@@ -308,12 +316,18 @@ export type OntologyProcessor = z.infer<typeof OntologyProcessorSchema>;
 
 // LLM provider enum, kept aligned with `src/runtime/llm/types.ts` LlmProvider union.
 // Schemas use this when a provider is part of an auditable record.
+//
+// "literal" is the non-LLM provider: a node with `node.literal` set bypasses
+// dispatch and persists a synthetic run whose output is the literal text.
+// Audit chain stays intact; the provider field tells the auditor the bytes
+// came from a hand-pinned escape hatch, not a probabilistic call.
 export const LlmProviderSchema = z.enum([
   "mock",
   "ollama",
   "openai",
   "anthropic",
   "local",
+  "literal",
 ]);
 
 // Persisted run records live under `.ontology/runs/run_<id>.json`.
