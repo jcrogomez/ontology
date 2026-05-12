@@ -37,6 +37,14 @@ export interface CompilePlanRunOptions {
   // independence guarantee callers want when one branch ships ahead of
   // another.
   branch?: string;
+  // Optional artifact-write target for the focal step. Upstream steps in
+  // the plan still write to the default generated/ directory; only the
+  // focal node — the one the caller explicitly named — lands at the
+  // override path. This mirrors the Legend usage: "regenerate file X
+  // from its node and overwrite the source path" is a focal operation;
+  // upstream nodes remain in the generated/ tree where their identity
+  // hash leads.
+  targetPath?: string;
 }
 
 export interface CompilePlanStepResult {
@@ -186,6 +194,10 @@ export async function runCompilePlan(options: CompilePlanRunOptions): Promise<Co
       cwd,
       upstream,
       registry,
+      // Apply --target only at the focal step. Upstream parents continue
+      // to land in the default generated/ tree; mass-redirecting every
+      // step would smash multiple artifacts onto a single path.
+      targetPath: step.nodeId === options.focalId ? options.targetPath : undefined,
     });
 
     if (!stepResult.ok) {

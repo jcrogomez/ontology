@@ -18,6 +18,12 @@ export interface CompileRunOptions {
   // The focal must itself be on the branch; otherwise the command exits
   // 1 rather than silently retargeting.
   branch?: string;
+  // Write the focal node's compiled artifact to this path instead of the
+  // default `.ontology/artifacts/generated/<nodeId>.<ext>`. Relative
+  // paths resolve against cwd; missing parent directories are created.
+  // The Legend "regenerate this file from intent" loop is the primary
+  // caller — upstream artifacts still land under generated/.
+  target?: string;
 }
 
 // `onto compile <nodeId>`
@@ -58,6 +64,7 @@ export async function compileRunCommand(focalId: string, options: CompileRunOpti
     runtimeCheck: options.runtimeCheck,
     runtimeCheckTimeoutMs: options.runtimeCheckTimeoutMs,
     branch: options.branch,
+    targetPath: options.target,
   });
 
   if (!result.ok) {
@@ -108,6 +115,7 @@ export async function compileRunCommand(focalId: string, options: CompileRunOpti
   console.log(`=== ONTOLOGY COMPILE ===`);
   console.log(`Focal:     ${result.focalId}`);
   if (options.branch) console.log(`Branch:    ${options.branch}`);
+  if (options.target) console.log(`Target:    ${options.target}`);
   console.log(`Provider:  ${provider ?? "per-node (model.ref)"}`);
   console.log(`Steps:     ${result.steps.length}`);
   console.log(``);

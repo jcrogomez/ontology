@@ -31,6 +31,7 @@ import { proposeNodeCommand } from "./commands/proposal/propose-node.js";
 import { proposeLinkCommand } from "./commands/proposal/propose-link.js";
 import { compilePlanCommand } from "./commands/compile/plan.js";
 import { compileRunCommand } from "./commands/compile/run.js";
+import { compileRunBatchCommand } from "./commands/compile/run-batch.js";
 import { proposalListCommand } from "./commands/proposal/list.js";
 import { proposalShowCommand } from "./commands/proposal/show.js";
 import { proposalRejectCommand } from "./commands/proposal/reject.js";
@@ -726,12 +727,34 @@ compile
   .option("--runtime-check", "After parse-check, execute the artifact (with timeout) and fail with runtime_failed on non-zero exit")
   .option("--runtime-check-timeout-ms <ms>", "Wall-clock timeout for the runtime check (default 5000, max 60000)", (v) => parseInt(v, 10))
   .option("--branch <name>", "Restrict the compile to the Grothendieck fiber over <name>: only intra-branch edges participate in the plan, and the focal must itself live on that branch.")
+  .option("--target <path>", "Write the focal's compiled artifact to <path> instead of .ontology/artifacts/generated/<nodeId>.<ext>. Relative paths resolve against cwd; missing parents are created. Upstream steps still land under generated/.")
   .option("--json", "Output results in JSON format")
   .action(async (id, options) => {
     try {
       await compileRunCommand(id, options);
     } catch (err: unknown) {
       console.error(`✖ Error during compile: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+compile
+  .command("run-batch")
+  .description("Compile multiple focals in one invocation, sharing the per-run cache across plans. Pre-foundation for Project Legend's multi-file verify-homeomorphism.")
+  .option("--all-artifacts", "Compile every node whose coordinates.manifestation is \"code\". Mutually exclusive with --nodes.")
+  .option("--nodes <ids>", "Comma-separated list of focal node ids to compile. Mutually exclusive with --all-artifacts.")
+  .option("--provider <provider>", "LLM provider override (mock or ollama). When omitted, each node compiles via its own model.ref resolved through the registry.")
+  .option("--model <model>", "Model override (only meaningful with --provider).")
+  .option("--ollama-host <host>", "Host for Ollama provider.")
+  .option("--runtime-check", "After parse-check, execute each artifact and fail its focal with runtime_failed on non-zero exit.")
+  .option("--runtime-check-timeout-ms <ms>", "Wall-clock timeout for the runtime check (default 5000, max 60000).", (v) => parseInt(v, 10))
+  .option("--branch <name>", "Restrict the batch to focals living on the named branch; the plan walk is fibre-scoped for each focal as well.")
+  .option("--json", "Output results in JSON format")
+  .action(async (options) => {
+    try {
+      await compileRunBatchCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during compile run-batch: ${errorMessage(err)}`);
       process.exit(1);
     }
   });

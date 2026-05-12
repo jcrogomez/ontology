@@ -105,6 +105,12 @@ export interface CompileNodeOptions {
   // and hashed into `PersistedRunInput.contextHash` so the run id reflects
   // both the focal prompt and the lineage that informed it.
   upstream?: UpstreamContextItem[];
+  // Optional artifact write target. When set, the compiled artifact is
+  // written to this path instead of the default
+  // `.ontology/artifacts/generated/<nodeId>.<ext>`. Threaded into
+  // writeArtifact unchanged; the rest of the pipeline (validate, runtime
+  // check, emit event) operates on the resulting absolutePath.
+  targetPath?: string;
 }
 
 export type CompileNodeFailureReason =
@@ -395,6 +401,7 @@ function writeArtifactE(
         node: input.options.node,
         content,
         cwd: input.options.cwd,
+        targetPath: input.options.targetPath,
       });
       return {
         value: ok(artifact),

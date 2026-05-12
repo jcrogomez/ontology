@@ -21,6 +21,14 @@ export interface WriteArtifactOptions {
   node: OntologyNode;
   content: string;
   cwd?: string;
+  // Optional override: write the artifact to this path instead of the
+  // default `.ontology/artifacts/generated/<nodeId>.<ext>`. The path may
+  // be absolute or relative to `cwd`; missing parent directories are
+  // created. The extension is taken from the override (so a target
+  // ending in `.py` keeps `.py` regardless of the manifestation mapping)
+  // — Legend's verify-homeomorphism flow needs to land artifacts at the
+  // real source path, byte-for-byte comparable to the file on disk.
+  targetPath?: string;
 }
 
 export interface WriteArtifactResult {
@@ -32,10 +40,31 @@ export interface WriteArtifactResult {
   relativePath: string;
   extension: string;
   bytesWritten: number;
+  // True when the artifact was written to an explicit target path rather
+  // than the default generated directory. Lets downstream observers
+  // (events, batch report) flag overridden writes.
+  targeted: boolean;
 }
 
 export function writeArtifact(options: WriteArtifactOptions): WriteArtifactResult {
   const cwd = options.cwd ?? process.cwd();
+
+  if (options.targetPath !== undefined) {
+    const absolutePath = path.isAbsolute(options.targetPath)
+      ? options.targetPath
+      : path.resolve(cwd, options.targetPath);
+    ensureDir(path.dirname(absolutePath));
+    fs.writeFileSync(absolutePath, options.content, "utf-8");
+    const ext = path.extname(absolutePath);
+    return {
+      absolutePath,
+      relativePath: path.relative(cwd, absolutePath),
+      extension: ext.startsWith(".") ? ext.slice(1) : ext,
+      bytesWritten: Buffer.byteLength(options.content, "utf-8"),
+      targeted: true,
+    };
+  }
+
   const paths = getOntologyPaths(cwd);
 
   const extension = resolveArtifactExtension({
@@ -55,5 +84,6 @@ export function writeArtifact(options: WriteArtifactOptions): WriteArtifactResul
     relativePath,
     extension,
     bytesWritten: Buffer.byteLength(options.content, "utf-8"),
+    targeted: false,
   };
 }
