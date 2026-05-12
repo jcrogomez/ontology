@@ -11,7 +11,7 @@ import { createProposal } from "../../core/proposals/persist.js";
 import { dispatchLlmRequest } from "../../runtime/llm/dispatcher.js";
 import type { LlmProvider, LlmResponse } from "../../runtime/llm/types.js";
 import {
-  collectTypeScriptFiles,
+  collectSourceFiles,
   inferEdgesFromDirectory,
 } from "../../runtime/static/typescript.js";
 import { errorMessage } from "../../core/errors.js";
@@ -80,6 +80,14 @@ export interface IngestCommandOptions {
   // against the mock provider with zero LLM cost.
   dryRun?: boolean;
   json?: boolean;
+  // Comma-separated file extensions to ingest in directory mode.
+  // Default: "ts,tsx". For a Python project pass "--include py";
+  // for a mixed Python/TS repo pass "--include py,ts,tsx". Has no
+  // effect on single-file mode (the path argument identifies the
+  // file directly). The per-file extraction is text-content-only;
+  // the LLM handles whatever language is in the file, the walker
+  // just picks which files to feed it.
+  include?: string;
 }
 
 // The extraction system prompt. The Anthropic adapter tags this block
@@ -293,6 +301,11 @@ export async function ingestCommand(
   }
 
   if (stat.isDirectory()) {
+    const extensions = parseIncludeFlag(options.include);
+    if (extensions.length === 0) {
+      failWith(`--include resolved to an empty extension list. Pass at least one extension (e.g. --include py,md).`, options.json);
+      return;
+    }
     await runDirectoryIngest(pathArg, {
       provider,
       model: options.model,
@@ -301,6 +314,7 @@ export async function ingestCommand(
       parentHash: parentNode.integrity.hash,
       dryRun: !!options.dryRun,
       json: !!options.json,
+      extensions,
     });
     return;
   }
@@ -444,6 +458,10 @@ interface DirectoryOptions {
   parentHash: string;
   dryRun: boolean;
   json: boolean;
+  // File extensions to include in the walk. Comes from --include
+  // (parsed by parseIncludeFlag). Always non-empty when this struct
+  // is constructed.
+  extensions: string[];
 }
 
 interface PerFileSummary {
@@ -462,7 +480,8 @@ async function runDirectoryIngest(
   opts: DirectoryOptions,
 ): Promise<void> {
   const absDir = path.resolve(dirPath);
-  const files = collectTypeScriptFiles(absDir);
+  const files = collectSourceFiles(absDir, opts.extensions);
+  const extLabel = opts.extensions.map((e) => `.${e}`).join("/");
   if (files.length === 0) {
     if (opts.json) {
       console.log(
@@ -475,7 +494,7 @@ async function runDirectoryIngest(
             results: [],
             edges: [],
             message:
-              "No .ts/.tsx files found under the directory (after skipping node_modules / dist / .ontology / __tests__ / .git / coverage).",
+              `No ${extLabel} files found under the directory (after skipping node_modules / dist / .ontology / __tests__ / .git / coverage).`,
           },
           null,
           2,
@@ -484,9 +503,10 @@ async function runDirectoryIngest(
     } else {
       console.log(`=== ONTOLOGY INGEST — DIRECTORY ===`);
       console.log(`Root:        ${dirPath}`);
+      console.log(`Include:     ${extLabel}`);
       console.log(`Files:       0`);
       console.log(``);
-      console.log(`No .ts/.tsx files found under the directory.`);
+      console.log(`No ${extLabel} files found under the directory.`);
     }
     return;
   }
@@ -559,15 +579,21 @@ async function runDirectoryIngest(
     });
   }
 
-  // Edge inference is pure static analysis — runs in milliseconds,
-  // no LLM cost, useful regardless of dry-run mode. γ-6 will turn
-  // this into edge_create proposals after the node proposals apply.
-  const inferredEdges = inferEdgesFromDirectory(absDir).map((e) => ({
-    fromFile: path.relative(absDir, e.fromFile),
-    toFile: path.relative(absDir, e.toFile),
-    type: e.type,
-    tokens: e.tokens,
-  }));
+  // Edge inference (γ-4) is TS-only: the parser walks TypeScript
+  // AST nodes for import / export declarations. For other-language
+  // ingests (e.g. --include py) we skip the inference and surface
+  // an empty edge list — a future γ-7+ can add per-language
+  // parsers if the use case materialises.
+  const wantsTsInference =
+    opts.extensions.includes("ts") || opts.extensions.includes("tsx");
+  const inferredEdges = wantsTsInference
+    ? inferEdgesFromDirectory(absDir).map((e) => ({
+        fromFile: path.relative(absDir, e.fromFile),
+        toFile: path.relative(absDir, e.toFile),
+        type: e.type,
+        tokens: e.tokens,
+      }))
+    : [];
 
   const okCount = results.filter((r) => r.ok).length;
   const failedCount = results.length - okCount;
@@ -721,6 +747,25 @@ function createNodeProposalForExtraction(
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
+
+// Parse the comma-separated --include flag. Default to ["ts", "tsx"]
+// when unset — the historical γ-5 behaviour. Lowercases, strips
+// leading dots, filters empties, and dedupes. Returns the cleaned
+// list (which may be empty if the user passed `--include ""` or
+// `--include ,,` — the caller surfaces that as a hard error).
+function parseIncludeFlag(raw: string | undefined): string[] {
+  if (raw === undefined) return ["ts", "tsx"];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const piece of raw.split(",")) {
+    const cleaned = piece.toLowerCase().replace(/^\./, "").trim();
+    if (cleaned.length === 0) continue;
+    if (seen.has(cleaned)) continue;
+    seen.add(cleaned);
+    out.push(cleaned);
+  }
+  return out;
+}
 
 // Compute a cwd-relative path that survives macOS symlinks. `/tmp` →
 // `/private/tmp` and `/var` → `/private/var`; `process.cwd()` returns

@@ -496,6 +496,107 @@ describe("onto ingest <directory> (γ-5 multi-file)", () => {
     expect(parsed.results[0].extracted.label).toBe("real");
   });
 
+  it("--include py picks up Python files, skips .ts (smoke test for non-TS ingest)", () => {
+    // Mock fixture is identical shape regardless of language — the
+    // walker just decides which files to feed the LLM. This pins
+    // that --include redirects the walk away from the TS default.
+    const srcDir = path.join(tempDir, "src");
+    fs.mkdirSync(srcDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(srcDir, "real.py"),
+      `# Real Python file\n# mock-fixture\n${JSON.stringify({
+        label: "python-leaf",
+        level: "unit",
+        kind: "rule",
+        prompt: "x",
+      })}\n`,
+    );
+    fs.writeFileSync(
+      path.join(srcDir, "ignored.ts"),
+      `/* mock-fixture\n${JSON.stringify({
+        label: "ts-not-included",
+        level: "unit",
+        kind: "rule",
+        prompt: "x",
+      })}\n*/`,
+    );
+
+    const r = runCli(tempDir, [
+      "ingest", srcDir,
+      "--provider", "mock",
+      "--include", "py",
+      "--dry-run",
+      "--json",
+    ]);
+    expect(r.status).toBe(0);
+    const parsed = JSON.parse(r.stdout);
+    expect(parsed.fileCount).toBe(1);
+    expect(parsed.results[0].extracted.label).toBe("python-leaf");
+    // γ-4 inference is TS-only; for a py-only walk, edges are empty.
+    expect(parsed.edges).toEqual([]);
+  });
+
+  it("--include py,ts ingests both languages but γ-4 edges only cover the TS portion", () => {
+    const srcDir = path.join(tempDir, "src");
+    fs.mkdirSync(srcDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(srcDir, "a.ts"),
+      [
+        `import { foo } from "./b.js";`,
+        `/* mock-fixture`,
+        JSON.stringify({ label: "a-ts", level: "unit", kind: "rule", prompt: "x" }),
+        `*/`,
+      ].join("\n"),
+    );
+    fs.writeFileSync(
+      path.join(srcDir, "b.ts"),
+      [
+        `export const foo = 1;`,
+        `/* mock-fixture`,
+        JSON.stringify({ label: "b-ts", level: "unit", kind: "rule", prompt: "x" }),
+        `*/`,
+      ].join("\n"),
+    );
+    fs.writeFileSync(
+      path.join(srcDir, "side.py"),
+      `# mock-fixture\n${JSON.stringify({
+        label: "side-py",
+        level: "unit",
+        kind: "rule",
+        prompt: "x",
+      })}\n`,
+    );
+
+    const r = runCli(tempDir, [
+      "ingest", srcDir,
+      "--provider", "mock",
+      "--include", "py,ts",
+      "--dry-run",
+      "--json",
+    ]);
+    expect(r.status).toBe(0);
+    const parsed = JSON.parse(r.stdout);
+    expect(parsed.fileCount).toBe(3);
+    // γ-4 inference still runs on the TS subset (a.ts → b.ts is
+    // depends_on). It does NOT try to wire the .py file into the
+    // graph — that would need a Python import parser.
+    expect(parsed.edges).toHaveLength(1);
+    expect(parsed.edges[0].fromFile).toBe("a.ts");
+    expect(parsed.edges[0].toFile).toBe("b.ts");
+  });
+
+  it("rejects an empty --include list", () => {
+    const srcDir = path.join(tempDir, "src");
+    fs.mkdirSync(srcDir, { recursive: true });
+    const r = runCli(tempDir, [
+      "ingest", srcDir,
+      "--provider", "mock",
+      "--include", ",,",
+    ]);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/empty extension list/);
+  });
+
   it("continues past a per-file failure and reports it in the per-file results", () => {
     const srcDir = path.join(tempDir, "src");
     fs.mkdirSync(srcDir, { recursive: true });

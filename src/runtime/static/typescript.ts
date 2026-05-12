@@ -489,11 +489,36 @@ const SKIP_DIRS = new Set([
 // Walk `rootDir` recursively and return absolute paths to every
 // `.ts` / `.tsx` file under it, skipping the conventional noise
 // directories (`node_modules`, `dist`, `.ontology`, `__tests__`,
-// `.git`, `coverage`). Exported so `onto ingest <directory>` (γ-5)
-// can reuse the same traversal as `inferEdgesFromDirectory`. Sorted
-// output ensures deterministic per-file proposal ordering across
-// runs.
+// `.git`, `coverage`). Used by γ-4's `inferEdgesFromDirectory` —
+// the TS-specific import parser ONLY makes sense on TS files, so
+// this helper is intentionally typed to that surface. For
+// language-agnostic walks (e.g. γ-5's `onto ingest --include py`),
+// use `collectSourceFiles` below.
 export function collectTypeScriptFiles(rootDir: string): string[] {
+  return collectSourceFiles(rootDir, ["ts", "tsx"]);
+}
+
+// Generalised walker — same skip rules and sorting, but accepts the
+// list of file extensions to include. γ-5 uses this so `onto ingest
+// <directory> --include py` (or `--include py,md`) can ingest a
+// Python codebase or a mixed-language project; the per-file
+// extraction is text-content-only and doesn't depend on the source
+// language having a TS-style import parser.
+//
+// Extensions are matched case-insensitively, accept with or without
+// the leading dot (".py" or "py" both work), and never include
+// directories or files without an extension.
+export function collectSourceFiles(
+  rootDir: string,
+  extensions: string[],
+): string[] {
+  // Normalise: lower-case, strip leading dot, ignore empties.
+  const wanted = new Set(
+    extensions
+      .map((e) => e.toLowerCase().replace(/^\./, "").trim())
+      .filter((e) => e.length > 0)
+      .map((e) => `.${e}`),
+  );
   const out: string[] = [];
   walk(rootDir);
   return out.sort();
@@ -512,7 +537,7 @@ export function collectTypeScriptFiles(rootDir: string): string[] {
         walk(full);
       } else if (entry.isFile()) {
         const ext = path.extname(entry.name).toLowerCase();
-        if (ext === ".ts" || ext === ".tsx") out.push(full);
+        if (wanted.has(ext)) out.push(full);
       }
     }
   }
