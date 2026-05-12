@@ -15,6 +15,11 @@ import {
   inferEdgesFromDirectory,
 } from "../../runtime/static/typescript.js";
 import { errorMessage } from "../../core/errors.js";
+import {
+  computeCostEstimate,
+  formatCostEstimateHuman,
+  readFileSizeInfos,
+} from "./cost-estimate.js";
 
 // `onto ingest <path>` — Project Legend Phase γ-1 + γ-5.
 //
@@ -88,6 +93,14 @@ export interface IngestCommandOptions {
   // the LLM handles whatever language is in the file, the walker
   // just picks which files to feed it.
   include?: string;
+  // Pre-flight cost guard: walk the inputs, count characters per
+  // file, multiply by published rates for the resolved provider,
+  // print the breakdown, exit WITHOUT dispatching the LLM. Safer
+  // than --dry-run for cost discovery — --dry-run still pays for
+  // the API call (it skips only the proposal write). --cost-estimate
+  // never dispatches and never reads file *contents* (only sizes),
+  // so it is safe to run against arbitrary trees.
+  costEstimate?: boolean;
 }
 
 // The extraction system prompt. The Anthropic adapter tags this block
@@ -291,6 +304,41 @@ export async function ingestCommand(
 
   const provider = resolveProvider(options);
   if (provider === undefined) return; // resolveProvider already failed.
+
+  // Cost-estimate short-circuit. Runs entirely locally: walks the
+  // input(s), reads file SIZES (statSync, not contents), feeds the
+  // estimator, prints, exits. No LLM dispatch; no parent-node lookup
+  // (the user might be exploring before having a project initialised
+  // at all). Safe to run against any tree, including trees outside a
+  // .ontology project.
+  if (options.costEstimate) {
+    let targetFiles: string[];
+    if (stat.isDirectory()) {
+      const extensions = parseIncludeFlag(options.include);
+      if (extensions.length === 0) {
+        failWith(
+          `--include resolved to an empty extension list. Pass at least one extension (e.g. --include py,md).`,
+          options.json,
+        );
+        return;
+      }
+      targetFiles = collectSourceFiles(path.resolve(pathArg), extensions);
+    } else {
+      targetFiles = [pathArg];
+    }
+    const sizeInfos = readFileSizeInfos(targetFiles);
+    const estimate = computeCostEstimate(
+      sizeInfos,
+      provider,
+      options.model,
+    );
+    if (options.json) {
+      console.log(JSON.stringify({ ok: true, estimate }, null, 2));
+    } else {
+      console.log(formatCostEstimateHuman(estimate));
+    }
+    return;
+  }
 
   const state = loadState();
   const parentNodeId = options.parent ?? state.rootNodeId;

@@ -789,6 +789,7 @@ program
   .option("--ollama-host <host>", "Host for Ollama provider.")
   .option("--parent <nodeId>", "Parent node id for the proposed node. Defaults to the project root canon.")
   .option("--dry-run", "Dispatch + parse + print the extraction, but do NOT create a proposal. Use to iterate the extraction template without piling up rejected proposals.")
+  .option("--cost-estimate", "Pre-flight cost guard: walk the inputs, count file sizes, multiply by published rates for the resolved provider, print the breakdown, and exit WITHOUT dispatching the LLM. Run this before any anthropic ingest on a large tree to confirm the cost. Unlike --dry-run, --cost-estimate makes ZERO API calls.")
   .option("--include <exts>", "Directory mode only: comma-separated file extensions to ingest (default: ts,tsx). Use --include py for a Python project, --include py,ts,tsx for a mixed repo. Has no effect on single-file mode. Static-edge inference (γ-4) stays TS-only — non-TS ingests skip the cross-file edge report.")
   .option("--json", "Output results in JSON format.")
   .action(async (file, options) => {
