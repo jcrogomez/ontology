@@ -98,7 +98,7 @@ describe("onto ingest <file>", () => {
     expect(proposals).toEqual([]);
   });
 
-  it("commit path creates a proposal with the extracted intent + rich fields in rationale", () => {
+  it("commit path creates a proposal whose payload carries the rich extracted fields directly (γ-3)", () => {
     fs.writeFileSync(srcFile, VALID_EXTRACTION_JSON);
     const r = runCli(tempDir, [
       "ingest", srcFile,
@@ -112,8 +112,9 @@ describe("onto ingest <file>", () => {
     expect(parsed.proposal.mutationKind).toBe("node_create");
     expect(parsed.proposal.id).toMatch(/^proposal_/);
 
-    // The proposal lives on disk and carries the rationale JSON with
-    // the rich extracted fields.
+    // The proposal lives on disk and carries the rich fields ON THE
+    // PAYLOAD (γ-3) — not buried in provenance.rationale anymore. Apply
+    // can thread them straight to createNode.
     const proposalPath = path.join(
       tempDir,
       ".ontology/proposals",
@@ -122,22 +123,73 @@ describe("onto ingest <file>", () => {
     expect(fs.existsSync(proposalPath)).toBe(true);
     const onDisk = JSON.parse(fs.readFileSync(proposalPath, "utf-8"));
     expect(onDisk.mutation.kind).toBe("node_create");
-    expect(onDisk.mutation.payload.level).toBe("artifact");
-    expect(onDisk.mutation.payload.kind).toBe("artifact");
-    expect(onDisk.mutation.payload.parentNodeId).toBe("node_0000_canon");
-    expect(onDisk.mutation.payload.label).toBe("Integrity hashing primitives");
-
-    // Rich extracted fields ride in provenance.rationale (JSON).
-    const rationale = JSON.parse(onDisk.provenance.rationale);
-    expect(rationale.extractedFields.manifestation).toBe("code");
-    expect(rationale.extractedFields.language).toBe("typescript");
-    expect(rationale.extractedFields.requires).toEqual([
+    const payload = onDisk.mutation.payload;
+    expect(payload.level).toBe("artifact");
+    expect(payload.kind).toBe("artifact");
+    expect(payload.parentNodeId).toBe("node_0000_canon");
+    expect(payload.label).toBe("Integrity hashing primitives");
+    // Rich fields, now first-class on the payload:
+    expect(payload.manifestation).toBe("code");
+    expect(payload.language).toBe("typescript");
+    expect(payload.requires).toEqual([
       "createHash",
       "fast_json_stable_stringify",
     ]);
-    expect(rationale.extractedFields.provides).toContain("hashObject");
-    expect(rationale.extractedFields.forbids).toContain("console.log");
+    expect(payload.provides).toContain("hashObject");
+    expect(payload.forbids).toContain("console.log");
+    expect(payload.rules).toEqual([
+      "REQUIRE: prefixed digests use '<kind>:hash:<digest>' convention",
+    ]);
+
+    // provenance.rationale now carries extractor metadata only (no
+    // extractedFields). This is the audit trail showing WHO produced
+    // the proposal.
+    const rationale = JSON.parse(onDisk.provenance.rationale);
+    expect(rationale.extractedFrom).toMatch(/fixture\.ts$/);
     expect(rationale.extractorProvider).toBe("mock");
+    expect(rationale.extractedFields).toBeUndefined();
+  });
+
+  it("apply produces a node with all the rich fields set in one step (γ-3 round-trip)", () => {
+    // The whole point of γ-3: ingest produces a proposal, apply uses
+    // the rich payload to create a COMPLETE node — no follow-up
+    // `onto node update --requires ... --provides ...` needed.
+    fs.writeFileSync(srcFile, VALID_EXTRACTION_JSON);
+    const ingestResult = runCli(tempDir, [
+      "ingest", srcFile,
+      "--provider", "mock",
+      "--json",
+    ]);
+    expect(ingestResult.status).toBe(0);
+    const proposalId = JSON.parse(ingestResult.stdout).proposal.id;
+
+    const applyResult = runCli(tempDir, ["proposal", "apply", proposalId, "--json"]);
+    expect(applyResult.status).toBe(0);
+    const applyParsed = JSON.parse(applyResult.stdout);
+    expect(applyParsed.ok).toBe(true);
+
+    // The created node carries every rich field the extractor produced.
+    const newNodeId = applyParsed.mutation.createdEntityId;
+    expect(newNodeId).toMatch(/^node_/);
+    const nodePath = path.join(tempDir, ".ontology/nodes", `${newNodeId}.json`);
+    const node = JSON.parse(fs.readFileSync(nodePath, "utf-8"));
+
+    expect(node.label).toBe("Integrity hashing primitives");
+    expect(node.coordinates.abstraction).toBe("artifact");
+    expect(node.kind).toBe("artifact");
+    expect(node.coordinates.manifestation).toBe("code");
+    expect(node.technical.language).toBe("typescript");
+    // context.requires is the structured-token list. Each entry is
+    // {source, nodeType:"declared"}; we map back to bare strings.
+    expect(node.context.requires.map((r: any) => r.source)).toEqual([
+      "createHash",
+      "fast_json_stable_stringify",
+    ]);
+    expect(node.context.provides.map((p: any) => p.key)).toContain("hashObject");
+    expect(node.context.forbids.map((f: any) => f.source)).toContain("console.log");
+    expect(node.rules).toEqual([
+      "REQUIRE: prefixed digests use '<kind>:hash:<digest>' convention",
+    ]);
   });
 
   it("rejects invalid JSON from the extractor", () => {

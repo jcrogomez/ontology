@@ -263,21 +263,17 @@ export async function ingestCommand(
     return;
   }
 
-  // 7. Create the proposal. The proposal payload carries only the
-  // fields ProposalNodeCreatePayloadSchema supports today (level /
-  // kind / prompt / label / parentNodeId). The rich fields ride
-  // along in provenance.rationale as JSON so the user can see them
-  // and apply them via `onto node update` after acceptance.
+  // 7. Create the proposal. The rich fields (manifestation, language,
+  // requires/provides/forbids, rules) ride on the payload directly
+  // since γ-3 extended ProposalNodeCreatePayloadSchema; applyNodeCreate
+  // threads them straight to createNode so a single
+  // `onto proposal apply` produces a complete node — no follow-up
+  // `onto node update --requires ... --provides ...` needed.
+  // provenance.rationale carries the extractor metadata only so the
+  // audit chain records WHO produced the proposal (which model, off
+  // which file).
   const rationalePayload = {
     extractedFrom: cwdRelative || filePath,
-    extractedFields: {
-      manifestation: extracted.manifestation ?? null,
-      language: extracted.language ?? null,
-      requires: extracted.requires ?? [],
-      provides: extracted.provides ?? [],
-      forbids: extracted.forbids ?? [],
-      rules: extracted.rules ?? [],
-    },
     extractorModel: response.model,
     extractorProvider: response.provider,
   };
@@ -292,6 +288,15 @@ export async function ingestCommand(
           prompt: extracted.prompt,
           label: extracted.label,
           parentNodeId,
+          // Rich fields, all optional — only forwarded when the
+          // extractor actually emitted them. Falls back to createNode's
+          // defaults when absent.
+          ...(extracted.manifestation !== undefined ? { manifestation: extracted.manifestation } : {}),
+          ...(extracted.language !== undefined ? { language: extracted.language } : {}),
+          ...(extracted.requires !== undefined ? { requires: extracted.requires } : {}),
+          ...(extracted.provides !== undefined ? { provides: extracted.provides } : {}),
+          ...(extracted.forbids !== undefined ? { forbids: extracted.forbids } : {}),
+          ...(extracted.rules !== undefined ? { rules: extracted.rules } : {}),
         },
         parentHash: parentNode.integrity.hash,
       },
@@ -426,22 +431,7 @@ function printExtraction(
     console.log(``);
     console.log(`Next:`);
     console.log(`  onto proposal show ${meta.proposalId}`);
-    console.log(`  onto proposal apply ${meta.proposalId}`);
-    console.log(`  # after apply, patch the new node with rich extracted fields:`);
-    console.log(`  onto node update <newNodeId> --manifestation ${extracted.manifestation ?? "code"} ${extracted.language ? `--language ${extracted.language}` : ""} \\`);
-    const requiresFlag = extracted.requires?.length
-      ? ` --requires "${extracted.requires.join(",")}"`
-      : "";
-    const providesFlag = extracted.provides?.length
-      ? ` --provides "${extracted.provides.join(",")}"`
-      : "";
-    const forbidsFlag = extracted.forbids?.length
-      ? ` --forbids "${extracted.forbids.join(",")}"`
-      : "";
-    const rulesFlag = extracted.rules?.length
-      ? ` --rules "${extracted.rules.join("|")}"`
-      : "";
-    console.log(`    ${requiresFlag.trim()}${providesFlag} ${forbidsFlag} ${rulesFlag}`.trim());
+    console.log(`  onto proposal apply ${meta.proposalId}    # creates the node with all extracted fields in one step`);
   } else if (!meta.committed) {
     console.log(``);
     console.log(`Dry run — no proposal created. Re-run without --dry-run to commit.`);

@@ -397,12 +397,39 @@ export const ProposalSourceSchema = z.object({
 
 // node_create: propose adding a new node as a child of an existing parent.
 // parentHash pins the proposal to the parent's state at creation time.
+//
+// The base fields (level / kind / prompt / label / parentNodeId) have
+// been on this schema since the proposal system shipped. The optional
+// "rich" fields (manifestation / language / requires / provides /
+// forbids / rules / literal) were added in Project Legend γ-3 so
+// `onto ingest` can produce proposals that, when applied, create a
+// complete node in one step — no follow-up `onto node update --requires
+// ... --provides ...` needed. The fields mirror the equivalents on
+// CreateNodeOptions and OntologyNode, so a proposal with everything
+// set is a 1:1 description of the node that apply will create.
+//
+// All rich fields are optional + nullable, so:
+//   - Pre-γ-3 proposals (which never set these) keep parsing.
+//   - The discriminator on apply is `payload.<field> !== undefined`:
+//     undefined → use createNode's default (e.g. manifestation "intent"
+//     when the field is missing); set → thread to createNode verbatim.
 export const ProposalNodeCreatePayloadSchema = z.object({
   level: AbstractionLevelSchema,
   kind: NodeKindSchema,
   prompt: z.string(),
   label: z.string().nullable().default(null),
   parentNodeId: z.string().startsWith("node_"),
+  // Rich fields — optional, mirror the equivalents on createNode.
+  manifestation: ManifestationSchema.optional(),
+  language: z.string().optional(),
+  requires: z.array(z.string()).optional(),
+  provides: z.array(z.string()).optional(),
+  forbids: z.array(z.string()).optional(),
+  rules: z.array(z.string()).optional(),
+  // The β-2 literal escape hatch can also be proposed: an ingest run
+  // can flag a node as "pin verbatim" so apply creates it with
+  // node.literal already set.
+  literal: z.string().optional(),
 });
 
 // edge_create: propose adding a typed edge between two existing nodes.

@@ -385,12 +385,26 @@ function applyNodeCreate(
 
   let nodeResult;
   try {
+    // Thread the optional rich fields straight to createNode. They
+    // landed on the proposal payload in γ-3 so `onto ingest` can
+    // produce a complete-node proposal — when the fields are absent,
+    // createNode's existing defaults apply (manifestation "intent",
+    // no language, empty contract / rules). Each field is only
+    // forwarded when defined so pre-γ-3 proposals (which never set
+    // these) behave identically.
     nodeResult = createNode({
       level: current.mutation.payload.level,
       kind: current.mutation.payload.kind,
       prompt: current.mutation.payload.prompt,
       label: current.mutation.payload.label ?? undefined,
       parentNodeId: current.mutation.payload.parentNodeId,
+      manifestation: current.mutation.payload.manifestation,
+      language: current.mutation.payload.language,
+      requires: current.mutation.payload.requires,
+      provides: current.mutation.payload.provides,
+      forbids: current.mutation.payload.forbids,
+      rules: current.mutation.payload.rules,
+      literal: current.mutation.payload.literal,
       eventMetadata: { sourceProposalId: id },
     });
   } catch (err: unknown) {
