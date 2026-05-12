@@ -4,6 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import {
   writeArtifact,
+  writeArtifactPending,
   TargetExistsError,
 } from "../../../src/runtime/compile/artifact-writer.js";
 import {
@@ -158,5 +159,124 @@ describe("writeArtifact — target safety", () => {
     });
     expect(result.targeted).toBe(false);
     expect(result.relativePath).toBe(".ontology/artifacts/generated/node_artifact_x.py");
+  });
+});
+
+describe("writeArtifactPending — two-phase commit", () => {
+  let workDir: string;
+
+  beforeEach(() => {
+    workDir = fs.mkdtempSync(path.join(os.tmpdir(), "artifact-writer-pending-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(workDir, { recursive: true, force: true });
+  });
+
+  it("staging writes to <finalPath>.tmp.<pid>, NOT to finalPath", () => {
+    fs.mkdirSync(path.join(workDir, "src"), { recursive: true });
+    const pending = writeArtifactPending({
+      node: makeArtifactNode(),
+      content: "x",
+      cwd: workDir,
+      targetPath: "src/main.py",
+    });
+    // Final path does NOT exist yet — only the staging path does.
+    expect(fs.existsSync(path.join(workDir, "src/main.py"))).toBe(false);
+    expect(fs.existsSync(pending.stagingPath)).toBe(true);
+    expect(pending.stagingPath).toMatch(/main\.py\.tmp\.\d+$/);
+    pending.commit();
+    // After commit: final exists, staging is gone.
+    expect(fs.existsSync(path.join(workDir, "src/main.py"))).toBe(true);
+    expect(fs.existsSync(pending.stagingPath)).toBe(false);
+  });
+
+  it("rollback unlinks the staging file without touching the final path", () => {
+    fs.mkdirSync(path.join(workDir, "src"), { recursive: true });
+    const existing = path.join(workDir, "src/main.py");
+    fs.writeFileSync(existing, "# original\n");
+    const pending = writeArtifactPending({
+      node: makeArtifactNode(),
+      content: 'print("new")',
+      cwd: workDir,
+      targetPath: "src/main.py",
+      force: true,
+    });
+    expect(fs.existsSync(pending.stagingPath)).toBe(true);
+    // The original final file is still its original content — staging
+    // does not touch it.
+    expect(fs.readFileSync(existing, "utf-8")).toBe("# original\n");
+    pending.rollback();
+    // Staging file is gone; original survives.
+    expect(fs.existsSync(pending.stagingPath)).toBe(false);
+    expect(fs.readFileSync(existing, "utf-8")).toBe("# original\n");
+  });
+
+  it("rollback is idempotent (safe to call twice)", () => {
+    fs.mkdirSync(path.join(workDir, "src"), { recursive: true });
+    const pending = writeArtifactPending({
+      node: makeArtifactNode(),
+      content: "x",
+      cwd: workDir,
+      targetPath: "src/new.py",
+    });
+    pending.rollback();
+    // Second call is a no-op, no throw.
+    expect(() => pending.rollback()).not.toThrow();
+  });
+
+  it("rollback after commit is a no-op (does not unlink the committed file)", () => {
+    fs.mkdirSync(path.join(workDir, "src"), { recursive: true });
+    const pending = writeArtifactPending({
+      node: makeArtifactNode(),
+      content: 'print("ok")',
+      cwd: workDir,
+      targetPath: "src/main.py",
+    });
+    pending.commit();
+    pending.rollback();
+    // The committed file survives.
+    expect(fs.existsSync(path.join(workDir, "src/main.py"))).toBe(true);
+    expect(fs.readFileSync(path.join(workDir, "src/main.py"), "utf-8")).toBe('print("ok")');
+  });
+
+  it("commit after rollback throws (no double-disposition)", () => {
+    fs.mkdirSync(path.join(workDir, "src"), { recursive: true });
+    const pending = writeArtifactPending({
+      node: makeArtifactNode(),
+      content: "x",
+      cwd: workDir,
+      targetPath: "src/main.py",
+    });
+    pending.rollback();
+    expect(() => pending.commit()).toThrow(/already rolled back/);
+  });
+
+  it("commit after commit throws (no double-disposition)", () => {
+    fs.mkdirSync(path.join(workDir, "src"), { recursive: true });
+    const pending = writeArtifactPending({
+      node: makeArtifactNode(),
+      content: "x",
+      cwd: workDir,
+      targetPath: "src/main.py",
+    });
+    pending.commit();
+    expect(() => pending.commit()).toThrow(/already committed/);
+  });
+
+  it("TargetExistsError fires at stage time, not at commit time", () => {
+    fs.mkdirSync(path.join(workDir, "src"), { recursive: true });
+    fs.writeFileSync(path.join(workDir, "src/main.py"), "# original");
+    expect(() =>
+      writeArtifactPending({
+        node: makeArtifactNode(),
+        content: "x",
+        cwd: workDir,
+        targetPath: "src/main.py",
+      }),
+    ).toThrow(TargetExistsError);
+    // The original is untouched and there is no staging file.
+    expect(fs.readFileSync(path.join(workDir, "src/main.py"), "utf-8")).toBe("# original");
+    expect(fs.readdirSync(path.join(workDir, "src")).filter((f) => f.includes(".tmp."))).toEqual([]);
   });
 });

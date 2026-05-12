@@ -8,25 +8,27 @@ import type { OntologyNode } from "../../schemas/ontology.js";
 // Writes a compiled artifact to .ontology/artifacts/generated/<nodeId>.<ext>
 // or, when `targetPath` is set, to the user-pinned absolute path.
 //
-// The extension is derived from the node's manifestation (and language tag,
-// if applicable) for the default path. For the targeted path, the extension
-// comes from the override so a `.py` target stays `.py` even if the node's
-// manifestation maps to something else.
+// Two-phase commit (Project Legend calibration finding §0). The
+// staging phase writes content to `<finalPath>.tmp.<pid>` next to the
+// target. The commit phase renames it onto the final path. Validators
+// (parse-check, intent gate, runtime-check) operate on the *staging
+// path* — they don't know it's a tmp file because the parent directory
+// is identical to the final's, so relative imports resolve the same.
+// Only if every validator passes does the caller call `pending.commit()`
+// and the user's source path receive the new bytes. Any failure between
+// stage and commit triggers `pending.rollback()`, which unlinks the
+// staged tmp; the user's pre-existing file (if any) survives untouched.
 //
-// The write is **crash-atomic**: content lands in a sibling
-// `<absolutePath>.tmp.<pid>` file first, then `fs.renameSync` swaps it
-// onto the final path. POSIX rename is atomic when source and destination
-// live on the same filesystem (guaranteed because the temp is in the
-// target's parent directory). A SIGKILL, out-of-disk, or unexpected
-// throw mid-write leaves the pre-existing target intact rather than
-// truncating it. This matters most for `--target` — Legend's
-// verify-homeomorphism flow writes onto user source files, so a partial
-// write would silently destroy code.
+// `writeArtifact` is the convenience wrapper that stages + commits in
+// one call — the same shape as before this refactor, kept for callers
+// that don't need to validate between stage and commit. Internally it
+// calls writeArtifactPending and then commits; failure to commit
+// rolls back automatically.
 //
 // Read-only on the graph: never mutates events.jsonl, edges.jsonl, state.json,
 // or the node files. The compile-node helper (src/runtime/compile/compile-node.ts)
 // is responsible for emitting the compilation_run event AFTER the artifact
-// is on disk.
+// is on disk AND every validator has accepted it.
 
 export interface WriteArtifactOptions {
   node: OntologyNode;
@@ -79,66 +81,124 @@ export interface WriteArtifactResult {
   targeted: boolean;
 }
 
-export function writeArtifact(options: WriteArtifactOptions): WriteArtifactResult {
+// A pending artifact: bytes are staged on disk at `stagingPath` next to
+// `finalPath` but the user's eventual target has not been touched yet.
+// Validators read from `stagingPath`. The caller commits or rolls back
+// based on whether every validator accepted the bytes.
+export interface PendingArtifact {
+  // The disk path validators read from while the write is staged. This
+  // is `<finalPath>.tmp.<pid>` — a sibling of the final path so any
+  // language tooling that resolves relative imports sees the same
+  // ambient directory it would see post-commit.
+  stagingPath: string;
+  // Where the artifact will live after commit succeeds. The compile
+  // event records THIS path (after commit), never the staging path.
+  finalPath: string;
+  // cwd-relative form of finalPath.
+  relativePath: string;
+  extension: string;
+  bytesWritten: number;
+  targeted: boolean;
+  // Atomic rename from stagingPath → finalPath. Returns the committed
+  // result with the user-facing absolute path. Throws on a rename
+  // failure (rare; ENOSPC, EACCES); the caller is responsible for
+  // calling rollback() in that case to remove the leftover staging
+  // file.
+  commit(): WriteArtifactResult;
+  // Remove the staging file. Best-effort: never throws. Safe to call
+  // multiple times. Safe to call after a successful commit (no-op).
+  rollback(): void;
+}
+
+// Two-phase commit entry point. Stages the artifact at a sibling tmp
+// path; returns a PendingArtifact whose `commit` / `rollback` methods
+// drive the final disposition. The caller MUST eventually call one of
+// the two — leaving a PendingArtifact uncommitted is a leak.
+export function writeArtifactPending(options: WriteArtifactOptions): PendingArtifact {
   const cwd = options.cwd ?? process.cwd();
 
+  let finalAbsolutePath: string;
+  let extension: string;
+  let targeted: boolean;
   if (options.targetPath !== undefined) {
-    const absolutePath = path.isAbsolute(options.targetPath)
+    finalAbsolutePath = path.isAbsolute(options.targetPath)
       ? options.targetPath
       : path.resolve(cwd, options.targetPath);
-    if (!options.force && fs.existsSync(absolutePath)) {
-      throw new TargetExistsError(path.relative(cwd, absolutePath));
+    if (!options.force && fs.existsSync(finalAbsolutePath)) {
+      throw new TargetExistsError(path.relative(cwd, finalAbsolutePath));
     }
-    ensureDir(path.dirname(absolutePath));
-    atomicWrite(absolutePath, options.content);
-    const ext = path.extname(absolutePath);
-    return {
-      absolutePath,
-      relativePath: path.relative(cwd, absolutePath),
-      extension: ext.startsWith(".") ? ext.slice(1) : ext,
-      bytesWritten: Buffer.byteLength(options.content, "utf-8"),
-      targeted: true,
-    };
+    const ext = path.extname(finalAbsolutePath);
+    extension = ext.startsWith(".") ? ext.slice(1) : ext;
+    targeted = true;
+  } else {
+    const paths = getOntologyPaths(cwd);
+    extension = resolveArtifactExtension({
+      manifestation: options.node.coordinates.manifestation,
+      language: options.node.technical.language,
+    });
+    const filename = `${options.node.id}.${extension}`;
+    finalAbsolutePath = path.join(paths.generatedArtifactsDir, filename);
+    targeted = false;
   }
 
-  const paths = getOntologyPaths(cwd);
+  ensureDir(path.dirname(finalAbsolutePath));
+  const stagingPath = `${finalAbsolutePath}.tmp.${process.pid}`;
+  fs.writeFileSync(stagingPath, options.content, "utf-8");
 
-  const extension = resolveArtifactExtension({
-    manifestation: options.node.coordinates.manifestation,
-    language: options.node.technical.language,
-  });
-
-  ensureDir(paths.generatedArtifactsDir);
-  const filename = `${options.node.id}.${extension}`;
-  const absolutePath = path.join(paths.generatedArtifactsDir, filename);
-  atomicWrite(absolutePath, options.content);
-
-  const relativePath = path.relative(cwd, absolutePath);
+  const relativePath = path.relative(cwd, finalAbsolutePath);
+  const bytesWritten = Buffer.byteLength(options.content, "utf-8");
+  let committed = false;
+  let rolledBack = false;
 
   return {
-    absolutePath,
+    stagingPath,
+    finalPath: finalAbsolutePath,
     relativePath,
     extension,
-    bytesWritten: Buffer.byteLength(options.content, "utf-8"),
-    targeted: false,
+    bytesWritten,
+    targeted,
+    commit(): WriteArtifactResult {
+      if (committed) {
+        throw new Error(`PendingArtifact.commit: already committed (${finalAbsolutePath})`);
+      }
+      if (rolledBack) {
+        throw new Error(`PendingArtifact.commit: already rolled back (${finalAbsolutePath})`);
+      }
+      fs.renameSync(stagingPath, finalAbsolutePath);
+      committed = true;
+      return {
+        absolutePath: finalAbsolutePath,
+        relativePath,
+        extension,
+        bytesWritten,
+        targeted,
+      };
+    },
+    rollback(): void {
+      if (committed || rolledBack) return;
+      try {
+        fs.unlinkSync(stagingPath);
+      } catch {
+        // best-effort cleanup; ignore if the staging file is already
+        // gone (concurrent removal, prior partial unlink).
+      }
+      rolledBack = true;
+    },
   };
 }
 
-// Crash-atomic write: serialize to a sibling temp file, then rename
-// into place. Same pattern as `writeJson` in `core/fs/json.ts`. The
-// orphan temp is unlinked on rename failure so a crashed run does
-// not litter the directory.
-function atomicWrite(absolutePath: string, content: string): void {
-  const tmp = `${absolutePath}.tmp.${process.pid}`;
+// One-shot convenience wrapper. Stages, then immediately commits. The
+// callers that don't need to interleave validation between stage and
+// commit (the artifact-writer's direct unit tests, simple test
+// fixtures) keep the original API. compile-node uses
+// writeArtifactPending directly so it can validate against the
+// staging path.
+export function writeArtifact(options: WriteArtifactOptions): WriteArtifactResult {
+  const pending = writeArtifactPending(options);
   try {
-    fs.writeFileSync(tmp, content, "utf-8");
-    fs.renameSync(tmp, absolutePath);
+    return pending.commit();
   } catch (err) {
-    try {
-      fs.unlinkSync(tmp);
-    } catch {
-      // best-effort cleanup; ignore if the tmp wasn't created
-    }
+    pending.rollback();
     throw err;
   }
 }

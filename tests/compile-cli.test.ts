@@ -209,10 +209,20 @@ describe("onto compile run", () => {
       expect(r.status).toBe(1);
       expect(r.stderr + r.stdout).toMatch(/validate_failed|python parse failed/i);
 
-      // The artifact was written before validation (so the user can inspect),
-      // but no compilation_run event was emitted for the focal step.
+      // Two-phase commit (Project Legend calibration finding §0):
+      // writeArtifactPending stages the bytes at a sibling tmp; parse
+      // failure rolls the staging file back. No artifact at the final
+      // path; no compilation_run event for the focal. The user can
+      // still inspect the rejected text via the persisted run record
+      // (provenance is preserved).
       const artifactPath = path.join(tmp2, ".ontology/artifacts/generated/node_0002.py");
-      expect(fs.existsSync(artifactPath)).toBe(true);
+      expect(fs.existsSync(artifactPath)).toBe(false);
+      // No leftover staging file either.
+      const generatedDir = path.join(tmp2, ".ontology/artifacts/generated");
+      const stragglers = fs.existsSync(generatedDir)
+        ? fs.readdirSync(generatedDir).filter((f) => f.startsWith("node_0002") && f.includes(".tmp."))
+        : [];
+      expect(stragglers).toEqual([]);
       const events = fs.readFileSync(path.join(tmp2, ".ontology/events.jsonl"), "utf-8")
         .trim().split("\n").map(l => JSON.parse(l));
       const focalCompileEvent = events.find(e => e.eventType === "compilation_run" && e.payload.nodeId === "node_0002");

@@ -6,7 +6,12 @@ import { resolveNodeModel } from "../llm/resolve-node-model.js";
 import type { LlmProvider, LlmTask } from "../llm/types.js";
 import { hashPrompt } from "../../core/integrity/hash.js";
 import { createPersistedRun, computeRunId, loadPersistedRun } from "../../core/runs/persist.js";
-import { writeArtifact, TargetExistsError, type WriteArtifactResult } from "./artifact-writer.js";
+import {
+  writeArtifactPending,
+  TargetExistsError,
+  type PendingArtifact,
+  type WriteArtifactResult,
+} from "./artifact-writer.js";
 import { extractCodeFence } from "./post/extract-code-fence.js";
 import { validateLanguage } from "./post/validate-language.js";
 import { runtimeCheck } from "./post/runtime-check.js";
@@ -405,14 +410,20 @@ function projectArtifactE(input: PostInput): EffectWithLog<string, never> {
   };
 }
 
-// (f) Write the artifact to disk.
-function writeArtifactE(
+// (f) Stage the artifact on disk at a sibling tmp path. Validators
+// (validateLanguage, runtimeCheck) read from `pending.stagingPath`;
+// the final path is only swapped in by commitArtifactE after every
+// gate has passed. Calibration finding §0 (Project Legend
+// 2026-05-12 milestone review): without the two-phase commit, a
+// rejected artifact lands at the user's --target path before the
+// validator gets a chance to reject it.
+function writeArtifactPendingE(
   input: PostInput,
   content: string,
-): EffectWithLog<WriteArtifactResult, CompileFailure> {
+): EffectWithLog<PendingArtifact, CompileFailure> {
   return () => {
     try {
-      const artifact = writeArtifact({
+      const pending = writeArtifactPending({
         node: input.options.node,
         content,
         cwd: input.options.cwd,
@@ -420,8 +431,11 @@ function writeArtifactE(
         force: input.options.force,
       });
       return {
-        value: ok(artifact),
-        logs: [{ level: "info", message: `writeArtifact: ${artifact.relativePath} (${artifact.bytesWritten} bytes)` }],
+        value: ok(pending),
+        logs: [{
+          level: "info",
+          message: `writeArtifactPending: staged at ${pending.stagingPath} → ${pending.relativePath} (${pending.bytesWritten} bytes)`,
+        }],
       };
     } catch (raw: unknown) {
       // TargetExistsError is a distinct failure mode: the artifact body
@@ -435,7 +449,7 @@ function writeArtifactE(
             reason: "target_exists",
             message: raw.message,
           }),
-          logs: [{ level: "error", message: `writeArtifact: refused (target exists: ${raw.target})` }],
+          logs: [{ level: "error", message: `writeArtifactPending: refused (target exists: ${raw.target})` }],
         };
       }
       return {
@@ -443,16 +457,19 @@ function writeArtifactE(
           reason: "write_failed",
           message: raw instanceof Error ? raw.message : String(raw),
         }),
-        logs: [{ level: "error", message: "writeArtifact: failed", data: raw }],
+        logs: [{ level: "error", message: "writeArtifactPending: failed", data: raw }],
       };
     }
   };
 }
 
-// (g) Parse-check the artifact against its declared language.
+// (g) Parse-check the artifact against its declared language. Reads
+// from the pending's staging path; the staging file is a sibling of
+// the final path, so any tooling that resolves relative imports
+// sees the same parent directory it would post-commit.
 function validateLanguageE(
   input: PostInput,
-  artifact: WriteArtifactResult,
+  pending: PendingArtifact,
 ): EffectWithLog<void, CompileFailure> {
   return () => {
     const node = input.options.node;
@@ -463,14 +480,14 @@ function validateLanguageE(
       };
     }
     const check = validateLanguage({
-      absolutePath: artifact.absolutePath,
+      absolutePath: pending.stagingPath,
       language: node.technical.language,
     });
     if (check.status === "failed") {
       return {
         value: err({
           reason: "validate_failed",
-          message: `${node.technical.language} parse failed for ${artifact.relativePath}: ${check.message}`,
+          message: `${node.technical.language} parse failed for ${pending.relativePath}: ${check.message}`,
         }),
         logs: [{ level: "error", message: `validateLanguage: ${node.technical.language} parse failed: ${check.message}` }],
       };
@@ -581,10 +598,13 @@ function validateIntentE(
   };
 }
 
-// (h) Optional runtime check (opt-in via options.runtimeCheck).
+// (h) Optional runtime check (opt-in via options.runtimeCheck). The
+// staging file is executed; the user-facing path in the error
+// message is the final relativePath (the user does not need to know
+// the file lived under a tmp name during validation).
 function runtimeCheckE(
   input: PostInput,
-  artifact: WriteArtifactResult,
+  pending: PendingArtifact,
 ): EffectWithLog<void, CompileFailure> {
   return () => {
     const opts = input.options;
@@ -596,7 +616,7 @@ function runtimeCheckE(
       };
     }
     const rc = runtimeCheck({
-      absolutePath: artifact.absolutePath,
+      absolutePath: pending.stagingPath,
       language: node.technical.language,
       timeoutMs: opts.runtimeCheckTimeoutMs,
     });
@@ -604,7 +624,7 @@ function runtimeCheckE(
       return {
         value: err({
           reason: "runtime_failed",
-          message: `${node.technical.language} runtime failed for ${artifact.relativePath}: ${rc.message}`,
+          message: `${node.technical.language} runtime failed for ${pending.relativePath}: ${rc.message}`,
         }),
         logs: [{ level: "error", message: `runtimeCheck: ${node.technical.language} failed: ${rc.message}` }],
       };
@@ -613,6 +633,34 @@ function runtimeCheckE(
       value: ok(undefined),
       logs: [{ level: "info", message: `runtimeCheck: ${rc.status}` }],
     };
+  };
+}
+
+// (h.5) Commit. Atomic rename from staging → final; returns the
+// committed WriteArtifactResult that emitEventE records. Only runs
+// after every post-write validator has accepted the bytes.
+function commitArtifactE(
+  pending: PendingArtifact,
+): EffectWithLog<WriteArtifactResult, CompileFailure> {
+  return () => {
+    try {
+      const artifact = pending.commit();
+      return {
+        value: ok(artifact),
+        logs: [{
+          level: "info",
+          message: `commit: ${artifact.relativePath} (${artifact.bytesWritten} bytes)`,
+        }],
+      };
+    } catch (raw: unknown) {
+      return {
+        value: err({
+          reason: "write_failed",
+          message: `commit failed for ${pending.relativePath}: ${raw instanceof Error ? raw.message : String(raw)}`,
+        }),
+        logs: [{ level: "error", message: "commit: rename failed", data: raw }],
+      };
+    }
   };
 }
 
@@ -801,33 +849,74 @@ export async function compileNode(options: CompileNodeOptions): Promise<CompileN
     }
   }
 
-  // (3) Synchronous post-dispatch slice: project, write, validate, runtime
-  // check, emit event. Same shape as prelude — bindWithLog tower, single
-  // run at the end, logs accumulate.
+  // (3) Synchronous post-dispatch slice: project, stage the write,
+  // validate (language + intent + runtime), commit, emit event. The
+  // post-dispatch pipeline is now two-phase: writeArtifactPendingE
+  // stages bytes at a sibling tmp path; commitArtifactE renames to
+  // the final path only after every gate has passed. Any error
+  // between stage and commit triggers a rollback (unlink the tmp)
+  // so a rejected artifact never lands at the user's --target path.
+  //
+  // The pending is captured via a closure (rather than threaded as
+  // a function value through bindWithLog) because the rollback has
+  // to run *outside* the bindWithLog chain: when a downstream step
+  // returns err the chain short-circuits, and the cleanup callback
+  // inside wouldn't fire. The closure variable is the simplest way
+  // to thread the rollback signal out of the chain.
   const postInput: PostInput = { options: optionsWithCwd, runId, cached, response };
+  let pendingForCleanup: PendingArtifact | null = null;
   const postPipeline: EffectWithLog<PostShape, CompileFailure> = bindWithLog(
     projectArtifactE(postInput),
     (content) => bindWithLog(
-      writeArtifactE(postInput, content),
-      (artifact) => bindWithLog(
-        validateLanguageE(postInput, artifact),
-        () => bindWithLog(
-          validateIntentE(postInput, content),
+      writeArtifactPendingE(postInput, content),
+      (pending) => {
+        pendingForCleanup = pending;
+        return bindWithLog(
+          validateLanguageE(postInput, pending),
           () => bindWithLog(
-            runtimeCheckE(postInput, artifact),
+            validateIntentE(postInput, content),
             () => bindWithLog(
-              emitEventE(postInput, artifact),
-              (event) => pureWithLog({ artifact, event } as PostShape),
+              runtimeCheckE(postInput, pending),
+              () => bindWithLog(
+                commitArtifactE(pending),
+                (artifact) => {
+                  // Commit succeeded — the tmp has been renamed to
+                  // the final path. Disarm the cleanup so a
+                  // downstream emit-event failure (currently
+                  // impossible, but tightening the channel is the
+                  // direction of travel) does not unlink the
+                  // committed artifact.
+                  pendingForCleanup = null;
+                  return bindWithLog(
+                    emitEventE(postInput, artifact),
+                    (event) => pureWithLog({ artifact, event } as PostShape),
+                  );
+                },
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     ),
   );
   const postOutcome = runWithLog(postPipeline);
   accumulatedLogs.push(...postOutcome.logs);
 
   if (postOutcome.value.tag === "err") {
+    // Rollback the staged write if it got that far. The rollback is
+    // best-effort: if the staging file already disappeared (e.g.,
+    // concurrent removal), the rollback silently no-ops. We log
+    // either way so an auditor can see the safety property fired.
+    // The cast is needed because TS's control-flow analysis cannot
+    // see the assignment inside the bindWithLog callback above.
+    const pending = pendingForCleanup as PendingArtifact | null;
+    if (pending) {
+      pending.rollback();
+      accumulatedLogs.push({
+        level: "info",
+        message: `rollback: staged artifact unlinked (target ${pending.relativePath} untouched)`,
+      });
+    }
     return packageFailure(postOutcome.value.error, accumulatedLogs);
   }
 

@@ -115,4 +115,54 @@ describe("onto compile run --target safety", () => {
     expect(r.status).toBe(1);
     expect(r.stderr).toContain("--force has no effect without --target");
   });
+
+  it("a failed validator does NOT clobber the target (two-phase commit, §0)", () => {
+    // Pre-existing user file at the target path. We pass --force so
+    // the clobber gate is open; what we want to assert here is that
+    // even with --force, a post-write validator failure rolls back
+    // the staged write and the user's bytes survive.
+    //
+    // Setup: a leaf node whose prompt is prose, manifestation=code,
+    // language=python. The mock provider emits the prose verbatim;
+    // validateLanguage rejects it as not-python. Without the
+    // two-phase commit, the target would now contain the rejected
+    // prose. With it, the target still contains the original code.
+    const tmp2 = createTempProject();
+    try {
+      expect(runCli(tmp2, ["init"]).status).toBe(0);
+      expect(runCli(tmp2, ["node", "create", "--level", "domain", "--kind", "entity", "--prompt", "d"]).status).toBe(0);
+      expect(runCli(tmp2, ["node", "create",
+        "--level", "artifact", "--kind", "artifact",
+        "--manifestation", "code", "--language", "python",
+        "--prompt", "Here you go:\nIn this example, we've:",
+      ]).status).toBe(0);
+      runCli(tmp2, ["node", "link", "--from", "node_0001", "--to", "node_0000_canon", "--type", "refines"]);
+      runCli(tmp2, ["node", "link", "--from", "node_0002", "--to", "node_0001", "--type", "refines"]);
+
+      const targetPath = path.join(tmp2, "main.py");
+      const originalContent = "# original user file\nprint('do not lose me')\n";
+      fs.writeFileSync(targetPath, originalContent);
+
+      const r = runCli(tmp2, [
+        "compile", "run", "node_0002",
+        "--provider", "mock",
+        "--target", "main.py",
+        "--force",
+        "--json",
+      ]);
+      expect(r.status).toBe(1);
+      const parsed = JSON.parse(r.stdout);
+      expect(parsed.ok).toBe(false);
+      const focal = parsed.completedSteps.find((s: any) => s.nodeId === "node_0002");
+      expect(focal.reason).toContain("validate_failed");
+
+      // The user's original file is untouched.
+      expect(fs.readFileSync(targetPath, "utf-8")).toBe(originalContent);
+      // No leftover .tmp.* sibling either.
+      const siblings = fs.readdirSync(tmp2);
+      expect(siblings.filter((f) => f.startsWith("main.py.tmp."))).toEqual([]);
+    } finally {
+      cleanupTempProject(tmp2);
+    }
+  });
 });
