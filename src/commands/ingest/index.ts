@@ -10,10 +10,8 @@ import { loadNodeById, loadState } from "../../core/project/load.js";
 import { createProposal } from "../../core/proposals/persist.js";
 import { dispatchLlmRequest } from "../../runtime/llm/dispatcher.js";
 import type { LlmProvider, LlmResponse } from "../../runtime/llm/types.js";
-import {
-  collectSourceFiles,
-  inferEdgesFromDirectory,
-} from "../../runtime/static/typescript.js";
+import { collectSourceFiles } from "../../runtime/static/typescript.js";
+import { inferEdgesAutoFromDirectory } from "../../runtime/static/edges.js";
 import { errorMessage } from "../../core/errors.js";
 import {
   computeCostEstimate,
@@ -627,21 +625,19 @@ async function runDirectoryIngest(
     });
   }
 
-  // Edge inference (γ-4) is TS-only: the parser walks TypeScript
-  // AST nodes for import / export declarations. For other-language
-  // ingests (e.g. --include py) we skip the inference and surface
-  // an empty edge list — a future γ-7+ can add per-language
-  // parsers if the use case materialises.
-  const wantsTsInference =
-    opts.extensions.includes("ts") || opts.extensions.includes("tsx");
-  const inferredEdges = wantsTsInference
-    ? inferEdgesFromDirectory(absDir).map((e) => ({
-        fromFile: path.relative(absDir, e.fromFile),
-        toFile: path.relative(absDir, e.toFile),
-        type: e.type,
-        tokens: e.tokens,
-      }))
-    : [];
+  // Edge inference (γ-4): dispatches per language by the include
+  // list. TS files go to the TS compiler API parser; .py files go
+  // to the regex-based Python parser. Unknown extensions (e.g.
+  // `--include rs`) silently skip the static-edge step — γ-5 still
+  // produces the node proposals, just without auto-inferred edges.
+  const inferredEdges = inferEdgesAutoFromDirectory(absDir, opts.extensions).map(
+    (e) => ({
+      fromFile: path.relative(absDir, e.fromFile),
+      toFile: path.relative(absDir, e.toFile),
+      type: e.type,
+      tokens: e.tokens,
+    }),
+  );
 
   const okCount = results.filter((r) => r.ok).length;
   const failedCount = results.length - okCount;

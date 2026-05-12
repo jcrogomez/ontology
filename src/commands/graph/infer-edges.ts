@@ -1,9 +1,9 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
-  inferEdgesFromDirectory,
+  inferEdgesAutoFromDirectory,
   type InferredEdge,
-} from "../../runtime/static/typescript.js";
+} from "../../runtime/static/edges.js";
 import { loadEdges, loadNodes, loadState } from "../../core/project/load.js";
 import { createProposal } from "../../core/proposals/persist.js";
 import type { OntologyNode } from "../../schemas/ontology.js";
@@ -48,6 +48,12 @@ export interface InferEdgesOptions {
   // whose endpoints are not yet on the graph; skips edges that
   // already exist (no duplicate proposals).
   createProposals?: boolean;
+  // Comma-separated extension list (same shape as `onto ingest
+  // --include`). Default is "ts,tsx" — matches the historical γ-4
+  // TS-only behaviour. Pass "py" for a Python project or "py,ts,tsx"
+  // for a mixed-language repo. Static-edge inference dispatches
+  // per-language and concatenates the results.
+  include?: string;
 }
 
 interface ResolvedEdge {
@@ -88,7 +94,15 @@ export async function graphInferEdgesCommand(
     return;
   }
 
-  const edges = inferEdgesFromDirectory(absDir);
+  const extensions = parseIncludeFlag(options.include);
+  if (extensions.length === 0) {
+    fail(
+      `--include resolved to an empty extension list. Pass at least one extension (e.g. --include py).`,
+      options.json,
+    );
+    return;
+  }
+  const edges = inferEdgesAutoFromDirectory(absDir, extensions);
 
   // Render paths relative to the scanned root so the *display* reads
   // independently of the absolute mount point — same paths whether
@@ -391,4 +405,21 @@ function fail(msg: string, json?: boolean): void {
     console.error(`✖ ${msg}`);
   }
   process.exit(1);
+}
+
+// Mirrors `onto ingest --include` parsing: comma-separated, lowercased,
+// leading-dot stripped, deduped. Default "ts,tsx" matches the
+// historical γ-4 TS-only behaviour for backward compatibility.
+function parseIncludeFlag(raw: string | undefined): string[] {
+  if (raw === undefined) return ["ts", "tsx"];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const piece of raw.split(",")) {
+    const cleaned = piece.toLowerCase().replace(/^\./, "").trim();
+    if (cleaned.length === 0) continue;
+    if (seen.has(cleaned)) continue;
+    seen.add(cleaned);
+    out.push(cleaned);
+  }
+  return out;
 }

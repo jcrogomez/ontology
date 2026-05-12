@@ -477,6 +477,7 @@ function expandResolutionCandidates(absPath: string): string[] {
 }
 
 const SKIP_DIRS = new Set([
+  // JS/TS / general noise
   "node_modules",
   "dist",
   "build",
@@ -484,6 +485,19 @@ const SKIP_DIRS = new Set([
   ".git",
   "__tests__",
   "coverage",
+  // Python noise (added for γ-4 Python variant — these directories
+  // never contain source we want to ingest, regardless of which
+  // language the surrounding project is). Safe to include
+  // unconditionally: none of these names collide with TS-project
+  // conventions either.
+  "__pycache__",
+  ".venv",
+  "venv",
+  "env",
+  ".pytest_cache",
+  ".tox",
+  ".mypy_cache",
+  ".ruff_cache",
 ]);
 
 // Walk `rootDir` recursively and return absolute paths to every
