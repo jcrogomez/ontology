@@ -47,6 +47,14 @@ export interface LlmRequest {
   // calibration surfaced 4096 as insufficient for files >~3KB once
   // adaptive thinking consumes part of the output budget.
   maxTokens?: number;
+  // Optional thinking-mode override. When omitted, providers that
+  // support adaptive thinking (anthropic Opus 4.7) leave it on. Pass
+  // "disabled" to suppress thinking — useful for large prompts where
+  // adaptive thinking exhausts the output budget and the response
+  // comes back as empty text. Vibe-Reasoning γ-7 calibration surfaced
+  // this on visualize_adaptive_strategy.py. Adapters that do not
+  // support thinking (mock, ollama) ignore the field.
+  thinking?: "adaptive" | "disabled";
 }
 
 export interface LlmUsage {

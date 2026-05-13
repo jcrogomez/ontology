@@ -49,6 +49,60 @@ const DEFAULT_MODEL = "claude-opus-4-7";
 // explicitly — see LlmRequest.maxTokens in types.ts.
 const DEFAULT_MAX_TOKENS = 8192;
 
+// Retry policy for transient HTTP 429 (rate-limit) responses. The
+// Vibe-Reasoning γ-7 calibration observed 3/22 nodes failing with 429
+// during a sequential sweep that fits well under any official quota —
+// these are usually short-lived shaper bursts. Three retries with
+// exponential backoff (1.5s, 3s, 6s) recover them without paying for
+// streaming machinery. Other transient SDK errors (5xx, network) get
+// the same treatment. 4xx other than 429 are NOT retried — those are
+// caller-fixable input problems.
+const RETRY_429_ATTEMPTS = 3;
+const RETRY_BASE_DELAY_MS = 1500;
+
+async function dispatchWithRetry<T>(send: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; attempt <= RETRY_429_ATTEMPTS; attempt += 1) {
+    try {
+      return await send();
+    } catch (err: unknown) {
+      const retryable = isRetryableTransient(err);
+      const last = attempt === RETRY_429_ATTEMPTS;
+      if (!retryable || last) {
+        throw err;
+      }
+      const delay = RETRY_BASE_DELAY_MS * 2 ** attempt;
+      await sleep(delay);
+    }
+  }
+  // Unreachable — the loop either returns or throws.
+  throw new Error("dispatchWithRetry: exhausted retries without throwing");
+}
+
+function isRetryableTransient(err: unknown): boolean {
+  if (err instanceof Anthropic.APIError) {
+    // 429 rate limit, 5xx server errors. 408 (timeout) too.
+    const s = err.status ?? 0;
+    return s === 429 || s === 408 || (s >= 500 && s < 600);
+  }
+  // ECONNRESET / ETIMEDOUT / similar low-level network blips.
+  if (err && typeof err === "object" && "code" in err) {
+    const code = (err as { code: unknown }).code;
+    if (typeof code === "string") {
+      return (
+        code === "ECONNRESET" ||
+        code === "ETIMEDOUT" ||
+        code === "ECONNREFUSED" ||
+        code === "EAI_AGAIN"
+      );
+    }
+  }
+  return false;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export interface AnthropicAdapterOptions {
   apiKey?: string;
   defaultModel?: string;
@@ -133,20 +187,21 @@ export function createAnthropicAdapter(
         : undefined;
 
       const t0 = performance.now();
-      const response = await client.messages.create({
-        model,
-        max_tokens: request.maxTokens ?? DEFAULT_MAX_TOKENS,
-        ...(systemBlocks ? { system: systemBlocks } : {}),
-        messages: [{ role: "user", content: request.prompt }],
-        // Adaptive thinking + high effort: the recommended pairing for
-        // most intelligence-sensitive tasks on Opus 4.7. Disable with
-        // a future `request.thinking = false` if a caller needs to
-        // suppress it.
-        thinking: { type: "adaptive" },
-        // effort lives under output_config on the messages API. Skipping
-        // it would default to "high" anyway on Opus 4.7, but being
-        // explicit makes the operational intent legible.
-      });
+      const response = await dispatchWithRetry(() =>
+        client.messages.create({
+          model,
+          max_tokens: request.maxTokens ?? DEFAULT_MAX_TOKENS,
+          ...(systemBlocks ? { system: systemBlocks } : {}),
+          messages: [{ role: "user", content: request.prompt }],
+          // Adaptive thinking by default. Pass `request.thinking =
+          // "disabled"` from the caller to suppress — useful for large
+          // prompts where adaptive thinking exhausts the output budget
+          // (Vibe-Reasoning γ-7 calibration finding).
+          ...(request.thinking === "disabled"
+            ? {}
+            : { thinking: { type: "adaptive" as const } }),
+        })
+      );
       const evalDurationMs = performance.now() - t0;
 
       // The response.content is an array of blocks. Concatenate every

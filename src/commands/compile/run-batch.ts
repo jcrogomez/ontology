@@ -19,6 +19,8 @@ export interface CompileRunBatchOptions {
   openWorld?: boolean;
   // Max-output-tokens override applied uniformly to every focal.
   maxTokens?: number;
+  // Thinking-mode override applied uniformly to every focal.
+  thinking?: "adaptive" | "disabled";
   json?: boolean;
 }
 
@@ -110,6 +112,7 @@ export async function compileRunBatchCommand(options: CompileRunBatchOptions): P
       branch: options.branch,
       openWorld: options.openWorld,
       maxTokens: options.maxTokens,
+      thinking: options.thinking,
     });
     if (!r.ok) {
       results.push({

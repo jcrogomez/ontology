@@ -58,6 +58,10 @@ export interface CompilePlanRunOptions {
   // Optional max-tokens passthrough — see CompileNodeOptions. Same
   // value applied to every step in the plan.
   maxTokens?: number;
+  // Optional thinking-mode passthrough — see CompileNodeOptions.
+  // "disabled" suppresses adaptive thinking on providers that support
+  // it. Applied uniformly to every step.
+  thinking?: "adaptive" | "disabled";
 }
 
 export interface CompilePlanStepResult {
@@ -214,6 +218,7 @@ export async function runCompilePlan(options: CompilePlanRunOptions): Promise<Co
       force: step.nodeId === options.focalId ? options.force : undefined,
       openWorld: options.openWorld,
       maxTokens: options.maxTokens,
+      thinking: options.thinking,
     });
 
     if (!stepResult.ok) {

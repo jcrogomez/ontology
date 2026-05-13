@@ -200,6 +200,18 @@ export function classifyVerdict(
 
 // ── Per-node result + file IO helpers ───────────────────────────────────────
 
+export interface VerificationUsage {
+  /** Anthropic SDK input_tokens or equivalent. Undefined when the run wasn't a dispatch (cache hit, dry run). */
+  promptTokens?: number;
+  /** Anthropic SDK output_tokens or equivalent. */
+  completionTokens?: number;
+  totalTokens?: number;
+  /** Approximate cost in USD computed from per-provider published rates. Undefined when the rate is unknown. */
+  costUSD?: number;
+  /** Whether the dispatch hit the deterministic-runId cache. When true, no fresh API spend happened on this node. */
+  cached?: boolean;
+}
+
 export interface VerificationResult {
   nodeId: string;
   sourceFile: string;
@@ -215,6 +227,8 @@ export interface VerificationResult {
   metrics?: DistanceMetrics;
   verdict: HomeomorphismVerdict;
   thresholds: VerdictThresholds;
+  /** Token + approximate cost telemetry for the compile-back dispatch. Surfaced so the JSON report carries the per-node bill — Vibe-Reasoning γ-7 calibration tooling gap #1. */
+  usage?: VerificationUsage;
 }
 
 export interface AggregateReport {
@@ -223,6 +237,8 @@ export interface AggregateReport {
   total: number;
   byVerdict: Record<HomeomorphismVerdict, number>;
   results: VerificationResult[];
+  /** Aggregate usage across all nodes. Undefined when no dispatch happened (--cost-estimate, --dry-run cache-only). */
+  totalUsage?: VerificationUsage;
 }
 
 export function emptyVerdictCounts(): Record<HomeomorphismVerdict, number> {

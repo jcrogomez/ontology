@@ -358,6 +358,20 @@ export const PersistedRunInputSchema = z.object({
   task: z.string(),
   includeEdges: z.boolean().default(false),
   edgeTypes: z.array(EdgeTypeSchema).nullable().default(null),
+  // Dispatch knobs that influence the model's output. Optional and
+  // omitted from the input object when no overrides are in effect, so
+  // legacy runs (which never had this field) and modern default-knob
+  // runs produce identical run ids. When set, a knob change (e.g.
+  // --max-tokens 16384 vs default 8192) deterministically produces a
+  // distinct run id — a retry with a larger budget no longer hits the
+  // cached empty-text result from a smaller-budget dispatch (the
+  // Vibe-Reasoning γ-7 Step 4 finding).
+  dispatch: z
+    .object({
+      maxTokens: z.number().int().min(1).optional(),
+      thinking: z.enum(["adaptive", "disabled"]).optional(),
+    })
+    .optional(),
 });
 
 export const PersistedRunModelSchema = z.object({
@@ -369,6 +383,19 @@ export const PersistedRunModelSchema = z.object({
 export const PersistedRunOutputSchema = z.object({
   text: z.string(),
   parsed: z.unknown().nullable().default(null),
+  // Optional usage telemetry from the LLM dispatch. Surfaced so that
+  // verify-homeomorphism and similar callers can compute per-node /
+  // per-sweep cost without re-querying the provider. Optional so that
+  // legacy run records (which never had this field) and adapters that
+  // do not report usage (mock, sometimes literal) remain valid.
+  usage: z
+    .object({
+      promptTokens: z.number().int().min(0).optional(),
+      completionTokens: z.number().int().min(0).optional(),
+      totalTokens: z.number().int().min(0).optional(),
+      evalDurationMs: z.number().min(0).optional(),
+    })
+    .optional(),
 });
 
 export const PersistedRunValidationSchema = z.object({

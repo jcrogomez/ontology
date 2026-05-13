@@ -135,6 +135,12 @@ export interface CompileNodeOptions {
   // Larger files surfaced by Project Legend's verify-homeomorphism
   // flow may need 16K+ once adaptive thinking eats budget.
   maxTokens?: number;
+  // Optional thinking-mode override. "disabled" suppresses adaptive
+  // thinking on providers that support it (anthropic Opus 4.7). Useful
+  // for large prompts where adaptive thinking exhausts the output
+  // budget and the response comes back as empty text. Adapters that
+  // do not support thinking ignore the field.
+  thinking?: "adaptive" | "disabled";
 }
 
 export type CompileNodeFailureReason =
@@ -253,6 +259,14 @@ function buildPreludeE(
     const systemPrompt = buildUpstreamSystemPrompt(upstream);
     const contextHash = hashUpstreamContext(upstream);
 
+    // Dispatch knobs that influence the model's output. Only emit the
+    // `dispatch` sub-object when at least one knob is set, so legacy
+    // runs (no knobs) and default-knob runs hash identically.
+    const dispatchKnobs: NonNullable<PersistedRunInput["dispatch"]> = {};
+    if (options.maxTokens !== undefined) dispatchKnobs.maxTokens = options.maxTokens;
+    if (options.thinking !== undefined) dispatchKnobs.thinking = options.thinking;
+    const hasDispatch = Object.keys(dispatchKnobs).length > 0;
+
     const runInput: PersistedRunInput = {
       // Hash the RAW prompt (axiom 9 — provenance), not the body. Two
       // prompts that differ only in markers produce different runIds even
@@ -266,6 +280,7 @@ function buildPreludeE(
       task: COMPILE_TASK as string,
       includeEdges: false,
       edgeTypes: null,
+      ...(hasDispatch ? { dispatch: dispatchKnobs } : {}),
     };
     const runModel: PersistedRunModel = {
       provider: handle.provider,
@@ -334,6 +349,7 @@ function dispatchAndPersistE(
           ...(handle.resolvedModel ? { model: handle.resolvedModel } : {}),
           ...(prelude.systemPrompt ? { system: prelude.systemPrompt } : {}),
           ...(options.maxTokens !== undefined ? { maxTokens: options.maxTokens } : {}),
+          ...(options.thinking !== undefined ? { thinking: options.thinking } : {}),
         },
         { provider: handle.provider, defaultModel: handle.resolvedModel, ollamaHost: options.ollamaHost },
       ),
@@ -355,7 +371,28 @@ function dispatchAndPersistE(
           kind: "context",
           input: prelude.runInput,
           model: { ...prelude.runModel, model: resp.model },
-          output: { text: resp.text, parsed: null },
+          output: {
+            text: resp.text,
+            parsed: null,
+            ...(resp.usage
+              ? {
+                  usage: {
+                    ...(resp.usage.promptTokens !== undefined
+                      ? { promptTokens: resp.usage.promptTokens }
+                      : {}),
+                    ...(resp.usage.completionTokens !== undefined
+                      ? { completionTokens: resp.usage.completionTokens }
+                      : {}),
+                    ...(resp.usage.totalTokens !== undefined
+                      ? { totalTokens: resp.usage.totalTokens }
+                      : {}),
+                    ...(resp.usage.evalDurationMs !== undefined
+                      ? { evalDurationMs: resp.usage.evalDurationMs }
+                      : {}),
+                  },
+                }
+              : {}),
+          },
           validation: null,
           durationMs,
           cwd: options.cwd,

@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { loadNodes, loadNodeById } from "../../core/project/load.js";
 import { runCompilePlan } from "../../runtime/compile/compile-plan-runner.js";
+import { loadPersistedRun } from "../../core/runs/persist.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
 import { errorMessage } from "../../core/errors.js";
 import type { OntologyNode } from "../../schemas/ontology.js";
@@ -16,12 +17,14 @@ import {
   type DistanceMetrics,
   type HomeomorphismVerdict,
   type VerificationResult,
+  type VerificationUsage,
   type VerdictThresholds,
 } from "../../runtime/legend/verify-homeomorphism.js";
 import {
   computeCostEstimate,
   formatCostEstimateHuman,
   readFileSizeInfos,
+  resolveProviderRate,
 } from "../ingest/cost-estimate.js";
 
 // `onto verify-homeomorphism` — Project Legend δ-2.
@@ -58,6 +61,16 @@ export interface VerifyHomeomorphismOptions {
   // Bumps the compile-back dispatch max_tokens (anthropic default
   // 8192 — see adapter). Use for large artifacts.
   maxTokens?: number;
+  // Suppress adaptive thinking on providers that support it
+  // (anthropic Opus 4.7). Use for large prompts where thinking
+  // exhausts the output budget — visualize_adaptive_strategy.py
+  // from the γ-7 calibration was the canonical case.
+  thinking?: "adaptive" | "disabled";
+  // When set, write a markdown report of the verdict + per-node
+  // usage to the given path in addition to (or instead of) the
+  // stdout / --json output. The markdown shape mirrors
+  // `docs/legend/calibrations/*` reports.
+  report?: string;
   // Open-world: degrades unsatisfied requires to warnings. Set by
   // default for verify because ingest-derived contracts routinely
   // reference external deps; explicit override available.
@@ -139,9 +152,11 @@ export async function verifyHomeomorphismCommand(
       model: options.model,
       ollamaHost: options.ollamaHost,
       maxTokens: options.maxTokens,
+      thinking: options.thinking,
       openWorld: options.openWorld ?? true, // verify defaults to open-world
       thresholds,
       dryRun: !!options.dryRun,
+      cwd,
     });
     results.push(r);
   }
@@ -149,19 +164,103 @@ export async function verifyHomeomorphismCommand(
   // 4. Aggregate + emit report.
   const counts = emptyVerdictCounts();
   for (const r of results) counts[r.verdict] += 1;
+  const totalUsage = aggregateUsage(results);
   const report: AggregateReport = {
     rootDir: cwd,
     thresholds,
     total: results.length,
     byVerdict: counts,
     results,
+    ...(totalUsage ? { totalUsage } : {}),
   };
+
+  // 5. Optional markdown report (Tooling gap #2 from γ-7 calibration).
+  if (options.report) {
+    const md = renderReportMarkdown(report, {
+      providerOverride: provider,
+      modelOverride: options.model,
+      thinking: options.thinking,
+      maxTokens: options.maxTokens,
+    });
+    const absReport = path.isAbsolute(options.report)
+      ? options.report
+      : path.resolve(cwd, options.report);
+    fs.mkdirSync(path.dirname(absReport), { recursive: true });
+    fs.writeFileSync(absReport, md, "utf-8");
+  }
 
   if (options.json) {
     console.log(JSON.stringify({ ok: true, report }, null, 2));
     return;
   }
   printReportHuman(report);
+  if (options.report) {
+    console.log(``);
+    console.log(`Markdown report written to: ${options.report}`);
+  }
+}
+
+// ── Usage telemetry ─────────────────────────────────────────────────────────
+
+// Load the persisted run for a focal step and translate its
+// output.usage into the VerificationUsage shape, adding an approximate
+// USD cost from the resolved provider rate. Returns undefined when the
+// run record is missing, has no usage payload (e.g. mock provider), or
+// the rate is unknown — callers treat the field as best-effort.
+function collectUsage(
+  runId: string | undefined,
+  cached: boolean | undefined,
+  cwd: string,
+): VerificationUsage | undefined {
+  if (!runId) return undefined;
+  const run = loadPersistedRun(runId, cwd);
+  if (!run) return undefined;
+  const u = run.output.usage;
+  if (!u) {
+    return cached !== undefined ? { cached } : undefined;
+  }
+  const out: VerificationUsage = {};
+  if (u.promptTokens !== undefined) out.promptTokens = u.promptTokens;
+  if (u.completionTokens !== undefined) out.completionTokens = u.completionTokens;
+  if (u.totalTokens !== undefined) out.totalTokens = u.totalTokens;
+  if (cached !== undefined) out.cached = cached;
+
+  // Approximate per-node cost from the published provider rate. We
+  // never charge for cached calls (no new API spend).
+  if (!cached && (u.promptTokens !== undefined || u.completionTokens !== undefined)) {
+    const rate = resolveProviderRate(run.model.provider, run.model.model);
+    if (rate.inputUsdPerMillion > 0 || rate.outputUsdPerMillion > 0) {
+      const inUsd = ((u.promptTokens ?? 0) / 1_000_000) * rate.inputUsdPerMillion;
+      const outUsd = ((u.completionTokens ?? 0) / 1_000_000) * rate.outputUsdPerMillion;
+      out.costUSD = inUsd + outUsd;
+    }
+  }
+  return out;
+}
+
+function aggregateUsage(results: VerificationResult[]): VerificationUsage | undefined {
+  let p = 0, c = 0, t = 0, cost = 0;
+  let any = false;
+  let hadCost = false;
+  for (const r of results) {
+    const u = r.usage;
+    if (!u) continue;
+    any = true;
+    if (u.promptTokens !== undefined) p += u.promptTokens;
+    if (u.completionTokens !== undefined) c += u.completionTokens;
+    if (u.totalTokens !== undefined) t += u.totalTokens;
+    if (u.costUSD !== undefined) {
+      cost += u.costUSD;
+      hadCost = true;
+    }
+  }
+  if (!any) return undefined;
+  const agg: VerificationUsage = {};
+  if (p > 0) agg.promptTokens = p;
+  if (c > 0) agg.completionTokens = c;
+  if (t > 0) agg.totalTokens = t;
+  if (hadCost) agg.costUSD = cost;
+  return agg;
 }
 
 // ── Per-node verify pipeline ────────────────────────────────────────────────
@@ -177,9 +276,11 @@ interface VerifyOneCtx {
   model?: string;
   ollamaHost?: string;
   maxTokens?: number;
+  thinking?: "adaptive" | "disabled";
   openWorld: boolean;
   thresholds: VerdictThresholds;
   dryRun: boolean;
+  cwd: string;
 }
 
 async function verifyOne(
@@ -215,6 +316,7 @@ async function verifyOne(
 
   // Compile-back (skipped under --dry-run; we still try to read any
   // existing regen below).
+  let usage: VerificationUsage | undefined;
   if (!ctx.dryRun) {
     const compileResult = await runCompilePlan({
       focalId: nodeId,
@@ -225,6 +327,7 @@ async function verifyOne(
       force: true,
       openWorld: ctx.openWorld,
       maxTokens: ctx.maxTokens,
+      thinking: ctx.thinking,
     });
     if (!compileResult.ok) {
       return {
@@ -236,6 +339,8 @@ async function verifyOne(
         thresholds: ctx.thresholds,
       };
     }
+    const focalStep = compileResult.steps.find((s) => s.nodeId === nodeId);
+    usage = collectUsage(focalStep?.runId, focalStep?.cached, ctx.cwd);
   } else if (!fs.existsSync(regenPath)) {
     return {
       nodeId,
@@ -270,6 +375,7 @@ async function verifyOne(
     metrics,
     verdict,
     thresholds: ctx.thresholds,
+    ...(usage ? { usage } : {}),
   };
 }
 
@@ -390,6 +496,13 @@ function printReportHuman(report: AggregateReport): void {
   console.log(`  divergent (struct):     ${report.byVerdict.divergent_structural}`);
   console.log(`  divergent (both):       ${report.byVerdict.divergent_both}`);
   console.log(`  unrecoverable:          ${report.byVerdict.unrecoverable}`);
+  if (report.totalUsage) {
+    const u = report.totalUsage;
+    const tokens = u.totalTokens ?? ((u.promptTokens ?? 0) + (u.completionTokens ?? 0));
+    const costStr = u.costUSD !== undefined ? ` (~$${u.costUSD.toFixed(4)})` : ``;
+    console.log(``);
+    console.log(`Aggregate dispatch: ${tokens.toLocaleString()} tokens${costStr}`);
+  }
   console.log(``);
   console.log(`Per node:`);
   for (const r of report.results) {
@@ -444,6 +557,97 @@ function fail(msg: string, json?: boolean): void {
     console.error(`✖ ${msg}`);
   }
   process.exit(1);
+}
+
+// ── Markdown report writer (Tooling gap #2) ─────────────────────────────────
+
+interface MarkdownReportContext {
+  providerOverride?: LlmProvider;
+  modelOverride?: string;
+  thinking?: "adaptive" | "disabled";
+  maxTokens?: number;
+}
+
+export function renderReportMarkdown(
+  report: AggregateReport,
+  ctx: MarkdownReportContext = {},
+): string {
+  const lines: string[] = [];
+  const now = new Date().toISOString();
+  lines.push(`# verify-homeomorphism report`);
+  lines.push(``);
+  lines.push(`**Generated:** ${now}`);
+  lines.push(`**Root:** \`${report.rootDir}\``);
+  lines.push(`**Provider override:** ${ctx.providerOverride ?? "—  (per-node model.ref)"}`);
+  if (ctx.modelOverride) lines.push(`**Model override:** \`${ctx.modelOverride}\``);
+  if (ctx.maxTokens !== undefined) lines.push(`**Max tokens:** ${ctx.maxTokens}`);
+  if (ctx.thinking) lines.push(`**Thinking:** \`${ctx.thinking}\``);
+  lines.push(`**Thresholds:** LoC < ${report.thresholds.loc}, Jaccard ≥ ${report.thresholds.jaccard}`);
+  lines.push(``);
+
+  lines.push(`## Aggregate`);
+  lines.push(``);
+  lines.push(`| Verdict | Count | % |`);
+  lines.push(`|---|---:|---:|`);
+  const order: HomeomorphismVerdict[] = [
+    "epsilon_equivalent",
+    "divergent_loc",
+    "divergent_structural",
+    "divergent_both",
+    "unrecoverable",
+  ];
+  for (const v of order) {
+    const n = report.byVerdict[v];
+    const pct = report.total > 0 ? `${((n / report.total) * 100).toFixed(0)}%` : "—";
+    lines.push(`| ${v} | ${n} | ${pct} |`);
+  }
+  lines.push(`| **Total** | **${report.total}** | |`);
+  lines.push(``);
+
+  if (report.totalUsage) {
+    const u = report.totalUsage;
+    lines.push(`**Aggregate dispatch:**`);
+    if (u.promptTokens !== undefined) lines.push(`- Input tokens: ${u.promptTokens.toLocaleString()}`);
+    if (u.completionTokens !== undefined) lines.push(`- Output tokens: ${u.completionTokens.toLocaleString()}`);
+    if (u.totalTokens !== undefined) lines.push(`- Total tokens: ${u.totalTokens.toLocaleString()}`);
+    if (u.costUSD !== undefined) lines.push(`- Estimated cost: \`$${u.costUSD.toFixed(4)}\` (per-provider published rates)`);
+    lines.push(``);
+  }
+
+  lines.push(`## Per-node`);
+  lines.push(``);
+  lines.push(`| Node | Source | Verdict | LoC dist | Jaccard | Tokens | Cost |`);
+  lines.push(`|---|---|---|---:|---:|---:|---:|`);
+  for (const r of report.results) {
+    const src = r.sourceFile.split("/").slice(-2).join("/");
+    const verdict = r.verdict;
+    const loc = r.metrics?.locDistance;
+    const jac = r.metrics?.structuralJaccard;
+    const tokens = r.usage?.totalTokens ?? r.usage?.completionTokens;
+    const cost = r.usage?.costUSD;
+    const cacheTag = r.usage?.cached ? " (cached)" : "";
+    const locStr = typeof loc === "number" ? loc.toFixed(3) : "—";
+    const jacStr = typeof jac === "number" ? jac.toFixed(3) : "—";
+    const tokStr = tokens !== undefined ? `${tokens}${cacheTag}` : "—";
+    const costStr = cost !== undefined ? `$${cost.toFixed(4)}` : "—";
+    lines.push(`| \`${r.nodeId}\` | ${src} | ${verdict} | ${locStr} | ${jacStr} | ${tokStr} | ${costStr} |`);
+    if (!r.ok && r.failure) {
+      lines.push(`| | ↳ failure | ${truncate(r.failure, 80)} | | | | |`);
+    }
+  }
+  lines.push(``);
+
+  lines.push(`## Methodology`);
+  lines.push(``);
+  lines.push(`Each node's compile-back artifact is diffed against its source on disk using two distances: \`locDistance\` (line-count delta normalized into [0,1]) and \`structuralJaccard\` over top-level declaration names. The (LoC, Jaccard) pair folds into a five-label verdict per the thresholds above. See \`docs/PROJECT_LEGEND.md\` §6 Layer 6 for the formal model.`);
+  lines.push(``);
+
+  return lines.join("\n");
+}
+
+function truncate(s: string, n: number): string {
+  if (s.length <= n) return s;
+  return s.slice(0, n - 1) + "…";
 }
 
 // Re-export the pure-comparison surface so test files and downstream

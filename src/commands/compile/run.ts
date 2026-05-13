@@ -38,6 +38,9 @@ export interface CompileRunOptions {
   // defaults to 8192; large artifacts (>~3KB regenerated output)
   // may need 16384+ once adaptive thinking consumes budget.
   maxTokens?: number;
+  // Suppress adaptive thinking on providers that support it.
+  // Pass-through to compileNode → LlmRequest.thinking.
+  thinking?: "adaptive" | "disabled";
 }
 
 // `onto compile <nodeId>`
@@ -91,6 +94,7 @@ export async function compileRunCommand(focalId: string, options: CompileRunOpti
     force: options.force,
     openWorld: options.openWorld,
     maxTokens: options.maxTokens,
+    thinking: options.thinking,
   });
 
   if (!result.ok) {

@@ -772,9 +772,15 @@ compile
   .option("--force", "Required to overwrite an existing file at --target. Without it, an existing target makes the focal step fail with reason=target_exists before any bytes are written.")
   .option("--open-world", "Open-world validation: unsatisfied 'requires' tokens degrade to warnings instead of hard failures. Use when the focal's contract references external dependencies (stdlib, pip, npm) that no other node provides — common for ingest-derived graphs (Project Legend γ-5).")
   .option("--max-tokens <n>", "Override the LLM's max-output-tokens setting (anthropic default: 8192). Use for large artifacts that may need 16K+; the Vibe-Reasoning calibration found 4096 insufficient on files >~3KB once adaptive thinking eats budget.", (v) => parseInt(v, 10))
+  .option("--no-thinking", "Suppress adaptive thinking on providers that support it (anthropic Opus 4.7). Useful for large prompts where adaptive thinking exhausts the output budget and the response comes back as empty text.")
   .option("--json", "Output results in JSON format")
-  .action(async (id, options) => {
+  .action(async (id, rawOptions) => {
     try {
+      const { thinking: rawThinking, ...rest } = rawOptions as Record<string, unknown> & { thinking?: boolean };
+      const options = {
+        ...rest,
+        ...(rawThinking === false ? { thinking: "disabled" as const } : {}),
+      };
       await compileRunCommand(id, options);
     } catch (err: unknown) {
       console.error(`✖ Error during compile: ${errorMessage(err)}`);
@@ -795,9 +801,15 @@ compile
   .option("--branch <name>", "Restrict the batch to focals living on the named branch; the plan walk is fibre-scoped for each focal as well.")
   .option("--open-world", "Open-world validation (same semantics as compile run --open-world). Applied uniformly to every step in every focal's plan.")
   .option("--max-tokens <n>", "Override the LLM's max-output-tokens setting for every dispatch in the batch (anthropic default: 8192).", (v) => parseInt(v, 10))
+  .option("--no-thinking", "Suppress adaptive thinking on providers that support it (anthropic Opus 4.7). Applied uniformly across the batch.")
   .option("--json", "Output results in JSON format")
-  .action(async (options) => {
+  .action(async (rawOptions) => {
     try {
+      const { thinking: rawThinking, ...rest } = rawOptions as Record<string, unknown> & { thinking?: boolean };
+      const options = {
+        ...rest,
+        ...(rawThinking === false ? { thinking: "disabled" as const } : {}),
+      };
       await compileRunBatchCommand(options);
     } catch (err: unknown) {
       console.error(`✖ Error during compile run-batch: ${errorMessage(err)}`);
@@ -836,15 +848,24 @@ program
   .option("--model <model>", "Model override (only meaningful with --provider).")
   .option("--ollama-host <host>", "Host for Ollama provider.")
   .option("--max-tokens <n>", "Override the LLM's max-output-tokens setting per compile-back (anthropic default 8192).", (v) => parseInt(v, 10))
+  .option("--no-thinking", "Suppress adaptive thinking on providers that support it (anthropic Opus 4.7). Useful for large prompts where adaptive thinking exhausts the output budget and the response comes back as empty text — γ-7 calibration finding on visualize_adaptive_strategy.py.")
   .option("--open-world", "Open-world validation: unsatisfied 'requires' tokens degrade to warnings (default: true for verify, since ingest-derived contracts routinely reference external deps). Pass --no-open-world to enforce strict closed-world.")
   .option("--no-open-world", "Disable the default open-world relaxation; use strict closed-world validation instead.")
   .option("--loc-threshold <n>", "LoC distance below this counts as \"small\" for the verdict folder (default 0.3, range 0-1).", (v) => parseFloat(v))
   .option("--jaccard-threshold <n>", "Structural Jaccard at or above this counts as \"similar\" (default 0.5, range 0-1).", (v) => parseFloat(v))
   .option("--cost-estimate", "Pre-flight cost guard: walks the inputs, estimates compile-back cost, exits WITHOUT dispatching the LLM.")
   .option("--dry-run", "Skip the compile-back dispatch entirely. Reads any existing regen under .ontology/verify/<nodeId>.<ext> and re-classifies with current thresholds. Useful for tuning thresholds without paying for new dispatches.")
+  .option("--report <path>", "Also write a markdown report of the verdict + per-node usage to the given path (in addition to stdout / --json). Shape mirrors docs/legend/calibrations/* reports.")
   .option("--json", "Output results in JSON format.")
-  .action(async (focal, options) => {
+  .action(async (focal, rawOptions) => {
     try {
+      // commander emits `thinking: false` when --no-thinking is passed
+      // (its default is true). Translate to the typed adapter form.
+      const { thinking: rawThinking, ...rest } = rawOptions as Record<string, unknown> & { thinking?: boolean };
+      const options = {
+        ...rest,
+        ...(rawThinking === false ? { thinking: "disabled" as const } : {}),
+      };
       await verifyHomeomorphismCommand(focal, options);
     } catch (err: unknown) {
       console.error(`✖ Error during verify-homeomorphism: ${errorMessage(err)}`);
