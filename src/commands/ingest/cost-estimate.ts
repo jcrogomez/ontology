@@ -1,5 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import type { LlmProvider, LlmTask } from "../../runtime/llm/types.js";
+import { getDefaultModelForTask } from "../../runtime/llm/registry.js";
 
 // Pre-flight cost estimator for `onto ingest`. Runs purely locally — no
 // LLM dispatch, no API call, no key required. The user invokes
@@ -124,6 +126,7 @@ export function estimateOutputTokens(_fileSizeChars: number): number {
 export function resolveProviderRate(
   provider: string,
   model?: string,
+  task?: LlmTask,
 ): ProviderRate {
   if (provider === "mock") {
     return {
@@ -133,7 +136,12 @@ export function resolveProviderRate(
     };
   }
   if (provider === "ollama") {
-    const modelLabel = model ? `ollama:${model}` : "ollama (local)";
+    // Free local dispatch — rate is $0 regardless of model. Prefer the
+    // task-default for the label so the estimate truthfully names what
+    // the dispatcher will use.
+    const effective = model
+      ?? (task ? getDefaultModelForTask("ollama", task) : undefined);
+    const modelLabel = effective ? `ollama:${effective}` : "ollama (local)";
     return {
       inputUsdPerMillion: 0,
       outputUsdPerMillion: 0,
@@ -141,7 +149,18 @@ export function resolveProviderRate(
     };
   }
   if (provider === "anthropic") {
-    const resolvedModel = model ?? "claude-opus-4-7";
+    // Resolution chain mirrors the dispatcher (src/runtime/llm/dispatcher.ts):
+    //   request.model > caller default > task default > adapter default.
+    // For cost-estimate, the caller passes `model` (explicit override)
+    // or `task` (lets us look up the per-task default model). Without
+    // either, we fall back to Opus 4.7 as the conservative ceiling.
+    // The γ-7 calibration found cost-estimate was over-quoting by 50%
+    // when --provider was set without --model because the routing now
+    // picks Sonnet for semantic_parse, not Opus.
+    const resolvedModel =
+      model
+      ?? (task ? getDefaultModelForTask("anthropic", task) : undefined)
+      ?? "claude-opus-4-7";
     // Match against the model id prefix so date-suffixed variants
     // (claude-opus-4-7-20251101 etc.) hit the same row.
     if (resolvedModel.startsWith("claude-opus-4-7")) {
@@ -195,8 +214,9 @@ export function computeCostEstimate(
   files: FileSizeInfo[],
   provider: string,
   model?: string,
+  task?: LlmTask,
 ): CostEstimate {
-  const rate = resolveProviderRate(provider, model);
+  const rate = resolveProviderRate(provider, model, task);
 
   const perFile: PerFileEstimate[] = files.map((f) => {
     const inputTokens = estimateInputTokens(f.sizeChars);

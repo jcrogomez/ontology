@@ -130,6 +130,7 @@ export async function verifyHomeomorphismCommand(
       sizeInfos,
       provider ?? "anthropic",
       options.model,
+      "code_sketch",
     );
     if (options.json) {
       console.log(JSON.stringify({ ok: true, estimate }, null, 2));

@@ -331,6 +331,7 @@ export async function ingestCommand(
       sizeInfos,
       provider,
       options.model,
+      "semantic_parse",
     );
     if (options.json) {
       console.log(JSON.stringify({ ok: true, estimate }, null, 2));

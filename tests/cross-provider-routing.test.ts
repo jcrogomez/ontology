@@ -5,6 +5,7 @@ import {
   DefaultAnthropicRouting,
   DefaultOllamaRouting,
 } from "../src/runtime/llm/registry.js";
+import { resolveProviderRate } from "../src/commands/ingest/cost-estimate.js";
 import type { OntologyModel } from "../src/schemas/ontology.js";
 
 // Tests for the cross-provider routing infrastructure landed after the
@@ -154,5 +155,64 @@ describe("getDefaultModelForTask — per-provider auto-pick", () => {
   it("returns undefined for providers without a routing table (mock, literal)", () => {
     expect(getDefaultModelForTask("mock", "inspect")).toBeUndefined();
     expect(getDefaultModelForTask("literal", "code_sketch")).toBeUndefined();
+  });
+});
+
+describe("resolveProviderRate — task-aware cost estimation", () => {
+  // The γ-7 calibration found cost-estimate was over-quoting by ~40%
+  // when `--provider anthropic` was passed without `--model`, because
+  // the helper defaulted to Opus 4.7 even when the dispatcher would
+  // actually route to Sonnet (semantic_parse) or Haiku (inspect).
+  // These tests pin that the helper now consults the task-default
+  // routing when the model is unset.
+
+  it("picks Sonnet pricing when provider=anthropic + task=semantic_parse (ingest)", () => {
+    const rate = resolveProviderRate("anthropic", undefined, "semantic_parse");
+    // Sonnet 4.6: $3/M input, $15/M output (vs Opus $5/M, $25/M).
+    expect(rate.inputUsdPerMillion).toBe(3.0);
+    expect(rate.outputUsdPerMillion).toBe(15.0);
+    expect(rate.modelLabel).toBe("claude-sonnet-4-6");
+  });
+
+  it("picks Opus pricing when provider=anthropic + task=code_sketch (verify)", () => {
+    const rate = resolveProviderRate("anthropic", undefined, "code_sketch");
+    expect(rate.inputUsdPerMillion).toBe(5.0);
+    expect(rate.outputUsdPerMillion).toBe(25.0);
+    expect(rate.modelLabel).toBe("claude-opus-4-7");
+  });
+
+  it("picks Haiku pricing when provider=anthropic + task=inspect (Inspector)", () => {
+    const rate = resolveProviderRate("anthropic", undefined, "inspect");
+    // Haiku 4.5: $1/M input, $5/M output (5× cheaper than Opus).
+    expect(rate.inputUsdPerMillion).toBe(1.0);
+    expect(rate.outputUsdPerMillion).toBe(5.0);
+    expect(rate.modelLabel).toBe("claude-haiku-4-5");
+  });
+
+  it("explicit --model overrides the task default", () => {
+    // User said "I want Opus on ingest even though it's overkill" —
+    // the explicit choice wins.
+    const rate = resolveProviderRate("anthropic", "claude-opus-4-7", "semantic_parse");
+    expect(rate.modelLabel).toBe("claude-opus-4-7");
+    expect(rate.inputUsdPerMillion).toBe(5.0);
+  });
+
+  it("falls back to Opus when neither model nor task is provided (conservative)", () => {
+    const rate = resolveProviderRate("anthropic");
+    expect(rate.modelLabel).toBe("claude-opus-4-7");
+  });
+
+  it("ollama with task labels the model in modelLabel ($0 either way)", () => {
+    const rate = resolveProviderRate("ollama", undefined, "semantic_parse");
+    expect(rate.inputUsdPerMillion).toBe(0);
+    expect(rate.outputUsdPerMillion).toBe(0);
+    expect(rate.modelLabel).toBe("ollama:qwen2.5-coder:7b");
+  });
+
+  it("mock stays free regardless of task", () => {
+    const rate = resolveProviderRate("mock", undefined, "code_sketch");
+    expect(rate.inputUsdPerMillion).toBe(0);
+    expect(rate.outputUsdPerMillion).toBe(0);
+    expect(rate.modelLabel).toContain("mock");
   });
 });
