@@ -182,8 +182,9 @@ Phase plan (estimates from PROJECT_LEGEND.md §6):
 | β | Layer 1 (multi-file compile + `--target`), 2 (`node.literal`), 5 (path fibration) | ✅ shipped (incl. 2 post-merge fixes) | actual ~10 h |
 | γ | Layer 7 (`onto ingest <file>`) + Anthropic provider + rich proposal payload | ✅ γ-0 / γ-1 / γ-3 shipped 2026-05-12; γ-2 calibration on `hash.ts` 5/5 ε-equivalent (see [`legend/calibrations/HASH_TS_2026-05-12.md`](legend/calibrations/HASH_TS_2026-05-12.md)) | γ-0–3: ~4 h |
 | γ-4/5/6 | Layer 3 (TS-first static-edge inference) + `onto ingest <directory>` + `infer-edges --create-proposals` + walker AI indicator + `--include` flag | ✅ shipped 2026-05-12 (commits `62d8c86` / `a25ade9` / `9c16b9d` / `69424af` / `bc350ce`); Vibe-Reasoning runbook at [`legend/calibrations/VIBE_REASONING_PROCEDURE.md`](legend/calibrations/VIBE_REASONING_PROCEDURE.md) | actual ~6 h |
-| δ | Layer 4 (Inspector / translator) + Layer 6 (verification + report) | 🟡 next | ~6–8 h |
-| ε | Self-ingestion — Legend run on the Ontology repo itself | pending | ~6–10 h |
+| δ | Layer 4 (Inspector / translator) + Layer 6 (verification + report) | ✅ shipped 2026-05-12 (`8779acc` δ-1 + `29b330c` δ-2); γ-7 prompt invariants (`2e8853e`) + 5 tooling-gap fixes (`6ea7e94`) + 5 reviewer fixes (`b035ce7`) + cross-provider routing (`f80163d`) all in main | actual ~12 h |
+| γ-7 + δ measurement | Vibe-Reasoning corpus calibration with γ-7 invariants | ✅ shipped 2026-05-12 (`7abd73e`); +29pp ε-equiv, `divergent_both` eliminated. Report at [`legend/calibrations/VIBE_REASONING_GAMMA_7_2026-05-12.md`](legend/calibrations/VIBE_REASONING_GAMMA_7_2026-05-12.md) | actual ~3 h |
+| ε | Self-ingestion — Legend run on the Ontology repo itself | 🟡 next active stream (gated on API credit) | ~6–10 h |
 | ζ | Release + Open-Prompt seeds (sign, verify-published, replay) | pending | ~3–5 h |
 
 **Known limitations (as of plasticity layer completion):**

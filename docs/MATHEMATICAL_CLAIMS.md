@@ -16,11 +16,15 @@ must appear here, classified honestly. If a doc *suggests* the analogy
 without claiming the formal correspondence, it should still appear
 here under tier T2 or T3.
 
-The audit was last refreshed on **2026-05-10** against `main` after the
-post-0.9 changes landed: the validator port onto the topos algebra
-(PR #119), the semantic linker CLI + `:link-analysis` walker action
-(PR #120), and the walker `:graph view [depth]` action (PR #121).
-Whenever code or docs change, this map should be re-verified.
+The audit was last refreshed on **2026-05-13** against `main` (HEAD
+`f80163d`). Phase β + Phase γ + Phase γ-7 + Phase δ are now all
+shipped; the two empirical data points for §3.10 (`hash.ts` single-file
+at γ-2, Vibe-Reasoning external corpus at γ-7) are recorded as
+supporting evidence. Cross-provider per-task routing
+(`f80163d`) makes the LlmTask vocabulary load-bearing — different
+tasks dispatch to different models, which was the categorical claim
+behind the routing tier. Whenever code or docs change, this map
+should be re-verified.
 
 ---
 

@@ -575,7 +575,7 @@ report stabilises. Document findings in
 $\varepsilon$ on the divergent set.
 
 ### Phase ζ — release + Open-Prompt seed (~3–5 h)
-`LEGENS.md` becomes a release note. `OPEN_PROMPT.md` is a sibling
+`LEGEND.md` becomes a release note. `OPEN_PROMPT.md` is a sibling
 document with the protocol skeleton. Signing + replay land in a
 follow-up.
 

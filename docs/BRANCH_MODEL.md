@@ -193,7 +193,7 @@ follow-up choices once Option C is in place.
 
 ---
 
-*Updated 2026-05-11. Once a model is selected and the user signs off, this
+*Updated 2026-05-13 (decision confirmed). Once a model is selected and the user signs off, this
 note becomes the canonical reference for the Bootstrap 0.10 implementation
 PR. The follow-up work above is recorded in `docs/ROADMAP.md` and tracked
 through the milestone reviews.*

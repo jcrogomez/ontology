@@ -3,12 +3,19 @@
 > *La luz que hace visible el código oscuro: convertir los streams pendientes
 > en microtareas con importancia, dependencias y cotas verificables.*
 
-Estado actual (2026-05-12): Phase γ completa en `main` (`bc350ce`). Lo que
-sigue son cinco streams: **δ-1** (Inspector / Lupa), **δ-2**
-(`verify-homeomorphism`), **ε** (self-ingestion sobre el repo de
-Ontology), **ζ** (release + semillas Open-Prompt) y **Hardening**
-(advisory lock + Walker v2 + BRANCH_MODEL.md). Ninguno bloquea el test
-actual de la Vertiente C, todos quedan abiertos como deuda de proyecto.
+Estado actual (2026-05-13): Phase γ + γ-7 + Phase δ completos en `main`.
+δ-1 (Inspector / Lupa, `8779acc`), δ-2 (`verify-homeomorphism`,
+`29b330c`), γ-7 prompt invariants (`2e8853e`), 5 tooling-gap fixes
+(`6ea7e94`), 5 reviewer fixes (`b035ce7`), cross-provider per-task
+routing (`f80163d`) — todos shipped. BRANCH_MODEL.md Option C
+confirmado (2026-05-13). Lo que sigue son tres streams: **ε**
+(self-ingestion sobre el repo de Ontology, gated por API credit),
+**ζ** (release + semillas Open-Prompt) y **Hardening** (advisory lock
++ Walker v2). Las secciones §1 (δ-1) y §2 (δ-2) abajo se preservan
+como referencia histórica de la planificación original; las casillas
+con tooling y documentación que prometían `docs/INSPECTOR.md` o
+`docs/VERIFICATION.md` se materializaron como secciones inline en
+[`PROJECT_LEGEND.md`](PROJECT_LEGEND.md) §3 y §6 respectivamente.
 
 ---
 
@@ -171,7 +178,7 @@ Open-Prompt que abre la puerta a la siguiente conversación
 
 | # | Tarea | LoC | Constraint |
 |---|---|---:|---|
-| 4.1 | `docs/LEGENS.md` — release note end-to-end desde γ-0 hasta ε, con el ε medido del reporte de §3.11. | — | Citar commits y reportes. Es el doc que un lector externo lee primero. |
+| 4.1 | `docs/LEGEND.md` — release note end-to-end desde γ-0 hasta ε, con el ε medido del reporte de §3.11. | — | Citar commits y reportes. Es el doc que un lector externo lee primero. |
 | 4.2 | `docs/OPEN_PROMPT.md` — esqueleto del protocolo. Toma §4 de PROJECT_LEGEND.md y lo formaliza: shape del `signed-artefact`, chain de eventos, los tres primitivos. **Spec only**, no implementation. | — | El doc es el contrato; los comandos vienen después. |
 | 4.3 | `onto sign <branch>` (experimental, gated por `--experimental`) — Merkle root sobre `node.hash` + `events.jsonl` hash chain. SHA-256 vía `node:crypto`. **No firmas reales en v1**, solo el Merkle. | ~80 | Output JSON con root + per-node leaves + chain head. La firma criptográfica real es follow-up post-ζ. |
 | 4.4 | `onto verify-published <signed-artefact>` (experimental) — re-walk del chain y validar el Merkle. | ~60 | Reusa los hashes existentes; no recomputa. |

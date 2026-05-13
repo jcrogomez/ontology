@@ -399,7 +399,7 @@ confirmation has landed. Bootstrap 0.10 (cross-branch `node_update`),
     protection becomes table-stakes when a user starts running
     scheduled verifications.
 
-13. **`docs/LEGENS.md` release note** end-to-end from γ-0 through
+13. **`docs/LEGEND.md` release note** end-to-end from γ-0 through
     ε with the measured ε from item 11.
 
 14. **`docs/OPEN_PROMPT.md` skeleton** — formalize `PROJECT_LEGEND.md`
@@ -456,7 +456,7 @@ dollars), full sweep on `src/runtime + src/commands + src/schemas`
 (~$15–30, 30–60 min wall-clock), produce
 `SELF_INGEST_2026-05-XX.md`, lift §3.10 to T2. **Phase ζ release**
 follows directly: advisory lock first (§4.9 — table-stakes for any
-scheduled verification), then `LEGENS.md` release note, then
+scheduled verification), then `LEGEND.md` release note, then
 `OPEN_PROMPT.md` spec skeleton, then tag `0.4.0`. **Hardening that
 can parallelize with ε:** Walker v2 PR-1 (proposal review pane —
 useful *during* the ε proposal-apply loop), `BRANCH_MODEL.md`
