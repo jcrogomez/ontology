@@ -27,6 +27,19 @@ export type ResolveNodeModelResult =
   | { ok: true; resolved: ResolvedNodeModel }
   | { ok: false; reason: "ref_not_found" | "unsupported_provider"; message: string };
 
+// Providers the dispatcher knows how to route a real LlmRequest through.
+// "literal" exists in the schema as a non-LLM escape hatch (compileNode
+// short-circuits before reaching the dispatcher when node.literal is set),
+// so we accept it here for `onto node create --literal` flows that go
+// through the resolver. "openai" / "local" stay rejected — those would
+// require new adapters.
+const DISPATCHABLE_PROVIDERS = new Set([
+  "mock",
+  "ollama",
+  "anthropic",
+  "literal",
+]);
+
 export function resolveNodeModel(
   ref: string,
   registry: { models: OntologyModel[] },
@@ -39,15 +52,11 @@ export function resolveNodeModel(
       message: `model.ref "${ref}" not found in .ontology/models/registry.json`,
     };
   }
-  // Today the dispatcher only routes mock and ollama. Other providers in
-  // the schema (openai, anthropic, local) are forward-compatible but not
-  // yet wired; surface the failure clearly rather than silently falling
-  // through to a stub.
-  if (entry.provider !== "mock" && entry.provider !== "ollama") {
+  if (!DISPATCHABLE_PROVIDERS.has(entry.provider)) {
     return {
       ok: false,
       reason: "unsupported_provider",
-      message: `model.ref "${ref}" resolves to provider "${entry.provider}" which is not yet supported by the dispatcher`,
+      message: `model.ref "${ref}" resolves to provider "${entry.provider}" which is not wired into the dispatcher yet (supported today: mock, ollama, anthropic, literal)`,
     };
   }
   return {

@@ -439,6 +439,52 @@ Bootstrap 0.9 (post-validator-port).
 - `onto model list --provider mock`
 - `onto model list --provider ollama`
 
+### Model Routing (post-γ-7 reviewer fix)
+
+Three layers decide which model dispatches a given LlmRequest, in
+order of decreasing priority:
+
+1. **`request.model`** — set explicitly by the caller. Wins over
+   everything. Surfaces as `--model <name>` on the CLI.
+2. **`options.defaultModel`** — caller-resolved per-node routing.
+   `compileNode` populates this from the focal's `node.model.ref`
+   through `resolveNodeModel` against `.ontology/models/registry.json`.
+   Mixed-provider plans work here: node A pointing at
+   `anthropic-opus-critic`, node B at `ollama-qwen-coder`, and node C
+   at `anthropic-haiku-fast` will dispatch through three different
+   adapters in the same compile plan.
+3. **Task-default from the routing registry** — `src/runtime/llm/registry.ts`
+   carries a `DefaultRouting` table per supported provider keyed on
+   `LlmTask`. When only `--provider <X>` is passed (no `--model`,
+   no per-node ref), the dispatcher looks up `task → preferred[0]`
+   and uses it as the dispatch default. Today: `ollama` and `anthropic`
+   are wired; mock and literal fall through to adapter-internal
+   defaults.
+
+Anthropic table (per-task, picked from the published price/intelligence
+frontier on the claude-4.x family):
+
+| Task | Tier | Default model | Why |
+|---|---|---|---|
+| `inspect` | fast | `claude-haiku-4-5` | Inspector translator (short prose) |
+| `semantic_parse` | balanced | `claude-sonnet-4-6` | Ingest JSON extraction |
+| `code_sketch` | critic | `claude-opus-4-7` | Compile-back, verify-homeomorphism |
+| `node_critique` | critic | `claude-opus-4-7` | Deep critique |
+| `context_assemble` | fast | `claude-haiku-4-5` | Context glue |
+| `documentation` | fast | `claude-haiku-4-5` | Doc generation |
+| `node_expand` / `test_generate` | balanced | `claude-sonnet-4-6` | Structured generation |
+
+Result: `onto compile run --provider anthropic` (no `--model`) routes
+each step through the right tier without the caller having to know
+the model catalogue. Override with `--model <name>` when the table
+choice is wrong for a particular run.
+
+The registry seeded by `onto init` carries the three Anthropic tiers
+(`anthropic-opus-critic`, `anthropic-sonnet-balanced`,
+`anthropic-haiku-fast`) plus an Ollama coder entry (`ollama-qwen-coder`)
+and the long-standing `mock_default`. Point any node's `model.ref` at
+one of these — or add your own.
+
 ## Planned Commands
 
 The following commands are *Planned / Not yet implemented*. The full

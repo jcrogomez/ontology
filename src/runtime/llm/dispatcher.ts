@@ -2,6 +2,7 @@ import type { LlmProvider, LlmRequest, LlmResponse } from './types.js';
 import { createMockLlmAdapter } from './mock.js';
 import { createOllamaAdapter } from './ollama/adapter.js';
 import { createAnthropicAdapter } from './anthropic/adapter.js';
+import { getDefaultModelForTask } from './registry.js';
 
 export async function dispatchLlmRequest(
   request: LlmRequest,
@@ -28,10 +29,27 @@ export async function dispatchLlmRequest(
     throw new Error(`Cannot dispatch through the "literal" provider; compileNode is expected to bypass dispatch when node.literal is set`);
   }
 
+  // Task-based default model. Precedence (lowest to highest):
+  //   1. adapter's built-in DEFAULT_MODEL (last-resort)
+  //   2. provider/task default from the routing registry (this layer)
+  //   3. options.defaultModel — caller-resolved (per-node model.ref,
+  //      or CLI --model when an explicit override is set)
+  //   4. request.model — request-level override
+  // The dispatcher resolves layers 1-3 here; the adapter resolves 4.
+  // Effect: `--provider anthropic` alone (no --model) routes
+  // semantic_parse → sonnet-4-6, inspect → haiku-4-5, code_sketch →
+  // opus-4-7 — the categorical-routing claim from the design becomes
+  // operational, instead of every task hitting whatever the adapter
+  // hardcoded.
+  const taskDefault = !options?.defaultModel && !request.model
+    ? getDefaultModelForTask(provider, request.task)
+    : undefined;
+  const effectiveDefaultModel = options?.defaultModel ?? taskDefault;
+
   if (provider === 'ollama') {
     const adapter = createOllamaAdapter({
       host: options?.ollamaHost,
-      defaultModel: options?.defaultModel
+      defaultModel: effectiveDefaultModel,
     });
     return adapter.generate(request);
   }
@@ -39,7 +57,7 @@ export async function dispatchLlmRequest(
   if (provider === 'anthropic') {
     const adapter = createAnthropicAdapter({
       apiKey: options?.anthropicApiKey,
-      defaultModel: options?.defaultModel,
+      defaultModel: effectiveDefaultModel,
     });
     return adapter.generate(request);
   }

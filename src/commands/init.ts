@@ -169,7 +169,14 @@ export async function initCommand(options: InitOptions = {}): Promise<void> {
 
   writeJson(`${paths.nodesDir}/node_0000_canon.json`, canonNode);
 
-  // Create models/registry.json
+  // Create models/registry.json with cross-provider, per-tier entries.
+  // A real project mixes nodes: simple translators want a fast/cheap
+  // model, deep code-reasoning wants a critic model, abstract canon
+  // nodes can stay on mock. Each entry below is a routing handle a
+  // node's `model.ref` can point at; combine freely across providers
+  // in the same compile plan. The DefaultAnthropicRouting / DefaultOllamaRouting
+  // tables in src/runtime/llm/registry.ts give the auto-pick when no
+  // ref is set and only `--provider` is on the CLI.
   const modelsRegistry = {
     models: [
       OntologyModelSchema.parse({
@@ -178,15 +185,60 @@ export async function initCommand(options: InitOptions = {}): Promise<void> {
         name: "deterministic-mock-model",
         temperature: 0,
         multimodal: false,
-        notes: "Default placeholder model for Network Kernel bootstrap.",
+        notes: "Default placeholder model for Network Kernel bootstrap and offline tests.",
       }),
+      // Anthropic frontier tier — for code-sketch / critique / verify-
+      // homeomorphism compile-back. The γ-2 and γ-7 calibrations both
+      // hit publishable verdicts using this model.
+      OntologyModelSchema.parse({
+        id: "anthropic-opus-critic",
+        provider: "anthropic",
+        name: "claude-opus-4-7",
+        temperature: 0,
+        multimodal: false,
+        notes: "Frontier model for deep code-reasoning, compile-back (code_sketch), and node_critique. Requires ANTHROPIC_API_KEY.",
+      }),
+      // Anthropic balanced tier — for ingest extraction (semantic_parse),
+      // node_expand, test_generate. Best $/quality on structured outputs.
+      OntologyModelSchema.parse({
+        id: "anthropic-sonnet-balanced",
+        provider: "anthropic",
+        name: "claude-sonnet-4-6",
+        temperature: 0,
+        multimodal: false,
+        notes: "Balanced model for ingest extraction and structured generation. ~40% cheaper than Opus on the same task family.",
+      }),
+      // Anthropic fast tier — for the Inspector translator, documentation,
+      // context_assemble. Short prose, low ambiguity.
+      OntologyModelSchema.parse({
+        id: "anthropic-haiku-fast",
+        provider: "anthropic",
+        name: "claude-haiku-4-5",
+        temperature: 0,
+        multimodal: false,
+        notes: "Fast tier — Inspector translator, documentation, lightweight tasks. ~5× cheaper than Opus per call.",
+      }),
+      // Ollama local-coder — free, runs against `ollama serve`. Useful
+      // for offline calibration baselines (the β-2 hash.ts run used
+      // this family) and for nodes where the user wants zero API spend.
+      OntologyModelSchema.parse({
+        id: "ollama-qwen-coder",
+        provider: "ollama",
+        name: "qwen2.5-coder:7b",
+        temperature: 0,
+        multimodal: false,
+        notes: "Local Ollama coder model for free dispatch. Pull with `ollama pull qwen2.5-coder:7b` before use.",
+      }),
+      // Legacy alias preserved so projects initialised before the cross-
+      // provider rewrite still resolve their `model.ref: "anthropic_default"`
+      // canon entries.
       OntologyModelSchema.parse({
         id: "anthropic_default",
         provider: "anthropic",
         name: "claude-opus-4-7",
         temperature: 0,
         multimodal: false,
-        notes: "Frontier model for Project Legend ingest and intent extraction. Requires ANTHROPIC_API_KEY in the environment.",
+        notes: "Legacy alias — kept for backwards compatibility. Prefer anthropic-opus-critic / anthropic-sonnet-balanced / anthropic-haiku-fast for tier-aware routing.",
       }),
     ],
   };
