@@ -773,13 +773,15 @@ compile
   .option("--open-world", "Open-world validation: unsatisfied 'requires' tokens degrade to warnings instead of hard failures. Use when the focal's contract references external dependencies (stdlib, pip, npm) that no other node provides — common for ingest-derived graphs (Project Legend γ-5).")
   .option("--max-tokens <n>", "Override the LLM's max-output-tokens setting (anthropic default: 8192). Use for large artifacts that may need 16K+; the Vibe-Reasoning calibration found 4096 insufficient on files >~3KB once adaptive thinking eats budget.", (v) => parseInt(v, 10))
   .option("--no-thinking", "Suppress adaptive thinking on providers that support it (anthropic Opus 4.7). Useful for large prompts where adaptive thinking exhausts the output budget and the response comes back as empty text.")
+  .option("--no-lock", "Skip the .ontology/.lock advisory lock. Off by default — the lock serializes concurrent cooperators. Pass when you know the prior process is gone (e.g. cross-host stale file the auto-detector cannot break safely).")
   .option("--json", "Output results in JSON format")
   .action(async (id, rawOptions) => {
     try {
-      const { thinking: rawThinking, ...rest } = rawOptions as Record<string, unknown> & { thinking?: boolean };
+      const { thinking: rawThinking, lock: rawLock, ...rest } = rawOptions as Record<string, unknown> & { thinking?: boolean; lock?: boolean };
       const options = {
         ...rest,
         ...(rawThinking === false ? { thinking: "disabled" as const } : {}),
+        ...(rawLock === false ? { noLock: true } : {}),
       };
       await compileRunCommand(id, options);
     } catch (err: unknown) {
@@ -802,13 +804,15 @@ compile
   .option("--open-world", "Open-world validation (same semantics as compile run --open-world). Applied uniformly to every step in every focal's plan.")
   .option("--max-tokens <n>", "Override the LLM's max-output-tokens setting for every dispatch in the batch (anthropic default: 8192).", (v) => parseInt(v, 10))
   .option("--no-thinking", "Suppress adaptive thinking on providers that support it (anthropic Opus 4.7). Applied uniformly across the batch.")
+  .option("--no-lock", "Skip the .ontology/.lock advisory lock — see compile run for semantics.")
   .option("--json", "Output results in JSON format")
   .action(async (rawOptions) => {
     try {
-      const { thinking: rawThinking, ...rest } = rawOptions as Record<string, unknown> & { thinking?: boolean };
+      const { thinking: rawThinking, lock: rawLock, ...rest } = rawOptions as Record<string, unknown> & { thinking?: boolean; lock?: boolean };
       const options = {
         ...rest,
         ...(rawThinking === false ? { thinking: "disabled" as const } : {}),
+        ...(rawLock === false ? { noLock: true } : {}),
       };
       await compileRunBatchCommand(options);
     } catch (err: unknown) {
@@ -856,15 +860,17 @@ program
   .option("--cost-estimate", "Pre-flight cost guard: walks the inputs, estimates compile-back cost, exits WITHOUT dispatching the LLM.")
   .option("--dry-run", "Skip the compile-back dispatch entirely. Reads any existing regen under .ontology/verify/<nodeId>.<ext> and re-classifies with current thresholds. Useful for tuning thresholds without paying for new dispatches.")
   .option("--report <path>", "Also write a markdown report of the verdict + per-node usage to the given path (in addition to stdout / --json). Shape mirrors docs/legend/calibrations/* reports.")
+  .option("--no-lock", "Skip the .ontology/.lock advisory lock — see compile run for semantics.")
   .option("--json", "Output results in JSON format.")
   .action(async (focal, rawOptions) => {
     try {
       // commander emits `thinking: false` when --no-thinking is passed
       // (its default is true). Translate to the typed adapter form.
-      const { thinking: rawThinking, ...rest } = rawOptions as Record<string, unknown> & { thinking?: boolean };
+      const { thinking: rawThinking, lock: rawLock, ...rest } = rawOptions as Record<string, unknown> & { thinking?: boolean; lock?: boolean };
       const options = {
         ...rest,
         ...(rawThinking === false ? { thinking: "disabled" as const } : {}),
+        ...(rawLock === false ? { noLock: true } : {}),
       };
       await verifyHomeomorphismCommand(focal, options);
     } catch (err: unknown) {

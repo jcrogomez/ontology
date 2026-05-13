@@ -1,5 +1,6 @@
 import { loadNodeById } from "../../core/project/load.js";
 import { runCompilePlan } from "../../runtime/compile/compile-plan-runner.js";
+import { withLock, LockAcquireError } from "../../core/fs/lock.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
 
 export interface CompileRunOptions {
@@ -41,6 +42,13 @@ export interface CompileRunOptions {
   // Suppress adaptive thinking on providers that support it.
   // Pass-through to compileNode → LlmRequest.thinking.
   thinking?: "adaptive" | "disabled";
+  // Bypass the .ontology/.lock advisory lock. Off by default — any
+  // command that mutates state.json / events.jsonl / artifacts wraps
+  // its work in the lock to keep concurrent cooperators from
+  // interleaving writes. Set true for tests, debug, or when the
+  // operator knows the prior process is gone but the file is stale
+  // beyond what the stale-detection probe can verify (cross-host).
+  noLock?: boolean;
 }
 
 // `onto compile <nodeId>`
@@ -82,20 +90,34 @@ export async function compileRunCommand(focalId: string, options: CompileRunOpti
     return;
   }
 
-  const result = await runCompilePlan({
-    focalId,
-    provider,
-    model: options.model,
-    ollamaHost: options.ollamaHost,
-    runtimeCheck: options.runtimeCheck,
-    runtimeCheckTimeoutMs: options.runtimeCheckTimeoutMs,
-    branch: options.branch,
-    targetPath: options.target,
-    force: options.force,
-    openWorld: options.openWorld,
-    maxTokens: options.maxTokens,
-    thinking: options.thinking,
-  });
+  let result;
+  try {
+    result = await withLock(
+      process.cwd(),
+      () =>
+        runCompilePlan({
+          focalId,
+          provider,
+          model: options.model,
+          ollamaHost: options.ollamaHost,
+          runtimeCheck: options.runtimeCheck,
+          runtimeCheckTimeoutMs: options.runtimeCheckTimeoutMs,
+          branch: options.branch,
+          targetPath: options.target,
+          force: options.force,
+          openWorld: options.openWorld,
+          maxTokens: options.maxTokens,
+          thinking: options.thinking,
+        }),
+      { skipLock: options.noLock, command: `compile run ${focalId}` },
+    );
+  } catch (err: unknown) {
+    if (err instanceof LockAcquireError) {
+      failWith(err.message, options.json);
+      return;
+    }
+    throw err;
+  }
 
   if (!result.ok) {
     if (options.json) {

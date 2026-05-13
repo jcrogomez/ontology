@@ -1,5 +1,6 @@
 import { loadNodes } from "../../core/project/load.js";
 import { runCompilePlan } from "../../runtime/compile/compile-plan-runner.js";
+import { withLock, LockAcquireError } from "../../core/fs/lock.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
 import type { OntologyNode } from "../../schemas/ontology.js";
 
@@ -21,6 +22,8 @@ export interface CompileRunBatchOptions {
   maxTokens?: number;
   // Thinking-mode override applied uniformly to every focal.
   thinking?: "adaptive" | "disabled";
+  // Bypass the .ontology/.lock advisory lock for the whole batch.
+  noLock?: boolean;
   json?: boolean;
 }
 
@@ -101,37 +104,51 @@ export async function compileRunBatchCommand(options: CompileRunBatchOptions): P
   }
 
   const results: BatchFocalResult[] = [];
-  for (const focalId of focals.ids) {
-    const r = await runCompilePlan({
-      focalId,
-      provider,
-      model: options.model,
-      ollamaHost: options.ollamaHost,
-      runtimeCheck: options.runtimeCheck,
-      runtimeCheckTimeoutMs: options.runtimeCheckTimeoutMs,
-      branch: options.branch,
-      openWorld: options.openWorld,
-      maxTokens: options.maxTokens,
-      thinking: options.thinking,
-    });
-    if (!r.ok) {
-      results.push({
-        focalId,
-        ok: false,
-        reason: r.reason,
-        message: r.message,
-      });
-      continue;
+  try {
+    await withLock(
+      process.cwd(),
+      async () => {
+        for (const focalId of focals.ids) {
+          const r = await runCompilePlan({
+            focalId,
+            provider,
+            model: options.model,
+            ollamaHost: options.ollamaHost,
+            runtimeCheck: options.runtimeCheck,
+            runtimeCheckTimeoutMs: options.runtimeCheckTimeoutMs,
+            branch: options.branch,
+            openWorld: options.openWorld,
+            maxTokens: options.maxTokens,
+            thinking: options.thinking,
+          });
+          if (!r.ok) {
+            results.push({
+              focalId,
+              ok: false,
+              reason: r.reason,
+              message: r.message,
+            });
+            continue;
+          }
+          const cacheHits = r.steps.filter((s) => s.cached).length;
+          results.push({
+            focalId,
+            ok: true,
+            artifactPath: r.focalArtifact.relativePath,
+            bytesWritten: r.focalArtifact.bytesWritten,
+            steps: r.steps.length,
+            cacheHits,
+          });
+        }
+      },
+      { skipLock: options.noLock, command: `compile run-batch (${focals.ids.length} focals)` },
+    );
+  } catch (err: unknown) {
+    if (err instanceof LockAcquireError) {
+      failWith(err.message, options.json);
+      return;
     }
-    const cacheHits = r.steps.filter((s) => s.cached).length;
-    results.push({
-      focalId,
-      ok: true,
-      artifactPath: r.focalArtifact.relativePath,
-      bytesWritten: r.focalArtifact.bytesWritten,
-      steps: r.steps.length,
-      cacheHits,
-    });
+    throw err;
   }
 
   const okCount = results.filter((r) => r.ok).length;

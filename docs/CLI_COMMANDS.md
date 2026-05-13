@@ -439,6 +439,31 @@ Bootstrap 0.9 (post-validator-port).
 - `onto model list --provider mock`
 - `onto model list --provider ollama`
 
+### Advisory lock (`.ontology/.lock`)
+
+Mutating commands (`compile run`, `compile run-batch`,
+`verify-homeomorphism`) acquire an exclusive advisory lock at
+`.ontology/.lock` for the duration of the run. The lock is a JSON
+file recording `{ pid, hostname, acquiredAt, command }` written
+atomically via `fs.openSync(path, "wx")`; concurrent cooperators
+fail fast with a friendly message naming the holder.
+
+- **Stale-lock recovery**: if the recorded PID is no longer alive
+  on the same hostname, the next caller takes the lock. Cross-host
+  locks are NOT broken automatically — we can't probe a remote
+  PID, so the safe default is to refuse and ask the operator to
+  intervene.
+- **Cleanup hooks** run on `process.exit`, `SIGINT`, and `SIGTERM`.
+  `SIGKILL` strands the file (the next process recovers via stale
+  detection).
+- **`--no-lock`** bypasses the acquire entirely. Use for tests that
+  run cooperators in parallel on purpose, or for the rare debug
+  session where the operator knows the other process is gone but
+  the file is stale beyond what the auto-detector can verify (e.g.
+  cross-host).
+
+Spec: `src/core/fs/lock.ts`. Reasoning: POST_GAMMA_PLAN §5.1.
+
 ### Model Routing (post-γ-7 reviewer fix)
 
 Three layers decide which model dispatches a given LlmRequest, in

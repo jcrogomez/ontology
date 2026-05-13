@@ -11,6 +11,7 @@ import type { OntologyNode } from "../../schemas/ontology.js";
 import { readState, writeState } from "../../core/state/state-store.js";
 import { getOntologyPaths } from "../../core/project/paths.js";
 import { appendJsonl } from "../../core/fs/json.js";
+import { withLock, LockAcquireError } from "../../core/fs/lock.js";
 import {
   compareFiles,
   classifyVerdict,
@@ -76,6 +77,11 @@ export interface VerifyHomeomorphismOptions {
   // stdout / --json output. The markdown shape mirrors
   // `docs/legend/calibrations/*` reports.
   report?: string;
+  // Bypass the .ontology/.lock advisory lock. See compileRun for
+  // semantics. Verify reads + writes .ontology/verify/<nodeId>.<ext>
+  // and emits a homeomorphism_verified event, so it must hold the
+  // lock by default; --no-lock is the explicit opt-out.
+  noLock?: boolean;
   // Open-world: degrades unsatisfied requires to warnings. Set by
   // default for verify because ingest-derived contracts routinely
   // reference external deps; explicit override available.
@@ -151,20 +157,37 @@ export async function verifyHomeomorphismCommand(
   }
 
   const results: VerificationResult[] = [];
-  for (const c of candidates) {
-    const r = await verifyOne(c, {
-      stagingDir,
-      provider,
-      model: options.model,
-      ollamaHost: options.ollamaHost,
-      maxTokens: options.maxTokens,
-      thinking: options.thinking,
-      openWorld: options.openWorld ?? true, // verify defaults to open-world
-      thresholds,
-      dryRun: !!options.dryRun,
+  try {
+    await withLock(
       cwd,
-    });
-    results.push(r);
+      async () => {
+        for (const c of candidates) {
+          const r = await verifyOne(c, {
+            stagingDir,
+            provider,
+            model: options.model,
+            ollamaHost: options.ollamaHost,
+            maxTokens: options.maxTokens,
+            thinking: options.thinking,
+            openWorld: options.openWorld ?? true, // verify defaults to open-world
+            thresholds,
+            dryRun: !!options.dryRun,
+            cwd,
+          });
+          results.push(r);
+        }
+      },
+      {
+        skipLock: options.noLock,
+        command: `verify-homeomorphism (${candidates.length} candidates)`,
+      },
+    );
+  } catch (err: unknown) {
+    if (err instanceof LockAcquireError) {
+      fail(err.message, options.json);
+      return;
+    }
+    throw err;
   }
 
   // 4. Aggregate + emit report.
