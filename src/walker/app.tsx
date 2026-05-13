@@ -41,6 +41,12 @@ import { graphViewFromWalker } from "./actions/graph-view-from-walker.js";
 import { parseGraphViewArgs } from "./state/parse-graph-view-args.js";
 import { linkFromWalker } from "./actions/link-from-walker.js";
 import { InfoPanel, type InfoPanelState } from "./layout/info-panel.js";
+import { ProposalsPanel, type ProposalsPanelState } from "./layout/proposals-panel.js";
+import {
+  loadProposalsForWalker,
+  applyProposalFromWalker,
+  rejectProposalFromWalker,
+} from "./actions/proposals-from-walker.js";
 import { parseProviderArgs } from "./state/parse-provider-args.js";
 import { parseQueryArgs } from "./state/parse-query-args.js";
 import { parseLinkArgs } from "./state/parse-link-args.js";
@@ -102,6 +108,11 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
   // synchronously; `:link-analysis` is async (semanticLink) and uses
   // the pendingLinkAnalysis sentinel below to stay interactive.
   const [infoState, setInfoState] = useState<InfoPanelState>({ kind: "idle" });
+  const [proposalsPanel, setProposalsPanel] = useState<ProposalsPanelState>({
+    open: false,
+    proposals: [],
+    cursor: 0,
+  });
   const [pendingLinkAnalysis, setPendingLinkAnalysis] = useState<{ focalId: string } | null>(null);
 
   const neighborhood = useMemo<FocalNeighborhood | { error: string }>(() => {
@@ -274,6 +285,133 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
 
     if ("error" in neighborhood) {
       if (input === "q" || key.escape) exit();
+      return;
+    }
+
+    // When the proposals panel is open, its keys take priority over
+    // graph navigation. j/k / arrows scroll the proposal list; a/r/d
+    // act on the focused proposal; Esc closes the panel and returns
+    // control to graph navigation. This is the only place in the
+    // walker where the same key (arrows) has a different meaning
+    // depending on which panel is open — kept local and obvious.
+    if (proposalsPanel.open) {
+      if (key.escape) {
+        setProposalsPanel({ open: false, proposals: [], cursor: 0 });
+        setMessage("proposals panel dismissed");
+        return;
+      }
+      if (proposalsPanel.loadError) {
+        // Read-only state; only Esc / R make sense.
+        if (input === "R") {
+          const reload = loadProposalsForWalker(cwd);
+          setProposalsPanel(
+            reload.ok
+              ? { open: true, proposals: reload.proposals, cursor: 0 }
+              : { open: true, proposals: [], cursor: 0, loadError: reload.message ?? "Failed to reload" },
+          );
+        }
+        return;
+      }
+      if (input === "j" || key.downArrow) {
+        setProposalsPanel((s) => ({
+          ...s,
+          cursor: Math.min(s.proposals.length - 1, s.cursor + 1),
+        }));
+        return;
+      }
+      if (input === "k" || key.upArrow) {
+        setProposalsPanel((s) => ({ ...s, cursor: Math.max(0, s.cursor - 1) }));
+        return;
+      }
+      if (input === "R") {
+        const reload = loadProposalsForWalker(cwd);
+        if (reload.ok) {
+          setProposalsPanel({
+            open: true,
+            proposals: reload.proposals,
+            cursor: Math.min(proposalsPanel.cursor, Math.max(0, reload.proposals.length - 1)),
+          });
+          setMessage(`reloaded — ${reload.proposals.length} pending`);
+        } else {
+          setProposalsPanel({
+            open: true,
+            proposals: [],
+            cursor: 0,
+            loadError: reload.message ?? "Failed to reload",
+          });
+        }
+        return;
+      }
+      if (proposalsPanel.proposals.length === 0) {
+        return; // a/r/d are no-ops without rows
+      }
+      const focused = proposalsPanel.proposals[proposalsPanel.cursor];
+      if (input === "a") {
+        const r = applyProposalFromWalker(focused.id, { cwd });
+        const at = Date.now();
+        // On success we drop the now-applied proposal from the list and
+        // keep the cursor on the next item (or the last item if we
+        // applied the bottom row). On failure we leave the list as-is.
+        if (r.ok && r.outcome === "applied") {
+          const remaining = proposalsPanel.proposals.filter((p) => p.id !== focused.id);
+          const newCursor = Math.min(proposalsPanel.cursor, Math.max(0, remaining.length - 1));
+          setProposalsPanel({
+            open: true,
+            proposals: remaining,
+            cursor: newCursor,
+            lastAction: {
+              proposalId: focused.id,
+              outcome: r.outcome,
+              message: r.createdId ? `applied — created ${r.createdId}` : "applied",
+              at,
+            },
+          });
+        } else {
+          setProposalsPanel((s) => ({
+            ...s,
+            lastAction: { proposalId: focused.id, outcome: r.outcome, message: r.message, at },
+          }));
+        }
+        return;
+      }
+      if (input === "d") {
+        const r = applyProposalFromWalker(focused.id, { dryRun: true, cwd });
+        setProposalsPanel((s) => ({
+          ...s,
+          lastAction: {
+            proposalId: focused.id,
+            outcome: r.outcome,
+            message: r.message,
+            at: Date.now(),
+          },
+        }));
+        return;
+      }
+      if (input === "r") {
+        const r = rejectProposalFromWalker(focused.id, { cwd });
+        if (r.ok) {
+          const remaining = proposalsPanel.proposals.filter((p) => p.id !== focused.id);
+          const newCursor = Math.min(proposalsPanel.cursor, Math.max(0, remaining.length - 1));
+          setProposalsPanel({
+            open: true,
+            proposals: remaining,
+            cursor: newCursor,
+            lastAction: { proposalId: focused.id, outcome: "rejected", message: "rejected", at: Date.now() },
+          });
+        } else {
+          setProposalsPanel((s) => ({
+            ...s,
+            lastAction: {
+              proposalId: focused.id,
+              outcome: "reject_failed",
+              message: r.message,
+              at: Date.now(),
+            },
+          }));
+        }
+        return;
+      }
+      // Any other key is ignored — keep the panel focused.
       return;
     }
 
@@ -573,6 +711,37 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       setMessage("info panel dismissed");
       return;
     }
+    if (cmd === "proposals" || cmd === "p") {
+      // Walker v2 PR-1 — proposal review pane. Loads the pending list
+      // and opens the panel. The operator drives it with j/k navigation
+      // and a/r/d action keys; see proposalsPanel mode below.
+      const result = loadProposalsForWalker(cwd);
+      if (!result.ok) {
+        setProposalsPanel({
+          open: true,
+          proposals: [],
+          cursor: 0,
+          loadError: result.message ?? "Failed to load proposals",
+        });
+      } else {
+        setProposalsPanel({
+          open: true,
+          proposals: result.proposals,
+          cursor: 0,
+        });
+        setMessage(
+          result.proposals.length === 0
+            ? "no pending proposals"
+            : `${result.proposals.length} pending proposal${result.proposals.length === 1 ? "" : "s"} — j/k to navigate, a/r/d to act`,
+        );
+      }
+      return;
+    }
+    if (cmd === "clearproposals") {
+      setProposalsPanel({ open: false, proposals: [], cursor: 0 });
+      setMessage("proposals panel dismissed");
+      return;
+    }
     setMessage(`unknown command: :${cmd}`);
   }
 
@@ -615,6 +784,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       <CompilePlanPanel state={planState} />
       <CompileResultPanel state={compileState} />
       <InfoPanel state={infoState} />
+      <ProposalsPanel state={proposalsPanel} />
       <HintBar mode={mode === "edit" ? "view" : mode} command={command} message={message} />
     </Box>
   );
