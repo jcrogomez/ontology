@@ -1,6 +1,6 @@
 # Ontology Roadmap
 
-## Current State: post-0.9 — Plasticity Layer + Legend Foundation (`0.3.0-alpha.0`)
+## Current State: 0.4.0-rc.1 — Project Legend Phases α–δ shipped (`0.4.0-rc.1`)
 
 Ontology has reached **post-Bootstrap 0.9** with the **plasticity layer** in
 place. The seven axioms of the canon all run concrete code (axiom 4 is now
