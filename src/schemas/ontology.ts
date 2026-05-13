@@ -276,6 +276,15 @@ export const OntologyEventSchema = z.object({
     "proposal_rejected",
     "proposal_applied",
     "proposal_staled",
+    // Project Legend δ-1: emitted by `onto node inspect` when a fresh
+    // translator dispatch lands on the node. Cache hits do NOT emit
+    // (no API spend, no provenance to record).
+    "node_inspected",
+    // Project Legend δ-2: emitted by `onto verify-homeomorphism` after
+    // a sweep completes (one event per CLI invocation, carrying the
+    // aggregate verdict counts + per-node ids). The temporal log
+    // becomes the canonical timeline of "what we measured, when".
+    "homeomorphism_verified",
   ]),
   branch: z.string().default("main"),
   previousEventId: z.string().nullable().default(null),

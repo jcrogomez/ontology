@@ -91,12 +91,17 @@ export function extractTopLevelDeclarations(
   if (language === "python") {
     const names: string[] = [];
     const seen = new Set<string>();
-    // Match `^def NAME(` and `^class NAME(` / `^class NAME:` at the
-    // beginning of a line. Python convention: a single underscore
-    // prefix marks an implementation detail; we still include them
-    // here because the Jaccard is comparing structural decomposition,
-    // not the public-import surface.
-    const re = /^(?:def|class)\s+(\w+)\s*[\(:]/gm;
+    // Match `^def NAME(`, `^async def NAME(`, and `^class NAME(` /
+    // `^class NAME:` at the beginning of a line. Python convention: a
+    // single underscore prefix marks an implementation detail; we
+    // still include them here because the Jaccard is comparing
+    // structural decomposition, not the public-import surface. The
+    // `async def` alternative is required for any modern Python
+    // codebase (Ontology's own src/ has async functions); without it
+    // the structural Jaccard silently under-counts coroutines and
+    // reports false `divergent_structural` verdicts on files where
+    // the regen renamed nothing.
+    const re = /^(?:async\s+def|def|class)\s+(\w+)\s*[\(:]/gm;
     let m: RegExpExecArray | null;
     while ((m = re.exec(source)) !== null) {
       const name = m[1];

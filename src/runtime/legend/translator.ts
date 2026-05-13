@@ -54,12 +54,16 @@ Your output is plain text — no JSON, no fences, no preamble.`;
 
 /**
  * Computes the hash of the inputs that produced a translator. When
- * the node's prompt / rules / contract change, this hash changes,
- * which lets a future invalidation pass detect a stale cache.
+ * the node's prompt / rules / contract / literal change, this hash
+ * changes, which lets a future invalidation pass detect a stale
+ * cache.
  *
  * Includes: prompt.raw, rules[], the focal's provides/requires/forbids
- * (the parts the inspector reads). Does NOT include node.label or
- * coordinates — those are framing metadata, not semantic content.
+ * (the parts the inspector reads) AND node.literal (β-2 escape hatch:
+ * a literal-pinned artifact IS the load-bearing content the inspector
+ * describes; mutating it must invalidate the cached prose). Does NOT
+ * include node.label or coordinates — those are framing metadata,
+ * not semantic content.
  *
  * Stable / canonical: arrays are sorted, JSON is fast-stringified
  * via stable JSON to make the hash deterministic across runs.
@@ -75,6 +79,7 @@ export function computeTranslatorSourceHash(node: OntologyNode): string {
     provides,
     requires,
     forbids,
+    literal: node.literal ?? null,
   };
   const text = JSON.stringify(payload);
   return createHash("sha256").update(text).digest("hex");

@@ -94,7 +94,14 @@ moment, the user thinks of X as "a name without any nodes yet".
     of changes, not a snapshot. Queries that span the inheritance chain
     need a `--include-parent-branch` flag (and we have to add it).
 
-## Recommendation: **Option C**
+## Decision: **Option C — confirmed 2026-05-13**
+
+The maintainer confirmed Option C (lazy materialisation on touch) on
+2026-05-13, after the recommendation had stood unchallenged for five
+days in this document. The three reasons below remain the load-bearing
+justification; Bootstrap 0.10 is now unblocked.
+
+## Why Option C (load-bearing rationale, preserved)
 
 Three concrete reasons:
 

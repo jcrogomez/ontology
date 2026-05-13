@@ -211,4 +211,46 @@ describe("onto node inspect (δ-1)", () => {
     expect(parsed.ok).toBe(false);
     expect(parsed.error).toContain("Unsupported provider");
   });
+
+  it("appends a node_inspected event on fresh dispatch, NOT on cache hit (§4.2)", () => {
+    const eventsPath = path.join(tempDir, ".ontology", "events.jsonl");
+    const readInspected = (): Array<{ payload: { nodeId: string; sourceHash: string } }> => {
+      if (!fs.existsSync(eventsPath)) return [];
+      return fs
+        .readFileSync(eventsPath, "utf-8")
+        .split("\n")
+        .filter(Boolean)
+        .map((l) => JSON.parse(l))
+        .filter((e: { eventType: string }) => e.eventType === "node_inspected");
+    };
+
+    // First call dispatches — event MUST land in the log.
+    const before = readInspected().length;
+    const r1 = runCli(tempDir, ["node", "inspect", nodeId, "--provider", "mock", "--json"]);
+    expect(r1.status).toBe(0);
+    const after1 = readInspected();
+    expect(after1.length).toBe(before + 1);
+    expect(after1.at(-1)!.payload.nodeId).toBe(nodeId);
+    expect(after1.at(-1)!.payload.sourceHash).toHaveLength(64);
+
+    // Second call is a cache hit — no new event (the timeline is a
+    // record of paid dispatches, not of every read).
+    const r2 = runCli(tempDir, ["node", "inspect", nodeId, "--provider", "mock", "--json"]);
+    expect(r2.status).toBe(0);
+    expect(JSON.parse(r2.stdout).cached).toBe(true);
+    expect(readInspected().length).toBe(after1.length);
+
+    // --regenerate forces a fresh dispatch — event SHOULD land again.
+    const r3 = runCli(tempDir, [
+      "node",
+      "inspect",
+      nodeId,
+      "--provider",
+      "mock",
+      "--regenerate",
+      "--json",
+    ]);
+    expect(r3.status).toBe(0);
+    expect(readInspected().length).toBe(after1.length + 1);
+  });
 });

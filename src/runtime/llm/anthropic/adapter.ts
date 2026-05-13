@@ -53,10 +53,17 @@ const DEFAULT_MAX_TOKENS = 8192;
 // Vibe-Reasoning γ-7 calibration observed 3/22 nodes failing with 429
 // during a sequential sweep that fits well under any official quota —
 // these are usually short-lived shaper bursts. Three retries with
-// exponential backoff (1.5s, 3s, 6s) recover them without paying for
-// streaming machinery. Other transient SDK errors (5xx, network) get
-// the same treatment. 4xx other than 429 are NOT retried — those are
-// caller-fixable input problems.
+// jittered exponential backoff (~1.5s, ~3s, ~6s scaled by a random
+// factor in [0.5, 1.5]) recover them without paying for streaming
+// machinery. Other transient SDK errors (5xx, network) get the same
+// treatment. 4xx other than 429 are NOT retried — those are caller-
+// fixable input problems.
+//
+// Jitter matters once Phase ε runs anything in parallel: pure
+// exponential backoff would have N concurrent callers synchronize
+// their retries onto the same wall-clock instant, hammering the
+// shaper window the next-attempt cohort just opened. The random
+// multiplier desynchronises them.
 const RETRY_429_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 1500;
 
@@ -70,8 +77,11 @@ async function dispatchWithRetry<T>(send: () => Promise<T>): Promise<T> {
       if (!retryable || last) {
         throw err;
       }
-      const delay = RETRY_BASE_DELAY_MS * 2 ** attempt;
-      await sleep(delay);
+      const baseDelay = RETRY_BASE_DELAY_MS * 2 ** attempt;
+      // Jitter in [0.5, 1.5] of the base. Spreads concurrent retries
+      // across a 1.0× window centred on the deterministic delay.
+      const jitter = 0.5 + Math.random();
+      await sleep(Math.round(baseDelay * jitter));
     }
   }
   // Unreachable — the loop either returns or throws.

@@ -1,11 +1,16 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { randomBytes } from "node:crypto";
 import { loadNodes, loadNodeById } from "../../core/project/load.js";
 import { runCompilePlan } from "../../runtime/compile/compile-plan-runner.js";
 import { loadPersistedRun } from "../../core/runs/persist.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
 import { errorMessage } from "../../core/errors.js";
+import { OntologyEventSchema } from "../../schemas/ontology.js";
 import type { OntologyNode } from "../../schemas/ontology.js";
+import { readState, writeState } from "../../core/state/state-store.js";
+import { getOntologyPaths } from "../../core/project/paths.js";
+import { appendJsonl } from "../../core/fs/json.js";
 import {
   compareFiles,
   classifyVerdict,
@@ -174,7 +179,44 @@ export async function verifyHomeomorphismCommand(
     ...(totalUsage ? { totalUsage } : {}),
   };
 
-  // 5. Optional markdown report (Tooling gap #2 from γ-7 calibration).
+  // 5. Append a `homeomorphism_verified` event so the temporal log
+  // carries the canonical timeline of "what we measured, when". One
+  // event per CLI invocation — the payload aggregates verdict counts
+  // and the node ids that participated. POST_GAMMA_PLAN.md §2.4
+  // requested this so Phase ε's report can be reconstructed from
+  // events.jsonl alone. Non-fatal: a failed append is logged but the
+  // user still gets stdout / --json / --report output.
+  if (!options.dryRun && !options.costEstimate && results.length > 0) {
+    try {
+      const paths = getOntologyPaths(cwd);
+      const state = readState(cwd);
+      const eventId = "evt_" + randomBytes(4).toString("hex");
+      const event = OntologyEventSchema.parse({
+        eventId,
+        sequence: state.eventCount,
+        timestamp: new Date().toISOString(),
+        eventType: "homeomorphism_verified",
+        branch: state.activeBranch,
+        previousEventId: state.lastEventId,
+        payload: {
+          nodeIds: results.map((r) => r.nodeId),
+          total: results.length,
+          byVerdict: counts,
+          thresholds,
+          ...(totalUsage ? { totalUsage } : {}),
+        },
+      });
+      appendJsonl(paths.eventsPath, event);
+      state.eventCount += 1;
+      state.lastEventId = eventId;
+      state.updatedAt = new Date().toISOString();
+      writeState(state, cwd);
+    } catch (err: unknown) {
+      console.error(`⚠ Failed to append homeomorphism_verified event: ${errorMessage(err)}`);
+    }
+  }
+
+  // 6. Optional markdown report (Tooling gap #2 from γ-7 calibration).
   if (options.report) {
     const md = renderReportMarkdown(report, {
       providerOverride: provider,

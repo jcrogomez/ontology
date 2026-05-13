@@ -301,10 +301,17 @@ The output is cached on the node JSON as
 first inspect dispatches; subsequent inspects return the cached text
 without a new LLM call. Cache invalidation is **automatic** via
 `sourceHash`: a deterministic SHA-256 over (`prompt.raw`, sorted rules,
-sorted `provides` / `requires` / `forbids`). When any of those change,
-the hash drifts and the next inspect re-dispatches. Label changes do
-NOT invalidate (framing metadata, not semantic content). `--regenerate`
-forces a fresh dispatch when iterating on the inspector prompt itself.
+sorted `provides` / `requires` / `forbids`, `node.literal`). When any
+of those change, the hash drifts and the next inspect re-dispatches.
+Label changes do NOT invalidate (framing metadata, not semantic
+content). `--regenerate` forces a fresh dispatch when iterating on
+the inspector prompt itself.
+
+Every paid dispatch (not cache hits) appends a `node_inspected` event
+to `.ontology/events.jsonl` carrying `{ nodeId, model, provider,
+sourceHash, totalTokens? }`. The temporal log is therefore the
+canonical record of inspector spend; replay across events alone
+reproduces the timeline of "what was read, when, and at what cost".
 
 The translator uses a new `LlmTask: "inspect"` in the routing registry
 (fast tier — short prose, doesn't need critic-tier compute). Pure
@@ -482,7 +489,13 @@ under `src/runtime/fibration/` and the two are sibling exports.
 its batch counterpart. Output is structured (JSON + human) and
 includes the per-node verdict, the sheaf coherence report, and a
 suggestion for any unrecoverable nodes (typically: extract the
-irreducible parts to a literal field, then re-verify).
+irreducible parts to a literal field, then re-verify). Each
+invocation appends a single `homeomorphism_verified` event to
+`.ontology/events.jsonl` carrying `{ nodeIds, total, byVerdict,
+thresholds, totalUsage? }`, so the temporal log reproduces the
+calibration timeline without re-reading the JSON output. Skipped
+under `--dry-run` and `--cost-estimate`, both of which dispatch
+nothing.
 
 **Layer 7 — `onto ingest <path>`.** The integrator. Walks the file
 tree, dispatches the extraction prompt per file, dedupes tokens

@@ -1,9 +1,13 @@
 import * as path from "node:path";
+import { randomBytes } from "node:crypto";
 import { loadNodeById } from "../../core/project/load.js";
-import { writeJson } from "../../core/fs/json.js";
+import { writeJson, appendJsonl } from "../../core/fs/json.js";
+import { readState, writeState } from "../../core/state/state-store.js";
+import { getOntologyPaths } from "../../core/project/paths.js";
 import { dispatchLlmRequest } from "../../runtime/llm/dispatcher.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
 import { errorMessage } from "../../core/errors.js";
+import { OntologyEventSchema } from "../../schemas/ontology.js";
 import {
   INSPECTOR_SYSTEM_PROMPT,
   buildInspectorPrompt,
@@ -141,7 +145,45 @@ export async function nodeInspectCommand(
     return;
   }
 
-  // 5. Emit.
+  // 5. Append `node_inspected` event to the temporal log. Cache hits
+  // bypass this block entirely (they returned in §1), so only paid
+  // dispatches show up — the timeline is a record of API spend and
+  // freshness moments. POST_GAMMA_PLAN.md §1.3 requested this so the
+  // Phase ε self-ingestion run is replayable from events.jsonl alone.
+  try {
+    const paths = getOntologyPaths(cwd);
+    const state = readState(cwd);
+    const eventId = "evt_" + randomBytes(4).toString("hex");
+    const event = OntologyEventSchema.parse({
+      eventId,
+      sequence: state.eventCount,
+      timestamp: new Date().toISOString(),
+      eventType: "node_inspected",
+      branch: state.activeBranch,
+      previousEventId: state.lastEventId,
+      payload: {
+        nodeId,
+        model: resp.model,
+        provider: resp.provider,
+        sourceHash,
+        ...(resp.usage?.totalTokens !== undefined
+          ? { totalTokens: resp.usage.totalTokens }
+          : {}),
+      },
+    });
+    appendJsonl(paths.eventsPath, event);
+    state.eventCount += 1;
+    state.lastEventId = eventId;
+    state.updatedAt = new Date().toISOString();
+    writeState(state, cwd);
+  } catch (err: unknown) {
+    // Non-fatal: the translator is already persisted on the node; the
+    // missing event is a provenance gap, not a correctness bug. Log
+    // and continue so the user still sees the inspect output.
+    console.error(`⚠ Failed to append node_inspected event: ${errorMessage(err)}`);
+  }
+
+  // 6. Emit.
   if (options.json) {
     console.log(
       JSON.stringify(
