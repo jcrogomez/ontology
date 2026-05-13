@@ -33,6 +33,13 @@ export const DefaultOllamaRouting = {
   documentation: {
     tier: "fast",
     preferred: ["llama3.1:8b", "qwen2.5:7b"]
+  },
+  // Project Legend δ-1 — the Inspector. Short prose summary, doesn't
+  // need the heavy critic tier; a fast model is fine and keeps the
+  // per-node lifetime cost low.
+  inspect: {
+    tier: "fast",
+    preferred: ["llama3.1:8b", "qwen2.5:7b"]
   }
 } as const satisfies Record<LlmTask, OllamaRoutingEntry>;
 

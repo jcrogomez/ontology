@@ -10,6 +10,7 @@ import { nodeListCommand } from "./commands/node/list.js";
 import { nodeShowCommand } from "./commands/node/show.js";
 import { nodeLinkCommand } from "./commands/node/link.js";
 import { nodeUpdateCommand } from "./commands/node/update.js";
+import { nodeInspectCommand } from "./commands/node/inspect.js";
 import { nodeRemoveCommand } from "./commands/node/remove.js";
 import { edgeRemoveCommand } from "./commands/edge/remove.js";
 import { edgeUpdateCommand } from "./commands/edge/update.js";
@@ -239,6 +240,23 @@ node
       } else {
         console.error(`✖ Error updating node: ${errorMessage(err)}`);
       }
+      process.exit(1);
+    }
+  });
+
+node
+  .command("inspect <id>")
+  .description("Project Legend δ-1 (Inspector / Lupa): render a human-readable 3-5 sentence summary of what this node does and what invariants any implementation must preserve. Cached on the node as `translator` — one LLM call per node lifetime. Subsequent inspects return the cached text; the cache auto-invalidates when prompt / rules / contract change (sourceHash mismatch). Pass --regenerate to force a fresh dispatch.")
+  .option("--provider <provider>", "LLM provider override (mock, ollama, or anthropic). When omitted, routes per-node via the model registry.")
+  .option("--model <model>", "Model override (only meaningful with --provider).")
+  .option("--ollama-host <host>", "Host for Ollama provider.")
+  .option("--regenerate", "Force a fresh inspect even when the cached translator is valid. Useful for iterating on the inspector prompt or switching providers.")
+  .option("--json", "Output results in JSON format.")
+  .action(async (id, options) => {
+    try {
+      await nodeInspectCommand(id, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during node inspect: ${errorMessage(err)}`);
       process.exit(1);
     }
   });

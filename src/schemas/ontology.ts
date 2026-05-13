@@ -208,6 +208,22 @@ export const OntologyNodeSchema = z.object({
     errors: z.array(z.string()).default([]),
     warnings: z.array(z.string()).default([]),
   }).default({ errors: [], warnings: [] }),
+  // Cached human-readable translation of what this node does — populated
+  // by `onto node inspect` (Project Legend δ-1). One LLM call per node
+  // lifetime: the inspector reads the node's prompt + context + rules and
+  // emits a 3-5 sentence developer-facing summary. Cached so subsequent
+  // `onto node inspect <id>` calls return the stored text without a new
+  // dispatch. `sourceHash` captures the inputs that produced the
+  // translator so a future invalidation pass (when prompt / rules /
+  // contract change) can detect a stale cache. `--regenerate` forces a
+  // fresh dispatch and overwrites the cache.
+  translator: z.object({
+    text: z.string(),
+    model: z.string(),
+    provider: z.string(),
+    generatedAt: z.string(),
+    sourceHash: z.string(),
+  }).optional(),
   integrity: z.object({
     frozen: z.boolean().default(false),
     hash: z.string(),

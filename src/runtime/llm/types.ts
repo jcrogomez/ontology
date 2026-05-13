@@ -7,7 +7,11 @@ export type LlmTask =
   | "context_assemble"
   | "code_sketch"
   | "test_generate"
-  | "documentation";
+  | "documentation"
+  // Project Legend δ-1: Inspector / Lupa renders a human-readable
+  // summary of a node's intent. One LLM call per node lifetime,
+  // cached on the node as `translator`.
+  | "inspect";
 
 export type LlmRoutingTier =
   | "tiny"
