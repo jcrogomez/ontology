@@ -51,10 +51,6 @@ describe('LLM Dispatcher', () => {
     ).rejects.toThrow('Unsupported LLM provider: openai');
 
     await expect(
-      dispatchLlmRequest(request, { provider: 'anthropic' })
-    ).rejects.toThrow('Unsupported LLM provider: anthropic');
-
-    await expect(
       dispatchLlmRequest(request, { provider: 'local' })
     ).rejects.toThrow('Unsupported LLM provider: local');
   });

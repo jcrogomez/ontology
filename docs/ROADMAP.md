@@ -233,6 +233,7 @@ work is in [Open follow-ups](#open-follow-ups).
 | post-0.9 | Project Legend foundation | [`PROJECT_LEGEND.md`](PROJECT_LEGEND.md) design document. Mathematical-claims registry updated with §3.10 (compile adjoint), §4.8 (Inspector triangle), §4.9 (Open-Prompt protocol), all T4 with explicit paths to T2 after the respective phases ship. |
 | post-0.9 | Project Legend Phase β | `onto compile run-batch` + `compile run --target <path>` (β-1, `a09e1d7`); `node.literal` escape hatch (β-2, `04f730c`); `computeFiberBy(input, projection)` for path fibration (β-3, `881506a`); post-β review blockers — atomic write + clobber gate + binary guard (`157d367`); two-phase commit for `writeArtifact` so failed validator no longer clobbers `--target` (`2cbaa32`). |
 | post-0.9 | Project Legend Phase γ (extraction core) | γ-0 Anthropic provider with prompt caching, default `claude-opus-4-7` (`aad0fed`); γ-1 `onto ingest <file>` with `--dry-run` (`b670ca3`); γ-3 rich proposal payload — manifestation/language/requires/provides/forbids/rules/literal/sourceFiles on `node_create` (`7d50c91`); γ-4 TS-first static-edge inference + `onto graph infer-edges <dir>` preview (`62d8c86`); γ-5 `onto ingest <directory>` multi-file (`a25ade9`); γ-6 `infer-edges --create-proposals` for edge proposals against applied nodes (`9c16b9d`); walker AI provider status indicator (`69424af`); `--include` flag for non-TS source extensions + Vibe-Reasoning runbook (`bc350ce`). γ-2 calibration: 5/5 ε-equivalent on `hash.ts` with Opus 4.7 (commit `ac0a45f`, report at [`legend/calibrations/HASH_TS_2026-05-12.md`](legend/calibrations/HASH_TS_2026-05-12.md)). |
+| post-0.9 | Project Legend Phase γ-7 + δ (Vibe-Reasoning hardening) | `eee5610` `onto ingest --cost-estimate` (zero-API pre-flight); `bad6840` γ-4 Python static-edge parser (regex-based; `src/runtime/static/python.ts` + language-agnostic dispatcher); `4dd59b1` `--open-world` flag + ingest prompt fix (stale `kind` enum + project-internal-only contract tokens); `23ac144` configurable `--max-tokens` (Anthropic default 4096 → 8192, exposed on `compile run` / `run-batch`); `2e8853e` γ-7 MANDATORY EXPORTS block in `assembleContext` + extractor prompt teaches comprehensive `provides` capture; `29b330c` δ-2 `onto verify-homeomorphism` — dual-distance (LoC + structural Jaccard) + five-label verdict folder, the `MATHEMATICAL_CLAIMS.md` §3.10 publishable measurement; `8779acc` δ-1 `onto node inspect` (Inspector / Lupa) — translator cached on `node.translator` with automatic `sourceHash` invalidation, `--regenerate` override, one LLM call per node lifetime. |
 
 Per-PR detail lives in [`RELEASE_NOTES.md`](RELEASE_NOTES.md).
 
@@ -245,24 +246,19 @@ Bootstrap) or 🔵 (longer-term / shape still to be decided). Items
 shipped today have been promoted out of this list and into the
 Bootstrap history table above.
 
-**Project Legend core (remaining δ–ε):**
-- 🟡 **`onto node inspect <id>`** — Inspector / Lupa primitive (Phase δ-1);
-  per-node `translator` cached as a node schema field. One LLM call
-  per node lifetime; subsequent inspects hit the cache.
-- 🟡 **`onto verify-homeomorphism <id>` + batch report** — compile +
-  diff for a given node or the whole project; reports
-  ε-equivalent / divergent / unrecoverable (Phase δ-2). The γ-2 hash.ts
-  calibration suggests reporting **both** LoC distance and
-  behaviour-aware distance per node — pure LoC over-estimates
-  divergence when the regenerated file's deltas are docstrings, not
-  semantics. See [`legend/calibrations/HASH_TS_2026-05-12.md`](legend/calibrations/HASH_TS_2026-05-12.md) for the data.
+**Project Legend core (remaining ε):**
 - 🟡 **Self-ingestion on the Ontology repo** (Phase ε). Run Legend on
   this codebase, measure $\varepsilon$ on the divergent set, upgrade
   the §3.10 adjoint claim from T4 → T2 in
-  [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md). The
-  Vibe-Reasoning runbook
-  ([`legend/calibrations/VIBE_REASONING_PROCEDURE.md`](legend/calibrations/VIBE_REASONING_PROCEDURE.md))
-  is the smaller out-of-tree pilot before this lands.
+  [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md). All prerequisites
+  are shipped: δ-1 (`onto node inspect`, `8779acc`) for human reading
+  of the ingested network, δ-2 (`onto verify-homeomorphism`, `29b330c`)
+  for the automated round-trip measurement, γ-7 prompt invariants
+  (`2e8853e`) for export-signature preservation. The Vibe-Reasoning
+  runbook ([`legend/calibrations/VIBE_REASONING_PROCEDURE.md`](legend/calibrations/VIBE_REASONING_PROCEDURE.md))
+  is the smaller out-of-tree pilot whose remaining steps (re-run
+  verify-homeomorphism over the 22 existing nodes; re-ingest + measure)
+  are the immediate next API spend.
 
 **Plasticity follow-ups:**
 - 🟡 **Advisory lock under `.ontology/.lock`** for multi-process safety.
@@ -309,10 +305,14 @@ Bootstrap history table above.
 *This roadmap is kept in sync with `main` after every commit that
 ships a new surface or closes a follow-up. Stale items move to the
 Bootstrap history table; new items land here under their phase
-heading. Last refresh: 2026-05-12, after Project Legend Phase γ
-completed end-to-end — γ-0 Anthropic provider, γ-1 single-file
-ingest, γ-2 calibration (5/5 on `hash.ts` with Opus 4.7), γ-3 rich
-proposal payload, γ-4 TS-first static-edge inference, γ-5 multi-file
-ingest, γ-6 edge_create proposals, walker AI indicator, `--include`
-flag for non-TS extensions. Phase δ (Inspector + verify-homeomorphism)
-is now the next active stream.*
+heading. Last refresh: 2026-05-12 (late), after Project Legend
+Phase δ shipped end-to-end on top of Phase γ-7 hardening — `eee5610`
+`onto ingest --cost-estimate`, `bad6840` γ-4 Python static-edge
+parser, `4dd59b1` `--open-world` flag + ingest prompt fix, `23ac144`
+configurable `--max-tokens`, `2e8853e` γ-7 MANDATORY EXPORTS block,
+`29b330c` δ-2 `onto verify-homeomorphism` (dual-distance LoC +
+structural Jaccard, five-label verdict folder), `8779acc` δ-1 `onto
+node inspect` (translator cached on `node.translator`, one LLM call
+per node lifetime). Phase ε (self-ingestion on the Ontology codebase
+itself) is now the next active stream — all prerequisites in place;
+remaining gating step is the API spend to measure $\varepsilon$.*

@@ -7,14 +7,22 @@
 > functor; and the protocol layer that makes "what an organisation runs"
 > verifiable without exposing its source.
 
-Status: **Phases α + β + γ shipped on `main` (2026-05-12).** Pre-foundation
-plasticity (§1–§6), Layer 1 (`compile run-batch` + `--target`), Layer 2
-(`node.literal`), Layer 3 (TS-first static-edge inference), Layer 5
-(`computeFiberBy` + `pathProjection`), and Layer 7 (`onto ingest <file>`
-and `onto ingest <directory>` with rich-payload `node_create` proposals)
-are all live. γ-2 calibration on `src/core/integrity/hash.ts` with
-`claude-opus-4-7` end-to-end reads **5/5 ε-equivalent** (see §7.1). Phase
-δ (Inspector + verify-homeomorphism) is the next active stream.
+Status: **Phases α + β + γ + δ shipped on `main` (2026-05-12, late).**
+Pre-foundation plasticity (§1–§6), Layer 1 (`compile run-batch` +
+`--target`), Layer 2 (`node.literal`), Layer 3 (static-edge inference,
+TS via compiler API and Python via regex), Layer 4 (`onto node inspect`
+— Inspector / Lupa, `8779acc`), Layer 5 (`computeFiberBy` +
+`pathProjection`), Layer 6 (`onto verify-homeomorphism` — dual-distance
+LoC + structural Jaccard with five-label verdict folder, `29b330c`),
+and Layer 7 (`onto ingest <file>` / `<directory>` with rich-payload
+`node_create` proposals) are all live. γ-7 prompt invariants (MANDATORY
+EXPORTS block + comprehensive `provides` capture, `2e8853e`) hardened
+the round-trip after the Vibe-Reasoning Vertiente C surfaced
+rename / decomposition divergences. γ-2 calibration on
+`src/core/integrity/hash.ts` with `claude-opus-4-7` end-to-end reads
+**5/5 ε-equivalent** (see §7.1). Phase ε (self-ingestion on the
+Ontology codebase) is the next active stream — all infrastructure is
+in place; the remaining gate is API spend to measure $\varepsilon$.
 
 Companion reads:
 [`BRANCH_FIBRATION.md`](BRANCH_FIBRATION.md) · [`BRANCH_MODEL.md`](BRANCH_MODEL.md) ·
@@ -276,21 +284,33 @@ substitute for the structured intent — it is a presentation layer for it.
 
 ### 3.2 The `onto node inspect` command
 
-The new command (Layer 4 below):
+Shipped as Layer 4 (`8779acc`):
 
 ```
-onto node inspect <nodeId> [--with-neighbors] [--no-cache]
+onto node inspect <nodeId> [--regenerate] [--provider <p>] [--model <m>]
 ```
 
-dispatches the LLM **once per node** to produce:
+dispatches the LLM **once per node lifetime** to produce a 3-5 sentence
+developer-facing summary answering "what does this node do, and what
+invariants must any implementation preserve?" The summary reads the
+focal's `prompt.raw`, the structured contract (`requires` / `provides`
+/ `forbids`), and the rules array.
 
-1. A one-sentence summary of the node's role in the network.
-2. The role of each of its `provides` tokens, in plain language.
-3. The role of each incident edge — what relation it enforces.
+The output is cached on the node JSON as
+`translator: { text, model, provider, generatedAt, sourceHash }`. The
+first inspect dispatches; subsequent inspects return the cached text
+without a new LLM call. Cache invalidation is **automatic** via
+`sourceHash`: a deterministic SHA-256 over (`prompt.raw`, sorted rules,
+sorted `provides` / `requires` / `forbids`). When any of those change,
+the hash drifts and the next inspect re-dispatches. Label changes do
+NOT invalidate (framing metadata, not semantic content). `--regenerate`
+forces a fresh dispatch when iterating on the inspector prompt itself.
 
-The output is cached in `node.translator` (an opt-in schema field) and
-in a sibling `node_inspected` event. Subsequent inspections read the
-cache; the LLM is not called again unless `--no-cache` is passed.
+The translator uses a new `LlmTask: "inspect"` in the routing registry
+(fast tier — short prose, doesn't need critic-tier compute). Pure
+library at `src/runtime/legend/translator.ts` owns the prompt builder,
+source-hash math, and cache-validity check; the CLI command owns the
+dispatch + persistence.
 
 ### 3.3 The Lupa walker action
 
@@ -416,10 +436,10 @@ infrastructure stack sits on top:
 | 0 | Iteration plasticity (§1–§6) | **shipped** | — |
 | 1 | Multi-file orchestration (`compile run-batch`, `--target`) | **shipped** β-1 (`a09e1d7`) | ~120 |
 | 2 | `node.literal` escape hatch + schema migration | **shipped** β-2 (`04f730c`) | ~50 |
-| 3 | Static analysis edge inference (TS-first via TS compiler API) | **shipped** γ-4 (`62d8c86`) + γ-6 proposal flow (`9c16b9d`) | ~150 |
-| 4 | `onto node inspect` (translator + cache) | pending (Phase δ-1) | ~120 |
+| 3 | Static analysis edge inference (TS via compiler API; Python via regex) | **shipped** γ-4 TS (`62d8c86`) + γ-6 proposal flow (`9c16b9d`) + γ-4 Python (`bad6840`) | ~250 |
+| 4 | `onto node inspect` (translator + cache) | **shipped** δ-1 (`8779acc`) | ~120 |
 | 5 | Path fibration helpers, `computeFiberBy` generalisation | **shipped** β-3 (`881506a`) | ~80 |
-| 6 | Verification framework (`verify-homeomorphism`, batch report) | pending (Phase δ-2) | ~150 |
+| 6 | Verification framework (`verify-homeomorphism`, dual-distance + verdict folder) | **shipped** δ-2 (`29b330c`) | ~150 |
 | 7 | The `onto ingest <path>` command itself | **shipped** γ-1 single-file (`b670ca3`) + γ-5 directory (`a25ade9`) | ~250 |
 | 8 | Open-Prompt signing + replay (out of scope for v1) | future | ~260 |
 
@@ -666,28 +686,37 @@ Status as of 2026-05-12:
    the focal cell, and `--include` accepts non-TS extensions for
    the Vibe-Reasoning pilot. All prerequisites for Phase ε
    (out-of-tree pilot + self-ingestion sweep) are in place.
-5. **Phase δ** — verification + inspector. **Next active stream.**
-   δ-1 = `onto node inspect <id>` (one LLM call per node lifetime,
-   cached as `node.translator`); δ-2 = `verify-homeomorphism`
-   reporting both LoC and behaviour-aware distance per node
-   (finding from §7.1).
-6. **Phase ε** — self-ingestion. The moment of truth. The
-   Vibe-Reasoning runbook ([`legend/calibrations/VIBE_REASONING_PROCEDURE.md`](legend/calibrations/VIBE_REASONING_PROCEDURE.md))
-   is the smaller out-of-tree pilot before self-ingestion lands.
+5. **Phase δ** — verification + inspector. **DONE.** δ-1 =
+   `onto node inspect <id>` shipped (`8779acc`): one LLM call per
+   node lifetime, cached as `node.translator` with automatic
+   `sourceHash` invalidation. δ-2 = `onto verify-homeomorphism`
+   shipped (`29b330c`): dual-distance (LoC + structural Jaccard)
+   with five-label verdict folder, the finding from §7.1.
+6. **Phase ε** — self-ingestion. **Next active stream.** All
+   infrastructure is in place; the moment of truth is the API
+   spend. The Vibe-Reasoning runbook
+   ([`legend/calibrations/VIBE_REASONING_PROCEDURE.md`](legend/calibrations/VIBE_REASONING_PROCEDURE.md))
+   is the smaller out-of-tree pilot, and its remaining steps
+   (re-run `verify-homeomorphism` over the 22 existing nodes; then
+   re-ingest + measure) are the immediate next API spend before
+   self-ingestion on the Ontology repo itself.
 7. **Phase ζ** — release.
 
-The immediate next step: Phase δ — `onto node inspect` (δ-1), then
-the verification framework (δ-2). With δ in place, an ingested
-repo becomes interactively readable per node *and* automatically
-measurable per round-trip — together they close the path to the
-Phase ε publishable claim.
+The immediate next step: re-run `verify-homeomorphism --all-artifacts`
+over the existing 22 Vibe-Reasoning nodes (no re-ingest) to measure
+how much the γ-7 MANDATORY EXPORTS block alone moves the structural
+Jaccard, then re-ingest under the new prompt template and measure
+the second delta. After that, scale the same loop to the Ontology
+codebase itself — Phase ε publishable claim.
 
 ---
 
-*Document version: draft 3. Authored 2026-05-11; revised 2026-05-12
-to reflect Phase β + full Phase γ shipped (commits `a09e1d7`,
-`04f730c`, `881506a`, `157d367`, `5da798c`, `2cbaa32`, `aad0fed`,
-`b670ca3`, `7d50c91`, `caf16f4`, `ac0a45f`, `62d8c86`, `a25ade9`,
-`9c16b9d`, `69424af`, `bc350ce`) and the γ-2 calibration data
-point. Phase δ (Inspector + verify-homeomorphism) is the next
-active stream.*
+*Document version: draft 4. Authored 2026-05-11; revised 2026-05-12
+to reflect Phase β + Phase γ + Phase γ-7 + Phase δ all shipped
+(commits `a09e1d7`, `04f730c`, `881506a`, `157d367`, `5da798c`,
+`2cbaa32`, `aad0fed`, `b670ca3`, `7d50c91`, `caf16f4`, `ac0a45f`,
+`62d8c86`, `a25ade9`, `9c16b9d`, `69424af`, `bc350ce`, `eee5610`,
+`bad6840`, `4dd59b1`, `23ac144`, `2e8853e`, `29b330c`, `8779acc`)
+and the γ-2 calibration data point. Phase ε (self-ingestion on the
+Ontology codebase) is the next active stream — all infrastructure
+in place; remaining gate is API spend to measure $\varepsilon$.*

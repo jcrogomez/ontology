@@ -20,3 +20,7 @@ src/generated/
 .ontology/cache/
 .ontology/reports/model-runs/
 .ontology/work/
+
+# Workspace artifacts
+.claude/
+PAPER_DRAFT.md
