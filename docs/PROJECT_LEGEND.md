@@ -575,9 +575,11 @@ report stabilises. Document findings in
 $\varepsilon$ on the divergent set.
 
 ### Phase ζ — release + Open-Prompt seed (~3–5 h)
-`LEGEND.md` becomes a release note. `OPEN_PROMPT.md` is a sibling
-document with the protocol skeleton. Signing + replay land in a
-follow-up.
+[`LEGEND.md`](LEGEND.md) is the 0.4.0 release note (authored
+2026-05-13; covers γ-0 through δ-2 + the post-γ-7 hardening sweep).
+[`OPEN_PROMPT.md`](OPEN_PROMPT.md) is the sibling protocol spec —
+spec-only in this release, v0 implementation targeted for 0.5.0
+after Phase ε ships the data the spec presumes.
 
 **Total estimate: 30–40 hours of focused work. 4–6 sessions.**
 

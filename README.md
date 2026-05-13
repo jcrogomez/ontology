@@ -166,6 +166,8 @@ If you want to **contribute or extend**:
 - [**Roadmap**](docs/ROADMAP.md) — what is implemented, what is planned, in which bootstrap; refreshed after every commit that ships a new surface.
 - [**RFCs**](docs) — `RUN_PERSISTENCE.md`, `PROPOSAL_SYSTEM.md`, `WALKER_INTERFACE.md`, `COMPILER.md`.
 - [**Release Notes**](docs/RELEASE_NOTES.md) — the running changelog.
+- [**LEGEND (0.4.0 release note)**](docs/LEGEND.md) — the public-facing release write-up for the inverse-functor cycle: what shipped γ-0 through δ-2, the two empirical data points, what to read next.
+- [**Open-Prompt protocol spec**](docs/OPEN_PROMPT.md) — Phase ζ design: signed intent + audit-chain replay as a third trust posture between open-source and self-attestation. Spec-only in 0.4.0; v0 implementation lands in 0.5.0.
 - [**Milestone reviews**](docs/reviews/) — daily snapshots that pair PR progress with a concrete bug list.
 
 ## Status
