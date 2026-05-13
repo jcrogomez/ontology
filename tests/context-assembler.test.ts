@@ -320,6 +320,70 @@ describe("Context Assembler", () => {
     // Default fixture has empty requires/provides/forbids on every node.
     const result = assembleContext({ targetNodeId: "node_0002_target", mode: "strict" }, cwd);
     expect(result.prompt).not.toContain("Contract (structured intent");
+    // γ-7 mandatory-exports block also omitted when there are no provides.
+    expect(result.prompt).not.toContain("MANDATORY EXPORTS");
+  });
+
+  it("emits a MANDATORY EXPORTS block for the focal when it has provides (γ-7)", () => {
+    // Vibe-Reasoning calibration showed that LLMs were renaming
+    // captured provides (e.g. solve_max_fooling_set → max_fooling_set)
+    // because "provides:" in the contract section read as a hint, not
+    // an enforced constraint. The γ-7 fix surfaces the focal's
+    // provides as a separate directive block.
+    const targetPath = path.join(cwd, ".ontology", "nodes", "node_0002_target.json");
+    const target = JSON.parse(fs.readFileSync(targetPath, "utf-8"));
+    target.context = {
+      requires: [],
+      provides: [
+        { key: "solve_max_fooling_set", nodeType: "rule" },
+        { key: "is_conflict", nodeType: "rule" },
+      ],
+      forbids: [],
+      optional: [],
+    };
+    fs.writeFileSync(targetPath, JSON.stringify(target));
+
+    const result = assembleContext({ targetNodeId: "node_0002_target", mode: "strict" }, cwd);
+    expect(result.prompt).toContain("MANDATORY EXPORTS");
+    expect(result.prompt).toContain("preserving the exact spelling");
+    expect(result.prompt).toContain("- solve_max_fooling_set");
+    expect(result.prompt).toContain("- is_conflict");
+  });
+
+  it("MANDATORY EXPORTS block uses ONLY the focal's provides, not ancestors'", () => {
+    // The directive language is targeted at the node being generated.
+    // Surfacing ancestor exports as "mandatory" would mis-instruct the
+    // LLM to re-emit them.
+    const ancestorPath = path.join(cwd, ".ontology", "nodes", "node_0001_ancestor.json");
+    const ancestor = JSON.parse(fs.readFileSync(ancestorPath, "utf-8"));
+    ancestor.context = {
+      requires: [],
+      provides: [{ key: "ancestor_only_token", nodeType: "rule" }],
+      forbids: [],
+      optional: [],
+    };
+    fs.writeFileSync(ancestorPath, JSON.stringify(ancestor));
+
+    const targetPath = path.join(cwd, ".ontology", "nodes", "node_0002_target.json");
+    const target = JSON.parse(fs.readFileSync(targetPath, "utf-8"));
+    target.context = {
+      requires: [],
+      provides: [{ key: "focal_token", nodeType: "rule" }],
+      forbids: [],
+      optional: [],
+    };
+    fs.writeFileSync(targetPath, JSON.stringify(target));
+
+    const result = assembleContext({ targetNodeId: "node_0002_target", mode: "strict" }, cwd);
+    // The MANDATORY block lists only focal_token; ancestor_only_token
+    // still appears in the shared Contract section but not the
+    // mandatory directive.
+    expect(result.prompt).toContain("MANDATORY EXPORTS");
+    const mandatoryBlockStart = result.prompt.indexOf("MANDATORY EXPORTS");
+    const mandatoryBlockEnd = result.prompt.indexOf("\n\n", mandatoryBlockStart);
+    const mandatoryBlock = result.prompt.slice(mandatoryBlockStart, mandatoryBlockEnd);
+    expect(mandatoryBlock).toContain("- focal_token");
+    expect(mandatoryBlock).not.toContain("ancestor_only_token");
   });
 
   it("fails when target node does not exist", () => {

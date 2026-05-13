@@ -169,11 +169,24 @@ export function assembleContext(input: ContextAssemblyInput, cwd = process.cwd()
   // FORBID prose strings already covered by `Constraints:`. Nodes with an
   // empty contract are skipped to keep the prompt compact. The focal is
   // marked with `[target]` so the LLM knows whose contract it is producing.
+  //
+  // γ-7 (Project Legend signature-invariants pass): `provides` for the
+  // FOCAL is rendered as a mandatory-export block separate from the
+  // shared contract. The Vibe-Reasoning calibration surfaced that LLMs
+  // were renaming captured provides (e.g. `solve_max_fooling_set` →
+  // `max_fooling_set`) because "provides:" reads as a hint, not a
+  // constraint. The directive language ("MUST export exactly these
+  // names ... preserving the exact spelling") catches that class of
+  // divergence at the prompt level.
   const contractLines: string[] = [];
+  let focalMandatoryExports: string[] = [];
   for (const node of nodes) {
     const provides = (node.context?.provides ?? []).map((p) => p.key);
     const requires = (node.context?.requires ?? []).map((r) => r.source);
     const forbids = (node.context?.forbids ?? []).map((f) => f.source);
+    if (node.id === targetNodeId && provides.length > 0) {
+      focalMandatoryExports = provides;
+    }
     if (provides.length === 0 && requires.length === 0 && forbids.length === 0) continue;
     const marker = node.id === targetNodeId ? " [target]" : "";
     contractLines.push(`- ${node.id}${marker}:`);
@@ -184,6 +197,16 @@ export function assembleContext(input: ContextAssemblyInput, cwd = process.cwd()
   if (contractLines.length > 0) {
     promptBuilder.push(`Contract (structured intent — enforced post-generation by the validator):`);
     promptBuilder.push(...contractLines);
+    promptBuilder.push(``);
+  }
+  if (focalMandatoryExports.length > 0) {
+    promptBuilder.push(`MANDATORY EXPORTS (signature invariants — γ-7):`);
+    promptBuilder.push(
+      `The compiled output MUST export every one of the following names, preserving the exact spelling. Do not rename, omit, or substitute. Renaming a mandatory export is a contract violation; the verify-homeomorphism gate will report it as divergent_structural.`,
+    );
+    for (const name of focalMandatoryExports) {
+      promptBuilder.push(`  - ${name}`);
+    }
     promptBuilder.push(``);
   }
 
