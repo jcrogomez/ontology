@@ -154,7 +154,7 @@
 **What is now possible:**
 
 - **Inspect any node in 30 seconds with one paid LLM call** (lifetime cost amortised across all future inspections): `onto node inspect <id>` returns a developer-facing summary of role + invariants.
-- **Measure the round-trip on the whole project in one command:** `onto verify-homeomorphism --all-artifacts --provider anthropic --report <path.md>` compiles back every artifact node and emits a five-class verdict per node plus aggregate distances. The publishable data for §3.10 of the claims map.
+- **Measure the round-trip on the whole project in one command:** `onto verify-homeomorphism --all-artifacts --provider anthropic --json > out.json` compiles back every artifact node and emits a five-class verdict per node plus aggregate distances. The publishable data for §3.10 of the claims map (markdown reports are generated separately from the JSON; CLI prints a plain stdout table when `--json` is omitted).
 - **Cost-estimate before paying:** `onto ingest <dir> --cost-estimate` walks the perimeter without any API call. Required before any non-trivial Opus sweep.
 - **Mixed-language repos:** Python + TS now have static-edge inference; the import graph is automatic for both.
 
@@ -169,5 +169,5 @@ All limitations from the previous section still apply, **minus** the three close
 Still pending:
 
 - γ-5 directory ingest is sequential per file (one LLM call each). No batching, no rate-limiter. Cost on a 100-file repo with `claude-opus-4-7` is ≈ $5 — verify with `--cost-estimate` first.
-- γ-7 prompt invariants (MANDATORY EXPORTS + provides-capture) are shipped but the **delta they produce** is not yet measured. Next step: re-run `verify-homeomorphism` over the 22 Vibe-Reasoning nodes (block #1 alone; no re-ingest), then re-ingest under the new prompt (#2) and measure the second delta.
+- γ-7 prompt invariants are shipped **and measured** on the Vibe-Reasoning external corpus: ε-equivalent fraction moved 36% → 65% across a re-ingest, `divergent_both` fully eliminated (4 → 0). Full report: [`docs/legend/calibrations/VIBE_REASONING_GAMMA_7_2026-05-12.md`](legend/calibrations/VIBE_REASONING_GAMMA_7_2026-05-12.md). This is the **second empirical data point** for `MATHEMATICAL_CLAIMS.md` §3.10 after γ-2's `HASH_TS_2026-05-12.md`; the §3.10 entry now cites both.
 - Self-ingestion on the Ontology codebase itself (Phase ε) is the gating step for upgrading the §3.10 adjoint claim from T4 → T2. Has not been run.
