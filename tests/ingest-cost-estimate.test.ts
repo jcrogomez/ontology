@@ -189,7 +189,10 @@ describe("onto ingest --cost-estimate (CLI)", () => {
     expect(r.status).toBe(0);
     expect(r.stdout).toContain("COST ESTIMATE");
     expect(r.stdout).toContain("anthropic");
-    expect(r.stdout).toContain("claude-opus-4-7");
+    // Cross-provider task-aware routing (commit e43b2cc): ingest is
+    // a `semantic_parse` task, which DefaultAnthropicRouting maps to
+    // Sonnet 4.6 (not Opus). The cost-estimate now reflects that.
+    expect(r.stdout).toContain("claude-sonnet-4-6");
     expect(r.stdout).toContain("Files:           1");
   });
 
@@ -230,7 +233,8 @@ describe("onto ingest --cost-estimate (CLI)", () => {
     expect(parsed.ok).toBe(true);
     expect(parsed.estimate.fileCount).toBe(1);
     expect(parsed.estimate.totalCostUsd).toBeGreaterThan(0);
-    expect(parsed.estimate.rate.modelLabel).toBe("claude-opus-4-7");
+    // semantic_parse routes to Sonnet 4.6 by default — see e43b2cc.
+    expect(parsed.estimate.rate.modelLabel).toBe("claude-sonnet-4-6");
   });
 
   it("reports $0 cost for the mock provider", () => {
