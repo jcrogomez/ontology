@@ -18,6 +18,12 @@ import {
   formatCostEstimateHuman,
   readFileSizeInfos,
 } from "./cost-estimate.js";
+import {
+  newRunId,
+  renderIngestReport,
+  writeProgressReport,
+  type IngestFileSummary,
+} from "../../runtime/legend/progress-report.js";
 
 // `onto ingest <paths...>` — Project Legend Phase γ-1 + γ-5 + Phase ε prework A.
 //
@@ -599,6 +605,23 @@ async function runSingleFileIngest(
     committed: true,
     proposalId: proposalResult.proposalId,
   });
+
+  tryWriteIngestProgressReport({
+    rootDir: process.cwd(),
+    provider: opts.provider,
+    model: opts.model,
+    dryRun: opts.dryRun,
+    json: opts.json,
+    files: [
+      {
+        filePath: result.cwdRelative || filePath,
+        ok: true,
+        tokensUsed: result.response.usage?.totalTokens,
+      },
+    ],
+    proposalsCreated: 1,
+    totalTokens: result.response.usage?.totalTokens ?? 0,
+  });
 }
 
 // ── Multi-file flow (γ-5) ───────────────────────────────────────────────────
@@ -823,6 +846,21 @@ async function runDirectoryIngest(
     console.log(``);
     console.log(`Dry run — no proposals created. Re-run without --dry-run to commit.`);
   }
+  tryWriteIngestProgressReport({
+    rootDir: process.cwd(),
+    provider: opts.provider,
+    model: opts.model,
+    dryRun: opts.dryRun,
+    json: opts.json,
+    files: results.map((r) => ({
+      filePath: r.filePath,
+      ok: r.ok,
+      tokensUsed: r.tokensUsed,
+      reason: r.reason,
+    })),
+    proposalsCreated: results.filter((r) => r.ok && r.proposalId !== undefined).length,
+    totalTokens,
+  });
   if (failedCount > 0 && failedCount === results.length) process.exit(1);
 }
 
@@ -1067,6 +1105,21 @@ async function runMultiInputIngest(
     console.log(``);
     console.log(`Dry run — no proposals created.`);
   }
+  tryWriteIngestProgressReport({
+    rootDir: process.cwd(),
+    provider: opts.provider,
+    model: opts.model,
+    dryRun: opts.dryRun,
+    json: opts.json,
+    files: results.map((r) => ({
+      filePath: r.filePath,
+      ok: r.ok,
+      tokensUsed: r.tokensUsed,
+      reason: r.reason,
+    })),
+    proposalsCreated: results.filter((r) => r.ok && r.proposalId !== undefined).length,
+    totalTokens,
+  });
   if (failedCount > 0 && failedCount === results.length) process.exit(1);
 }
 
@@ -1275,6 +1328,50 @@ function indent(text: string, prefix: string): string {
     .split("\n")
     .map((line) => `${prefix}${line}`)
     .join("\n");
+}
+
+// Write a per-invocation progress report to .ontology/reports/INGEST_<runId>.md
+// with charts derived from the per-file results. Non-fatal: any error
+// is logged to stderr (or swallowed under --json) and the command
+// returns normally. The function is shared by all three ingest flows
+// (single file, directory, multi-input).
+function tryWriteIngestProgressReport(args: {
+  rootDir: string;
+  provider: string;
+  model: string | undefined;
+  dryRun: boolean;
+  json: boolean;
+  files: IngestFileSummary[];
+  proposalsCreated: number;
+  totalTokens: number;
+}): void {
+  try {
+    const runId = newRunId();
+    const body = renderIngestReport({
+      runId,
+      timestamp: new Date().toISOString(),
+      rootDir: args.rootDir,
+      branch: undefined,
+      provider: args.provider,
+      model: args.model ?? "(adapter default)",
+      dryRun: args.dryRun,
+      files: args.files,
+      proposalsCreated: args.proposalsCreated,
+      totalTokens: args.totalTokens,
+      totalUsd: 0,
+    });
+    const reportPath = writeProgressReport(args.rootDir, "INGEST", runId, body);
+    if (!args.json) {
+      console.log(``);
+      console.log(`Report: ${path.relative(process.cwd(), reportPath)}`);
+    }
+  } catch (err: unknown) {
+    if (!args.json) {
+      console.error(
+        `⚠ Failed to write ingest progress report: ${errorMessage(err)}`,
+      );
+    }
+  }
 }
 
 function failWith(msg: string, json?: boolean): void {

@@ -1,7 +1,14 @@
+import * as path from "node:path";
 import { loadNodeById } from "../../core/project/load.js";
 import { runCompilePlan } from "../../runtime/compile/compile-plan-runner.js";
 import { withLock, LockAcquireError } from "../../core/fs/lock.js";
+import { errorMessage } from "../../core/errors.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
+import {
+  newRunId,
+  renderCompileReport,
+  writeProgressReport,
+} from "../../runtime/legend/progress-report.js";
 
 export interface CompileRunOptions {
   provider?: string;        // "mock" (default) or "ollama"
@@ -180,6 +187,41 @@ export async function compileRunCommand(focalId: string, options: CompileRunOpti
   console.log(``);
   console.log(`Focal artifact: ${result.focalArtifact.relativePath}`);
   console.log(`Bytes:          ${result.focalArtifact.bytesWritten}`);
+
+  // Phase ε prework I: write a per-invocation progress report to
+  // .ontology/reports/COMPILE_<runId>.md. Steps-level data is folded
+  // into a CompileReportData; tokens / cost are not yet threaded
+  // through runCompilePlan, so those fields stay undefined for now.
+  try {
+    const runId = newRunId();
+    const body = renderCompileReport({
+      runId,
+      timestamp: new Date().toISOString(),
+      rootDir: process.cwd(),
+      focalId: result.focalId,
+      branch: options.branch,
+      provider: provider ?? "per-node (model.ref)",
+      steps: result.steps.map((s) => ({
+        nodeId: s.nodeId,
+        status: s.status,
+        cached: s.cached === true,
+        bytesWritten: s.artifact?.bytesWritten ?? 0,
+      })),
+      totalTokens: 0,
+      totalUsd: 0,
+    });
+    const reportPath = writeProgressReport(
+      process.cwd(),
+      "COMPILE",
+      runId,
+      body,
+    );
+    console.log(`Report:         ${path.relative(process.cwd(), reportPath)}`);
+  } catch (err: unknown) {
+    console.error(
+      `⚠ Failed to write compile progress report: ${errorMessage(err)}`,
+    );
+  }
 }
 
 function failWith(msg: string, json?: boolean): void {
