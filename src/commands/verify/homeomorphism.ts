@@ -39,7 +39,10 @@ import {
   type ByAxis,
   type PerNodeMatrix,
 } from "../../runtime/legend/matrix.js";
-import { aggregateByIntersection } from "../../runtime/legend/matrix-intersections.js";
+import {
+  aggregateByIntersection,
+  REQUIRED_INTERSECTIONS,
+} from "../../runtime/legend/matrix-intersections.js";
 import { tagFileFromDisk } from "../../runtime/legend/frontier-tagger.js";
 
 // `onto verify-homeomorphism` — Project Legend δ-2.
@@ -748,6 +751,79 @@ export function renderReportMarkdown(
     lines.push(``);
   }
 
+  // ── Phase ε prework C: matrix-by-axis section ──
+  if (report.byAxis) {
+    lines.push(`## Matrix by axis (Phase ε prework C)`);
+    lines.push(``);
+    lines.push(`| Axis | Distribution |`);
+    lines.push(`|---|---|`);
+    const axisOrder: Array<keyof typeof report.byAxis> = [
+      "contract",
+      "structural",
+      "behavior",
+      "intent",
+      "literalRequired",
+    ];
+    for (const axis of axisOrder) {
+      const dist = report.byAxis[axis] as Record<string, number>;
+      const nonZero = Object.entries(dist)
+        .filter(([, n]) => n > 0)
+        .sort((a, b) => b[1] - a[1])
+        .map(([state, n]) => `\`${state}\`=${n}`)
+        .join(", ");
+      lines.push(`| ${axis} | ${nonZero || "—"} |`);
+    }
+    lines.push(``);
+    lines.push(
+      '*Pilot fills `structural` + `literalRequired` + `cost` with measured data. `contract`, `behavior`, `intent` report explicit not-measured / untested / not-reviewed until their checkers ship — the honest "no data" signal required by `SELF_INGEST_HYPOTHESIS_<date>.md` §3.*',
+    );
+    lines.push(``);
+  }
+
+  // ── Phase ε prework C: frontier coverage section ──
+  if (report.matrix && report.matrix.length > 0) {
+    const tagCounts = new Map<string, number>();
+    for (const m of report.matrix) {
+      for (const t of m.frontier) {
+        tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
+      }
+    }
+    if (tagCounts.size > 0) {
+      lines.push(`## Frontier coverage`);
+      lines.push(``);
+      lines.push(`| Tag | Count |`);
+      lines.push(`|---|---:|`);
+      const sorted = Array.from(tagCounts.entries()).sort(
+        (a, b) => b[1] - a[1],
+      );
+      for (const [tag, n] of sorted) {
+        lines.push(`| \`${tag}\` | ${n} |`);
+      }
+      lines.push(``);
+    }
+  }
+
+  // ── Phase ε prework D: required intersections section ──
+  if (report.byIntersection) {
+    lines.push(`## Frontier intersections (hypothesis §6 required + discovered)`);
+    lines.push(``);
+    lines.push(`| Intersection | Count |`);
+    lines.push(`|---|---:|`);
+    const requiredNames = new Set(REQUIRED_INTERSECTIONS.map((s) => s.name));
+    // Required first, in their canonical order.
+    for (const spec of REQUIRED_INTERSECTIONS) {
+      const n = report.byIntersection[spec.name] ?? 0;
+      lines.push(`| ${spec.name} | ${n} |`);
+    }
+    // Then any additional intersections discovered during the run.
+    for (const [name, n] of Object.entries(report.byIntersection)) {
+      if (!requiredNames.has(name)) {
+        lines.push(`| ${name} *(discovered)* | ${n} |`);
+      }
+    }
+    lines.push(``);
+  }
+
   lines.push(`## Per-node`);
   lines.push(``);
   lines.push(`| Node | Source | Verdict | LoC dist | Jaccard | Tokens | Cost |`);
@@ -774,6 +850,16 @@ export function renderReportMarkdown(
   lines.push(`## Methodology`);
   lines.push(``);
   lines.push(`Each node's compile-back artifact is diffed against its source on disk using two distances: \`locDistance\` (line-count delta normalized into [0,1]) and \`structuralJaccard\` over top-level declaration names. The (LoC, Jaccard) pair folds into a five-label verdict per the thresholds above. See \`docs/PROJECT_LEGEND.md\` §6 Layer 6 for the formal model.`);
+  if (report.matrix) {
+    lines.push(``);
+    lines.push(
+      `When \`--matrix\` is set, each node also carries the six-axis Phase ε matrix (contract / structural / behavior / intent / literalRequired / cost) defined in \`docs/POSITIONING.md\` §2. The verdict above maps onto the \`structural\` axis; the other axes are explicit not-measured / untested / not-reviewed in the pilot — see \`docs/legend/PREWORK_2026-05-13.md\` §C for the mapping table.`,
+    );
+    lines.push(``);
+    lines.push(
+      `Frontier tags come from the path/content tagger (\`src/runtime/legend/frontier-tagger.ts\`) unioned with verdict-derived tags. Required intersections are pre-registered in \`SELF_INGEST_HYPOTHESIS_<date>.md\` §6.`,
+    );
+  }
   lines.push(``);
 
   return lines.join("\n");

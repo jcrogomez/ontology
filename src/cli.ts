@@ -35,6 +35,7 @@ import { compilePlanCommand } from "./commands/compile/plan.js";
 import { compileRunCommand } from "./commands/compile/run.js";
 import { compileRunBatchCommand } from "./commands/compile/run-batch.js";
 import { ingestCommand } from "./commands/ingest/index.js";
+import { frontierCommand } from "./commands/frontier/index.js";
 import { proposalListCommand } from "./commands/proposal/list.js";
 import { proposalShowCommand } from "./commands/proposal/show.js";
 import { proposalRejectCommand } from "./commands/proposal/reject.js";
@@ -837,6 +838,21 @@ program
       await ingestCommand(paths, options);
     } catch (err: unknown) {
       console.error(`✖ Error during ingest: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("frontier <paths...>")
+  .description("Phase ε pre-flight diagnostic: runs the frontier tagger (src/runtime/legend/frontier-tagger.ts) over every TS/TSX file in the given paths and reports the multi-label tag distribution. Pure $0, no LLM, no project state mutation. Use to confirm the tagger assigns sensible attributes to a perimeter before paying for ingest — catches rule gaps that would otherwise surface only after a paid run. Same multi-positional contract as `onto ingest`.")
+  .option("--include <exts>", "Comma-separated file extensions to walk (default: ts,tsx).")
+  .option("--totals-only", "Suppress the per-file listing; print only aggregate totals (distribution + diagnostic counts).")
+  .option("--json", "Output results in JSON format.")
+  .action(async (paths: string[], options) => {
+    try {
+      await frontierCommand(paths, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during frontier preview: ${errorMessage(err)}`);
       process.exit(1);
     }
   });

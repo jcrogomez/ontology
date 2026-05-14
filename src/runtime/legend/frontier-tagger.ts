@@ -317,9 +317,12 @@ const CONTENT_RULES: readonly ContentRule[] = [
     // Prompt-sensitive heuristic: any long prompt-template-shaped
     // literal in the file body. The 256-char threshold rules out
     // short string constants but catches real system prompts and
-    // extraction templates without over-eager false positives.
+    // extraction templates without over-eager false positives. The
+    // optional `: \w+` between identifier and assignment accepts
+    // type-annotated declarations (`const SYSTEM_PROMPT: string = ...`)
+    // without losing the object-literal case (`{ prompt: ... }`).
     pattern:
-      /(?:prompt|template|SYSTEM_PROMPT|systemPrompt|userPrompt)\s*[=:]\s*[`'"`][\s\S]{256,}/,
+      /(?:prompt|template|SYSTEM_PROMPT|systemPrompt|userPrompt)(?:\s*:\s*\w+)?\s*[=:]\s*[`'"`][\s\S]{256,}/,
     attr: "prompt-sensitive",
     why: "Contains a 256+ char prompt/template string literal.",
   },
