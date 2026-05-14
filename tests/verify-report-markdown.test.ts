@@ -303,3 +303,35 @@ describe("renderReportMarkdown — Pareto (Phase ε prework G)", () => {
     expect(md).not.toContain("Pareto: cost vs fidelity");
   });
 });
+
+describe("renderReportMarkdown — ASCII charts (Phase ε prework H)", () => {
+  it("emits a verdict bar chart in a fenced code block when total > 0", () => {
+    const md = renderReportMarkdown(makeReportWithoutMatrix());
+    // Look for a UTF-8 block character inside a fenced code block.
+    expect(md).toMatch(/```[\s\S]*epsilon_equivalent[\s\S]*█[\s\S]*```/);
+  });
+
+  it("includes a structural-honesty histogram when matrix scores exist", () => {
+    const md = renderReportMarkdown(makeReportWithMatrix());
+    expect(md).toContain("structural honesty (n=3)");
+    // The axis caption shows min─max with two decimals.
+    expect(md).toMatch(/0\.\d{2}─0\.\d{2}/);
+  });
+
+  it("emits a frontier-coverage bar chart when tags exist", () => {
+    const md = renderReportMarkdown(makeReportWithMatrix());
+    // Find a tag followed by bar characters and a count.
+    expect(md).toMatch(/not-reviewed\s+[█░]+\s+3/);
+  });
+
+  it("does NOT emit the histogram when matrix has no structural scores", () => {
+    const r = makeReportWithMatrix();
+    // Strip every structural honesty value.
+    r.matrix = r.matrix!.map((m) => ({
+      ...m,
+      honesty: { ...m.honesty, structural: null },
+    }));
+    const md = renderReportMarkdown(r);
+    expect(md).not.toContain("structural honesty (n=");
+  });
+});

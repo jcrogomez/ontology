@@ -47,6 +47,10 @@ import {
 } from "../../runtime/legend/matrix-intersections.js";
 import { tagFileFromDisk } from "../../runtime/legend/frontier-tagger.js";
 import { aggregateByTaskModel } from "../../runtime/legend/pareto.js";
+import {
+  barChart,
+  histogram,
+} from "../../runtime/legend/render-ascii.js";
 
 // `onto verify-homeomorphism` — Project Legend δ-2.
 //
@@ -748,6 +752,21 @@ export function renderReportMarkdown(
   lines.push(`| **Total** | **${report.total}** | |`);
   lines.push(``);
 
+  // Inline bar chart of the verdict distribution (Phase ε prework H).
+  if (report.total > 0) {
+    const chart = barChart(
+      order.map((v) => ({ label: v, count: report.byVerdict[v] })),
+      report.total,
+      20,
+    );
+    if (chart.length > 0) {
+      lines.push("```");
+      lines.push(chart);
+      lines.push("```");
+      lines.push(``);
+    }
+  }
+
   if (report.totalUsage) {
     const u = report.totalUsage;
     lines.push(`**Aggregate dispatch:**`);
@@ -810,6 +829,22 @@ export function renderReportMarkdown(
       "*Per-axis means computed over nodes with non-null scores. Formulas: `structural = 0.5·(1 − loc) + 0.5·jaccard`; `contract / behavior` = pass→1, fail→0; `intent` = accepted→1, rejected→0, needs-human→0.5. `not-reviewed` / `untested` / `not-measured` collapse to null and are excluded from the mean.*",
     );
     lines.push(``);
+
+    // Histogram of per-node structural honesty (Phase ε prework H).
+    // Pure visual aid for the matrix — the mean above is the same
+    // number, the histogram shows the shape of the distribution.
+    const structuralScores = report.matrix
+      .map((m) => m.honesty.structural)
+      .filter((v): v is number => v !== null);
+    if (structuralScores.length > 0) {
+      const h = histogram(structuralScores, 20);
+      lines.push("```");
+      lines.push(`structural honesty (n=${h.total})`);
+      lines.push(h.bars);
+      lines.push(`${h.axis.padStart(20)}`);
+      lines.push("```");
+      lines.push(``);
+    }
   }
 
   // ── Phase ε prework G: Pareto pivot by (task, provider, model) ──
@@ -859,6 +894,23 @@ export function renderReportMarkdown(
         lines.push(`| \`${tag}\` | ${n} |`);
       }
       lines.push(``);
+
+      // Bar chart of frontier-tag coverage (Phase ε prework H). Bars
+      // scale to the most-frequent tag (within-series scale) so the
+      // shape of the distribution is visible even when total nodes is
+      // small.
+      const peak = Math.max(...Array.from(tagCounts.values()));
+      const chart = barChart(
+        sorted.map(([tag, n]) => ({ label: tag, count: n })),
+        peak,
+        20,
+      );
+      if (chart.length > 0) {
+        lines.push("```");
+        lines.push(chart);
+        lines.push("```");
+        lines.push(``);
+      }
     }
   }
 
