@@ -273,6 +273,12 @@ export interface AggregateReport {
    * flag computed per task. Undefined when `matrix` is undefined.
    */
   paretoByTaskModel?: import("./pareto.js").TaskModelAgg[];
+  /**
+   * Phase ε prework J: vocab-gap aggregate — counts of declared
+   * provides keys without matching exports (G said more than F
+   * delivers) and vice-versa. Undefined when `matrix` is undefined.
+   */
+  vocabGaps?: import("./vocab-gap.js").VocabGapAggregate;
 }
 
 export function emptyVerdictCounts(): Record<HomeomorphismVerdict, number> {

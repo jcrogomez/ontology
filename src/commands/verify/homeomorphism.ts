@@ -51,6 +51,13 @@ import {
   barChart,
   histogram,
 } from "../../runtime/legend/render-ascii.js";
+import {
+  aggregateVocabGaps,
+  detectVocabGaps,
+  hasVocabGap,
+  type VocabGapAggregate,
+  type VocabGapReport,
+} from "../../runtime/legend/vocab-gap.js";
 
 // `onto verify-homeomorphism` — Project Legend δ-2.
 //
@@ -229,6 +236,10 @@ export async function verifyHomeomorphismCommand(
   // both touch only files we already have on disk.
   let matrix: PerNodeMatrix[] | undefined;
   let byAxis: ByAxis | undefined;
+  let vocabGaps: VocabGapAggregate | undefined;
+  // Per-node gap reports — kept around for the aggregate roll-up
+  // below the matrix-building loop.
+  const perNodeGapReports: Array<{ nodeId: string; gap: VocabGapReport }> = [];
   if (options.matrix) {
     matrix = [];
     for (const r of results) {
@@ -252,6 +263,15 @@ export async function verifyHomeomorphismCommand(
         task: "code_sketch",
         usage: r.usage,
       });
+      // Phase ε prework J: vocab-gap detector. Compare what G said
+      // the node provides against what F actually exported in the
+      // regen. Heuristic v0 — see vocab-gap.ts. Only meaningful when
+      // both sides have content; otherwise the gap is vacuously empty.
+      const providedKeys = (node?.context.provides ?? []).map((p) => p.key);
+      const regenExports = r.metrics?.regenDeclarations ?? [];
+      const gap = detectVocabGaps(providedKeys, regenExports);
+      perNodeGapReports.push({ nodeId: r.nodeId, gap });
+      const extraDerivedTags = hasVocabGap(gap) ? (["vocab-gap"] as const) : [];
       matrix.push(
         buildPerNodeMatrix({
           nodeId: r.nodeId,
@@ -261,10 +281,12 @@ export async function verifyHomeomorphismCommand(
           literal,
           cost,
           metrics: r.metrics,
+          extraDerivedTags,
         }),
       );
     }
     byAxis = aggregateByAxis(matrix.map((m) => m.cell));
+    vocabGaps = aggregateVocabGaps(perNodeGapReports);
   }
   // Phase ε prework D: intersection counts. Always present when the
   // matrix is, with the seven required keys initialised to zero.
@@ -283,6 +305,7 @@ export async function verifyHomeomorphismCommand(
     ...(byAxis ? { byAxis } : {}),
     ...(byIntersection ? { byIntersection } : {}),
     ...(paretoByTaskModel ? { paretoByTaskModel } : {}),
+    ...(vocabGaps ? { vocabGaps } : {}),
   };
 
   // 5. Append a `homeomorphism_verified` event so the temporal log
@@ -845,6 +868,44 @@ export function renderReportMarkdown(
       lines.push("```");
       lines.push(``);
     }
+  }
+
+  // ── Phase ε prework J: vocab-gap aggregate ──
+  if (report.vocabGaps && report.vocabGaps.nodesInspected > 0) {
+    const v = report.vocabGaps;
+    lines.push(`## Vocab gaps — provides ⊖ exports (Phase ε prework J)`);
+    lines.push(``);
+    lines.push(`| Metric | Value |`);
+    lines.push(`|---|---:|`);
+    lines.push(`| Nodes inspected | ${v.nodesInspected} |`);
+    lines.push(`| Nodes with any gap | ${v.nodesWithAnyGap} |`);
+    lines.push(`| Missing exports (G said, F skipped) | ${v.totalMissingExports} |`);
+    lines.push(`| Unexpected exports (F invented, G silent) | ${v.totalUnexpectedExports} |`);
+    lines.push(``);
+    if (v.topMissingKeys.length > 0) {
+      lines.push(`**Top missing-export keys (declared in provides, no matching export):**`);
+      lines.push(``);
+      lines.push(`| Key | Nodes |`);
+      lines.push(`|---|---:|`);
+      for (const k of v.topMissingKeys.slice(0, 20)) {
+        lines.push(`| \`${k.key}\` | ${k.nodes} |`);
+      }
+      lines.push(``);
+    }
+    if (v.topUnexpectedExports.length > 0) {
+      lines.push(`**Top unexpected exports (regen surfaced, no matching provides key):**`);
+      lines.push(``);
+      lines.push(`| Export | Nodes |`);
+      lines.push(`|---|---:|`);
+      for (const e of v.topUnexpectedExports.slice(0, 20)) {
+        lines.push(`| \`${e.name}\` | ${e.nodes} |`);
+      }
+      lines.push(``);
+    }
+    lines.push(
+      "*Heuristic v0: loose word-token overlap after camelCase + non-alphanumeric splitting. A pair matches if their token sets share at least one element. False positives (unrelated overlap on a common word) and false negatives (semantically equivalent pairs with no surface overlap) are expected — read with the same skepticism as the per-axis means. This signal is the operational form of the G∘F asymmetry: a missing-export gap suggests the regen prompt could not surface a declared concept; an unexpected-export gap suggests F invented surface G did not ask for.*",
+    );
+    lines.push(``);
   }
 
   // ── Phase ε prework G: Pareto pivot by (task, provider, model) ──

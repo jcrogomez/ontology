@@ -156,7 +156,22 @@ function makeReportWithMatrix(): AggregateReport {
       paretoFrontier: true,
     },
   ];
-  return { ...base, matrix, byAxis, byIntersection, paretoByTaskModel };
+  const vocabGaps = {
+    nodesInspected: 3,
+    nodesWithAnyGap: 1,
+    totalMissingExports: 1,
+    totalUnexpectedExports: 0,
+    topMissingKeys: [{ key: "unused_concept", nodes: 1 }],
+    topUnexpectedExports: [],
+  };
+  return {
+    ...base,
+    matrix,
+    byAxis,
+    byIntersection,
+    paretoByTaskModel,
+    vocabGaps,
+  };
 }
 
 describe("renderReportMarkdown — legacy shape unchanged when matrix is absent", () => {
@@ -301,6 +316,28 @@ describe("renderReportMarkdown — Pareto (Phase ε prework G)", () => {
   it("omits the Pareto section when paretoByTaskModel is absent", () => {
     const md = renderReportMarkdown(makeReportWithoutMatrix());
     expect(md).not.toContain("Pareto: cost vs fidelity");
+  });
+});
+
+describe("renderReportMarkdown — Vocab gaps (Phase ε prework J)", () => {
+  it("renders the Vocab-gaps section with aggregate counts", () => {
+    const md = renderReportMarkdown(makeReportWithMatrix());
+    expect(md).toContain(
+      "## Vocab gaps — provides ⊖ exports (Phase ε prework J)",
+    );
+    expect(md).toContain("| Nodes inspected | 3 |");
+    expect(md).toContain("| Nodes with any gap | 1 |");
+    expect(md).toContain("| Missing exports (G said, F skipped) | 1 |");
+  });
+
+  it("lists top missing keys when present", () => {
+    const md = renderReportMarkdown(makeReportWithMatrix());
+    expect(md).toContain("`unused_concept`");
+  });
+
+  it("omits the section when vocabGaps is absent (legacy report)", () => {
+    const md = renderReportMarkdown(makeReportWithoutMatrix());
+    expect(md).not.toContain("Vocab gaps");
   });
 });
 

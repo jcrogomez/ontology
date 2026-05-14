@@ -56,14 +56,20 @@ export type FrontierAttribute =
   | "contract-missing"
   | "structural-drift"
   | "behavior-drift"
-  | "not-reviewed";
+  | "not-reviewed"
+  | "vocab-gap";
 
 // The subset of attributes the path/content tagger may emit. The
 // remaining four (`contract-missing`, `structural-drift`,
-// `behavior-drift`, `not-reviewed`) are verdict-derived.
+// `behavior-drift`, `not-reviewed`) and the prework-J `vocab-gap`
+// are verdict-derived.
 export type TaggerAttribute = Exclude<
   FrontierAttribute,
-  "contract-missing" | "structural-drift" | "behavior-drift" | "not-reviewed"
+  | "contract-missing"
+  | "structural-drift"
+  | "behavior-drift"
+  | "not-reviewed"
+  | "vocab-gap"
 >;
 
 export const ALL_FRONTIER_ATTRIBUTES: readonly FrontierAttribute[] = [
@@ -83,6 +89,7 @@ export const ALL_FRONTIER_ATTRIBUTES: readonly FrontierAttribute[] = [
   "structural-drift",
   "behavior-drift",
   "not-reviewed",
+  "vocab-gap",
 ] as const;
 
 // ── Path rules ──────────────────────────────────────────────────────────────

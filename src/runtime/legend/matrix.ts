@@ -413,6 +413,13 @@ export function buildPerNodeMatrix(args: {
    * cache hit / dry run / mock.
    */
   metrics?: { locDistance: number; structuralJaccard: number };
+  /**
+   * Additional frontier attributes derived OUTSIDE the matrix cell —
+   * e.g. `vocab-gap` from the prework-J detector, which depends on
+   * `node.context.provides[].key` vs the regen's actual exports. Union
+   * into the final frontier alongside tagger + verdict-derived tags.
+   */
+  extraDerivedTags?: readonly FrontierAttribute[];
 }): PerNodeMatrix {
   const cell = verdictToMatrixCell({
     verdict: args.verdict,
@@ -420,7 +427,11 @@ export function buildPerNodeMatrix(args: {
     cost: args.cost,
   });
   const derived = verdictDerivedTags(cell);
-  const union = new Set<FrontierAttribute>([...args.taggerTags, ...derived]);
+  const union = new Set<FrontierAttribute>([
+    ...args.taggerTags,
+    ...derived,
+    ...(args.extraDerivedTags ?? []),
+  ]);
   const honesty = honestyForCell(cell, args.metrics);
   return {
     nodeId: args.nodeId,
@@ -479,6 +490,7 @@ const FrontierAttributeSchema = z.enum([
   "structural-drift",
   "behavior-drift",
   "not-reviewed",
+  "vocab-gap",
 ]);
 
 const AxisHonestyValueSchema = z.number().min(0).max(1).nullable();
