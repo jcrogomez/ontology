@@ -633,3 +633,115 @@ describe("onto ingest <directory> (γ-5 multi-file)", () => {
     expect(failed.reason).toBe("schema_failed");
   });
 });
+
+describe("onto ingest <paths...> (Phase ε prework A — multi-positional)", () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = createTempProject();
+    expect(runCli(tempDir, ["init"]).status).toBe(0);
+  });
+
+  afterEach(() => cleanupTempProject(tempDir));
+
+  function writeFixture(filePath: string, label: string): void {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(
+      filePath,
+      `/* mock-fixture\n${JSON.stringify({
+        label,
+        level: "unit",
+        kind: "rule",
+        prompt: `intent for ${label}`,
+      })}\n*/`,
+    );
+  }
+
+  it("--cost-estimate over multiple directories prints per-input breakdown and a single deduped total", () => {
+    const dirA = path.join(tempDir, "src", "a");
+    const dirB = path.join(tempDir, "src", "b");
+    writeFixture(path.join(dirA, "one.ts"), "a-one");
+    writeFixture(path.join(dirA, "two.ts"), "a-two");
+    writeFixture(path.join(dirB, "three.ts"), "b-three");
+
+    const r = runCli(tempDir, [
+      "ingest", dirA, dirB,
+      "--provider", "ollama",
+      "--include", "ts",
+      "--cost-estimate",
+      "--json",
+    ]);
+    expect(r.status).toBe(0);
+    const parsed = JSON.parse(r.stdout);
+    expect(parsed.ok).toBe(true);
+    expect(parsed.inputs).toHaveLength(2);
+    expect(parsed.inputs[0]).toMatchObject({ kind: "directory", fileCount: 2 });
+    expect(parsed.inputs[1]).toMatchObject({ kind: "directory", fileCount: 1 });
+    expect(parsed.dedupedTotal).toBe(3);
+    // Ollama is free → estimate cost is zero, but the estimate block
+    // must still be present (shape contract for downstream tooling).
+    expect(parsed.estimate).toBeDefined();
+  });
+
+  it("deduplicates when a file is passed both directly and via its parent directory", () => {
+    const dirA = path.join(tempDir, "src", "a");
+    const fileInA = path.join(dirA, "one.ts");
+    writeFixture(fileInA, "a-one");
+    writeFixture(path.join(dirA, "two.ts"), "a-two");
+
+    const r = runCli(tempDir, [
+      "ingest", dirA, fileInA,
+      "--provider", "ollama",
+      "--include", "ts",
+      "--cost-estimate",
+      "--json",
+    ]);
+    expect(r.status).toBe(0);
+    const parsed = JSON.parse(r.stdout);
+    // Two inputs declared, but only two unique files exist; the file
+    // passed directly collapses into the directory walk.
+    expect(parsed.inputs).toHaveLength(2);
+    expect(parsed.dedupedTotal).toBe(2);
+  });
+
+  it("--dry-run over two directories produces one proposal-ready summary per file with no proposals on disk", () => {
+    const dirA = path.join(tempDir, "src", "a");
+    const dirB = path.join(tempDir, "src", "b");
+    writeFixture(path.join(dirA, "one.ts"), "a-one");
+    writeFixture(path.join(dirB, "two.ts"), "b-two");
+
+    const r = runCli(tempDir, [
+      "ingest", dirA, dirB,
+      "--provider", "mock",
+      "--include", "ts",
+      "--dry-run",
+      "--json",
+    ]);
+    expect(r.status).toBe(0);
+    const parsed = JSON.parse(r.stdout);
+    expect(parsed.ok).toBe(true);
+    expect(parsed.dryRun).toBe(true);
+    expect(parsed.fileCount).toBe(2);
+    expect(parsed.okCount).toBe(2);
+    expect(parsed.inputs).toHaveLength(2);
+    const labels = parsed.results.map((r: any) => r.extracted?.label).sort();
+    expect(labels).toEqual(["a-one", "b-two"]);
+
+    const proposalsDir = path.join(tempDir, ".ontology/proposals");
+    const proposals = fs.existsSync(proposalsDir) ? fs.readdirSync(proposalsDir) : [];
+    expect(proposals).toEqual([]);
+  });
+
+  it("rejects when any positional path cannot be stat'd", () => {
+    const dirA = path.join(tempDir, "src", "a");
+    writeFixture(path.join(dirA, "one.ts"), "a-one");
+    const r = runCli(tempDir, [
+      "ingest", dirA, "/tmp/does-not-exist-xyz-multi",
+      "--provider", "mock",
+      "--include", "ts",
+      "--dry-run",
+    ]);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/Could not stat/);
+  });
+});

@@ -822,19 +822,19 @@ compile
   });
 
 program
-  .command("ingest <path>")
-  .description("Project Legend γ-1 + γ-5: extract structured intent from source code. <path> may be a single file (produces one node_create proposal) or a directory (walks every .ts/.tsx, produces one proposal per file, also reports static-inferred cross-file edges via γ-4). Defaults to provider=anthropic (requires ANTHROPIC_API_KEY). Use --dry-run to preview without committing — load-bearing for iterating the extraction template at zero cost via the mock provider.")
+  .command("ingest <paths...>")
+  .description("Project Legend γ-1 + γ-5 + Phase ε prework A: extract structured intent from source code. Accepts one or more positional paths; each may be a file or a directory. A single file path produces one node_create proposal; a single directory walks every matching file. Multiple paths are unioned and deduped by realpath, then ingested as one batch — load-bearing for Phase ε perimeters that span subtrees (e.g. src/runtime src/core src/commands src/schemas). Defaults to provider=anthropic (requires ANTHROPIC_API_KEY); use --provider ollama or --provider mock for $0 runs. --dry-run previews without committing.")
   .option("--provider <provider>", "LLM provider override: anthropic (default), ollama, or mock.")
   .option("--model <model>", "Model override. For anthropic, defaults to claude-opus-4-7.")
   .option("--ollama-host <host>", "Host for Ollama provider.")
   .option("--parent <nodeId>", "Parent node id for the proposed node. Defaults to the project root canon.")
   .option("--dry-run", "Dispatch + parse + print the extraction, but do NOT create a proposal. Use to iterate the extraction template without piling up rejected proposals.")
-  .option("--cost-estimate", "Pre-flight cost guard: walk the inputs, count file sizes, multiply by published rates for the resolved provider, print the breakdown, and exit WITHOUT dispatching the LLM. Run this before any anthropic ingest on a large tree to confirm the cost. Unlike --dry-run, --cost-estimate makes ZERO API calls.")
-  .option("--include <exts>", "Directory mode only: comma-separated file extensions to ingest (default: ts,tsx). Use --include py for a Python project, --include py,ts,tsx for a mixed repo. Has no effect on single-file mode. Static-edge inference (γ-4) stays TS-only — non-TS ingests skip the cross-file edge report.")
+  .option("--cost-estimate", "Pre-flight cost guard: walk the inputs, count file sizes, multiply by published rates for the resolved provider, print the breakdown (per-input when multiple paths), and exit WITHOUT dispatching the LLM. Run this before any anthropic ingest on a large tree to confirm the cost. Unlike --dry-run, --cost-estimate makes ZERO API calls.")
+  .option("--include <exts>", "Directory mode only: comma-separated file extensions to ingest (default: ts,tsx). Use --include py for a Python project, --include py,ts,tsx for a mixed repo. Has no effect on a single explicit file path. Static-edge inference (γ-4) stays TS-only — non-TS ingests skip the cross-file edge report.")
   .option("--json", "Output results in JSON format.")
-  .action(async (file, options) => {
+  .action(async (paths: string[], options) => {
     try {
-      await ingestCommand(file, options);
+      await ingestCommand(paths, options);
     } catch (err: unknown) {
       console.error(`✖ Error during ingest: ${errorMessage(err)}`);
       process.exit(1);
@@ -860,6 +860,7 @@ program
   .option("--cost-estimate", "Pre-flight cost guard: walks the inputs, estimates compile-back cost, exits WITHOUT dispatching the LLM.")
   .option("--dry-run", "Skip the compile-back dispatch entirely. Reads any existing regen under .ontology/verify/<nodeId>.<ext> and re-classifies with current thresholds. Useful for tuning thresholds without paying for new dispatches.")
   .option("--report <path>", "Also write a markdown report of the verdict + per-node usage to the given path (in addition to stdout / --json). Shape mirrors docs/legend/calibrations/* reports.")
+  .option("--matrix", "Phase ε prework C: emit the six-axis matrix (contract, structural, behavior, intent, literalRequired, cost) per node + per-axis aggregate counts alongside the legacy verdict report. The pilot fills structural + cost + literalRequired with measured data; the other axes report explicit not-measured / untested / not-reviewed until their checkers ship.")
   .option("--no-lock", "Skip the .ontology/.lock advisory lock — see compile run for semantics.")
   .option("--json", "Output results in JSON format.")
   .action(async (focal, rawOptions) => {

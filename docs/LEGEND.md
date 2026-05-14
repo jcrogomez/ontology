@@ -132,6 +132,28 @@ itself. Phase ε is the canonical measurement; the tier upgrades to
 T2 the moment a Phase ε run lands `docs/legend/calibrations/SELF_INGEST_<date>.md`
 with a non-trivial ε-faithful fraction over a meaningful n.
 
+### Phase ε framework
+
+The framework for any Phase ε run lives in
+[`docs/POSITIONING.md`](POSITIONING.md): the devtools-first positioning,
+the six-axis measurement matrix
+($\mathcal{C}_{\text{faithful}}^{(\text{axis})}$ for contract,
+structural, behavior, intent, literal-required, and cost-per-provider),
+the multi-label frontier taxonomy, the pre-registration template, and
+the human-authorship boundary statement. Concrete run hypotheses live
+in dated `docs/legend/calibrations/SELF_INGEST_HYPOTHESIS_<date>.md`
+files; each one is committed before its run so `git log` proves the
+prediction predates the result. The first one,
+[`SELF_INGEST_HYPOTHESIS_2026-05-13.md`](legend/calibrations/SELF_INGEST_HYPOTHESIS_2026-05-13.md),
+targets `src/runtime + src/core + src/commands + src/schemas` (~117
+TS/TSX files) and pre-registers the faithful/resistant frontier
+prediction. The $0 tooling that makes the matrix output meaningful is
+spec'd in
+[`docs/legend/PREWORK_2026-05-13.md`](legend/PREWORK_2026-05-13.md) and
+ships under `src/runtime/legend/{frontier-tagger,matrix,matrix-intersections}.ts`,
+exposed through `onto ingest <paths…>` (multi-positional) and `onto
+verify-homeomorphism --matrix`.
+
 ---
 
 ## 4. Two things this release is NOT

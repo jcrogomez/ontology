@@ -19,20 +19,29 @@ import {
   readFileSizeInfos,
 } from "./cost-estimate.js";
 
-// `onto ingest <path>` — Project Legend Phase γ-1 + γ-5.
+// `onto ingest <paths...>` — Project Legend Phase γ-1 + γ-5 + Phase ε prework A.
 //
-// When <path> is a FILE: γ-1 single-file ingest. Dispatches a frontier
-// LLM with an extraction template against that file and produces one
-// node_create proposal under the canon parent (or --parent override).
+// When a single <path> is a FILE: γ-1 single-file ingest. Dispatches a
+// frontier LLM with an extraction template against that file and
+// produces one node_create proposal under the canon parent (or
+// --parent override).
 //
-// When <path> is a DIRECTORY: γ-5 multi-file ingest. Walks the
+// When a single <path> is a DIRECTORY: γ-5 multi-file ingest. Walks the
 // directory (skipping node_modules / dist / .ontology / __tests__ /
 // .git / coverage), runs the per-file extraction for every `.ts` /
 // `.tsx` file via the same helper, and emits one node_create proposal
 // per file. The proposal carries the file path in
-// `payload.sourceFiles[0]` so a future γ-6 (`onto graph infer-edges
+// `payload.sourceFiles[0]` so γ-6 (`onto graph infer-edges
 // --create-proposals`) can resolve the file-path edges that γ-4
 // (`onto graph infer-edges`) computes back to the applied node IDs.
+//
+// When MULTIPLE <paths> are passed (Phase ε prework A): each path is
+// resolved file-vs-directory, files are unioned and deduped by
+// realpath, and the batch runs as a single ingest pass. Edge inference
+// runs per-directory-input; cross-root edges (e.g. src/commands →
+// src/runtime when both are passed as separate inputs) are out of
+// scope for this iteration — the matrix measurement is what drives
+// the multi-input perimeter, not edge completeness.
 //
 // Both modes share:
 //   - Binary-byte guard (NUL rejects → no LLM dispatch)
@@ -291,51 +300,164 @@ async function extractIntentFromFile(
 // ── Top-level command: route file vs directory ──────────────────────────────
 
 export async function ingestCommand(
-  pathArg: string,
+  pathArgs: string[],
   options: IngestCommandOptions,
 ): Promise<void> {
-  let stat: fs.Stats;
-  try {
-    stat = fs.statSync(pathArg);
-  } catch (err: unknown) {
-    failWith(`Could not stat "${pathArg}": ${errorMessage(err)}`, options.json);
+  if (!Array.isArray(pathArgs) || pathArgs.length === 0) {
+    failWith("No paths provided to ingest.", options.json);
     return;
+  }
+
+  // Stat every input up front. A bad path anywhere in the list fails
+  // the whole call — we don't want to half-ingest a perimeter because
+  // the user mistyped one entry.
+  const inputs: Array<{ path: string; stat: fs.Stats }> = [];
+  for (const p of pathArgs) {
+    try {
+      inputs.push({ path: p, stat: fs.statSync(p) });
+    } catch (err: unknown) {
+      failWith(`Could not stat "${p}": ${errorMessage(err)}`, options.json);
+      return;
+    }
   }
 
   const provider = resolveProvider(options);
   if (provider === undefined) return; // resolveProvider already failed.
 
-  // Cost-estimate short-circuit. Runs entirely locally: walks the
-  // input(s), reads file SIZES (statSync, not contents), feeds the
-  // estimator, prints, exits. No LLM dispatch; no parent-node lookup
-  // (the user might be exploring before having a project initialised
-  // at all). Safe to run against any tree, including trees outside a
-  // .ontology project.
-  if (options.costEstimate) {
-    let targetFiles: string[];
-    if (stat.isDirectory()) {
+  // ── Single-input branch (backward compat: 1 positional, file OR dir) ──
+  if (inputs.length === 1) {
+    const only = inputs[0];
+
+    // Cost-estimate short-circuit. Runs entirely locally: walks the
+    // input, reads file SIZES (statSync, not contents), feeds the
+    // estimator, prints, exits. No LLM dispatch; no parent-node lookup
+    // (the user might be exploring before having a project initialised
+    // at all). Safe to run against any tree, including trees outside a
+    // .ontology project.
+    if (options.costEstimate) {
+      let targetFiles: string[];
+      if (only.stat.isDirectory()) {
+        const extensions = parseIncludeFlag(options.include);
+        if (extensions.length === 0) {
+          failWith(
+            `--include resolved to an empty extension list. Pass at least one extension (e.g. --include py,md).`,
+            options.json,
+          );
+          return;
+        }
+        targetFiles = collectSourceFiles(path.resolve(only.path), extensions);
+      } else {
+        targetFiles = [only.path];
+      }
+      const sizeInfos = readFileSizeInfos(targetFiles);
+      const estimate = computeCostEstimate(
+        sizeInfos,
+        provider,
+        options.model,
+        "semantic_parse",
+      );
+      if (options.json) {
+        console.log(JSON.stringify({ ok: true, estimate }, null, 2));
+      } else {
+        console.log(formatCostEstimateHuman(estimate));
+      }
+      return;
+    }
+
+    const state = loadState();
+    const parentNodeId = options.parent ?? state.rootNodeId;
+    const parentNode = loadNodeById(parentNodeId);
+    if (!parentNode) {
+      failWith(`Parent node not found: ${parentNodeId}`, options.json);
+      return;
+    }
+
+    if (only.stat.isDirectory()) {
       const extensions = parseIncludeFlag(options.include);
       if (extensions.length === 0) {
-        failWith(
-          `--include resolved to an empty extension list. Pass at least one extension (e.g. --include py,md).`,
-          options.json,
-        );
+        failWith(`--include resolved to an empty extension list. Pass at least one extension (e.g. --include py,md).`, options.json);
         return;
       }
-      targetFiles = collectSourceFiles(path.resolve(pathArg), extensions);
-    } else {
-      targetFiles = [pathArg];
+      await runDirectoryIngest(only.path, {
+        provider,
+        model: options.model,
+        ollamaHost: options.ollamaHost,
+        parentNodeId,
+        parentHash: parentNode.integrity.hash,
+        dryRun: !!options.dryRun,
+        json: !!options.json,
+        extensions,
+      });
+      return;
     }
-    const sizeInfos = readFileSizeInfos(targetFiles);
+
+    await runSingleFileIngest(only.path, {
+      provider,
+      model: options.model,
+      ollamaHost: options.ollamaHost,
+      parentNodeId,
+      parentHash: parentNode.integrity.hash,
+      dryRun: !!options.dryRun,
+      json: !!options.json,
+    });
+    return;
+  }
+
+  // ── Multi-input branch (N>1 paths) ──
+  // Union files across every input with realpath-based dedup. Files
+  // passed directly are kept as-is; directories walk through
+  // collectSourceFiles (same skip list as γ-5). A file that appears
+  // both directly and inside a passed directory only ingests once.
+  const extensions = parseIncludeFlag(options.include);
+  if (extensions.length === 0) {
+    failWith(
+      `--include resolved to an empty extension list. Pass at least one extension (e.g. --include py,md).`,
+      options.json,
+    );
+    return;
+  }
+
+  const allFiles = collectAllInputFiles(inputs, extensions);
+
+  if (options.costEstimate) {
+    const sizeInfos = readFileSizeInfos(allFiles);
     const estimate = computeCostEstimate(
       sizeInfos,
       provider,
       options.model,
       "semantic_parse",
     );
+    const perInput = inputs.map((i) => ({
+      path: i.path,
+      kind: (i.stat.isDirectory() ? "directory" : "file") as
+        | "directory"
+        | "file",
+      fileCount: i.stat.isDirectory()
+        ? collectSourceFiles(path.resolve(i.path), extensions).length
+        : 1,
+    }));
     if (options.json) {
-      console.log(JSON.stringify({ ok: true, estimate }, null, 2));
+      console.log(
+        JSON.stringify(
+          {
+            ok: true,
+            inputs: perInput,
+            dedupedTotal: allFiles.length,
+            estimate,
+          },
+          null,
+          2,
+        ),
+      );
     } else {
+      console.log(`=== ONTOLOGY INGEST — MULTI-INPUT COST ESTIMATE ===`);
+      for (const row of perInput) {
+        console.log(
+          `  ${row.kind.padEnd(9)}  ${row.path}  →  ${row.fileCount} file(s)`,
+        );
+      }
+      console.log(`  deduped total:    ${allFiles.length} file(s)`);
+      console.log(``);
       console.log(formatCostEstimateHuman(estimate));
     }
     return;
@@ -349,26 +471,7 @@ export async function ingestCommand(
     return;
   }
 
-  if (stat.isDirectory()) {
-    const extensions = parseIncludeFlag(options.include);
-    if (extensions.length === 0) {
-      failWith(`--include resolved to an empty extension list. Pass at least one extension (e.g. --include py,md).`, options.json);
-      return;
-    }
-    await runDirectoryIngest(pathArg, {
-      provider,
-      model: options.model,
-      ollamaHost: options.ollamaHost,
-      parentNodeId,
-      parentHash: parentNode.integrity.hash,
-      dryRun: !!options.dryRun,
-      json: !!options.json,
-      extensions,
-    });
-    return;
-  }
-
-  await runSingleFileIngest(pathArg, {
+  await runMultiInputIngest(inputs, allFiles, {
     provider,
     model: options.model,
     ollamaHost: options.ollamaHost,
@@ -376,6 +479,7 @@ export async function ingestCommand(
     parentHash: parentNode.integrity.hash,
     dryRun: !!options.dryRun,
     json: !!options.json,
+    extensions,
   });
 }
 
@@ -718,6 +822,250 @@ async function runDirectoryIngest(
   if (opts.dryRun) {
     console.log(``);
     console.log(`Dry run — no proposals created. Re-run without --dry-run to commit.`);
+  }
+  if (failedCount > 0 && failedCount === results.length) process.exit(1);
+}
+
+// ── Multi-input flow (Phase ε prework A) ────────────────────────────────────
+
+// Walks every input and returns a deduped absolute-path file list.
+// Files are kept verbatim; directories are walked with
+// collectSourceFiles (which already honours node_modules / dist /
+// .ontology / __tests__ / .git / coverage skips). Dedup uses
+// fs.realpathSync canonicalisation so a file passed both directly and
+// via its parent directory only appears once, and macOS /tmp ↔
+// /private/tmp symlink doublings collapse.
+function collectAllInputFiles(
+  inputs: Array<{ path: string; stat: fs.Stats }>,
+  extensions: string[],
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const input of inputs) {
+    const fromInput = input.stat.isDirectory()
+      ? collectSourceFiles(path.resolve(input.path), extensions)
+      : [path.resolve(input.path)];
+    for (const f of fromInput) {
+      let canonical: string;
+      try {
+        canonical = fs.realpathSync(f);
+      } catch {
+        canonical = f;
+      }
+      if (seen.has(canonical)) continue;
+      seen.add(canonical);
+      out.push(f);
+    }
+  }
+  return out;
+}
+
+async function runMultiInputIngest(
+  inputs: Array<{ path: string; stat: fs.Stats }>,
+  files: string[],
+  opts: DirectoryOptions,
+): Promise<void> {
+  const extLabel = opts.extensions.map((e) => `.${e}`).join("/");
+
+  if (files.length === 0) {
+    if (opts.json) {
+      console.log(
+        JSON.stringify(
+          {
+            ok: true,
+            dryRun: opts.dryRun,
+            inputs: inputs.map((i) => ({
+              path: i.path,
+              kind: i.stat.isDirectory() ? "directory" : "file",
+            })),
+            fileCount: 0,
+            results: [],
+            edges: [],
+            message: `No ${extLabel} files found across the provided inputs.`,
+          },
+          null,
+          2,
+        ),
+      );
+    } else {
+      console.log(`=== ONTOLOGY INGEST — MULTI-INPUT ===`);
+      for (const input of inputs) {
+        console.log(
+          `  ${input.stat.isDirectory() ? "dir " : "file"}  ${input.path}`,
+        );
+      }
+      console.log(`Include:        ${extLabel}`);
+      console.log(`Files:          0`);
+      console.log(``);
+      console.log(`No ${extLabel} files found across the inputs.`);
+    }
+    return;
+  }
+
+  const results: PerFileSummary[] = [];
+  let totalTokens = 0;
+
+  for (const filePath of files) {
+    const cwdRelative = computeCwdRelative(filePath);
+    const extract = await extractIntentFromFile({
+      filePath,
+      provider: opts.provider,
+      model: opts.model,
+      ollamaHost: opts.ollamaHost,
+    });
+    if (!extract.ok) {
+      results.push({
+        filePath,
+        cwdRelative,
+        ok: false,
+        reason: extract.reason,
+        message: extract.message,
+      });
+      continue;
+    }
+
+    const tokensUsed = extract.response.usage?.totalTokens ?? 0;
+    totalTokens += tokensUsed;
+
+    if (opts.dryRun) {
+      results.push({
+        filePath,
+        cwdRelative,
+        ok: true,
+        extracted: extract.extracted,
+        tokensUsed,
+      });
+      continue;
+    }
+
+    const created = createNodeProposalForExtraction(
+      cwdRelative,
+      extract.extracted,
+      extract.response,
+      opts.parentNodeId,
+      opts.parentHash,
+    );
+    if (!created.ok) {
+      results.push({
+        filePath,
+        cwdRelative,
+        ok: false,
+        reason: "proposal_create_failed",
+        message: created.message,
+      });
+      continue;
+    }
+    results.push({
+      filePath,
+      cwdRelative,
+      ok: true,
+      extracted: extract.extracted,
+      proposalId: created.proposalId,
+      tokensUsed,
+    });
+  }
+
+  // Edge inference per-directory-input. Files passed directly are not
+  // edge-walked (the static analysers need a tree root to anchor
+  // imports). Cross-root edges (file in input A imports file in input
+  // B) are missed by this loop; documented in the command header and
+  // accepted for Phase ε pilot scope.
+  const inferredEdges: Array<{
+    fromFile: string;
+    toFile: string;
+    type: string;
+    tokens?: string[];
+  }> = [];
+  for (const input of inputs) {
+    if (!input.stat.isDirectory()) continue;
+    const absDir = path.resolve(input.path);
+    const edges = inferEdgesAutoFromDirectory(absDir, opts.extensions);
+    for (const e of edges) {
+      inferredEdges.push({
+        fromFile: path.relative(absDir, e.fromFile),
+        toFile: path.relative(absDir, e.toFile),
+        type: e.type,
+        tokens: e.tokens,
+      });
+    }
+  }
+
+  const okCount = results.filter((r) => r.ok).length;
+  const failedCount = results.length - okCount;
+
+  if (opts.json) {
+    console.log(
+      JSON.stringify(
+        {
+          ok: failedCount === 0,
+          dryRun: opts.dryRun,
+          inputs: inputs.map((i) => ({
+            path: i.path,
+            kind: i.stat.isDirectory() ? "directory" : "file",
+          })),
+          fileCount: results.length,
+          okCount,
+          failedCount,
+          totalTokens,
+          results: results.map((r) => ({
+            filePath: r.cwdRelative,
+            ok: r.ok,
+            reason: r.reason,
+            message: r.message,
+            extracted: r.extracted,
+            proposalId: r.proposalId,
+            tokensUsed: r.tokensUsed,
+          })),
+          edges: inferredEdges,
+        },
+        null,
+        2,
+      ),
+    );
+    if (failedCount > 0 && failedCount === results.length) process.exit(1);
+    return;
+  }
+
+  console.log(
+    `=== ONTOLOGY INGEST — MULTI-INPUT${opts.dryRun ? " (DRY RUN)" : ""} ===`,
+  );
+  for (const input of inputs) {
+    console.log(
+      `  ${input.stat.isDirectory() ? "dir " : "file"}  ${input.path}`,
+    );
+  }
+  console.log(`Files scanned:  ${results.length}`);
+  console.log(`  ok:           ${okCount}`);
+  if (failedCount > 0) console.log(`  failed:       ${failedCount}`);
+  if (totalTokens > 0) console.log(`Tokens used:    ${totalTokens}`);
+  console.log(``);
+  for (const r of results) {
+    if (r.ok) {
+      const label = r.extracted?.label ?? "(no label)";
+      const proposalTag = r.proposalId ? `  →  ${r.proposalId}` : "";
+      console.log(` ✓ ${r.cwdRelative}  ${label}${proposalTag}`);
+    } else {
+      console.log(` ✖ ${r.cwdRelative}  ${r.reason}: ${r.message}`);
+    }
+  }
+  if (inferredEdges.length > 0) {
+    console.log(``);
+    console.log(
+      `Inferred cross-file edges (γ-4, per-root scope — cross-root edges not inferred):`,
+    );
+    for (const edge of inferredEdges) {
+      const arrow = edge.type === "uses_token" ? "─type→" : "──→";
+      console.log(`  ${edge.fromFile}  ${arrow}  ${edge.toFile}`);
+    }
+  }
+  if (!opts.dryRun && okCount > 0) {
+    console.log(``);
+    console.log(`Next:`);
+    console.log(`  onto proposal list                # review the ${okCount} proposals`);
+  }
+  if (opts.dryRun) {
+    console.log(``);
+    console.log(`Dry run — no proposals created.`);
   }
   if (failedCount > 0 && failedCount === results.length) process.exit(1);
 }

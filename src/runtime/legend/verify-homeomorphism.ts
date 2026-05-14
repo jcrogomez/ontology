@@ -244,6 +244,29 @@ export interface AggregateReport {
   results: VerificationResult[];
   /** Aggregate usage across all nodes. Undefined when no dispatch happened (--cost-estimate, --dry-run cache-only). */
   totalUsage?: VerificationUsage;
+  /**
+   * Phase ε prework C: the six-axis matrix per node, populated when the
+   * verify command runs with --matrix. Undefined for the legacy verdict-only
+   * report shape. The matrix module (`src/runtime/legend/matrix.ts`) owns
+   * the canonical mapping from `HomeomorphismVerdict` to the structural
+   * axis state; other axes (contract, behavior, intent) are explicit
+   * "not-measured" / "untested" / "not-reviewed" until their checkers ship.
+   */
+  matrix?: import("./matrix.js").PerNodeMatrix[];
+  /**
+   * Aggregate count of cells per axis state. Same axes and vocabularies
+   * as `matrix[i].cell`. Undefined when `matrix` is undefined.
+   */
+  byAxis?: import("./matrix.js").ByAxis;
+  /**
+   * Phase ε prework D: count of nodes matching each required
+   * intersection predicate from
+   * `SELF_INGEST_HYPOTHESIS_2026-05-13.md` §6. Always carries the seven
+   * required keys (with explicit zeros when nothing matched); the run
+   * may append additional intersections discovered during the analysis.
+   * Undefined when `matrix` is undefined.
+   */
+  byIntersection?: Record<string, number>;
 }
 
 export function emptyVerdictCounts(): Record<HomeomorphismVerdict, number> {

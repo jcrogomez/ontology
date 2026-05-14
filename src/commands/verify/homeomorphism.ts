@@ -32,6 +32,15 @@ import {
   readFileSizeInfos,
   resolveProviderRate,
 } from "../ingest/cost-estimate.js";
+import {
+  aggregateByAxis,
+  buildMatrixCost,
+  buildPerNodeMatrix,
+  type ByAxis,
+  type PerNodeMatrix,
+} from "../../runtime/legend/matrix.js";
+import { aggregateByIntersection } from "../../runtime/legend/matrix-intersections.js";
+import { tagFileFromDisk } from "../../runtime/legend/frontier-tagger.js";
 
 // `onto verify-homeomorphism` — Project Legend δ-2.
 //
@@ -101,6 +110,14 @@ export interface VerifyHomeomorphismOptions {
   // reason="no_existing_regen". Useful for re-classifying with
   // tuned thresholds without paying for new dispatches.
   dryRun?: boolean;
+  // Phase ε prework C: emit the six-axis matrix per node and the
+  // per-axis aggregate counts alongside the legacy verdict report.
+  // The axes are: contract, structural, behavior, intent,
+  // literalRequired, and cost. The pilot fills structural + cost +
+  // literalRequired with real data and reports the rest as
+  // not-measured / untested / not-reviewed. Off by default so legacy
+  // callers see the unchanged report shape.
+  matrix?: boolean;
   json?: boolean;
 }
 
@@ -194,6 +211,54 @@ export async function verifyHomeomorphismCommand(
   const counts = emptyVerdictCounts();
   for (const r of results) counts[r.verdict] += 1;
   const totalUsage = aggregateUsage(results);
+
+  // Phase ε prework C: optional six-axis matrix. Walks results, tags
+  // each source file via the path/content tagger, loads the node to
+  // read `node.literal`, builds the cell, and aggregates by axis. All
+  // pure modulo the node.literal lookup and the tagFileFromDisk read;
+  // both touch only files we already have on disk.
+  let matrix: PerNodeMatrix[] | undefined;
+  let byAxis: ByAxis | undefined;
+  if (options.matrix) {
+    matrix = [];
+    for (const r of results) {
+      const tagResult = tagFileFromDisk(r.sourceFile);
+      // Best-effort node lookup. Verify never operates on a node it
+      // can't find (resolveCandidates filtered the set), so this
+      // should always succeed; treat undefined as `literal=false`
+      // rather than failing the whole matrix build. `node.literal`
+      // is the literal-content string when β-2's escape hatch is in
+      // use; "is literal" is `node.literal !== undefined`.
+      const node = loadNodeById(r.nodeId, cwd);
+      const literal: boolean | undefined =
+        node?.literal !== undefined ? true : false;
+      // The cost record's provider/model fall back to the resolved
+      // verify provider when the per-result usage is sparse (cache
+      // hits, mock dispatches). Task is "code_sketch" since this is
+      // the compile-back direction.
+      const cost = buildMatrixCost({
+        provider: provider ?? "unknown",
+        model: options.model ?? node?.model?.ref ?? "unknown",
+        task: "code_sketch",
+        usage: r.usage,
+      });
+      matrix.push(
+        buildPerNodeMatrix({
+          nodeId: r.nodeId,
+          sourceFile: r.sourceFile,
+          taggerTags: tagResult.attrs,
+          verdict: r.verdict,
+          literal,
+          cost,
+        }),
+      );
+    }
+    byAxis = aggregateByAxis(matrix.map((m) => m.cell));
+  }
+  // Phase ε prework D: intersection counts. Always present when the
+  // matrix is, with the seven required keys initialised to zero.
+  const byIntersection = matrix ? aggregateByIntersection(matrix) : undefined;
+
   const report: AggregateReport = {
     rootDir: cwd,
     thresholds,
@@ -201,6 +266,9 @@ export async function verifyHomeomorphismCommand(
     byVerdict: counts,
     results,
     ...(totalUsage ? { totalUsage } : {}),
+    ...(matrix ? { matrix } : {}),
+    ...(byAxis ? { byAxis } : {}),
+    ...(byIntersection ? { byIntersection } : {}),
   };
 
   // 5. Append a `homeomorphism_verified` event so the temporal log
