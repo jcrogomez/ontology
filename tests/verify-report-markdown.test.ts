@@ -140,7 +140,23 @@ function makeReportWithMatrix(): AggregateReport {
     "pure-transform ∧ behavior-equivalent": 0,
     "contract-missing ∧ not-reviewed": 0,
   };
-  return { ...base, matrix, byAxis, byIntersection };
+  // Pareto pivot — derived from `matrix` but pre-computed here so the
+  // renderer test fixture matches what the verify command produces.
+  const paretoByTaskModel = [
+    {
+      task: "code_sketch",
+      provider: "ollama",
+      model: "qwen2.5-coder:7b",
+      n: 3,
+      meanHonestyStructural: (0.9 + 0.2 + 0.7) / 3,
+      honestyN: 3,
+      meanUsdPerNode: 0,
+      meanInputTokensPerNode: 0,
+      meanOutputTokensPerNode: 0,
+      paretoFrontier: true,
+    },
+  ];
+  return { ...base, matrix, byAxis, byIntersection, paretoByTaskModel };
 }
 
 describe("renderReportMarkdown — legacy shape unchanged when matrix is absent", () => {
@@ -267,5 +283,23 @@ describe("renderReportMarkdown — honesty (Phase ε prework F)", () => {
     r.matrix = [];
     const md = renderReportMarkdown(r);
     expect(md).not.toContain("## Honesty by axis");
+  });
+});
+
+describe("renderReportMarkdown — Pareto (Phase ε prework G)", () => {
+  it("renders the Pareto section with frontier markers", () => {
+    const md = renderReportMarkdown(makeReportWithMatrix());
+    expect(md).toContain(
+      "## Pareto: cost vs fidelity by (task, provider, model) (Phase ε prework G)",
+    );
+    expect(md).toContain("| code_sketch | ollama |");
+    expect(md).toContain("`qwen2.5-coder:7b`");
+    // Star marker for the only entry → on the frontier (trivially).
+    expect(md).toMatch(/\| ★ \|/);
+  });
+
+  it("omits the Pareto section when paretoByTaskModel is absent", () => {
+    const md = renderReportMarkdown(makeReportWithoutMatrix());
+    expect(md).not.toContain("Pareto: cost vs fidelity");
   });
 });

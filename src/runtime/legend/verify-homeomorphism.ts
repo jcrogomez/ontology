@@ -267,6 +267,12 @@ export interface AggregateReport {
    * Undefined when `matrix` is undefined.
    */
   byIntersection?: Record<string, number>;
+  /**
+   * Phase ε prework G: Pareto pivot — one row per (task, provider,
+   * model) bucket with mean honesty + mean cost + a `paretoFrontier`
+   * flag computed per task. Undefined when `matrix` is undefined.
+   */
+  paretoByTaskModel?: import("./pareto.js").TaskModelAgg[];
 }
 
 export function emptyVerdictCounts(): Record<HomeomorphismVerdict, number> {

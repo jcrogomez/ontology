@@ -46,6 +46,7 @@ import {
   REQUIRED_INTERSECTIONS,
 } from "../../runtime/legend/matrix-intersections.js";
 import { tagFileFromDisk } from "../../runtime/legend/frontier-tagger.js";
+import { aggregateByTaskModel } from "../../runtime/legend/pareto.js";
 
 // `onto verify-homeomorphism` — Project Legend δ-2.
 //
@@ -264,6 +265,8 @@ export async function verifyHomeomorphismCommand(
   // Phase ε prework D: intersection counts. Always present when the
   // matrix is, with the seven required keys initialised to zero.
   const byIntersection = matrix ? aggregateByIntersection(matrix) : undefined;
+  // Phase ε prework G: Pareto pivot by (task, provider, model).
+  const paretoByTaskModel = matrix ? aggregateByTaskModel(matrix) : undefined;
 
   const report: AggregateReport = {
     rootDir: cwd,
@@ -275,6 +278,7 @@ export async function verifyHomeomorphismCommand(
     ...(matrix ? { matrix } : {}),
     ...(byAxis ? { byAxis } : {}),
     ...(byIntersection ? { byIntersection } : {}),
+    ...(paretoByTaskModel ? { paretoByTaskModel } : {}),
   };
 
   // 5. Append a `homeomorphism_verified` event so the temporal log
@@ -804,6 +808,33 @@ export function renderReportMarkdown(
     lines.push(``);
     lines.push(
       "*Per-axis means computed over nodes with non-null scores. Formulas: `structural = 0.5·(1 − loc) + 0.5·jaccard`; `contract / behavior` = pass→1, fail→0; `intent` = accepted→1, rejected→0, needs-human→0.5. `not-reviewed` / `untested` / `not-measured` collapse to null and are excluded from the mean.*",
+    );
+    lines.push(``);
+  }
+
+  // ── Phase ε prework G: Pareto pivot by (task, provider, model) ──
+  if (report.paretoByTaskModel && report.paretoByTaskModel.length > 0) {
+    lines.push(`## Pareto: cost vs fidelity by (task, provider, model) (Phase ε prework G)`);
+    lines.push(``);
+    lines.push(`| Task | Provider | Model | n | Honesty (struct) | Mean cost/node | In tok | Out tok | Pareto |`);
+    lines.push(`|---|---|---|---:|---:|---:|---:|---:|:---:|`);
+    for (const a of report.paretoByTaskModel) {
+      const honestyStr =
+        a.meanHonestyStructural === null
+          ? "—"
+          : `${a.meanHonestyStructural.toFixed(3)} (n=${a.honestyN})`;
+      const costStr =
+        a.meanUsdPerNode > 0 ? `$${a.meanUsdPerNode.toFixed(4)}` : "$0";
+      const inTok = Math.round(a.meanInputTokensPerNode);
+      const outTok = Math.round(a.meanOutputTokensPerNode);
+      const flag = a.paretoFrontier ? "★" : "";
+      lines.push(
+        `| ${a.task} | ${a.provider} | \`${a.model}\` | ${a.n} | ${honestyStr} | ${costStr} | ${inTok} | ${outTok} | ${flag} |`,
+      );
+    }
+    lines.push(``);
+    lines.push(
+      "*★ marks an entry on the cost-vs-fidelity Pareto frontier within its task. An entry is dominated when another (task, provider, model) bucket has strictly higher mean honesty at lower-or-equal cost (or strictly lower cost at greater-or-equal honesty). Entries with null honesty cannot be on the frontier — `SELF_INGEST_HYPOTHESIS_<date>.md` §7 calls cost-changes-recommendation a discovery outcome; this is where it surfaces.*",
     );
     lines.push(``);
   }
