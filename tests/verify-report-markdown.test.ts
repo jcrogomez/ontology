@@ -79,6 +79,7 @@ function makeReportWithMatrix(): AggregateReport {
           wallClockMs: 0,
         },
       },
+      honesty: { structural: 0.9, contract: null, behavior: null, intent: null },
     },
     {
       nodeId: "n2",
@@ -100,6 +101,7 @@ function makeReportWithMatrix(): AggregateReport {
           wallClockMs: 0,
         },
       },
+      honesty: { structural: 0.2, contract: null, behavior: null, intent: null },
     },
     {
       nodeId: "n3",
@@ -126,6 +128,7 @@ function makeReportWithMatrix(): AggregateReport {
           wallClockMs: 0,
         },
       },
+      honesty: { structural: 0.7, contract: null, behavior: null, intent: null },
     },
   ];
   const byIntersection: Record<string, number> = {
@@ -224,5 +227,45 @@ describe("renderReportMarkdown — partial matrix data is honest", () => {
     const md = renderReportMarkdown(r);
     expect(md).toContain("## Matrix by axis");
     expect(md).not.toContain("## Frontier coverage");
+  });
+});
+
+describe("renderReportMarkdown — honesty (Phase ε prework F)", () => {
+  it("renders the 'Honesty by axis' section with mean + n + coverage", () => {
+    const md = renderReportMarkdown(makeReportWithMatrix());
+    expect(md).toContain("## Honesty by axis (Phase ε prework F)");
+    // structural mean = (0.9 + 0.2 + 0.7) / 3 = 0.600 over 3 nodes (100% coverage)
+    expect(md).toMatch(/\| structural \| 0\.600 \| 3 \| 100% \|/);
+    // contract / behavior / intent have n=0 → mean dashed, 0% coverage
+    expect(md).toMatch(/\| contract \| — \| 0 \| 0% \|/);
+    expect(md).toMatch(/\| behavior \| — \| 0 \| 0% \|/);
+    expect(md).toMatch(/\| intent \| — \| 0 \| 0% \|/);
+  });
+
+  it("adds a 'Honesty' column in the per-node table when matrix is present", () => {
+    const md = renderReportMarkdown(makeReportWithMatrix());
+    // Header includes Honesty
+    expect(md).toMatch(
+      /\| Node \| Source \| Verdict \| LoC dist \| Jaccard \| Honesty \| Tokens \| Cost \|/,
+    );
+    // n1's structural honesty = 0.9 appears as 0.900
+    expect(md).toMatch(/\| `n1` \|.*\| 0\.900 \|/);
+  });
+
+  it("dashes the Honesty column when matrix is absent (legacy report)", () => {
+    const md = renderReportMarkdown(makeReportWithoutMatrix());
+    // Honesty column header is no longer rendered in legacy mode? Confirm
+    // policy: prework F adds the column unconditionally so the legacy
+    // shape stays uniform; dashes signal "no matrix".
+    expect(md).toContain("Honesty");
+    // Per-node row for n1: honesty must be "—" since matrix is absent
+    expect(md).toMatch(/\| `n1` \|.*foo\.ts \| epsilon_equivalent \|.*\| — \|/);
+  });
+
+  it("omits the 'Honesty by axis' section when matrix is empty", () => {
+    const r = makeReportWithMatrix();
+    r.matrix = [];
+    const md = renderReportMarkdown(r);
+    expect(md).not.toContain("## Honesty by axis");
   });
 });

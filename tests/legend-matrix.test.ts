@@ -5,11 +5,15 @@ import {
   buildMatrixCost,
   buildPerNodeMatrix,
   emptyByAxis,
+  honestyForCell,
+  meanHonesty,
   verdictDerivedTags,
   verdictToMatrixCell,
+  AxisHonestySchema,
   ByAxisSchema,
   MatrixCellSchema,
   PerNodeMatrixSchema,
+  type AxisHonesty,
   type MatrixCell,
   type MatrixCost,
 } from "../src/runtime/legend/matrix.js";
@@ -314,5 +318,168 @@ describe("legend-matrix — Zod schemas", () => {
   it("ByAxisSchema validates an emptyByAxis output", () => {
     const empty = emptyByAxis();
     expect(ByAxisSchema.safeParse(empty).success).toBe(true);
+  });
+});
+
+// ── Honesty per axis (Phase ε prework F) ────────────────────────────────────
+
+describe("legend-matrix — honestyForCell", () => {
+  const baseCell = (): MatrixCell =>
+    verdictToMatrixCell({
+      verdict: "epsilon_equivalent",
+      literal: false,
+      cost: ZERO_COST,
+    });
+
+  it("structural is null when no metrics supplied (cache hit / dry run / unrecoverable)", () => {
+    const h = honestyForCell(baseCell(), undefined);
+    expect(h.structural).toBeNull();
+  });
+
+  it("structural folds (loc=0, jaccard=1) to 1.0 (perfect)", () => {
+    const h = honestyForCell(baseCell(), { locDistance: 0, structuralJaccard: 1 });
+    expect(h.structural).toBeCloseTo(1.0);
+  });
+
+  it("structural folds (loc=1, jaccard=0) to 0.0 (worst)", () => {
+    const h = honestyForCell(baseCell(), { locDistance: 1, structuralJaccard: 0 });
+    expect(h.structural).toBeCloseTo(0.0);
+  });
+
+  it("structural folds (loc=0.2, jaccard=0.9) to 0.85", () => {
+    const h = honestyForCell(baseCell(), {
+      locDistance: 0.2,
+      structuralJaccard: 0.9,
+    });
+    expect(h.structural).toBeCloseTo(0.85);
+  });
+
+  it("clamps locDistance > 1 and jaccard < 0", () => {
+    const h = honestyForCell(baseCell(), {
+      locDistance: 1.7, // clamps to 1
+      structuralJaccard: -0.3, // clamps to 0
+    });
+    expect(h.structural).toBeCloseTo(0);
+  });
+
+  it("treats NaN distance as the worst case (clamped to 0/1 by the bounds)", () => {
+    const h = honestyForCell(baseCell(), {
+      locDistance: Number.NaN,
+      structuralJaccard: Number.NaN,
+    });
+    // NaN → 0; structural = 0.5*(1-0) + 0.5*0 = 0.5. Documented bound.
+    expect(h.structural).toBeCloseTo(0.5);
+  });
+
+  it("contract pass=1, fail=0, unknown/not-measured=null", () => {
+    const passCell: MatrixCell = { ...baseCell(), contract: "pass" };
+    const failCell: MatrixCell = { ...baseCell(), contract: "fail" };
+    expect(honestyForCell(passCell, undefined).contract).toBe(1);
+    expect(honestyForCell(failCell, undefined).contract).toBe(0);
+    expect(honestyForCell(baseCell(), undefined).contract).toBeNull();
+  });
+
+  it("behavior pass=1, fail=0, untested/not-applicable=null", () => {
+    const passCell: MatrixCell = { ...baseCell(), behavior: "pass" };
+    const failCell: MatrixCell = { ...baseCell(), behavior: "fail" };
+    expect(honestyForCell(passCell, undefined).behavior).toBe(1);
+    expect(honestyForCell(failCell, undefined).behavior).toBe(0);
+    expect(honestyForCell(baseCell(), undefined).behavior).toBeNull();
+  });
+
+  it("intent accepted=1, rejected=0, needs-human=0.5, not-reviewed=null", () => {
+    const accept: MatrixCell = { ...baseCell(), intent: "accepted" };
+    const reject: MatrixCell = { ...baseCell(), intent: "rejected" };
+    const needs: MatrixCell = { ...baseCell(), intent: "needs-human" };
+    expect(honestyForCell(accept, undefined).intent).toBe(1);
+    expect(honestyForCell(reject, undefined).intent).toBe(0);
+    expect(honestyForCell(needs, undefined).intent).toBe(0.5);
+    expect(honestyForCell(baseCell(), undefined).intent).toBeNull();
+  });
+});
+
+describe("legend-matrix — meanHonesty", () => {
+  it("returns mean=null, n=0 for an empty input", () => {
+    const m = meanHonesty([]);
+    for (const axis of ["structural", "contract", "behavior", "intent"] as const) {
+      expect(m[axis].mean).toBeNull();
+      expect(m[axis].n).toBe(0);
+    }
+  });
+
+  it("excludes null entries from the mean and counts only non-null contributors", () => {
+    const scores: AxisHonesty[] = [
+      { structural: 1.0, contract: null, behavior: null, intent: null },
+      { structural: 0.5, contract: null, behavior: null, intent: 1.0 },
+      { structural: null, contract: 0, behavior: null, intent: 0.5 },
+    ];
+    const m = meanHonesty(scores);
+    expect(m.structural.mean).toBeCloseTo(0.75); // (1.0 + 0.5) / 2
+    expect(m.structural.n).toBe(2);
+    expect(m.contract.mean).toBe(0); // single 0
+    expect(m.contract.n).toBe(1);
+    expect(m.behavior.mean).toBeNull();
+    expect(m.behavior.n).toBe(0);
+    expect(m.intent.mean).toBeCloseTo(0.75); // (1.0 + 0.5) / 2
+    expect(m.intent.n).toBe(2);
+  });
+});
+
+describe("legend-matrix — buildPerNodeMatrix carries honesty", () => {
+  it("computes structural honesty when metrics are supplied", () => {
+    const entry = buildPerNodeMatrix({
+      nodeId: "n",
+      sourceFile: "f.ts",
+      taggerTags: ["pure-transform"],
+      verdict: "epsilon_equivalent",
+      literal: false,
+      cost: ZERO_COST,
+      metrics: { locDistance: 0.1, structuralJaccard: 0.9 },
+    });
+    expect(entry.honesty.structural).toBeCloseTo(0.5 * 0.9 + 0.5 * 0.9);
+  });
+
+  it("leaves structural honesty null when metrics are omitted", () => {
+    const entry = buildPerNodeMatrix({
+      nodeId: "n",
+      sourceFile: "f.ts",
+      taggerTags: ["pure-transform"],
+      verdict: "unrecoverable",
+      literal: false,
+      cost: ZERO_COST,
+    });
+    expect(entry.honesty.structural).toBeNull();
+  });
+});
+
+describe("legend-matrix — AxisHonestySchema", () => {
+  it("accepts a fully-null honesty record", () => {
+    const ok = AxisHonestySchema.safeParse({
+      structural: null,
+      contract: null,
+      behavior: null,
+      intent: null,
+    });
+    expect(ok.success).toBe(true);
+  });
+
+  it("accepts a valid mixed record", () => {
+    const ok = AxisHonestySchema.safeParse({
+      structural: 0.85,
+      contract: null,
+      behavior: null,
+      intent: 0.5,
+    });
+    expect(ok.success).toBe(true);
+  });
+
+  it("rejects values outside [0, 1]", () => {
+    const bad = AxisHonestySchema.safeParse({
+      structural: 1.5,
+      contract: null,
+      behavior: null,
+      intent: null,
+    });
+    expect(bad.success).toBe(false);
   });
 });

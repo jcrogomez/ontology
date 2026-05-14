@@ -148,6 +148,14 @@ export interface PerNodeMatrix {
    */
   frontier: FrontierAttribute[];
   cell: MatrixCell;
+  /**
+   * Per-axis honesty score in [0, 1] (or null when the axis cannot
+   * speak for this node). Derived from `cell` + raw distance metrics
+   * via `honestyForCell`. Persisted on the canonical shape so JSON
+   * consumers, the markdown renderer, and downstream pivots all read
+   * the same numbers without re-deriving them.
+   */
+  honesty: AxisHonesty;
 }
 
 // ── Aggregate ───────────────────────────────────────────────────────────────
@@ -235,6 +243,138 @@ export function verdictToMatrixCell(inputs: VerdictToCellInputs): MatrixCell {
   };
 }
 
+// ── Honesty scores per axis (Phase ε prework F) ─────────────────────────────
+//
+// A honesty score is a *per-axis* fold from the matrix cell + raw
+// metrics into [0, 1] (or null when undefined). Each axis has its own
+// simple, transparent formula. The scores are intentionally vectorial:
+// SELF_INGEST_HYPOTHESIS_2026-05-13.md §9 forbids collapsing the
+// matrix to one number, and the per-axis split honours that. The mean
+// within an axis is reported alongside its sample size `n` so a low
+// denominator cannot masquerade as a confident reading.
+
+export interface AxisHonesty {
+  /**
+   * Structural fidelity, computed directly from raw distance metrics:
+   * `0.5 * (1 - clamp(locDistance, 0, 1)) + 0.5 * clamp(structuralJaccard, 0, 1)`.
+   * Null when no metrics are available (unrecoverable verdict,
+   * cache hit, dry run, mock dispatch).
+   */
+  structural: number | null;
+  /**
+   * Contract fidelity. `pass` → 1, `fail` → 0, otherwise null.
+   * No contract checker in the pilot, so this is null for every
+   * node until that axis ships.
+   */
+  contract: number | null;
+  /**
+   * Behavior fidelity. `pass` → 1, `fail` → 0, otherwise null.
+   * Pilot lacks a behavior harness, so this is null for every
+   * node until that axis ships.
+   */
+  behavior: number | null;
+  /**
+   * Intent fidelity. `accepted` → 1, `rejected` → 0, `needs-human` → 0.5,
+   * `not-reviewed` → null. Keeps the review-state vs review-result
+   * distinction the hypothesis §3 insists on.
+   */
+  intent: number | null;
+}
+
+export type HonestyAxis = keyof AxisHonesty;
+export const HONESTY_AXES: readonly HonestyAxis[] = [
+  "structural",
+  "contract",
+  "behavior",
+  "intent",
+] as const;
+
+function clamp01(x: number): number {
+  if (Number.isNaN(x)) return 0;
+  if (x < 0) return 0;
+  if (x > 1) return 1;
+  return x;
+}
+
+export function honestyForCell(
+  cell: MatrixCell,
+  metrics: { locDistance: number; structuralJaccard: number } | undefined,
+): AxisHonesty {
+  const structural =
+    metrics === undefined
+      ? null
+      : 0.5 * (1 - clamp01(metrics.locDistance)) +
+        0.5 * clamp01(metrics.structuralJaccard);
+
+  let contract: number | null;
+  switch (cell.contract) {
+    case "pass":
+      contract = 1;
+      break;
+    case "fail":
+      contract = 0;
+      break;
+    default:
+      contract = null;
+  }
+
+  let behavior: number | null;
+  switch (cell.behavior) {
+    case "pass":
+      behavior = 1;
+      break;
+    case "fail":
+      behavior = 0;
+      break;
+    default:
+      behavior = null;
+  }
+
+  let intent: number | null;
+  switch (cell.intent) {
+    case "accepted":
+      intent = 1;
+      break;
+    case "rejected":
+      intent = 0;
+      break;
+    case "needs-human":
+      intent = 0.5;
+      break;
+    case "not-reviewed":
+      intent = null;
+      break;
+  }
+
+  return { structural, contract, behavior, intent };
+}
+
+export interface AxisMeanHonesty {
+  /** Arithmetic mean of non-null scores across nodes. Null when no node contributed a non-null score on this axis. */
+  mean: number | null;
+  /** Number of nodes that contributed a non-null score on this axis. */
+  n: number;
+}
+
+export type MeanHonesty = Record<HonestyAxis, AxisMeanHonesty>;
+
+export function meanHonesty(scores: readonly AxisHonesty[]): MeanHonesty {
+  const out = {} as MeanHonesty;
+  for (const axis of HONESTY_AXES) {
+    let sum = 0;
+    let n = 0;
+    for (const s of scores) {
+      const v = s[axis];
+      if (v !== null) {
+        sum += v;
+        n += 1;
+      }
+    }
+    out[axis] = { mean: n > 0 ? sum / n : null, n };
+  }
+  return out;
+}
+
 // Returns the FrontierAttribute set derivable from a matrix cell. The
 // intersection aggregator (prework D) consumes (frontier from tagger ∪
 // these verdict-derived tags) per node.
@@ -266,6 +406,13 @@ export function buildPerNodeMatrix(args: {
   verdict: HomeomorphismVerdict;
   literal: boolean | undefined;
   cost: MatrixCost;
+  /**
+   * Raw distance metrics from the verify pipeline. Required for a
+   * non-null structural honesty score; undefined is honest when the
+   * verdict was `unrecoverable` (no artifact) or the dispatch was a
+   * cache hit / dry run / mock.
+   */
+  metrics?: { locDistance: number; structuralJaccard: number };
 }): PerNodeMatrix {
   const cell = verdictToMatrixCell({
     verdict: args.verdict,
@@ -274,11 +421,13 @@ export function buildPerNodeMatrix(args: {
   });
   const derived = verdictDerivedTags(cell);
   const union = new Set<FrontierAttribute>([...args.taggerTags, ...derived]);
+  const honesty = honestyForCell(cell, args.metrics);
   return {
     nodeId: args.nodeId,
     sourceFile: args.sourceFile,
     frontier: Array.from(union).sort(),
     cell,
+    honesty,
   };
 }
 
@@ -332,11 +481,20 @@ const FrontierAttributeSchema = z.enum([
   "not-reviewed",
 ]);
 
+const AxisHonestyValueSchema = z.number().min(0).max(1).nullable();
+export const AxisHonestySchema = z.object({
+  structural: AxisHonestyValueSchema,
+  contract: AxisHonestyValueSchema,
+  behavior: AxisHonestyValueSchema,
+  intent: AxisHonestyValueSchema,
+});
+
 export const PerNodeMatrixSchema = z.object({
   nodeId: z.string(),
   sourceFile: z.string(),
   frontier: z.array(FrontierAttributeSchema).min(1),
   cell: MatrixCellSchema,
+  honesty: AxisHonestySchema,
 });
 
 export const ByAxisSchema = z.object({

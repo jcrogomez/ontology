@@ -36,6 +36,8 @@ import {
   aggregateByAxis,
   buildMatrixCost,
   buildPerNodeMatrix,
+  meanHonesty,
+  HONESTY_AXES,
   type ByAxis,
   type PerNodeMatrix,
 } from "../../runtime/legend/matrix.js";
@@ -253,6 +255,7 @@ export async function verifyHomeomorphismCommand(
           verdict: r.verdict,
           literal,
           cost,
+          metrics: r.metrics,
         }),
       );
     }
@@ -780,6 +783,31 @@ export function renderReportMarkdown(
     lines.push(``);
   }
 
+  // ── Phase ε prework F: honesty score per axis ──
+  // Per-axis honesty (no global scalar — hypothesis §9 forbids it).
+  // Reported with sample size so a low denominator can't masquerade as
+  // a confident reading.
+  if (report.matrix && report.matrix.length > 0) {
+    const means = meanHonesty(report.matrix.map((m) => m.honesty));
+    lines.push(`## Honesty by axis (Phase ε prework F)`);
+    lines.push(``);
+    lines.push(`| Axis | Mean | n | Coverage |`);
+    lines.push(`|---|---:|---:|---:|`);
+    const totalNodes = report.matrix.length;
+    for (const axis of HONESTY_AXES) {
+      const entry = means[axis];
+      const meanStr = entry.mean === null ? "—" : entry.mean.toFixed(3);
+      const cov =
+        totalNodes > 0 ? `${((entry.n / totalNodes) * 100).toFixed(0)}%` : "—";
+      lines.push(`| ${axis} | ${meanStr} | ${entry.n} | ${cov} |`);
+    }
+    lines.push(``);
+    lines.push(
+      "*Per-axis means computed over nodes with non-null scores. Formulas: `structural = 0.5·(1 − loc) + 0.5·jaccard`; `contract / behavior` = pass→1, fail→0; `intent` = accepted→1, rejected→0, needs-human→0.5. `not-reviewed` / `untested` / `not-measured` collapse to null and are excluded from the mean.*",
+    );
+    lines.push(``);
+  }
+
   // ── Phase ε prework C: frontier coverage section ──
   if (report.matrix && report.matrix.length > 0) {
     const tagCounts = new Map<string, number>();
@@ -826,8 +854,22 @@ export function renderReportMarkdown(
 
   lines.push(`## Per-node`);
   lines.push(``);
-  lines.push(`| Node | Source | Verdict | LoC dist | Jaccard | Tokens | Cost |`);
-  lines.push(`|---|---|---|---:|---:|---:|---:|`);
+  // Honesty column is the structural honesty score in [0, 1]. The
+  // other axes are uniformly null today (no contract / behavior /
+  // intent checker in the pilot), so we only surface the per-node
+  // structural score; the full per-axis split is in the "Honesty by
+  // axis" section above.
+  lines.push(
+    `| Node | Source | Verdict | LoC dist | Jaccard | Honesty | Tokens | Cost |`,
+  );
+  lines.push(`|---|---|---|---:|---:|---:|---:|---:|`);
+  // Lookup table from nodeId to its matrix entry so we can read the
+  // honesty score without recomputing it. Built only when --matrix
+  // produced a matrix; otherwise honesty is "—" everywhere.
+  const matrixById = new Map<string, PerNodeMatrix>();
+  if (report.matrix) {
+    for (const m of report.matrix) matrixById.set(m.nodeId, m);
+  }
   for (const r of report.results) {
     const src = r.sourceFile.split("/").slice(-2).join("/");
     const verdict = r.verdict;
@@ -838,11 +880,16 @@ export function renderReportMarkdown(
     const cacheTag = r.usage?.cached ? " (cached)" : "";
     const locStr = typeof loc === "number" ? loc.toFixed(3) : "—";
     const jacStr = typeof jac === "number" ? jac.toFixed(3) : "—";
+    const honestyVal = matrixById.get(r.nodeId)?.honesty.structural;
+    const honestyStr =
+      typeof honestyVal === "number" ? honestyVal.toFixed(3) : "—";
     const tokStr = tokens !== undefined ? `${tokens}${cacheTag}` : "—";
     const costStr = cost !== undefined ? `$${cost.toFixed(4)}` : "—";
-    lines.push(`| \`${r.nodeId}\` | ${src} | ${verdict} | ${locStr} | ${jacStr} | ${tokStr} | ${costStr} |`);
+    lines.push(
+      `| \`${r.nodeId}\` | ${src} | ${verdict} | ${locStr} | ${jacStr} | ${honestyStr} | ${tokStr} | ${costStr} |`,
+    );
     if (!r.ok && r.failure) {
-      lines.push(`| | ↳ failure | ${truncate(r.failure, 80)} | | | | |`);
+      lines.push(`| | ↳ failure | ${truncate(r.failure, 80)} | | | | | |`);
     }
   }
   lines.push(``);
