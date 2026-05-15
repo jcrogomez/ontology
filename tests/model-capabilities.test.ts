@@ -5,8 +5,10 @@ import {
   ModelCapabilityProfileSchema,
   getCapabilityProfile,
   isModelBannedForTask,
+  llmTaskToTaskKind,
   modelsPreferredForTask,
 } from "../src/runtime/llm/model-capabilities.js";
+import type { LlmTask } from "../src/runtime/llm/types.js";
 
 describe("model-capabilities — initial profiles validate", () => {
   it("every profile parses cleanly against the Zod schema", () => {
@@ -98,6 +100,53 @@ describe("model-capabilities — modelsPreferredForTask", () => {
 
   it("returns empty array for tasks no model is preferred for (yet)", () => {
     expect(modelsPreferredForTask("critique")).toEqual([]);
+  });
+});
+
+describe("model-capabilities — llmTaskToTaskKind mapping", () => {
+  it("maps semantic_parse → structured_extraction (ingest extraction)", () => {
+    expect(llmTaskToTaskKind("semantic_parse")).toBe("structured_extraction");
+  });
+
+  it("maps node_expand → structured_extraction (also produces typed records)", () => {
+    expect(llmTaskToTaskKind("node_expand")).toBe("structured_extraction");
+  });
+
+  it("maps node_critique → critique", () => {
+    expect(llmTaskToTaskKind("node_critique")).toBe("critique");
+  });
+
+  it("maps code_sketch + test_generate → code_generation", () => {
+    expect(llmTaskToTaskKind("code_sketch")).toBe("code_generation");
+    expect(llmTaskToTaskKind("test_generate")).toBe("code_generation");
+  });
+
+  it("maps inspect + documentation + context_assemble → summarization", () => {
+    expect(llmTaskToTaskKind("inspect")).toBe("summarization");
+    expect(llmTaskToTaskKind("documentation")).toBe("summarization");
+    expect(llmTaskToTaskKind("context_assemble")).toBe("summarization");
+  });
+
+  it("covers every LlmTask in the vocabulary (no missing entries)", () => {
+    // If a new LlmTask is added to types.ts without a kind here,
+    // the typecheck on TASK_TO_KIND (Record<LlmTask, ...>) fails at
+    // build time. This runtime test additionally confirms each value
+    // is one of the declared kinds — defends against a future
+    // refactor that loosens the type.
+    const allTasks: LlmTask[] = [
+      "semantic_parse",
+      "node_expand",
+      "node_critique",
+      "context_assemble",
+      "code_sketch",
+      "test_generate",
+      "documentation",
+      "inspect",
+    ];
+    for (const t of allTasks) {
+      const kind = llmTaskToTaskKind(t);
+      expect(LLM_TASK_KINDS).toContain(kind);
+    }
   });
 });
 

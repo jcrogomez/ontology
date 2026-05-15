@@ -148,8 +148,12 @@ describe("getDefaultModelForTask — per-provider auto-pick", () => {
     expect(getDefaultModelForTask("anthropic", "code_sketch")).toBe("claude-opus-4-7");
   });
 
-  it("returns the qwen-coder model for ollama + semantic_parse", () => {
-    expect(getDefaultModelForTask("ollama", "semantic_parse")).toBe("qwen2.5-coder:7b");
+  it("returns the calibrated qwen-coder 3b for ollama + semantic_parse", () => {
+    // Updated 2026-05-15 per BAKEOFF_3B_FAMILY_2026-05-15.md §5:
+    // qwen2.5-coder:3b is the deterministic calibration default for
+    // structured_extraction (95% single-run, zero variance × 3 reps,
+    // fits comfortably in M1's 5.3 GiB unified VRAM).
+    expect(getDefaultModelForTask("ollama", "semantic_parse")).toBe("qwen2.5-coder:3b");
   });
 
   it("returns undefined for providers without a routing table (mock, literal)", () => {
@@ -203,10 +207,12 @@ describe("resolveProviderRate — task-aware cost estimation", () => {
   });
 
   it("ollama with task labels the model in modelLabel ($0 either way)", () => {
+    // The label tracks the registry's preferred[0]. Updated to
+    // qwen2.5-coder:3b after the 2026-05-15 bake-off calibration.
     const rate = resolveProviderRate("ollama", undefined, "semantic_parse");
     expect(rate.inputUsdPerMillion).toBe(0);
     expect(rate.outputUsdPerMillion).toBe(0);
-    expect(rate.modelLabel).toBe("ollama:qwen2.5-coder:7b");
+    expect(rate.modelLabel).toBe("ollama:qwen2.5-coder:3b");
   });
 
   it("mock stays free regardless of task", () => {

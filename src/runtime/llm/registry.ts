@@ -30,9 +30,18 @@ export type ProviderRoutingEntry = {
 export type ProviderRoutingMap = Record<LlmTask, ProviderRoutingEntry>;
 
 export const DefaultOllamaRouting: ProviderRoutingMap = {
+  // structured_extraction default — calibrated by bake-off v2
+  // (BAKEOFF_3B_FAMILY_2026-05-15.md §2.1 + §5). qwen2.5-coder:3b
+  // delivered deterministic 95% single-run OK rate on the curated
+  // Ontology subset; llama3.2:3b is the high-confidence ensemble
+  // fallback (100% via ×3 union). Both fit comfortably in the M1's
+  // 5.3 GiB shared VRAM ceiling that the 7-8B family stressed.
+  // Other LlmTasks in this routing map still reference legacy
+  // 7b/8b/14b names; updating them is out of scope for this change
+  // (only structured_extraction was bake-off'd).
   semantic_parse: {
     tier: "fast",
-    preferred: ["qwen2.5-coder:7b", "llama3.1:8b"]
+    preferred: ["qwen2.5-coder:3b", "llama3.2:3b"]
   },
   node_expand: {
     tier: "balanced",

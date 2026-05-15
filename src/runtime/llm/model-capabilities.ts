@@ -99,6 +99,47 @@ export const MODEL_CAPABILITY_PROFILES: readonly ModelCapabilityProfile[] = [
   },
 ];
 
+// ── LlmTask ⇒ LlmTaskKind mapping ───────────────────────────────────────────
+//
+// LlmTask is the Ontology vocabulary (semantic_parse, code_sketch, ...).
+// LlmTaskKind is the cognitive-demand axis (structured_extraction,
+// reasoning, ...). The router needs to translate one into the other to
+// consult the capability profiles.
+//
+// This mapping is conservative: each LlmTask maps to exactly one
+// LlmTaskKind. If a task ever becomes multi-kind, refactor to allow
+// arrays — but until then, the single value keeps the policy
+// auditable.
+
+import type { LlmTask } from "./types.js";
+
+const TASK_TO_KIND: Record<LlmTask, LlmTaskKind> = {
+  // Ingest extraction: produce a JSON object that satisfies
+  // ExtractionResultSchema (label / level / kind / prompt + optional
+  // context contract). This is THE archetype of structured_extraction.
+  semantic_parse: "structured_extraction",
+  // Node expansion: given a sketch, produce a fuller structured node.
+  // Structured output by definition.
+  node_expand: "structured_extraction",
+  // Critique: evaluate a candidate, return an opinion (free-form).
+  node_critique: "critique",
+  // Context assembly: produce a presheaf-flavored prose / structured
+  // context for a focal. Treated as summarization — the output is a
+  // condensed view, not a typed record.
+  context_assemble: "summarization",
+  // Code generation: produce code as the artifact output.
+  code_sketch: "code_generation",
+  test_generate: "code_generation",
+  // Prose docs and inspect (translator paragraph) are
+  // free-form summaries.
+  documentation: "summarization",
+  inspect: "summarization",
+};
+
+export function llmTaskToTaskKind(task: LlmTask): LlmTaskKind {
+  return TASK_TO_KIND[task];
+}
+
 // ── Lookup helpers ──────────────────────────────────────────────────────────
 
 /**
