@@ -257,10 +257,10 @@ async function extractIntentFromFile(
     fileContent.length,
   );
 
-  // 3. Dispatch.
+  // 3. Dispatch (with H3 transient-retry backoff).
   let response: LlmResponse;
   try {
-    response = await dispatchLlmRequest(
+    response = await dispatchWithRetry(
       {
         task: "semantic_parse",
         prompt: userPrompt,
@@ -276,7 +276,7 @@ async function extractIntentFromFile(
       ok: false,
       filePath,
       reason: "dispatch_failed",
-      message: `Dispatch failed: ${errorMessage(err)}`,
+      message: `Dispatch failed (after ${RETRY_BACKOFF_MS.length} attempts): ${errorMessage(err)}`,
     };
   }
 
@@ -321,7 +321,7 @@ async function extractIntentFromFile(
   const retryPrompt = buildRetryPrompt(userPrompt, firstFailureMessage);
   let retryResponse: LlmResponse;
   try {
-    retryResponse = await dispatchLlmRequest(
+    retryResponse = await dispatchWithRetry(
       {
         task: "semantic_parse",
         prompt: retryPrompt,
@@ -333,8 +333,9 @@ async function extractIntentFromFile(
       { provider, defaultModel: model, ollamaHost },
     );
   } catch (err: unknown) {
-    // Retry dispatch failed — surface the original schema error
-    // alongside the dispatch failure so the operator sees both.
+    // Retry dispatch failed (after H3 backoff exhausted) — surface
+    // the original schema error alongside the dispatch failure so
+    // the operator sees both.
     return {
       ok: false,
       filePath,
@@ -372,6 +373,55 @@ async function extractIntentFromFile(
     extracted: retryParsed.data,
     response: retryResponse,
   };
+}
+
+// Phase ε H3: dispatch wrapper with bounded retry on transient
+// errors. The pilot (qwen2.5-coder:7b, 124 files, 2h21m) emitted 2
+// dispatch_failed entries — both consistent with brief network blips
+// against the local Ollama, not deterministic adapter / model
+// errors. A retry with short backoff (1s, 4s) recovers those cases
+// without lengthening the happy path (no sleep on the first attempt)
+// and without masking truly deterministic failures (the final error
+// is surfaced verbatim if every attempt fails).
+//
+// Retry policy is deliberately uniform across error classes: we
+// don't introspect the error message to decide retry-vs-fail. Cost
+// of an unnecessary retry on a deterministic error is ~5s extra
+// before the same final error appears; cost of NOT retrying on a
+// transient is the entire ingest attempt failing for one file. The
+// 2h21m pilot shows the transient cost is the relevant one.
+export const RETRY_BACKOFF_MS: readonly number[] = [0, 1000, 4000];
+
+// Injectable dispatcher signature — exported so tests can stub the
+// underlying call without mocking the whole dispatcher module.
+export type DispatchFn = (
+  request: Parameters<typeof dispatchLlmRequest>[0],
+  config: Parameters<typeof dispatchLlmRequest>[1],
+) => Promise<LlmResponse>;
+
+export async function dispatchWithRetry(
+  request: Parameters<typeof dispatchLlmRequest>[0],
+  config: Parameters<typeof dispatchLlmRequest>[1],
+  // Hooks for tests: a custom dispatcher (default: the real one) and
+  // a sleep function (default: setTimeout). Production callers ignore
+  // both; the unit test injects a counting stub + an instant sleep.
+  dispatcher: DispatchFn = dispatchLlmRequest,
+  sleep: (ms: number) => Promise<void> = (ms) =>
+    new Promise((resolve) => setTimeout(resolve, ms)),
+): Promise<LlmResponse> {
+  let lastError: unknown;
+  for (let i = 0; i < RETRY_BACKOFF_MS.length; i++) {
+    const wait = RETRY_BACKOFF_MS[i];
+    if (wait > 0) {
+      await sleep(wait);
+    }
+    try {
+      return await dispatcher(request, config);
+    } catch (err: unknown) {
+      lastError = err;
+    }
+  }
+  throw lastError;
 }
 
 // Phase ε H2: compute the input/output budget for an extraction
