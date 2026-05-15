@@ -1,0 +1,13 @@
+model,repeat,files,ok,failed,total_tokens,wallclock_s,report_path
+qwen2.5-coder:3b,1,20,19,1,45028,363,results/INGEST_qwen2.5-coder_3b_1.md
+qwen2.5-coder:3b,2,20,19,1,45360,382,results/INGEST_qwen2.5-coder_3b_2.md
+qwen2.5-coder:3b,3,20,19,1,45138,403,results/INGEST_qwen2.5-coder_3b_3.md
+llama3.2:3b,1,20,18,2,40733,383,results/INGEST_llama3.2_3b_1.md
+llama3.2:3b,2,20,19,1,44639,518,results/INGEST_llama3.2_3b_2.md
+llama3.2:3b,3,20,19,1,42495,488,results/INGEST_llama3.2_3b_3.md
+phi3:mini,1,20,12,8,28689,978,results/INGEST_phi3_mini_1.md
+phi3:mini,2,20,10,10,30074,1049,results/INGEST_phi3_mini_2.md
+phi3:mini,3,20,16,4,49531,1203,results/INGEST_phi3_mini_3.md
+deepseek-r1:1.5b,1,20,5,15,12286,1483,results/INGEST_deepseek-r1_1.5b_1.md
+deepseek-r1:1.5b,2,20,5,15,14362,824,results/INGEST_deepseek-r1_1.5b_2.md
+deepseek-r1:1.5b,3,20,5,15,13404,770,results/INGEST_deepseek-r1_1.5b_3.md
