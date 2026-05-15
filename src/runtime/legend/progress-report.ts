@@ -3,6 +3,11 @@ import * as path from "node:path";
 import { randomBytes } from "node:crypto";
 import { tagFileFromDisk } from "./frontier-tagger.js";
 import { barChart, histogram, sparkline } from "./render-ascii.js";
+import type {
+  SemanticRole,
+  StructuralClassification,
+  StructuralShape,
+} from "./structural-classifier.js";
 
 // Per-ingest / per-compile progress reports — Phase ε prework I.
 //
@@ -76,6 +81,10 @@ export interface IngestFileSummary {
   /** Phase ε E6 step 4: ensemble metadata when the file went through
    * the high-confidence ensemble path. Absent for default single-run. */
   ensemble?: IngestFileEnsembleMetadata;
+  /** Structural classifier facts when --static-classifier=report-only
+   * was set on the ingest invocation. Absent for default behaviour.
+   * Pure observation — does not affect dispatch or execution. */
+  classification?: StructuralClassification;
 }
 
 // Mirror of EnsembleMetadata from src/runtime/llm/ensemble.ts. Kept
@@ -357,6 +366,122 @@ export function renderIngestReport(data: IngestReportData): string {
     lines.push(``);
   }
 
+  // Structural classification section (report-only consumer of the
+  // Structural Semantic Classifier). Only renders when at least one
+  // file carries classification facts. Pure observation — no claim
+  // about what ingest did or did not do with these facts (it did
+  // nothing: report-only means execute as before, just observe).
+  const filesWithClass = data.files.filter(
+    (f) => f.classification !== undefined,
+  );
+  if (filesWithClass.length > 0) {
+    lines.push(`## Structural classification`);
+    lines.push(``);
+    lines.push(`Static classifier mode: \`report-only\``);
+    lines.push(``);
+
+    // Shape counts.
+    const shapeOrder: StructuralShape[] = [
+      "barrel",
+      "declaration_only",
+      "executable_module",
+      "component_module",
+      "test_module",
+      "configuration_module",
+      "schema_module",
+      "adapter_module",
+      "cli_module",
+      "mixed_module",
+      "unknown",
+    ];
+    const shapeCounts = new Map<StructuralShape, number>();
+    for (const s of shapeOrder) shapeCounts.set(s, 0);
+    for (const f of filesWithClass) {
+      const k = f.classification!.structuralShape;
+      shapeCounts.set(k, (shapeCounts.get(k) ?? 0) + 1);
+    }
+    lines.push(`### Structural shapes`);
+    lines.push(``);
+    lines.push(`| Structural shape | Count |`);
+    lines.push(`|---|---:|`);
+    for (const s of shapeOrder) {
+      lines.push(`| ${s} | ${shapeCounts.get(s) ?? 0} |`);
+    }
+    lines.push(``);
+
+    // Role counts.
+    const roleOrder: SemanticRole[] = [
+      "domain_model",
+      "runtime_policy",
+      "llm_adapter",
+      "command_surface",
+      "validation_schema",
+      "ui_surface",
+      "test_specification",
+      "configuration",
+      "module_boundary",
+      "utility",
+      "unknown",
+    ];
+    const roleCounts = new Map<SemanticRole, number>();
+    for (const r of roleOrder) roleCounts.set(r, 0);
+    for (const f of filesWithClass) {
+      const k = f.classification!.semanticRole;
+      roleCounts.set(k, (roleCounts.get(k) ?? 0) + 1);
+    }
+    lines.push(`### Semantic roles`);
+    lines.push(``);
+    lines.push(`| Semantic role | Count |`);
+    lines.push(`|---|---:|`);
+    for (const r of roleOrder) {
+      lines.push(`| ${r} | ${roleCounts.get(r) ?? 0} |`);
+    }
+    lines.push(``);
+
+    // Notable classifications: include files whose structuralShape
+    // is NOT the common run-of-the-mill (executable_module /
+    // test_module / configuration_module fill the bulk and would
+    // drown the signal). Cap at 15 rows. Within the selection,
+    // order by confidence desc, then path asc — keeps the table
+    // deterministic across runs.
+    const COMMON_SHAPES = new Set<StructuralShape>([
+      "executable_module",
+      "test_module",
+      "configuration_module",
+    ]);
+    const notable = filesWithClass
+      .filter((f) => !COMMON_SHAPES.has(f.classification!.structuralShape))
+      .sort((a, b) => {
+        const dc = b.classification!.confidence - a.classification!.confidence;
+        if (dc !== 0) return dc;
+        return a.filePath.localeCompare(b.filePath);
+      })
+      .slice(0, 15);
+    if (notable.length > 0) {
+      lines.push(`### Notable classifications`);
+      lines.push(``);
+      lines.push(`| Path | Shape | Role | Confidence | Reason |`);
+      lines.push(`|---|---|---|---:|---|`);
+      for (const f of notable) {
+        const c = f.classification!;
+        const rel = relativiseOrAbsolute(f.filePath, data.rootDir);
+        const reason = c.reasons[0] ?? "—";
+        lines.push(
+          `| \`${rel}\` | ${c.structuralShape} | ${c.semanticRole} | ${c.confidence.toFixed(2)} | ${reason} |`,
+        );
+      }
+      lines.push(``);
+    }
+
+    lines.push(
+      "*This section observes the forest. It does not prune it. " +
+        "`report-only` does not change which files are dispatched to the LLM, " +
+        "the routed model, or the ensemble strategy. Future modes may consume " +
+        "these facts as ingest policy.*",
+    );
+    lines.push(``);
+  }
+
   // Per-file table (concise). Source file path relative to rootDir
   // when possible — keeps the table narrow. Adds attempts + wall-clock
   // columns when telemetry is present.
@@ -503,11 +628,48 @@ export function renderCompileReport(data: CompileReportData): string {
 // Compute a path relative to `rootDir` when `p` is under it; otherwise
 // fall back to the absolute path. Keeps the report tables narrow when
 // every file is under the same root.
+//
+// Handles the macOS /var ↔ /private/var symlink quirk: ingest's file
+// walker calls fs.realpathSync on each input (so the file paths
+// arrive canonicalised under /private/var/...), while rootDir is
+// process.cwd() which sometimes is the non-canonical form
+// (/var/...). Falling back through realpath on rootDir gets both
+// sides into the same canonical form before comparing.
 function relativiseOrAbsolute(p: string, rootDir: string): string {
   const abs = path.resolve(p);
-  const root = path.resolve(rootDir);
-  if (abs.startsWith(root + path.sep) || abs === root) {
-    return path.relative(root, abs);
+  const directRoot = path.resolve(rootDir);
+
+  // Canonicalise both sides if reachable; macOS adds /private/var
+  // for /var/folders/... and Node may return either form depending on
+  // chdir timing. Without normalising both we lose relativisation on
+  // realistic tmp-dir paths.
+  const safeReal = (s: string): string => {
+    try {
+      return fs.realpathSync(s);
+    } catch {
+      return s;
+    }
+  };
+  const absCanon = safeReal(abs);
+  const rootCanon = safeReal(directRoot);
+
+  const tryRel = (a: string, r: string): string | undefined => {
+    if (a === r) return "";
+    if (a.startsWith(r + path.sep)) return path.relative(r, a);
+    return undefined;
+  };
+
+  // Try every combination (direct/direct, direct/canon, canon/direct,
+  // canon/canon) — whichever matches first wins.
+  const candidates: Array<[string, string]> = [
+    [abs, directRoot],
+    [abs, rootCanon],
+    [absCanon, directRoot],
+    [absCanon, rootCanon],
+  ];
+  for (const [a, r] of candidates) {
+    const rel = tryRel(a, r);
+    if (rel !== undefined) return rel;
   }
   return abs;
 }

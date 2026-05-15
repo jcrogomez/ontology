@@ -24,18 +24,21 @@ ONTO="npx tsx ${REPO_ROOT}/src/cli.ts"
 
 # ── Configuration ──────────────────────────────────────────────────────────
 
-# Four diverse model families, all ~7-8B params. Order matters: each
-# model's two repeats run consecutively so Ollama keeps the model
-# loaded — only one warmup per model instead of one per (model,
-# repeat) tuple. Saves ~30-60s × 4 warmups.
+# Four diverse small model families (~1.5-3.8B params). Sized for
+# the actual M1 VRAM ceiling (5.3 GiB unified, ~3 GiB headroom after
+# a 4-bit 3B model loads). The thesis frames "what can small local
+# models extract reliably?" — running 8B+ on this hardware burns
+# wall-clock to swap-paging without producing better intent.
+# Order matters: each model's repeats run consecutively so Ollama
+# keeps the model loaded — saves warmup × N(repeats) per swap.
 MODELS=(
-  "qwen2.5-coder:7b"    # code-specialized
-  "llama3.1:8b"         # generalist
-  "hermes3:8b"          # instruction-tuned
-  "deepseek-r1:8b"      # reasoning-tuned
+  "qwen2.5-coder:3b"    # code-specialized
+  "llama3.2:3b"         # generalist
+  "phi3:mini"           # Microsoft instruction-tuned (~3.8B)
+  "deepseek-r1:1.5b"    # reasoning-tuned (smallest in family)
 )
 
-REPEATS=2
+REPEATS=3
 
 # Curated 20 files spanning hypothesis §4 (faithful predictions)
 # + §5 (resistant predictions) + edge cases. Annotated with the
@@ -104,6 +107,21 @@ SUMMARY_CSV="$BAKEOFF_ROOT/results/summary.csv"
 echo "model,repeat,files,ok,failed,total_tokens,wallclock_s,report_path" > "$SUMMARY_CSV"
 
 for model in "${MODELS[@]}"; do
+  # Pre-flight: confirm VRAM is empty before starting this model's
+  # repeats. If any prior model is still loaded, stop it. Without
+  # this, Ollama may try to coexist two models in the unified 5.3GiB
+  # VRAM and one of them gets paged to swap silently — kills wall-clock.
+  echo "  ── pre-flight: VRAM state before $model ──"
+  loaded=$(curl -s http://localhost:11434/api/ps 2>/dev/null | python3 -c "import sys,json; d=json.loads(sys.stdin.read()); print(' '.join(m['name'] for m in d.get('models',[])))" 2>/dev/null || true)
+  if [[ -n "$loaded" ]]; then
+    for m in $loaded; do
+      echo "    stopping leftover: $m"
+      ollama stop "$m" 2>&1 | tail -1 || true
+    done
+  else
+    echo "    VRAM clean"
+  fi
+
   for repeat in $(seq 1 $REPEATS); do
     ROW_COUNT=$((ROW_COUNT + 1))
     slug="$(echo "$model" | tr ':/' '_')_${repeat}"
@@ -138,17 +156,33 @@ for model in "${MODELS[@]}"; do
       report_path="(no report — ingest failed before writer)"
     fi
 
-    # Pull the aggregate numbers out of the stdout log.
-    ok=$(grep -c '^ ✓' "$log_out" 2>/dev/null || echo 0)
-    failed=$(grep -c '^ ✖' "$log_out" 2>/dev/null || echo 0)
+    # Pull the aggregate numbers out of the stdout log. grep -c
+    # returns exit 1 on zero matches WHILE still writing "0" to
+    # stdout, which under `|| echo 0` concatenates as "0\n0" and
+    # breaks the `$(( ))` arithmetic. The `; true` pattern is the
+    # portable fix: keep the "0" stdout, swallow the exit code.
+    ok=$(grep -c '^ ✓' "$log_out" 2>/dev/null; true)
+    failed=$(grep -c '^ ✖' "$log_out" 2>/dev/null; true)
+    ok="${ok:-0}"
+    failed="${failed:-0}"
     files=$(( ok + failed ))
-    tokens=$(grep -oE 'Tokens used:[[:space:]]+[0-9]+' "$log_out" | grep -oE '[0-9]+' | head -1 || true)
+    tokens=$(grep -oE 'Tokens used:[[:space:]]+[0-9]+' "$log_out" 2>/dev/null | grep -oE '[0-9]+' | head -1; true)
     tokens="${tokens:-0}"
 
     echo "  ok=$ok failed=$failed tokens=$tokens wall=${wall}s"
     echo "$model,$repeat,$files,$ok,$failed,$tokens,$wall,$report_path" >> "$SUMMARY_CSV"
     echo ""
   done
+
+  # Done with this model's repeats — unload it explicitly so the next
+  # model has a fresh VRAM budget. Without this, the next model has to
+  # evict the prior (which Ollama would do anyway via
+  # OLLAMA_MAX_LOADED_MODELS=1 default) but the unload happens lazily
+  # on the next request, sometimes producing a slow first-file on the
+  # next run while the prior model is being paged out.
+  echo "  ── post-flight: stopping $model to free VRAM ──"
+  ollama stop "$model" 2>&1 | tail -1 || true
+  sleep 1
 done
 
 END=$(date +%s)
