@@ -832,6 +832,7 @@ program
   .option("--dry-run", "Dispatch + parse + print the extraction, but do NOT create a proposal. Use to iterate the extraction template without piling up rejected proposals.")
   .option("--cost-estimate", "Pre-flight cost guard: walk the inputs, count file sizes, multiply by published rates for the resolved provider, print the breakdown (per-input when multiple paths), and exit WITHOUT dispatching the LLM. Run this before any anthropic ingest on a large tree to confirm the cost. Unlike --dry-run, --cost-estimate makes ZERO API calls.")
   .option("--include <exts>", "Directory mode only: comma-separated file extensions to ingest (default: ts,tsx). Use --include py for a Python project, --include py,ts,tsx for a mixed repo. Has no effect on a single explicit file path. Static-edge inference (γ-4) stays TS-only — non-TS ingests skip the cross-file edge report.")
+  .option("--ensemble <mode>", "Phase ε E6 step 4: structured-extraction ensemble strategy. \"none\" (default) — single-run via the resolved model. \"high-confidence\" — run llama3.2:3b three times and select the most complete valid extraction. Use when 100% coverage on the perimeter matters more than per-file wall-clock. Currently honoured for semantic_parse (ingest extraction) only; other LlmTasks ignore the flag. Calibration: BAKEOFF_3B_FAMILY_2026-05-15.md §2.2.")
   .option("--json", "Output results in JSON format.")
   .action(async (paths: string[], options) => {
     try {

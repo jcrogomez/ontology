@@ -73,6 +73,21 @@ export interface IngestFileSummary {
   reason?: string;
   /** Phase ε E1 telemetry: dispatch counts, retry flags, budget actually used, wall-clock. */
   telemetry?: IngestFileTelemetry;
+  /** Phase ε E6 step 4: ensemble metadata when the file went through
+   * the high-confidence ensemble path. Absent for default single-run. */
+  ensemble?: IngestFileEnsembleMetadata;
+}
+
+// Mirror of EnsembleMetadata from src/runtime/llm/ensemble.ts. Kept
+// duplicated here so the progress-report module stays free of imports
+// from the command layer.
+export interface IngestFileEnsembleMetadata {
+  mode: "high-confidence";
+  model: string;
+  repetitions: number;
+  validCount: number;
+  failedCount: number;
+  selectedAttempt?: number;
 }
 
 // Mirror of ExtractTelemetry in commands/ingest/index.ts — kept
@@ -299,6 +314,47 @@ export function renderIngestReport(data: IngestReportData): string {
       }
       lines.push(``);
     }
+  }
+
+  // Ensemble usage section (Phase ε E6 step 4). Only renders when at
+  // least one file went through an ensemble path — the default
+  // single-run shape stays unchanged.
+  const filesWithEnsemble = data.files.filter((f) => f.ensemble !== undefined);
+  if (filesWithEnsemble.length > 0) {
+    lines.push(`## High-confidence ensemble`);
+    lines.push(``);
+    const totalReps = filesWithEnsemble.reduce(
+      (s, f) => s + (f.ensemble?.repetitions ?? 0),
+      0,
+    );
+    const totalValid = filesWithEnsemble.reduce(
+      (s, f) => s + (f.ensemble?.validCount ?? 0),
+      0,
+    );
+    const totalFailed = filesWithEnsemble.reduce(
+      (s, f) => s + (f.ensemble?.failedCount ?? 0),
+      0,
+    );
+    const filesAllValid = filesWithEnsemble.filter(
+      (f) => f.ensemble && f.ensemble.validCount === f.ensemble.repetitions,
+    ).length;
+    const filesNoneValid = filesWithEnsemble.filter(
+      (f) => f.ensemble && f.ensemble.validCount === 0,
+    ).length;
+    // Model and mode are uniform across reps by construction —
+    // sample from the first file.
+    const sample = filesWithEnsemble[0].ensemble!;
+    lines.push(`| Metric | Value |`);
+    lines.push(`|---|---:|`);
+    lines.push(`| Mode | \`${sample.mode}\` |`);
+    lines.push(`| Model | \`${sample.model}\` |`);
+    lines.push(`| Files via ensemble | ${filesWithEnsemble.length} |`);
+    lines.push(`| Total repetitions executed | ${totalReps} |`);
+    lines.push(`| Repetitions that produced valid extractions | ${totalValid} |`);
+    lines.push(`| Repetitions that failed | ${totalFailed} |`);
+    lines.push(`| Files where every rep validated | ${filesAllValid} |`);
+    lines.push(`| Files where every rep failed (ensemble_failed) | ${filesNoneValid} |`);
+    lines.push(``);
   }
 
   // Per-file table (concise). Source file path relative to rootDir

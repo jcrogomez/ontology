@@ -24,6 +24,14 @@ import {
   writeProgressReport,
   type IngestFileSummary,
 } from "../../runtime/legend/progress-report.js";
+import {
+  HIGH_CONFIDENCE_MODEL,
+  HIGH_CONFIDENCE_REPS,
+  selectBestByScore,
+  type EnsembleMetadata,
+  type EnsembleMode,
+  type EnsembleRunOutcome,
+} from "../../runtime/llm/ensemble.js";
 
 // `onto ingest <paths...>` — Project Legend Phase γ-1 + γ-5 + Phase ε prework A.
 //
@@ -82,6 +90,27 @@ const ExtractionResultSchema = z.object({
 
 type ExtractionResult = z.infer<typeof ExtractionResultSchema>;
 
+// Phase ε E6 step 4 — score an ExtractionResult by how many optional
+// structured fields it populates. Required fields (label / level /
+// kind / prompt) are guaranteed by Zod validation in any valid
+// candidate, so they don't differentiate. Optional fields that the
+// extractor MAY emit when the file warrants them are the score's
+// signal: a richer set of provides / requires / forbids / rules
+// suggests the model engaged with the file's intent rather than
+// producing a minimal stub.
+//
+// Pure function — exported for unit testing.
+export function scoreExtractionCompleteness(e: ExtractionResult): number {
+  let score = 0;
+  if (e.manifestation !== undefined) score += 1;
+  if (e.language !== undefined && e.language.length > 0) score += 1;
+  if (e.requires && e.requires.length > 0) score += 1;
+  if (e.provides && e.provides.length > 0) score += 1;
+  if (e.forbids && e.forbids.length > 0) score += 1;
+  if (e.rules && e.rules.length > 0) score += 1;
+  return score;
+}
+
 export interface IngestCommandOptions {
   // LLM provider. Defaults to "anthropic" — γ-0's frontier route.
   // mock = identity functor (file content becomes the proposal's
@@ -114,6 +143,14 @@ export interface IngestCommandOptions {
   // never dispatches and never reads file *contents* (only sizes),
   // so it is safe to run against arbitrary trees.
   costEstimate?: boolean;
+  // Phase ε E6 step 4 — high-confidence ensemble mode. When set to
+  // "high-confidence", each file's structured extraction runs three
+  // times against the calibrated stochastic-complementary model
+  // (llama3.2:3b) and the best valid result is selected. Default
+  // "none" preserves the existing single-run behaviour exactly.
+  // Currently honoured only for semantic_parse (ingest extraction);
+  // other LlmTasks ignore the flag.
+  ensemble?: EnsembleMode;
 }
 
 // The extraction system prompt. The Anthropic adapter tags this block
@@ -212,6 +249,9 @@ type ExtractResult =
       extracted: ExtractionResult;
       response: LlmResponse;
       telemetry: ExtractTelemetry;
+      /** Set when the extraction went through the high-confidence
+       * ensemble path. Absent (undefined) for single-run extractions. */
+      ensemble?: EnsembleMetadata;
     }
   | {
       ok: false;
@@ -222,9 +262,11 @@ type ExtractResult =
         | "empty_file"
         | "dispatch_failed"
         | "invalid_json"
-        | "schema_failed";
+        | "schema_failed"
+        | "ensemble_failed";
       message: string;
       telemetry: ExtractTelemetry;
+      ensemble?: EnsembleMetadata;
     };
 
 // Classify a Zod error message into one of the firstFailureKind
@@ -603,6 +645,167 @@ function buildRetryPrompt(
   ].join("\n");
 }
 
+// ── Phase ε E6 step 4 — high-confidence ensemble runner ────────────────────
+//
+// Runs `extractIntentFromFile` three times against the calibrated
+// stochastic-complementary model (llama3.2:3b — see ensemble.ts
+// constants + BAKEOFF_3B_FAMILY_2026-05-15.md §2.2). Each rep is an
+// independent dispatch with its own H1 schema-retry and H3 backoff;
+// the ensemble is a SECOND layer of resilience that complements the
+// per-rep retries, exploiting the bake-off finding that
+// llama3.2:3b's failures rotate across files between repetitions.
+//
+// Returns a single ExtractResult. When at least one rep produced a
+// valid extraction, the one with the most populated optional fields
+// wins (deterministic tie-break on earliest). When every rep failed,
+// the result carries reason "ensemble_failed" with a message that
+// summarises each rep's failure reason.
+
+async function extractIntentEnsemble(
+  inputs: ExtractInputs,
+): Promise<ExtractResult> {
+  const reps: EnsembleRunOutcome<{
+    extracted: ExtractionResult;
+    response: LlmResponse;
+    cwdRelative: string;
+  }>[] = [];
+  const innerTelemetries: ExtractTelemetry[] = [];
+  let lastFatalFailure: ExtractResult | undefined;
+
+  for (let i = 1; i <= HIGH_CONFIDENCE_REPS; i++) {
+    const t0 = performance.now();
+    const result = await extractIntentFromFile({
+      ...inputs,
+      model: HIGH_CONFIDENCE_MODEL,
+    });
+    const wall = performance.now() - t0;
+    innerTelemetries.push(result.telemetry);
+
+    if (!result.ok) {
+      // Structural failures (file disappeared, became binary, was
+      // emptied) won't get better with repetition — short-circuit
+      // and surface the original error. The ensemble metadata
+      // records how many reps actually ran before bailing.
+      if (
+        result.reason === "read_failed" ||
+        result.reason === "binary_content" ||
+        result.reason === "empty_file"
+      ) {
+        lastFatalFailure = result;
+        break;
+      }
+      reps.push({
+        attempt: i,
+        ok: false,
+        failureReason: `${result.reason}: ${result.message.slice(0, 200)}`,
+        wallClockMs: wall,
+      });
+      continue;
+    }
+
+    reps.push({
+      attempt: i,
+      ok: true,
+      value: {
+        extracted: result.extracted,
+        response: result.response,
+        cwdRelative: result.cwdRelative,
+      },
+      wallClockMs: wall,
+    });
+  }
+
+  // Aggregate inner telemetries into a single record for the per-file
+  // summary. Sums for additive counters, OR for the booleans, first
+  // non-empty for categoricals — keeps the report's mean / sparkline
+  // semantics intact even when each file was actually 3 dispatches.
+  const aggregatedTelemetry: ExtractTelemetry = {
+    dispatchAttempts: innerTelemetries.reduce(
+      (s, t) => s + t.dispatchAttempts,
+      0,
+    ),
+    schemaRetried: innerTelemetries.some((t) => t.schemaRetried),
+    contextWindowRequested: innerTelemetries[0]?.contextWindowRequested,
+    maxTokensRequested: innerTelemetries[0]?.maxTokensRequested,
+    firstFailureKind: innerTelemetries.find((t) => t.firstFailureKind)
+      ?.firstFailureKind,
+    wallClockMs: innerTelemetries.reduce((s, t) => s + t.wallClockMs, 0),
+  };
+
+  // Short-circuit fatal failure — propagate the original reason +
+  // message but tag with ensemble metadata so the report still shows
+  // that the file went through the ensemble code path.
+  if (lastFatalFailure) {
+    return {
+      ...lastFatalFailure,
+      telemetry: aggregatedTelemetry,
+      ensemble: {
+        mode: "high-confidence",
+        model: HIGH_CONFIDENCE_MODEL,
+        repetitions: reps.length + 1, // includes the failing structural rep
+        validCount: 0,
+        failedCount: reps.length + 1,
+      },
+    };
+  }
+
+  const validRuns = reps.filter((r) => r.ok);
+  const failedRuns = reps.filter((r) => !r.ok);
+  const ensembleBase: EnsembleMetadata = {
+    mode: "high-confidence",
+    model: HIGH_CONFIDENCE_MODEL,
+    repetitions: HIGH_CONFIDENCE_REPS,
+    validCount: validRuns.length,
+    failedCount: failedRuns.length,
+  };
+
+  if (validRuns.length === 0) {
+    const perRunSummary = failedRuns
+      .map((r) => `[#${r.attempt}] ${r.failureReason ?? "unknown"}`)
+      .join("; ");
+    return {
+      ok: false,
+      filePath: inputs.filePath,
+      reason: "ensemble_failed",
+      message: `All ${HIGH_CONFIDENCE_REPS} high-confidence ensemble attempts on ${HIGH_CONFIDENCE_MODEL} failed. ${perRunSummary}`,
+      telemetry: aggregatedTelemetry,
+      ensemble: ensembleBase,
+    };
+  }
+
+  // Pick the highest-scoring valid extraction. Ties go to the
+  // earliest attempt (deterministic — selectBestByScore preserves
+  // insertion order on ties).
+  const validValues = validRuns.map((r) => r.value!.extracted);
+  const bestIdx = selectBestByScore(validValues, scoreExtractionCompleteness);
+  // bestIdx is defined here because validRuns is non-empty.
+  const winner = validRuns[bestIdx!];
+
+  return {
+    ok: true,
+    filePath: inputs.filePath,
+    cwdRelative: winner.value!.cwdRelative,
+    extracted: winner.value!.extracted,
+    response: winner.value!.response,
+    telemetry: aggregatedTelemetry,
+    ensemble: { ...ensembleBase, selectedAttempt: winner.attempt },
+  };
+}
+
+// Single-dispatch entry point: routes between the default single-run
+// path and the high-confidence ensemble path based on the option.
+// All three ingest flows (single-file, directory, multi-input) go
+// through this selector so the flag honours its contract uniformly.
+async function extractWithStrategy(
+  inputs: ExtractInputs,
+  ensemble: EnsembleMode | undefined,
+): Promise<ExtractResult> {
+  if (ensemble === "high-confidence") {
+    return extractIntentEnsemble(inputs);
+  }
+  return extractIntentFromFile(inputs);
+}
+
 // ── Top-level command: route file vs directory ──────────────────────────────
 
 export async function ingestCommand(
@@ -629,6 +832,21 @@ export async function ingestCommand(
 
   const provider = resolveProvider(options);
   if (provider === undefined) return; // resolveProvider already failed.
+
+  // Validate --ensemble. Acceptable values: "none" (default,
+  // single-run) or "high-confidence" (3× llama3.2:3b, pick best
+  // valid). Anything else fails fast — operators expect typos to
+  // not silently produce single-run behaviour.
+  const ensembleMode: EnsembleMode = (() => {
+    const raw = options.ensemble;
+    if (raw === undefined || raw === "none") return "none";
+    if (raw === "high-confidence") return "high-confidence";
+    failWith(
+      `Unsupported --ensemble value: "${String(raw)}" (try "none" or "high-confidence")`,
+      options.json,
+    );
+    return "none"; // unreachable — failWith exits 1
+  })();
 
   // ── Single-input branch (backward compat: 1 positional, file OR dir) ──
   if (inputs.length === 1) {
@@ -692,6 +910,7 @@ export async function ingestCommand(
         parentHash: parentNode.integrity.hash,
         dryRun: !!options.dryRun,
         json: !!options.json,
+        ensemble: ensembleMode,
         extensions,
       });
       return;
@@ -705,6 +924,7 @@ export async function ingestCommand(
       parentHash: parentNode.integrity.hash,
       dryRun: !!options.dryRun,
       json: !!options.json,
+      ensemble: ensembleMode,
     });
     return;
   }
@@ -785,6 +1005,7 @@ export async function ingestCommand(
     parentHash: parentNode.integrity.hash,
     dryRun: !!options.dryRun,
     json: !!options.json,
+    ensemble: ensembleMode,
     extensions,
   });
 }
@@ -815,18 +1036,22 @@ interface SingleFileOptions {
   parentHash: string;
   dryRun: boolean;
   json: boolean;
+  ensemble: EnsembleMode;
 }
 
 async function runSingleFileIngest(
   filePath: string,
   opts: SingleFileOptions,
 ): Promise<void> {
-  const result = await extractIntentFromFile({
-    filePath,
-    provider: opts.provider,
-    model: opts.model,
-    ollamaHost: opts.ollamaHost,
-  });
+  const result = await extractWithStrategy(
+    {
+      filePath,
+      provider: opts.provider,
+      model: opts.model,
+      ollamaHost: opts.ollamaHost,
+    },
+    opts.ensemble,
+  );
   if (!result.ok) {
     failWith(result.message, opts.json);
     return;
@@ -917,6 +1142,8 @@ async function runSingleFileIngest(
         filePath: result.cwdRelative || filePath,
         ok: true,
         tokensUsed: result.response.usage?.totalTokens,
+        telemetry: result.telemetry,
+        ensemble: result.ensemble,
       },
     ],
     proposalsCreated: 1,
@@ -934,6 +1161,7 @@ interface DirectoryOptions {
   parentHash: string;
   dryRun: boolean;
   json: boolean;
+  ensemble: EnsembleMode;
   // File extensions to include in the walk. Comes from --include
   // (parsed by parseIncludeFlag). Always non-empty when this struct
   // is constructed.
@@ -950,6 +1178,7 @@ interface PerFileSummary {
   proposalId?: string;
   tokensUsed?: number;
   telemetry?: ExtractTelemetry;
+  ensemble?: EnsembleMetadata;
 }
 
 async function runDirectoryIngest(
@@ -998,12 +1227,15 @@ async function runDirectoryIngest(
   // also keeps the audit log ordering deterministic.
   for (const filePath of files) {
     const cwdRelative = computeCwdRelative(filePath);
-    const extract = await extractIntentFromFile({
-      filePath,
-      provider: opts.provider,
-      model: opts.model,
-      ollamaHost: opts.ollamaHost,
-    });
+    const extract = await extractWithStrategy(
+      {
+        filePath,
+        provider: opts.provider,
+        model: opts.model,
+        ollamaHost: opts.ollamaHost,
+      },
+      opts.ensemble,
+    );
     if (!extract.ok) {
       results.push({
         filePath,
@@ -1012,6 +1244,7 @@ async function runDirectoryIngest(
         reason: extract.reason,
         message: extract.message,
         telemetry: extract.telemetry,
+        ensemble: extract.ensemble,
       });
       continue;
     }
@@ -1027,6 +1260,7 @@ async function runDirectoryIngest(
         extracted: extract.extracted,
         tokensUsed,
         telemetry: extract.telemetry,
+        ensemble: extract.ensemble,
       });
       continue;
     }
@@ -1046,6 +1280,7 @@ async function runDirectoryIngest(
         reason: "proposal_create_failed",
         message: created.message,
         telemetry: extract.telemetry,
+        ensemble: extract.ensemble,
       });
       continue;
     }
@@ -1057,6 +1292,7 @@ async function runDirectoryIngest(
       proposalId: created.proposalId,
       tokensUsed,
       telemetry: extract.telemetry,
+      ensemble: extract.ensemble,
     });
   }
 
@@ -1163,6 +1399,7 @@ async function runDirectoryIngest(
       tokensUsed: r.tokensUsed,
       reason: r.reason,
       telemetry: r.telemetry,
+      ensemble: r.ensemble,
     })),
     proposalsCreated: results.filter((r) => r.ok && r.proposalId !== undefined).length,
     totalTokens,
@@ -1251,12 +1488,15 @@ async function runMultiInputIngest(
 
   for (const filePath of files) {
     const cwdRelative = computeCwdRelative(filePath);
-    const extract = await extractIntentFromFile({
-      filePath,
-      provider: opts.provider,
-      model: opts.model,
-      ollamaHost: opts.ollamaHost,
-    });
+    const extract = await extractWithStrategy(
+      {
+        filePath,
+        provider: opts.provider,
+        model: opts.model,
+        ollamaHost: opts.ollamaHost,
+      },
+      opts.ensemble,
+    );
     if (!extract.ok) {
       results.push({
         filePath,
@@ -1265,6 +1505,7 @@ async function runMultiInputIngest(
         reason: extract.reason,
         message: extract.message,
         telemetry: extract.telemetry,
+        ensemble: extract.ensemble,
       });
       continue;
     }
@@ -1280,6 +1521,7 @@ async function runMultiInputIngest(
         extracted: extract.extracted,
         tokensUsed,
         telemetry: extract.telemetry,
+        ensemble: extract.ensemble,
       });
       continue;
     }
@@ -1299,6 +1541,7 @@ async function runMultiInputIngest(
         reason: "proposal_create_failed",
         message: created.message,
         telemetry: extract.telemetry,
+        ensemble: extract.ensemble,
       });
       continue;
     }
@@ -1310,6 +1553,7 @@ async function runMultiInputIngest(
       proposalId: created.proposalId,
       tokensUsed,
       telemetry: extract.telemetry,
+      ensemble: extract.ensemble,
     });
   }
 
@@ -1427,6 +1671,7 @@ async function runMultiInputIngest(
       tokensUsed: r.tokensUsed,
       reason: r.reason,
       telemetry: r.telemetry,
+      ensemble: r.ensemble,
     })),
     proposalsCreated: results.filter((r) => r.ok && r.proposalId !== undefined).length,
     totalTokens,
