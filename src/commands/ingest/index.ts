@@ -284,23 +284,111 @@ async function extractIntentFromFile(
     };
   }
   const parsed = ExtractionResultSchema.safeParse(candidate);
-  if (!parsed.success) {
+  if (parsed.success) {
+    return {
+      ok: true,
+      filePath,
+      cwdRelative,
+      extracted: parsed.data,
+      response,
+    };
+  }
+
+  // Phase ε hardening H1: retry-once with the Zod failure as feedback.
+  // The pilot (qwen2.5-coder:7b) emitted 19/124 schema_failed,
+  // concentrated on types.ts / index.ts barrels / schemas.ts where the
+  // model improvises `kind: "meta" | "type" | "module"` outside the
+  // canon enum. The system prompt already lists the enum verbatim; the
+  // model just doesn't honour it on the first pass at 7b tier. A
+  // single retry with the specific Zod errors as feedback recovers
+  // most of them, idempotent (read-only on disk).
+  const firstFailureMessage = formatZodIssues(parsed.error.issues);
+  const retryPrompt = buildRetryPrompt(userPrompt, firstFailureMessage);
+  let retryResponse: LlmResponse;
+  try {
+    retryResponse = await dispatchLlmRequest(
+      {
+        task: "semantic_parse",
+        prompt: retryPrompt,
+        system: EXTRACTION_SYSTEM_PROMPT,
+        json: true,
+      },
+      { provider, defaultModel: model, ollamaHost },
+    );
+  } catch (err: unknown) {
+    // Retry dispatch failed — surface the original schema error
+    // alongside the dispatch failure so the operator sees both.
     return {
       ok: false,
       filePath,
       reason: "schema_failed",
-      message: `Extraction JSON failed validation: ${parsed.error.issues
-        .map((i) => `${i.path.join(".")}: ${i.message}`)
-        .join("; ")}`,
+      message: `Extraction JSON failed validation (retry also failed: ${errorMessage(err)}): ${firstFailureMessage}`,
     };
   }
+  const retryCandidate =
+    retryResponse.json !== undefined
+      ? retryResponse.json
+      : tryParseJsonFromText(retryResponse.text);
+  if (retryCandidate === undefined) {
+    return {
+      ok: false,
+      filePath,
+      reason: "schema_failed",
+      message: `Extraction JSON failed validation (retry returned invalid JSON): ${firstFailureMessage}`,
+    };
+  }
+  const retryParsed = ExtractionResultSchema.safeParse(retryCandidate);
+  if (!retryParsed.success) {
+    const retryFailureMessage = formatZodIssues(retryParsed.error.issues);
+    return {
+      ok: false,
+      filePath,
+      reason: "schema_failed",
+      message: `Extraction JSON failed validation after retry. First: ${firstFailureMessage}. Retry: ${retryFailureMessage}`,
+    };
+  }
+  // Retry succeeded.
   return {
     ok: true,
     filePath,
     cwdRelative,
-    extracted: parsed.data,
-    response,
+    extracted: retryParsed.data,
+    response: retryResponse,
   };
+}
+
+// Format a Zod issue list into the same compact `path: message; path:
+// message` shape that the original error path emitted, so existing
+// log consumers (the per-file summary, the ingest report) see a
+// familiar string.
+function formatZodIssues(
+  issues: ReadonlyArray<{ path: ReadonlyArray<string | number>; message: string }>,
+): string {
+  return issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+}
+
+// Build the retry user prompt. Reuses the full first-attempt user
+// turn (so the file content stays in context) and appends a focused
+// feedback block listing the Zod errors plus the most common 7b
+// mistakes the pilot surfaced.
+function buildRetryPrompt(
+  firstAttemptPrompt: string,
+  firstFailureMessage: string,
+): string {
+  return [
+    firstAttemptPrompt,
+    ``,
+    `--- PREVIOUS ATTEMPT FAILED VALIDATION ---`,
+    `Errors from Zod:`,
+    firstFailureMessage,
+    ``,
+    `Common causes from the pilot data (qwen2.5-coder:7b):`,
+    `- "kind" MUST be exactly one of: canon, decision, rule, constraint, definition, entity, action, function, asset, view, component, token, artifact. For files that only declare TypeScript / Python types or interfaces, use "definition". For Zod schemas, use "constraint". For barrel / index re-export files, use "artifact". Never invent values like "meta", "type", "module", "schema", "interface".`,
+    `- "level" MUST be exactly one of: canon, project, target, stack, architecture, domain, workflow, interface, unit, token, artifact. For most concrete source files use "artifact" or "unit". The interface level is for INTERFACE specs (the architectural tier), not TypeScript interface declarations.`,
+    `- All of label, level, kind, prompt are REQUIRED. Empty or missing values fail the schema.`,
+    ``,
+    `Output ONLY the corrected JSON. No preamble, no markdown fence, no explanation.`,
+  ].join("\n");
 }
 
 // ── Top-level command: route file vs directory ──────────────────────────────
