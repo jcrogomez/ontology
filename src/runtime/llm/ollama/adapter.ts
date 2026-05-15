@@ -61,12 +61,25 @@ export function createOllamaAdapter(options?: {
       }
       messages.push({ role: "user", content: request.prompt });
 
+      // Phase ε H2: Ollama defaults to num_ctx=2048 (input) and a
+      // model-defined num_predict (often 128 for chat templates) —
+      // both silently truncate non-trivial source files and their
+      // extractions. When the caller computed an explicit budget,
+      // forward it; otherwise fall back to the model's own defaults
+      // so we don't regress mock-provider tests or interactive use.
+      const ollamaOptions: Record<string, unknown> = {
+        temperature: request.temperature,
+      };
+      if (request.contextWindow !== undefined) {
+        ollamaOptions.num_ctx = request.contextWindow;
+      }
+      if (request.maxTokens !== undefined) {
+        ollamaOptions.num_predict = request.maxTokens;
+      }
       const ollamaRequest = {
         model,
         messages,
-        options: {
-          temperature: request.temperature,
-        },
+        options: ollamaOptions,
         format: request.json ? "json" : undefined,
       };
 

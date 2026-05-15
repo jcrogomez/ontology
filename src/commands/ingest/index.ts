@@ -246,6 +246,17 @@ async function extractIntentFromFile(
     `Extract the structured intent for this file. Output JSON only.`,
   ].join("\n");
 
+  // Phase ε H2: adaptive input/output budget. Ollama defaults to
+  // num_ctx=2048 (input) — Pilot data showed source files >~6 KB
+  // silently truncating; the model returns garbled or empty JSON.
+  // The budget below covers system prompt + file body + retry
+  // feedback + output JSON with a small safety buffer. Anthropic
+  // ignores `contextWindow` (auto-managed).
+  const budget = computeAdaptiveBudget(
+    EXTRACTION_SYSTEM_PROMPT.length,
+    fileContent.length,
+  );
+
   // 3. Dispatch.
   let response: LlmResponse;
   try {
@@ -255,6 +266,8 @@ async function extractIntentFromFile(
         prompt: userPrompt,
         system: EXTRACTION_SYSTEM_PROMPT,
         json: true,
+        contextWindow: budget.contextWindow,
+        maxTokens: budget.maxTokens,
       },
       { provider, defaultModel: model, ollamaHost },
     );
@@ -294,7 +307,9 @@ async function extractIntentFromFile(
     };
   }
 
-  // Phase ε hardening H1: retry-once with the Zod failure as feedback.
+  // Phase ε hardening H1: retry-once with the Zod failure as feedback (no quotes).
+  // Same adaptive budget — the retry adds ~600 chars of feedback, well
+  // within the 512-token safety buffer.
   // The pilot (qwen2.5-coder:7b) emitted 19/124 schema_failed,
   // concentrated on types.ts / index.ts barrels / schemas.ts where the
   // model improvises `kind: "meta" | "type" | "module"` outside the
@@ -312,6 +327,8 @@ async function extractIntentFromFile(
         prompt: retryPrompt,
         system: EXTRACTION_SYSTEM_PROMPT,
         json: true,
+        contextWindow: budget.contextWindow,
+        maxTokens: budget.maxTokens,
       },
       { provider, defaultModel: model, ollamaHost },
     );
@@ -355,6 +372,62 @@ async function extractIntentFromFile(
     extracted: retryParsed.data,
     response: retryResponse,
   };
+}
+
+// Phase ε H2: compute the input/output budget for an extraction
+// dispatch. Forwarded to the adapter as `contextWindow` (num_ctx in
+// Ollama) and `maxTokens` (num_predict). Anthropic ignores
+// contextWindow (auto-managed); Ollama desperately needs it because
+// the default num_ctx=2048 truncates anything >~6 KB silently.
+//
+// Token approximation: 3 chars/token for safety (code is denser per
+// token than prose; Ontology source averages ~3.2 chars/token in
+// pilot data).
+//
+// Constraints:
+//   - Floor contextWindow at 4096 so tiny files still get a sensible
+//     budget (the Ollama default of 2048 would barely fit the system
+//     prompt + a 20-line file).
+//   - Cap at 16384 to bound the KV cache memory (~8 MB at 7b 4-bit).
+//     Files larger than ~30 KB will be served truncated; this should
+//     be rare in practice and the rerun of the truly outsized files
+//     can override via --max-tokens.
+//   - maxTokens: half the estimated file tokens, capped to 4096 — an
+//     extraction JSON rarely exceeds 1500-2000 tokens.
+function computeAdaptiveBudget(
+  systemPromptChars: number,
+  fileContentChars: number,
+): { contextWindow: number; maxTokens: number } {
+  const CHARS_PER_TOKEN = 3;
+  const RETRY_FEEDBACK_OVERHEAD_CHARS = 600;
+  const USER_PROMPT_OVERHEAD_CHARS = 500;
+  const SAFETY_BUFFER_TOKENS = 512;
+  const MIN_CONTEXT = 4096;
+  const MAX_CONTEXT = 16384;
+  const MIN_OUTPUT = 1024;
+  const MAX_OUTPUT = 4096;
+
+  const inputChars =
+    systemPromptChars +
+    fileContentChars +
+    USER_PROMPT_OVERHEAD_CHARS +
+    RETRY_FEEDBACK_OVERHEAD_CHARS;
+  const inputTokens = Math.ceil(inputChars / CHARS_PER_TOKEN);
+
+  const fileTokens = Math.ceil(fileContentChars / CHARS_PER_TOKEN);
+  const maxTokens = Math.max(
+    MIN_OUTPUT,
+    Math.min(MAX_OUTPUT, Math.ceil(fileTokens / 2)),
+  );
+
+  const rawCtx = inputTokens + maxTokens + SAFETY_BUFFER_TOKENS;
+  const roundedCtx = Math.ceil(rawCtx / 1024) * 1024;
+  const contextWindow = Math.max(
+    MIN_CONTEXT,
+    Math.min(MAX_CONTEXT, roundedCtx),
+  );
+
+  return { contextWindow, maxTokens };
 }
 
 // Format a Zod issue list into the same compact `path: message; path:

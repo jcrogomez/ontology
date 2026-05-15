@@ -47,6 +47,15 @@ export interface LlmRequest {
   // calibration surfaced 4096 as insufficient for files >~3KB once
   // adaptive thinking consumes part of the output budget.
   maxTokens?: number;
+  // Optional input context window for the dispatch. Phase ε H2
+  // discovery: Ollama defaults to num_ctx=2048 which silently
+  // truncates source files of typical Ontology size (5-20 KB ≈
+  // 1500-6000 tokens). When provided, the Ollama adapter forwards
+  // this as `num_ctx`. Anthropic and other adapters that manage
+  // context-window allocation themselves ignore the field. Adaptive
+  // sizing in the ingest pipeline computes this from file size +
+  // system prompt size + output budget.
+  contextWindow?: number;
   // Optional thinking-mode override. When omitted, providers that
   // support adaptive thinking (anthropic Opus 4.7) leave it on. Pass
   // "disabled" to suppress thinking — useful for large prompts where
