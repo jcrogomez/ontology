@@ -71,6 +71,29 @@ export interface IngestFileSummary {
   usd?: number;
   /** Failure reason key when ok=false. */
   reason?: string;
+  /** Phase ε E1 telemetry: dispatch counts, retry flags, budget actually used, wall-clock. */
+  telemetry?: IngestFileTelemetry;
+}
+
+// Mirror of ExtractTelemetry in commands/ingest/index.ts — kept
+// duplicated here so the progress-report module stays free of cyclic
+// imports with the command layer. If you change one, change the
+// other.
+export interface IngestFileTelemetry {
+  dispatchAttempts: number;
+  schemaRetried: boolean;
+  contextWindowRequested: number | undefined;
+  maxTokensRequested: number | undefined;
+  firstFailureKind:
+    | "kind_invalid_value"
+    | "level_invalid_value"
+    | "required_missing"
+    | "out_of_range"
+    | "invalid_json"
+    | "dispatch_error"
+    | "other"
+    | undefined;
+  wallClockMs: number;
 }
 
 export interface IngestReportData {
@@ -182,18 +205,132 @@ export function renderIngestReport(data: IngestReportData): string {
     lines.push(``);
   }
 
+  // Extraction telemetry (Phase ε E1+E2). Aggregates dispatch counts,
+  // retry flags, budget-actually-requested, and wall-clock so the
+  // operator sees the cost topology of the run — not just the
+  // headline "X% ok". Only renders when at least one file carries
+  // telemetry; older runs without the field skip this block.
+  const filesWithTel = data.files.filter((f) => f.telemetry !== undefined);
+  if (filesWithTel.length > 0) {
+    lines.push(`## Extraction telemetry`);
+    lines.push(``);
+    // Aggregate counters across the whole run.
+    const totalDispatches = filesWithTel.reduce(
+      (a, f) => a + (f.telemetry?.dispatchAttempts ?? 0),
+      0,
+    );
+    const schemaRetries = filesWithTel.filter(
+      (f) => f.telemetry?.schemaRetried,
+    ).length;
+    const multiAttemptFiles = filesWithTel.filter(
+      (f) => (f.telemetry?.dispatchAttempts ?? 0) > 1,
+    ).length;
+    const wallClocks = filesWithTel.map((f) => f.telemetry!.wallClockMs);
+    const sumWall = wallClocks.reduce((a, b) => a + b, 0);
+    const meanWall = sumWall / wallClocks.length;
+    // Warmup heuristic: first file vs mean-of-rest.
+    const firstWall = wallClocks[0] ?? 0;
+    const restWalls = wallClocks.slice(1);
+    const meanRest =
+      restWalls.length > 0
+        ? restWalls.reduce((a, b) => a + b, 0) / restWalls.length
+        : firstWall;
+    const warmupOverhead = firstWall > meanRest ? firstWall - meanRest : 0;
+
+    lines.push(`| Metric | Value |`);
+    lines.push(`|---|---:|`);
+    lines.push(`| Total LLM dispatches | ${totalDispatches} |`);
+    lines.push(`| Files with >1 attempt | ${multiAttemptFiles} |`);
+    lines.push(`| Files with H1 schema retry | ${schemaRetries} |`);
+    lines.push(`| Mean wall-clock per file | ${(meanWall / 1000).toFixed(2)}s |`);
+    lines.push(`| First-file wall-clock | ${(firstWall / 1000).toFixed(2)}s |`);
+    lines.push(`| Mean wall-clock after first | ${(meanRest / 1000).toFixed(2)}s |`);
+    lines.push(`| Warmup overhead (heuristic) | ${(warmupOverhead / 1000).toFixed(2)}s |`);
+    lines.push(``);
+
+    // Wall-clock sparkline — visual peaks expose slow outliers.
+    lines.push("```");
+    lines.push(`wall-clock per file:  ${sparkline(wallClocks)}`);
+    const totalLabel = `total: ${(sumWall / 1000).toFixed(1)}s`.padStart(
+      22 + wallClocks.length,
+    );
+    lines.push(totalLabel);
+    lines.push("```");
+    lines.push(``);
+
+    // First-failure-kind breakdown — categorises retries by what the
+    // model got wrong first. Useful for "is the prompt the bottleneck
+    // or is the model truncating?".
+    const failureKindCounts = new Map<string, number>();
+    for (const f of filesWithTel) {
+      const k = f.telemetry?.firstFailureKind;
+      if (k) failureKindCounts.set(k, (failureKindCounts.get(k) ?? 0) + 1);
+    }
+    if (failureKindCounts.size > 0) {
+      lines.push(`**First-failure kinds (across files that needed any retry):**`);
+      lines.push(``);
+      lines.push(`| Kind | Count |`);
+      lines.push(`|---|---:|`);
+      const sorted = Array.from(failureKindCounts.entries()).sort(
+        (a, b) => b[1] - a[1],
+      );
+      for (const [k, n] of sorted) {
+        lines.push(`| \`${k}\` | ${n} |`);
+      }
+      lines.push(``);
+    }
+
+    // Top-3 slowest files — outliers worth investigating before the
+    // next sweep (likely large files or those that retried).
+    const slowest = [...filesWithTel]
+      .sort((a, b) => (b.telemetry?.wallClockMs ?? 0) - (a.telemetry?.wallClockMs ?? 0))
+      .slice(0, 3);
+    if (slowest.length > 0) {
+      lines.push(`**Top-3 slowest files:**`);
+      lines.push(``);
+      lines.push(`| File | Wall-clock | Dispatches | Schema retry |`);
+      lines.push(`|---|---:|---:|:---:|`);
+      for (const f of slowest) {
+        const rel = relativiseOrAbsolute(f.filePath, data.rootDir);
+        const t = f.telemetry!;
+        const ms = (t.wallClockMs / 1000).toFixed(2) + "s";
+        const sr = t.schemaRetried ? "✓" : "";
+        lines.push(`| \`${rel}\` | ${ms} | ${t.dispatchAttempts} | ${sr} |`);
+      }
+      lines.push(``);
+    }
+  }
+
   // Per-file table (concise). Source file path relative to rootDir
-  // when possible — keeps the table narrow.
+  // when possible — keeps the table narrow. Adds attempts + wall-clock
+  // columns when telemetry is present.
   lines.push(`## Per-file`);
   lines.push(``);
-  lines.push(`| File | Status | Tokens | Cost |`);
-  lines.push(`|---|---|---:|---:|`);
+  const hasAnyTelemetry = data.files.some((f) => f.telemetry !== undefined);
+  if (hasAnyTelemetry) {
+    lines.push(`| File | Status | Tokens | Cost | Attempts | Wall |`);
+    lines.push(`|---|---|---:|---:|---:|---:|`);
+  } else {
+    lines.push(`| File | Status | Tokens | Cost |`);
+    lines.push(`|---|---|---:|---:|`);
+  }
   for (const f of data.files) {
     const rel = relativiseOrAbsolute(f.filePath, data.rootDir);
     const status = f.ok ? "ok" : `failed (${f.reason ?? "—"})`;
     const tokStr = f.tokensUsed ? f.tokensUsed.toLocaleString() : "—";
     const costStr = f.usd !== undefined && f.usd > 0 ? `$${f.usd.toFixed(4)}` : "—";
-    lines.push(`| \`${rel}\` | ${status} | ${tokStr} | ${costStr} |`);
+    if (hasAnyTelemetry) {
+      const attempts = f.telemetry?.dispatchAttempts ?? "—";
+      const wall =
+        f.telemetry !== undefined
+          ? `${(f.telemetry.wallClockMs / 1000).toFixed(2)}s`
+          : "—";
+      lines.push(
+        `| \`${rel}\` | ${status} | ${tokStr} | ${costStr} | ${attempts} | ${wall} |`,
+      );
+    } else {
+      lines.push(`| \`${rel}\` | ${status} | ${tokStr} | ${costStr} |`);
+    }
   }
   lines.push(``);
 

@@ -110,6 +110,57 @@ describe("progress-report — renderIngestReport", () => {
     expect(md).not.toContain("## Token usage per file");
   });
 
+  it("renders the Extraction telemetry section when files carry telemetry", () => {
+    const md = renderIngestReport(
+      baseData({
+        files: [
+          {
+            filePath: "/tmp/test-project/src/foo.ts",
+            ok: true,
+            tokensUsed: 1200,
+            telemetry: {
+              dispatchAttempts: 2,
+              schemaRetried: true,
+              contextWindowRequested: 8192,
+              maxTokensRequested: 2048,
+              firstFailureKind: "kind_invalid_value",
+              wallClockMs: 45000,
+            },
+          },
+          {
+            filePath: "/tmp/test-project/src/bar.ts",
+            ok: true,
+            tokensUsed: 800,
+            telemetry: {
+              dispatchAttempts: 1,
+              schemaRetried: false,
+              contextWindowRequested: 4096,
+              maxTokensRequested: 1024,
+              firstFailureKind: undefined,
+              wallClockMs: 12000,
+            },
+          },
+        ],
+      }),
+    );
+    expect(md).toContain("## Extraction telemetry");
+    expect(md).toContain("| Total LLM dispatches | 3 |");
+    expect(md).toContain("| Files with H1 schema retry | 1 |");
+    expect(md).toContain("| Files with >1 attempt | 1 |");
+    expect(md).toContain("First-failure kinds");
+    expect(md).toContain("`kind_invalid_value`");
+    expect(md).toContain("Top-3 slowest files");
+    // Per-file table now has extra columns when telemetry exists.
+    expect(md).toMatch(
+      /\| File \| Status \| Tokens \| Cost \| Attempts \| Wall \|/,
+    );
+  });
+
+  it("omits Extraction telemetry section when no file carries telemetry", () => {
+    const md = renderIngestReport(baseData());
+    expect(md).not.toContain("## Extraction telemetry");
+  });
+
   it("surfaces failed files with their reason in the per-file table", () => {
     const md = renderIngestReport(
       baseData({

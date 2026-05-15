@@ -171,6 +171,39 @@ interface ExtractInputs {
   ollamaHost?: string;
 }
 
+// Phase ε E1: per-file telemetry. Accumulated by extractIntentFromFile
+// across attempts so the INGEST report can render what really
+// happened — not just ok / fail. The 7b pilot collapsed every
+// retry into a single "tokens used" total, hiding which files paid
+// for an H1 retry vs an H3 backoff vs a clean first pass. With this
+// struct populated, the operator sees the topology of the cost.
+export interface ExtractTelemetry {
+  /** Total dispatch attempts (H3 backoff retries counted). Includes the H1 retry as an extra attempt when triggered. */
+  dispatchAttempts: number;
+  /** True iff the H1 schema-failure retry path fired. */
+  schemaRetried: boolean;
+  /** num_ctx requested for Ollama (forwarded as contextWindow). undefined for non-Ollama adapters. */
+  contextWindowRequested: number | undefined;
+  /** num_predict requested (forwarded as maxTokens). undefined when not set. */
+  maxTokensRequested: number | undefined;
+  /**
+   * Coarse classification of the first failure that triggered a
+   * retry. Drawn from the Zod error path the first invalid attempt
+   * produced. Undefined when no retry was needed.
+   */
+  firstFailureKind:
+    | "kind_invalid_value"
+    | "level_invalid_value"
+    | "required_missing"
+    | "out_of_range"
+    | "invalid_json"
+    | "dispatch_error"
+    | "other"
+    | undefined;
+  /** Total wall-clock for the extraction (read + all dispatches + parse). */
+  wallClockMs: number;
+}
+
 type ExtractResult =
   | {
       ok: true;
@@ -178,6 +211,7 @@ type ExtractResult =
       cwdRelative: string;
       extracted: ExtractionResult;
       response: LlmResponse;
+      telemetry: ExtractTelemetry;
     }
   | {
       ok: false;
@@ -190,7 +224,20 @@ type ExtractResult =
         | "invalid_json"
         | "schema_failed";
       message: string;
+      telemetry: ExtractTelemetry;
     };
+
+// Classify a Zod error message into one of the firstFailureKind
+// buckets. Heuristic — string-matches the error text from Zod's
+// default formatter. Keeps the telemetry interpretable without
+// requiring callers to re-walk Zod's issue tree.
+function classifyZodFailure(message: string): ExtractTelemetry["firstFailureKind"] {
+  if (/kind:.*Invalid enum value/i.test(message)) return "kind_invalid_value";
+  if (/level:.*Invalid enum value/i.test(message)) return "level_invalid_value";
+  if (/Required/.test(message)) return "required_missing";
+  if (/min|max|too_(small|big)/i.test(message)) return "out_of_range";
+  return "other";
+}
 
 // Reads, validates, dispatches, parses, returns. Pure with respect to
 // graph state — never writes proposals or events. γ-1 (single-file
@@ -199,6 +246,30 @@ async function extractIntentFromFile(
   inputs: ExtractInputs,
 ): Promise<ExtractResult> {
   const { filePath, provider, model, ollamaHost } = inputs;
+
+  // Phase ε E1: telemetry accumulator. Mutable, threaded through every
+  // return path via finalize(). Populated incrementally as the
+  // function progresses; finalize() snaps wallClockMs at exit.
+  const t0 = performance.now();
+  const telemetry: ExtractTelemetry = {
+    dispatchAttempts: 0,
+    schemaRetried: false,
+    contextWindowRequested: undefined,
+    maxTokensRequested: undefined,
+    firstFailureKind: undefined,
+    wallClockMs: 0,
+  };
+  const finalize = (): ExtractTelemetry => {
+    telemetry.wallClockMs = performance.now() - t0;
+    return { ...telemetry };
+  };
+  // DispatchFn wrapper that increments the dispatch counter on every
+  // LLM call (including H3 backoff internal retries). Passed to
+  // dispatchWithRetry so the counter sees real network attempts.
+  const countingDispatcher: DispatchFn = async (req, cfg) => {
+    telemetry.dispatchAttempts += 1;
+    return dispatchLlmRequest(req, cfg);
+  };
 
   // 1. Read + binary guard. NUL is the high-precision signal of
   // binary content; let the user know up front rather than paying
@@ -212,6 +283,7 @@ async function extractIntentFromFile(
       filePath,
       reason: "read_failed",
       message: `Could not read "${filePath}": ${errorMessage(err)}`,
+      telemetry: finalize(),
     };
   }
   if (fileContent.includes("\u0000")) {
@@ -220,6 +292,7 @@ async function extractIntentFromFile(
       filePath,
       reason: "binary_content",
       message: `"${filePath}" appears to be a binary file (contains NUL bytes).`,
+      telemetry: finalize(),
     };
   }
   if (fileContent.trim().length === 0) {
@@ -228,6 +301,7 @@ async function extractIntentFromFile(
       filePath,
       reason: "empty_file",
       message: `"${filePath}" is empty; nothing to ingest.`,
+      telemetry: finalize(),
     };
   }
 
@@ -256,6 +330,8 @@ async function extractIntentFromFile(
     EXTRACTION_SYSTEM_PROMPT.length,
     fileContent.length,
   );
+  telemetry.contextWindowRequested = budget.contextWindow;
+  telemetry.maxTokensRequested = budget.maxTokens;
 
   // 3. Dispatch (with H3 transient-retry backoff).
   let response: LlmResponse;
@@ -270,13 +346,16 @@ async function extractIntentFromFile(
         maxTokens: budget.maxTokens,
       },
       { provider, defaultModel: model, ollamaHost },
+      countingDispatcher,
     );
   } catch (err: unknown) {
+    telemetry.firstFailureKind = "dispatch_error";
     return {
       ok: false,
       filePath,
       reason: "dispatch_failed",
       message: `Dispatch failed (after ${RETRY_BACKOFF_MS.length} attempts): ${errorMessage(err)}`,
+      telemetry: finalize(),
     };
   }
 
@@ -289,11 +368,13 @@ async function extractIntentFromFile(
       ? response.json
       : tryParseJsonFromText(response.text);
   if (candidate === undefined) {
+    telemetry.firstFailureKind = "invalid_json";
     return {
       ok: false,
       filePath,
       reason: "invalid_json",
       message: `The extractor did not return valid JSON. Raw response:\n${response.text.slice(0, 500)}`,
+      telemetry: finalize(),
     };
   }
   const parsed = ExtractionResultSchema.safeParse(candidate);
@@ -304,6 +385,7 @@ async function extractIntentFromFile(
       cwdRelative,
       extracted: parsed.data,
       response,
+      telemetry: finalize(),
     };
   }
 
@@ -317,7 +399,9 @@ async function extractIntentFromFile(
   // model just doesn't honour it on the first pass at 7b tier. A
   // single retry with the specific Zod errors as feedback recovers
   // most of them, idempotent (read-only on disk).
+  telemetry.schemaRetried = true;
   const firstFailureMessage = formatZodIssues(parsed.error.issues);
+  telemetry.firstFailureKind = classifyZodFailure(firstFailureMessage);
   const retryPrompt = buildRetryPrompt(userPrompt, firstFailureMessage);
   let retryResponse: LlmResponse;
   try {
@@ -331,6 +415,7 @@ async function extractIntentFromFile(
         maxTokens: budget.maxTokens,
       },
       { provider, defaultModel: model, ollamaHost },
+      countingDispatcher,
     );
   } catch (err: unknown) {
     // Retry dispatch failed (after H3 backoff exhausted) — surface
@@ -341,6 +426,7 @@ async function extractIntentFromFile(
       filePath,
       reason: "schema_failed",
       message: `Extraction JSON failed validation (retry also failed: ${errorMessage(err)}): ${firstFailureMessage}`,
+      telemetry: finalize(),
     };
   }
   const retryCandidate =
@@ -353,6 +439,7 @@ async function extractIntentFromFile(
       filePath,
       reason: "schema_failed",
       message: `Extraction JSON failed validation (retry returned invalid JSON): ${firstFailureMessage}`,
+      telemetry: finalize(),
     };
   }
   const retryParsed = ExtractionResultSchema.safeParse(retryCandidate);
@@ -363,6 +450,7 @@ async function extractIntentFromFile(
       filePath,
       reason: "schema_failed",
       message: `Extraction JSON failed validation after retry. First: ${firstFailureMessage}. Retry: ${retryFailureMessage}`,
+      telemetry: finalize(),
     };
   }
   // Retry succeeded.
@@ -372,6 +460,7 @@ async function extractIntentFromFile(
     cwdRelative,
     extracted: retryParsed.data,
     response: retryResponse,
+    telemetry: finalize(),
   };
 }
 
@@ -860,6 +949,7 @@ interface PerFileSummary {
   extracted?: ExtractionResult;
   proposalId?: string;
   tokensUsed?: number;
+  telemetry?: ExtractTelemetry;
 }
 
 async function runDirectoryIngest(
@@ -921,6 +1011,7 @@ async function runDirectoryIngest(
         ok: false,
         reason: extract.reason,
         message: extract.message,
+        telemetry: extract.telemetry,
       });
       continue;
     }
@@ -935,6 +1026,7 @@ async function runDirectoryIngest(
         ok: true,
         extracted: extract.extracted,
         tokensUsed,
+        telemetry: extract.telemetry,
       });
       continue;
     }
@@ -953,6 +1045,7 @@ async function runDirectoryIngest(
         ok: false,
         reason: "proposal_create_failed",
         message: created.message,
+        telemetry: extract.telemetry,
       });
       continue;
     }
@@ -963,6 +1056,7 @@ async function runDirectoryIngest(
       extracted: extract.extracted,
       proposalId: created.proposalId,
       tokensUsed,
+      telemetry: extract.telemetry,
     });
   }
 
@@ -1068,6 +1162,7 @@ async function runDirectoryIngest(
       ok: r.ok,
       tokensUsed: r.tokensUsed,
       reason: r.reason,
+      telemetry: r.telemetry,
     })),
     proposalsCreated: results.filter((r) => r.ok && r.proposalId !== undefined).length,
     totalTokens,
@@ -1169,6 +1264,7 @@ async function runMultiInputIngest(
         ok: false,
         reason: extract.reason,
         message: extract.message,
+        telemetry: extract.telemetry,
       });
       continue;
     }
@@ -1183,6 +1279,7 @@ async function runMultiInputIngest(
         ok: true,
         extracted: extract.extracted,
         tokensUsed,
+        telemetry: extract.telemetry,
       });
       continue;
     }
@@ -1201,6 +1298,7 @@ async function runMultiInputIngest(
         ok: false,
         reason: "proposal_create_failed",
         message: created.message,
+        telemetry: extract.telemetry,
       });
       continue;
     }
@@ -1211,6 +1309,7 @@ async function runMultiInputIngest(
       extracted: extract.extracted,
       proposalId: created.proposalId,
       tokensUsed,
+      telemetry: extract.telemetry,
     });
   }
 
@@ -1327,6 +1426,7 @@ async function runMultiInputIngest(
       ok: r.ok,
       tokensUsed: r.tokensUsed,
       reason: r.reason,
+      telemetry: r.telemetry,
     })),
     proposalsCreated: results.filter((r) => r.ok && r.proposalId !== undefined).length,
     totalTokens,
