@@ -72,7 +72,7 @@ describe("onto ingest --static-classifier — option parsing", () => {
     expect(r.status).toBe(0);
   });
 
-  it("rejects --static-classifier enabled (not implemented in this PR)", () => {
+  it("accepts --static-classifier enabled", () => {
     const r = runCli(tempDir, [
       "ingest",
       path.join(tempDir, "src"),
@@ -84,9 +84,7 @@ describe("onto ingest --static-classifier — option parsing", () => {
       "enabled",
       "--dry-run",
     ]);
-    expect(r.status).toBe(1);
-    expect(r.stderr).toMatch(/Invalid --static-classifier mode/);
-    expect(r.stderr).toMatch(/report-only/);
+    expect(r.status).toBe(0);
   });
 
   it("rejects an unknown --static-classifier value", () => {
@@ -103,6 +101,8 @@ describe("onto ingest --static-classifier — option parsing", () => {
     ]);
     expect(r.status).toBe(1);
     expect(r.stderr).toMatch(/Invalid --static-classifier mode/);
+    expect(r.stderr).toMatch(/report-only/);
+    expect(r.stderr).toMatch(/enabled/);
   });
 });
 

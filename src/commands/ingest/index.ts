@@ -36,6 +36,12 @@ import {
   classifySourceFile,
   type StructuralClassification,
 } from "../../runtime/legend/structural-classifier.js";
+import { buildStaticSummary } from "../../runtime/legend/static-summary.js";
+import {
+  decideStaticClassifierIngestAction,
+  type IngestAction,
+  type StaticClassifierMode,
+} from "./static-classifier-policy.js";
 
 // `onto ingest <paths...>` — Project Legend Phase γ-1 + γ-5 + Phase ε prework A.
 //
@@ -155,14 +161,23 @@ export interface IngestCommandOptions {
   // Currently honoured only for semantic_parse (ingest extraction);
   // other LlmTasks ignore the flag.
   ensemble?: EnsembleMode;
-  // Structural Semantic Classifier integration. "report-only"
-  // classifies every discovered file via classifySourceFile (no LLM,
-  // pure AST + filename rules) and surfaces aggregates in the INGEST
-  // report. It does NOT skip files, does NOT change routing, does
-  // NOT alter ensemble. Pure observation pass — designed to let
-  // operators inspect what's IN the perimeter before any future
-  // enabled mode considers acting on it.
-  staticClassifier?: "report-only";
+  // Structural Semantic Classifier integration.
+  //   - "report-only" classifies every discovered file via
+  //     classifySourceFile (no LLM, pure AST + filename rules) and
+  //     surfaces aggregates in the INGEST report. Does NOT change
+  //     routing, does NOT skip files. Pure observation pass.
+  //   - "enabled" consumes those facts as ingest policy. Files
+  //     classified as barrels, declaration-only modules, or
+  //     configuration modules bypass the LLM entirely and receive a
+  //     deterministic static summary instead (see
+  //     runtime/legend/static-summary.ts). Files classified as test
+  //     modules are skipped (no proposal). All other shapes
+  //     (schema_module, adapter_module, cli_module, executable_module,
+  //     component_module, mixed_module, unknown) still dispatch to
+  //     the LLM exactly as before. The savings shape on the perimeter
+  //     is surfaced in the INGEST report's "Classifier routing"
+  //     section.
+  staticClassifier?: "report-only" | "enabled";
 }
 
 // The extraction system prompt. The Anthropic adapter tags this block
@@ -220,17 +235,17 @@ interface ExtractInputs {
   ollamaHost?: string;
 }
 
-// Helper: classify a file when the static classifier is in
-// report-only mode. Pure observation — never changes control flow,
-// never throws. A failed read or classification just returns
-// undefined and the rest of ingest continues as if the flag were
-// off, so the contract "report-only does not alter execution" holds
-// even on edge cases.
+// Helper: classify a file when the static classifier is on
+// (report-only or enabled). Pure observation in report-only mode —
+// never changes control flow. A failed read or classification
+// returns undefined; the rest of ingest continues as if the flag
+// were off, so the contract "report-only does not alter execution"
+// holds even on edge cases.
 function classifyIfEnabled(
   filePath: string,
-  mode: "off" | "report-only",
+  mode: StaticClassifierMode,
 ): StructuralClassification | undefined {
-  if (mode !== "report-only") return undefined;
+  if (mode === "off") return undefined;
   try {
     const content = fs.readFileSync(filePath, "utf-8");
     return classifySourceFile({ path: filePath, content });
@@ -837,6 +852,89 @@ async function extractWithStrategy(
   return extractIntentFromFile(inputs);
 }
 
+// Static-summary entry point — builds a synthetic ExtractResult with
+// no LLM dispatch. Used by extractWithRouting when the policy adapter
+// says the classified shape can be summarized deterministically
+// (barrel, declaration_only). The response carries provider
+// "literal" + model "static_summary" so the audit trail (proposal
+// rationale) clearly shows the extraction did not come from an LLM.
+//
+// usage is omitted on purpose — there is no token spend to report.
+function buildStaticSummaryExtractResult(args: {
+  filePath: string;
+  classification: StructuralClassification;
+}): ExtractResult {
+  const t0 = performance.now();
+  const extracted = buildStaticSummary({
+    filePath: args.filePath,
+    classification: args.classification,
+  });
+  const cwdRelative = computeCwdRelative(args.filePath);
+  const wallClockMs = performance.now() - t0;
+  const telemetry: ExtractTelemetry = {
+    dispatchAttempts: 0,
+    schemaRetried: false,
+    contextWindowRequested: undefined,
+    maxTokensRequested: undefined,
+    firstFailureKind: undefined,
+    wallClockMs,
+  };
+  const response: LlmResponse = {
+    text: "",
+    json: extracted,
+    model: "static_summary",
+    provider: "literal",
+    usage: undefined,
+    raw: { classification: args.classification },
+  };
+  return {
+    ok: true,
+    filePath: args.filePath,
+    cwdRelative,
+    extracted,
+    response,
+    telemetry,
+  };
+}
+
+// Single-dispatch entry point WITH structural-classifier policy
+// applied. When the classifier is in enabled mode AND the file's
+// classified shape is static_summary-eligible (barrel or
+// declaration_only), this short-circuits the LLM and synthesizes
+// the ExtractResult deterministically. Otherwise it delegates to
+// extractWithStrategy (preserving ensemble semantics for the
+// semantic_parse path). Returns the action taken alongside the
+// result so callers can report routing distribution.
+async function extractWithRouting(args: {
+  inputs: ExtractInputs;
+  ensemble: EnsembleMode;
+  classification: StructuralClassification | undefined;
+  staticClassifierMode: StaticClassifierMode;
+}): Promise<{ result: ExtractResult; action: IngestAction }> {
+  const action = decideStaticClassifierIngestAction(
+    args.classification,
+    args.staticClassifierMode,
+  );
+  if (action === "static_summary") {
+    // The policy adapter only returns static_summary when classification is
+    // present — assertion is type narrowing, not runtime checking.
+    if (args.classification === undefined) {
+      throw new Error(
+        "decideStaticClassifierIngestAction returned static_summary without a classification — invariant violated",
+      );
+    }
+    return {
+      result: buildStaticSummaryExtractResult({
+        filePath: args.inputs.filePath,
+        classification: args.classification,
+      }),
+      action,
+    };
+  }
+  const result = await extractWithStrategy(args.inputs, args.ensemble);
+  return { result, action };
+}
+
 // ── Top-level command: route file vs directory ──────────────────────────────
 
 export async function ingestCommand(
@@ -879,16 +977,22 @@ export async function ingestCommand(
     return "none"; // unreachable — failWith exits 1
   })();
 
-  // Validate --static-classifier. Only "report-only" is implemented
-  // in this PR; "enabled" is reserved for a future PR that will
-  // consume classifier facts as ingest policy. Unknown values fail
-  // fast so a typo doesn't silently downgrade.
-  const staticClassifierMode: "off" | "report-only" = (() => {
+  // Validate --static-classifier. Two modes are supported:
+  //   - "report-only" classifies every file and surfaces aggregates
+  //     in the INGEST report but does NOT alter dispatch.
+  //   - "enabled" consumes classifier facts as ingest policy:
+  //     barrels / declaration-only / configuration modules bypass
+  //     the LLM via a deterministic static summary; test modules are
+  //     skipped; all other shapes still go through the LLM. See
+  //     runtime/legend/static-summary.ts for the routing table.
+  // Unknown values fail fast so a typo doesn't silently downgrade.
+  const staticClassifierMode: StaticClassifierMode = (() => {
     const raw = options.staticClassifier;
     if (raw === undefined) return "off";
     if (raw === "report-only") return "report-only";
+    if (raw === "enabled") return "enabled";
     failWith(
-      `Invalid --static-classifier mode "${String(raw)}". Supported modes: report-only`,
+      `Invalid --static-classifier mode "${String(raw)}". Supported modes: report-only, enabled`,
       options.json,
     );
     return "off"; // unreachable — failWith exits 1
@@ -1086,7 +1190,7 @@ interface SingleFileOptions {
   dryRun: boolean;
   json: boolean;
   ensemble: EnsembleMode;
-  staticClassifier: "off" | "report-only";
+  staticClassifier: StaticClassifierMode;
 }
 
 async function runSingleFileIngest(
@@ -1094,15 +1198,17 @@ async function runSingleFileIngest(
   opts: SingleFileOptions,
 ): Promise<void> {
   const classification = classifyIfEnabled(filePath, opts.staticClassifier);
-  const result = await extractWithStrategy(
-    {
+  const { result, action } = await extractWithRouting({
+    inputs: {
       filePath,
       provider: opts.provider,
       model: opts.model,
       ollamaHost: opts.ollamaHost,
     },
-    opts.ensemble,
-  );
+    ensemble: opts.ensemble,
+    classification,
+    staticClassifierMode: opts.staticClassifier,
+  });
   if (!result.ok) {
     failWith(result.message, opts.json);
     return;
@@ -1188,6 +1294,7 @@ async function runSingleFileIngest(
     model: opts.model,
     dryRun: opts.dryRun,
     json: opts.json,
+    staticClassifierMode: opts.staticClassifier,
     files: [
       {
         filePath: result.cwdRelative || filePath,
@@ -1196,6 +1303,7 @@ async function runSingleFileIngest(
         telemetry: result.telemetry,
         ensemble: result.ensemble,
         classification,
+        routing: opts.staticClassifier === "off" ? undefined : action,
       },
     ],
     proposalsCreated: 1,
@@ -1214,7 +1322,7 @@ interface DirectoryOptions {
   dryRun: boolean;
   json: boolean;
   ensemble: EnsembleMode;
-  staticClassifier: "off" | "report-only";
+  staticClassifier: StaticClassifierMode;
   // File extensions to include in the walk. Comes from --include
   // (parsed by parseIncludeFlag). Always non-empty when this struct
   // is constructed.
@@ -1233,8 +1341,14 @@ interface PerFileSummary {
   telemetry?: ExtractTelemetry;
   ensemble?: EnsembleMetadata;
   /** Phase ε E6 → next step: facts from the structural classifier
-   * (report-only). Pure observation — does not affect dispatch. */
+   * (report-only or enabled). Pure observation in report-only;
+   * informs routing in enabled. */
   classification?: StructuralClassification;
+  /** Phase ε prework C: the actual route taken for this file
+   * (semantic_parse via the LLM, or static_summary via the
+   * deterministic builder). Absent for runs without the
+   * --static-classifier flag. */
+  routing?: IngestAction;
 }
 
 async function runDirectoryIngest(
@@ -1284,15 +1398,19 @@ async function runDirectoryIngest(
   for (const filePath of files) {
     const cwdRelative = computeCwdRelative(filePath);
     const classification = classifyIfEnabled(filePath, opts.staticClassifier);
-    const extract = await extractWithStrategy(
-      {
+    const { result: extract, action } = await extractWithRouting({
+      inputs: {
         filePath,
         provider: opts.provider,
         model: opts.model,
         ollamaHost: opts.ollamaHost,
       },
-      opts.ensemble,
-    );
+      ensemble: opts.ensemble,
+      classification,
+      staticClassifierMode: opts.staticClassifier,
+    });
+    const routing: IngestAction | undefined =
+      opts.staticClassifier === "off" ? undefined : action;
     if (!extract.ok) {
       results.push({
         filePath,
@@ -1303,6 +1421,7 @@ async function runDirectoryIngest(
         telemetry: extract.telemetry,
         ensemble: extract.ensemble,
         classification,
+        routing,
       });
       continue;
     }
@@ -1320,6 +1439,7 @@ async function runDirectoryIngest(
         telemetry: extract.telemetry,
         ensemble: extract.ensemble,
         classification,
+        routing,
       });
       continue;
     }
@@ -1341,6 +1461,7 @@ async function runDirectoryIngest(
         telemetry: extract.telemetry,
         ensemble: extract.ensemble,
         classification,
+        routing,
       });
       continue;
     }
@@ -1354,6 +1475,7 @@ async function runDirectoryIngest(
       telemetry: extract.telemetry,
       ensemble: extract.ensemble,
       classification,
+      routing,
     });
   }
 
@@ -1454,6 +1576,7 @@ async function runDirectoryIngest(
     model: opts.model,
     dryRun: opts.dryRun,
     json: opts.json,
+    staticClassifierMode: opts.staticClassifier,
     files: results.map((r) => ({
       filePath: r.filePath,
       ok: r.ok,
@@ -1462,6 +1585,7 @@ async function runDirectoryIngest(
       telemetry: r.telemetry,
       ensemble: r.ensemble,
       classification: r.classification,
+      routing: r.routing,
     })),
     proposalsCreated: results.filter((r) => r.ok && r.proposalId !== undefined).length,
     totalTokens,
@@ -1551,15 +1675,19 @@ async function runMultiInputIngest(
   for (const filePath of files) {
     const cwdRelative = computeCwdRelative(filePath);
     const classification = classifyIfEnabled(filePath, opts.staticClassifier);
-    const extract = await extractWithStrategy(
-      {
+    const { result: extract, action } = await extractWithRouting({
+      inputs: {
         filePath,
         provider: opts.provider,
         model: opts.model,
         ollamaHost: opts.ollamaHost,
       },
-      opts.ensemble,
-    );
+      ensemble: opts.ensemble,
+      classification,
+      staticClassifierMode: opts.staticClassifier,
+    });
+    const routing: IngestAction | undefined =
+      opts.staticClassifier === "off" ? undefined : action;
     if (!extract.ok) {
       results.push({
         filePath,
@@ -1570,6 +1698,7 @@ async function runMultiInputIngest(
         telemetry: extract.telemetry,
         ensemble: extract.ensemble,
         classification,
+        routing,
       });
       continue;
     }
@@ -1587,6 +1716,7 @@ async function runMultiInputIngest(
         telemetry: extract.telemetry,
         ensemble: extract.ensemble,
         classification,
+        routing,
       });
       continue;
     }
@@ -1608,6 +1738,7 @@ async function runMultiInputIngest(
         telemetry: extract.telemetry,
         ensemble: extract.ensemble,
         classification,
+        routing,
       });
       continue;
     }
@@ -1621,6 +1752,7 @@ async function runMultiInputIngest(
       telemetry: extract.telemetry,
       ensemble: extract.ensemble,
       classification,
+      routing,
     });
   }
 
@@ -1732,6 +1864,7 @@ async function runMultiInputIngest(
     model: opts.model,
     dryRun: opts.dryRun,
     json: opts.json,
+    staticClassifierMode: opts.staticClassifier,
     files: results.map((r) => ({
       filePath: r.filePath,
       ok: r.ok,
@@ -1740,6 +1873,7 @@ async function runMultiInputIngest(
       telemetry: r.telemetry,
       ensemble: r.ensemble,
       classification: r.classification,
+      routing: r.routing,
     })),
     proposalsCreated: results.filter((r) => r.ok && r.proposalId !== undefined).length,
     totalTokens,
@@ -1965,6 +2099,7 @@ function tryWriteIngestProgressReport(args: {
   model: string | undefined;
   dryRun: boolean;
   json: boolean;
+  staticClassifierMode: StaticClassifierMode;
   files: IngestFileSummary[];
   proposalsCreated: number;
   totalTokens: number;
@@ -1979,6 +2114,7 @@ function tryWriteIngestProgressReport(args: {
       provider: args.provider,
       model: args.model ?? "(adapter default)",
       dryRun: args.dryRun,
+      staticClassifierMode: args.staticClassifierMode,
       files: args.files,
       proposalsCreated: args.proposalsCreated,
       totalTokens: args.totalTokens,

@@ -81,10 +81,15 @@ export interface IngestFileSummary {
   /** Phase ε E6 step 4: ensemble metadata when the file went through
    * the high-confidence ensemble path. Absent for default single-run. */
   ensemble?: IngestFileEnsembleMetadata;
-  /** Structural classifier facts when --static-classifier=report-only
-   * was set on the ingest invocation. Absent for default behaviour.
-   * Pure observation — does not affect dispatch or execution. */
+  /** Structural classifier facts when --static-classifier was set
+   * (report-only or enabled) on the ingest invocation. Absent for
+   * default behaviour. */
   classification?: StructuralClassification;
+  /** Phase ε prework C: the actual route taken in --static-classifier
+   * enabled mode (semantic_parse via the LLM, or static_summary via
+   * the deterministic builder). Absent when the classifier is off
+   * or in report-only. */
+  routing?: "semantic_parse" | "static_summary";
 }
 
 // Mirror of EnsembleMetadata from src/runtime/llm/ensemble.ts. Kept
@@ -131,6 +136,10 @@ export interface IngestReportData {
   /** Resolved model. */
   model: string;
   dryRun: boolean;
+  /** Phase ε prework C: classifier mode for this run. Drives the
+   * label of the "Structural classification" section and gates the
+   * "Classifier routing" section that only renders in enabled mode. */
+  staticClassifierMode?: "off" | "report-only" | "enabled";
   files: IngestFileSummary[];
   proposalsCreated: number;
   totalTokens: number;
@@ -366,18 +375,19 @@ export function renderIngestReport(data: IngestReportData): string {
     lines.push(``);
   }
 
-  // Structural classification section (report-only consumer of the
-  // Structural Semantic Classifier). Only renders when at least one
-  // file carries classification facts. Pure observation — no claim
-  // about what ingest did or did not do with these facts (it did
-  // nothing: report-only means execute as before, just observe).
+  // Structural classification section (consumer of the Structural
+  // Semantic Classifier). Only renders when at least one file
+  // carries classification facts. In report-only mode this is pure
+  // observation; in enabled mode the classifier additionally
+  // informs routing (see the Classifier routing section below).
   const filesWithClass = data.files.filter(
     (f) => f.classification !== undefined,
   );
   if (filesWithClass.length > 0) {
+    const mode = data.staticClassifierMode ?? "report-only";
     lines.push(`## Structural classification`);
     lines.push(``);
-    lines.push(`Static classifier mode: \`report-only\``);
+    lines.push(`Static classifier mode: \`${mode}\``);
     lines.push(``);
 
     // Shape counts.
@@ -473,13 +483,111 @@ export function renderIngestReport(data: IngestReportData): string {
       lines.push(``);
     }
 
-    lines.push(
-      "*This section observes the forest. It does not prune it. " +
-        "`report-only` does not change which files are dispatched to the LLM, " +
-        "the routed model, or the ensemble strategy. Future modes may consume " +
-        "these facts as ingest policy.*",
-    );
+    if (mode === "enabled") {
+      lines.push(
+        "*The classifier is informing routing on this run — see the " +
+          "Classifier routing section below for the actual savings shape.*",
+      );
+    } else {
+      lines.push(
+        "*This section observes the forest. It does not prune it. " +
+          "`report-only` does not change which files are dispatched to the LLM, " +
+          "the routed model, or the ensemble strategy. Re-run with " +
+          "`--static-classifier enabled` to deflect barrels and declaration-only " +
+          "modules to a deterministic static summary.*",
+      );
+    }
     lines.push(``);
+
+    // Classifier routing section (enabled mode only). Surfaces the
+    // count of files that bypassed the LLM via static_summary, the
+    // count that still went through semantic_parse, and a per-shape
+    // breakdown so the operator can see exactly which shapes got
+    // deflected. Conservative v0: only `barrel` and `declaration_only`
+    // ever appear in the static_summary column.
+    if (mode === "enabled") {
+      const filesWithRouting = data.files.filter(
+        (f) => f.routing !== undefined,
+      );
+      if (filesWithRouting.length > 0) {
+        const staticCount = filesWithRouting.filter(
+          (f) => f.routing === "static_summary",
+        ).length;
+        const llmCount = filesWithRouting.filter(
+          (f) => f.routing === "semantic_parse",
+        ).length;
+        lines.push(`## Classifier routing`);
+        lines.push(``);
+        lines.push(`| Route | Count |`);
+        lines.push(`|---|---:|`);
+        lines.push(`| \`static_summary\` (LLM bypassed) | ${staticCount} |`);
+        lines.push(`| \`semantic_parse\` (LLM dispatched) | ${llmCount} |`);
+        lines.push(``);
+        lines.push(`**LLM dispatches avoided: ${staticCount}**`);
+        lines.push(``);
+
+        // Per-shape routing breakdown. A shape can appear in BOTH
+        // columns when --static-classifier is enabled but the shape
+        // is not in the static_summary-eligible set (then everything
+        // stays on semantic_parse — surfaced explicitly so the
+        // operator can see why a deflection didn't happen).
+        const routedByShape = new Map<
+          StructuralShape,
+          { static_summary: number; semantic_parse: number }
+        >();
+        for (const f of filesWithRouting) {
+          const shape = f.classification?.structuralShape;
+          if (shape === undefined) continue;
+          const entry =
+            routedByShape.get(shape) ??
+            { static_summary: 0, semantic_parse: 0 };
+          if (f.routing === "static_summary") entry.static_summary += 1;
+          else entry.semantic_parse += 1;
+          routedByShape.set(shape, entry);
+        }
+        if (routedByShape.size > 0) {
+          lines.push(`### Routing by shape`);
+          lines.push(``);
+          lines.push(`| Shape | static_summary | semantic_parse |`);
+          lines.push(`|---|---:|---:|`);
+          // Render in the canonical shapeOrder for stable diffs
+          // across runs (matches Structural shapes section above).
+          for (const s of shapeOrder) {
+            const entry = routedByShape.get(s);
+            if (entry === undefined) continue;
+            if (entry.static_summary === 0 && entry.semantic_parse === 0) {
+              continue;
+            }
+            lines.push(`| ${s} | ${entry.static_summary} | ${entry.semantic_parse} |`);
+          }
+          lines.push(``);
+        }
+
+        // Notable static summaries — show every file that bypassed
+        // the LLM, capped at 15 rows (matches the cap on the
+        // Notable classifications table above). Sorted by path for
+        // deterministic output.
+        const staticSummaries = filesWithRouting
+          .filter((f) => f.routing === "static_summary")
+          .sort((a, b) => a.filePath.localeCompare(b.filePath))
+          .slice(0, 15);
+        if (staticSummaries.length > 0) {
+          lines.push(`### Notable static summaries`);
+          lines.push(``);
+          lines.push(`| Path | Shape | Role | Reason |`);
+          lines.push(`|---|---|---|---|`);
+          for (const f of staticSummaries) {
+            const c = f.classification!;
+            const rel = relativiseOrAbsolute(f.filePath, data.rootDir);
+            const reason = c.reasons[0] ?? "—";
+            lines.push(
+              `| \`${rel}\` | ${c.structuralShape} | ${c.semanticRole} | ${reason} |`,
+            );
+          }
+          lines.push(``);
+        }
+      }
+    }
   }
 
   // Per-file table (concise). Source file path relative to rootDir
