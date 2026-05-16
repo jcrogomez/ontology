@@ -19,10 +19,16 @@ describe('Ollama Model Registry Schema', () => {
   });
 
   it('getDefaultRoutingForTask returns tier and preferred', () => {
+    // semantic_parse defaults were recalibrated by bake-off v2
+    // (BAKEOFF_3B_FAMILY_2026-05-15.md §2.1 + §5; commit e106c02):
+    // qwen2.5-coder:3b delivered deterministic ~95% single-run OK
+    // rate and llama3.2:3b is the high-confidence ensemble fallback.
+    // Both fit under the M1 5.3 GiB VRAM ceiling the 7-8B family
+    // stressed.
     const routing = getDefaultRoutingForTask('semantic_parse');
     expect(routing).toBeDefined();
     expect(routing.tier).toBe('fast');
-    expect(routing.preferred).toEqual(['qwen2.5-coder:7b', 'llama3.1:8b']);
+    expect(routing.preferred).toEqual(['qwen2.5-coder:3b', 'llama3.2:3b']);
   });
 
   it('unknown task fails clearly', () => {
