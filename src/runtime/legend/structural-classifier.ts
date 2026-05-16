@@ -91,6 +91,45 @@ export interface StaticSignals {
   symbolCount?: number;
 }
 
+/**
+ * Slim, semantic view of the file's import/export surface — exposed
+ * here so downstream consumers (notably static-summary.ts) can build
+ * deterministic intent extractions WITHOUT re-parsing the file or
+ * importing ParsedTSFile shapes. Populated only for parseable
+ * languages (typescript / tsx / javascript / jsx); absent on
+ * non-parseable files.
+ *
+ * Phase ε β-self-ingest finding: the previous classifier output
+ * stripped all symbol names from its surface, leaving buildStaticSummary
+ * with no vocabulary to put in provides/requires. Barrels and
+ * declaration-only modules — files whose entire semantic identity IS
+ * their export list — round-tripped to Jaccard 0 in verify-homeomorphism.
+ * This field restores the vocabulary.
+ */
+export interface ClassificationVocabulary {
+  /** Top-level exports: declarations + named re-exports. Wildcard
+   * re-exports (`export * from "./x.js"`) produce no entries here —
+   * they have no local name. See `imports` for the module surface. */
+  exports: ReadonlyArray<{
+    name: string;
+    kind: "value" | "type";
+    /** Set when this export passes through from another module
+     * (`export { X } from "./y.js"`). */
+    reExportedFrom?: string;
+  }>;
+  /** Every module specifier this file consumes — including the
+   * synthetic specifiers from `export * from "./x.js"` (which look
+   * like imports at the AST level and ARE structural dependencies). */
+  imports: ReadonlyArray<{
+    modulePath: string;
+    kind: "value" | "type" | "namespace";
+    /** Specific named symbols brought in by `import { … } from …`.
+     * Empty for `import "./side-effect.js"`, for namespace imports,
+     * and for the synthetic ImportRefs produced by `export *`. */
+    symbols: ReadonlyArray<string>;
+  }>;
+}
+
 export interface StructuralClassification {
   path: string;
   language: SourceLanguage;
@@ -99,6 +138,10 @@ export interface StructuralClassification {
   confidence: number;
   reasons: string[];
   signals: StaticSignals;
+  /** Phase ε prework C follow-up — parsed-AST vocabulary for
+   * downstream deterministic extraction. Absent on non-parseable
+   * languages (json, markdown, unknown). */
+  vocabulary?: ClassificationVocabulary;
 }
 
 // ── Language detection ─────────────────────────────────────────────────────
@@ -664,6 +707,7 @@ export function classifySourceFile(input: {
   const ast = walkAst(sourceFile);
   const signals = buildSignals(parsed, ast);
   const verdict = applyRules({ filePath, language, signals });
+  const vocabulary = buildVocabulary(parsed);
 
   return {
     path: filePath,
@@ -673,5 +717,41 @@ export function classifySourceFile(input: {
     confidence: verdict.confidence,
     reasons: verdict.reasons,
     signals,
+    vocabulary,
   };
+}
+
+// Narrow ParsedTSFile down to the semantic surface static-summary.ts
+// (and any future deterministic-extraction consumer) actually needs.
+// Deterministic ordering preserved: imports/exports are emitted in
+// source-file order, so two calls on the same content produce
+// identical structures.
+function buildVocabulary(parsed: ParsedTSFile): ClassificationVocabulary {
+  const exports = parsed.exports.map((e) => {
+    const entry: ClassificationVocabulary["exports"][number] = {
+      name: e.name,
+      kind: e.kind,
+    };
+    if (e.reExportedFrom !== undefined) {
+      return { ...entry, reExportedFrom: e.reExportedFrom };
+    }
+    return entry;
+  });
+  const imports = parsed.imports.map((i) => {
+    // Build the "symbols this import brings into scope" set. For
+    // named imports `{ a, b }` it is [a, b]; for default imports it
+    // is [defaultImport]; for namespace imports it is [namespace];
+    // for wildcard re-exports (`export * from "./x.js"`) and
+    // side-effect imports it is the empty array.
+    const symbols: string[] = [];
+    for (const s of i.imports) symbols.push(s);
+    if (i.defaultImport !== undefined) symbols.push(i.defaultImport);
+    if (i.namespace !== undefined) symbols.push(i.namespace);
+    return {
+      modulePath: i.modulePath,
+      kind: i.kind,
+      symbols,
+    };
+  });
+  return { exports, imports };
 }
