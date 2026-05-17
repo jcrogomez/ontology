@@ -39,16 +39,34 @@ export const DefaultOllamaRouting: ProviderRoutingMap = {
   // Other LlmTasks in this routing map still reference legacy
   // 7b/8b/14b names; updating them is out of scope for this change
   // (only structured_extraction was bake-off'd).
+  // IMPORTANT — preferred[] ordering: `getDefaultModelForTask`
+  // currently returns `preferred[0]` ONLY. There is no automatic
+  // fallback through preferred[1..N] when the first entry isn't
+  // pulled / doesn't fit VRAM. Phase ε β′ (2026-05-16) surfaced
+  // this when the original ordering put 14b-tier models first and
+  // every code_sketch dispatch failed with "model not found" on
+  // an M1 (5.3 GiB VRAM ceiling per bake-off v2 §2.1). The lists
+  // below put the largest DEPLOYABLE model on each host class
+  // first; larger aspirational entries are kept as second so the
+  // semantic ranking stays readable, but they will not dispatch
+  // until either the dispatcher learns to fall back or the host
+  // can host them.
   semantic_parse: {
     tier: "fast",
     preferred: ["qwen2.5-coder:3b", "llama3.2:3b"]
   },
   node_expand: {
     tier: "balanced",
-    preferred: ["qwen2.5:14b", "llama3.1:8b"]
+    // qwen2.5:14b kept as the larger aspirational target; llama3.1:8b
+    // first because 14b doesn't fit M1 VRAM.
+    preferred: ["llama3.1:8b", "qwen2.5:14b"]
   },
   node_critique: {
     tier: "critic",
+    // Both options exceed M1's 5.3 GiB VRAM ceiling — node_critique
+    // is functionally unavailable on this host class until either a
+    // smaller critic-tier model is added OR the host grows. Ordering
+    // here is purely semantic ranking; neither will dispatch on M1.
     preferred: ["qwen2.5:14b", "deepseek-r1:14b"]
   },
   context_assemble: {
@@ -57,11 +75,15 @@ export const DefaultOllamaRouting: ProviderRoutingMap = {
   },
   code_sketch: {
     tier: "balanced",
-    preferred: ["qwen2.5-coder:14b", "qwen2.5-coder:7b"]
+    // 7b is the largest deployable qwen-coder on M1 (4.7 GiB vs 5.3
+    // ceiling). 14b kept as aspirational; will not dispatch until
+    // either dispatcher fallback ships or host VRAM grows.
+    preferred: ["qwen2.5-coder:7b", "qwen2.5-coder:14b"]
   },
   test_generate: {
     tier: "balanced",
-    preferred: ["qwen2.5-coder:14b", "qwen2.5-coder:7b"]
+    // Same VRAM constraint as code_sketch.
+    preferred: ["qwen2.5-coder:7b", "qwen2.5-coder:14b"]
   },
   documentation: {
     tier: "fast",
