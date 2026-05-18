@@ -17,6 +17,13 @@ con tooling y documentación que prometían `docs/INSPECTOR.md` o
 `docs/VERIFICATION.md` se materializaron como secciones inline en
 [`PROJECT_LEGEND.md`](PROJECT_LEGEND.md) §3 y §6 respectivamente.
 
+> **Alcance de este documento.** Cubre los streams entre Phase γ y
+> Phase ζ. Las dos chapters que vienen *después* de ζ —
+> [`WAKEUP_SCANNERS.md`](WAKEUP_SCANNERS.md) (system-initiated
+> proposals) y [`PROMPT_GENERATORS.md`](PROMPT_GENERATORS.md)
+> (content-addressed templates, prerrequisito de scanners LLM) —
+> viven en sus propios RFCs. Sus roadmaps no se duplican aquí.
+
 ---
 
 ## 0. Grafo de dependencias y orden recomendado
