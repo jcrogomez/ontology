@@ -563,3 +563,23 @@ the Ontology repo; the publishable adjunction-claim measurement.
 - **`onto replay`** — rebuild `state.json` from `events.jsonl` and
   assert equality. Would lift the "replayable" claim from analogy to
   strict (see [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §4.4).
+
+**Wakeup + Generators (post-Phase ζ chapters, RFCs drafted):**
+
+- 🟡 **`onto wakeup [--scope] [--scanners] [--budget] [--cost-estimate] [--dry-run]`** —
+  runs system-initiated scanners over a subgraph, emitting typed Intents
+  that materialise as bundles of atomic proposals. Fase 1 ships the
+  topological scanners (`orphan_warning`, `missing_edge`) with no LLM
+  dependency. Spec: [`WAKEUP_SCANNERS.md`](WAKEUP_SCANNERS.md).
+- 🟡 **`onto bundle list / show / apply / reject`** — manage the
+  transactional groupers that wakeup produces. `bundle apply` ratifies
+  all hijas atomically after dry-run pre-flight under the existing
+  advisory lock. Spec: [`WAKEUP_SCANNERS.md`](WAKEUP_SCANNERS.md) §2.3.
+- 🟡 **`onto generator register / list / show / compile / verify`** —
+  manage content-addressed, composable prompt templates in
+  `.ontology/generators/`. Materialisation via `{{param}}` substitution
+  and `@expand: gen_xxx` composition (reusing the existing PromptAST
+  marker). Prerequisite for [`WAKEUP_SCANNERS.md`](WAKEUP_SCANNERS.md)
+  Fase 3 (LLM-using scanners) and migration target for the two
+  hardcoded prompts in `src/commands/ingest/` and
+  `src/runtime/translator.ts`. Spec: [`PROMPT_GENERATORS.md`](PROMPT_GENERATORS.md).
