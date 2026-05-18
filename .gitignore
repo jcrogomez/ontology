@@ -21,6 +21,10 @@ src/generated/
 .ontology/reports/model-runs/
 .ontology/work/
 
+# Phase ε self-ingestion + archive snapshots — never staged
+.ontology.archive-*/
+.ontology.self-ingest-*-result/
+
 # Workspace artifacts
 .claude/
 PAPER_DRAFT.md

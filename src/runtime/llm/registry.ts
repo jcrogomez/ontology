@@ -171,6 +171,26 @@ export function getDefaultModelForTask(
   return table[task]?.preferred[0];
 }
 
+// Full ordered list of preferred models for a (provider, task) pair.
+// Used by the dispatcher's fallback loop — when preferred[0] fails
+// with a model-unavailable error (not pulled locally / 404 from
+// remote / VRAM ceiling on M1), the dispatcher tries preferred[1..N]
+// before surfacing the failure. Phase ε β′ (2026-05-16) surfaced this
+// gap in anger: the registry listed an undeployable 14b first and
+// every code_sketch dispatch failed in 2s. Empty array when the
+// provider has no routing table (mock, literal) or the task has no
+// preferred models.
+export function getPreferredModelsForTask(
+  provider: LlmProvider,
+  task: LlmTask,
+): readonly string[] {
+  let table: ProviderRoutingMap | undefined;
+  if (provider === "ollama") table = DefaultOllamaRouting;
+  if (provider === "anthropic") table = DefaultAnthropicRouting;
+  if (!table) return [];
+  return table[task]?.preferred ?? [];
+}
+
 // Legacy alias preserved so existing callers (mock adapter test
 // helpers, etc.) keep working.
 export function getDefaultRoutingForTask(task: LlmTask): ProviderRoutingEntry {

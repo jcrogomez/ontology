@@ -82,23 +82,55 @@ import {
 // testable end-to-end against the mock provider without ever firing
 // the real API.
 
+// Symbol-name vocabulary contract — Phase ε β′ vocab-domain guard
+// (MR_2026-05-17 §6.2). The intent-validator's gluing check matches
+// `requires` entries against upstream nodes' `provides` arrays;
+// both must speak the SAME vocabulary. Both should carry symbol
+// names (`createNodeProposalForExtraction`), never module paths
+// (`./io.js`) or source-file specifiers (`foo.tsx`). The β′ run
+// (2026-05-16) emitted module paths from buildStaticSummary and the
+// gluing check silently rejected — 6 of 7 deflected files moved to
+// `unrecoverable`. Move 1b (2026-05-18) fixed buildStaticSummary;
+// this schema refine is the regression net so a future contributor
+// who reaches for a module-path shape elsewhere hits a clear Zod
+// rejection at extraction time instead of producing silent
+// unrecoverables downstream.
+//
+// Permissive on purpose: rejects only the two known broken shapes
+// (module-path prefix, source-file extension suffix). Any other
+// string is accepted — the schema is the LAST line of defense, not
+// a positive-only allowlist.
+const MODULE_PATH_PREFIX = /^\.\.?\//;
+const SOURCE_FILE_EXT = /\.(js|ts|tsx|jsx|mjs|cjs)$/;
+
+export const SymbolNameSchema = z
+  .string()
+  .min(1)
+  .refine((s) => !MODULE_PATH_PREFIX.test(s) && !SOURCE_FILE_EXT.test(s), {
+    message:
+      'must be a symbol name (e.g. "createNodeProposalForExtraction"), not a module path ("./foo.js") or source-file specifier ("foo.tsx"). The intent-validator gluing check matches requires/provides on symbol names; vocabulary-domain mismatches surface as silent `unrecoverable` verdicts in verify-homeomorphism. See docs/legend/calibrations/SELF_INGEST_BETA_PRIME_2026-05-16_SYNTHESIS.md.',
+  });
+
 // JSON the extractor returns. The schema is the contract between the
 // system prompt and the parser; if the LLM emits anything outside
 // this shape, Zod rejects it loudly.
-const ExtractionResultSchema = z.object({
+export const ExtractionResultSchema = z.object({
   label: z.string().min(1).max(256),
   level: AbstractionLevelSchema,
   kind: NodeKindSchema,
   manifestation: ManifestationSchema.optional(),
   language: z.string().optional(),
   prompt: z.string().min(1),
-  requires: z.array(z.string()).optional(),
-  provides: z.array(z.string()).optional(),
+  // @semantic: symbol-name — see SymbolNameSchema docs above. The
+  // gluing check matches these against upstream `provides`.
+  requires: z.array(SymbolNameSchema).optional(),
+  // @semantic: symbol-name — see SymbolNameSchema docs above.
+  provides: z.array(SymbolNameSchema).optional(),
   forbids: z.array(z.string()).optional(),
   rules: z.array(z.string()).optional(),
 });
 
-type ExtractionResult = z.infer<typeof ExtractionResultSchema>;
+export type ExtractionResult = z.infer<typeof ExtractionResultSchema>;
 
 // Phase ε E6 step 4 — score an ExtractionResult by how many optional
 // structured fields it populates. Required fields (label / level /
@@ -632,7 +664,14 @@ function computeAdaptiveBudget(
   const MIN_CONTEXT = 4096;
   const MAX_CONTEXT = 16384;
   const MIN_OUTPUT = 1024;
-  const MAX_OUTPUT = 4096;
+  // Anthropic-side default is 8192 (the adapter's own MAX_TOKENS).
+  // γ-7 calibration explicitly required 8192 for files where the
+  // adaptive-thinking budget eats the output ceiling. Phase ε Move 3
+  // (Sonnet 4.6 verify probe) hits this cap on files > ~3 KB if it
+  // stays at 4096. Aligned with the adapter default here so the
+  // ingest path no longer caps below what the underlying provider
+  // is willing to emit. See docs/legend/calibrations/VIBE_REASONING_GAMMA_7_2026-05-12.md.
+  const MAX_OUTPUT = 8192;
 
   const inputChars =
     systemPromptChars +
@@ -707,6 +746,26 @@ function buildRetryPrompt(
 // the result carries reason "ensemble_failed" with a message that
 // summarises each rep's failure reason.
 
+// Pure helper for the fatal-failure metadata path. Extracted so the
+// rep-N-ok / rep-(N+1)-fatal counting is unit-testable without
+// running the ensemble loop. Phase ε bug fix (2026-05-18, MR §4.3):
+// the previous inline path emitted validCount: 0 and failedCount:
+// reps.length + 1, double-counting successful pre-fatal reps as
+// failures. Exported for ingest-ensemble-scoring.test.ts.
+export function ensembleCountsOnFatal(
+  repsBeforeFatal: ReadonlyArray<{ ok: boolean }>,
+): { repetitions: number; validCount: number; failedCount: number } {
+  const valid = repsBeforeFatal.filter((r) => r.ok).length;
+  const failed = repsBeforeFatal.length - valid;
+  return {
+    // Non-fatal attempts already in `reps` PLUS the one that hit the
+    // structural-fatal branch (read_failed / binary_content / empty_file).
+    repetitions: repsBeforeFatal.length + 1,
+    validCount: valid,
+    failedCount: failed + 1,
+  };
+}
+
 async function extractIntentEnsemble(
   inputs: ExtractInputs,
 ): Promise<ExtractResult> {
@@ -780,17 +839,18 @@ async function extractIntentEnsemble(
 
   // Short-circuit fatal failure — propagate the original reason +
   // message but tag with ensemble metadata so the report still shows
-  // that the file went through the ensemble code path.
+  // that the file went through the ensemble code path. Counts come
+  // from the pure helper below so the rep-N-ok / rep-(N+1)-fatal
+  // trace is testable without spinning up the LLM loop.
   if (lastFatalFailure) {
+    const counts = ensembleCountsOnFatal(reps);
     return {
       ...lastFatalFailure,
       telemetry: aggregatedTelemetry,
       ensemble: {
         mode: "high-confidence",
         model: HIGH_CONFIDENCE_MODEL,
-        repetitions: reps.length + 1, // includes the failing structural rep
-        validCount: 0,
-        failedCount: reps.length + 1,
+        ...counts,
       },
     };
   }

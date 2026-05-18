@@ -150,13 +150,23 @@ function buildBarrelSummary(
   // the same name twice would be a bug we want to surface, not hide).
   const provides = namedReExports.map((e) => e.name);
 
-  // requires — every upstream module specifier this barrel depends
-  // on. Includes both named re-export sources AND wildcard re-export
-  // sources. Deduped (a module may host several named re-exports);
-  // source order preserved.
-  const requires = uniqueInOrder([
-    ...(vocabulary?.imports ?? []).map((i) => i.modulePath),
-  ]);
+  // requires — every imported SYMBOL NAME this barrel pulls in from
+  // upstream modules. Phase ε β′ (2026-05-16) revealed that emitting
+  // module specifiers here causes the intent-validator's gluing check
+  // to silently reject — upstream nodes' `provides` carry symbol
+  // names (e.g. `createNodeProposalForExtraction`), not module paths
+  // (e.g. `./io.js`). The vocabulary-domain mismatch turned
+  // successful extractions into `unrecoverable` verdicts. Move 1b
+  // (Phase ε 2026-05-18) restored symbol-domain consistency by
+  // pulling from `i.symbols` instead of `i.modulePath`. Wildcard
+  // re-exports (`export * from "..."`) have no symbols visible at
+  // the AST layer and contribute zero entries; the prompt surfaces
+  // them separately so compile-back still sees them. Source-file
+  // order preserved; deduped (a module hosting multiple named
+  // re-exports surfaces each symbol once).
+  const requires = uniqueInOrder(
+    (vocabulary?.imports ?? []).flatMap((i) => i.symbols),
+  );
 
   // The prompt is the load-bearing field for compile-back. It MUST
   // mention specific upstream module specifiers and the named
@@ -236,18 +246,22 @@ function buildDeclarationOnlySummary(
   // name here is type-only.
   const exportedNames = (vocabulary?.exports ?? []).map((e) => e.name);
 
-  // requires — type-only imports are this file's structural
-  // dependencies. value imports CAN appear in declaration-only
-  // files (e.g. `import type` ergonomic shortcuts that still parse
-  // as values in some configs); include them too. Dedupe by module
-  // path, preserve source order.
+  // requires — imported SYMBOL NAMES referenced by this file's
+  // type declarations. Phase ε β′ (2026-05-16) Move 1b: same
+  // vocabulary-domain fix as barrel — the gluing check needs
+  // symbol names (which upstream `provides` arrays carry), not
+  // module paths. Source order preserved; deduped.
   const requires = uniqueInOrder(
-    (vocabulary?.imports ?? []).map((i) => i.modulePath),
+    (vocabulary?.imports ?? []).flatMap((i) => i.symbols),
   );
 
   // Imported symbols referenced inside the type declarations.
   // Surfaced in the prompt so compile-back has anchors for any
-  // declared types that reference upstream tokens.
+  // declared types that reference upstream tokens. Post-Move-1b
+  // this computation coincides with `requires`; kept as a separate
+  // local for prompt-render clarity (if `requires` semantics ever
+  // diverge from "what the prompt cites", they will not need to
+  // be re-aligned).
   const importedSymbols = uniqueInOrder(
     (vocabulary?.imports ?? []).flatMap((i) => i.symbols),
   );

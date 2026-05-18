@@ -97,6 +97,34 @@ export const MODEL_CAPABILITY_PROFILES: readonly ModelCapabilityProfile[] = [
     notes:
       "Bake-off v2 (2026-05-15) — 63% single-run, 95% ensemble × 3 but at ~5× the wall-clock of qwen/llama (≈17 min/run vs ≈6.5). Strictly dominated on the Pareto frontier for production extraction. Useful as an adversarial probe in test setups where a different failure distribution helps stress prompts/schemas. No preferredFor set — the model is not banned, just not recommended by calibration. See BAKEOFF_3B_FAMILY_2026-05-15.md §2.3.",
   },
+
+  // ── Anthropic Claude 4.x — added 2026-05-18 ahead of Phase ε Move 3 ──
+  //
+  // Initial profiles seeded from DefaultAnthropicRouting in registry.ts
+  // and the existing γ-2 / γ-7 measurement evidence. Empty bannedFor
+  // across the family — these are frontier models with no measured
+  // failure mode on the tasks the routing assigns to them. The
+  // preferredFor mapping mirrors the tier choice (Haiku=fast,
+  // Sonnet=balanced, Opus=critic). Re-tune from data after Move 3
+  // produces per-task Anthropic numbers.
+  {
+    model: "claude-haiku-4-5",
+    preferredFor: ["summarization"],
+    notes:
+      "Fast tier — short prose, structured extraction with low ambiguity. Routed for context_assemble / documentation / inspect (Project Legend δ-1's Inspector translator runs on Haiku at ~$0.002 per inspect, see PROJECT_LEGEND.md §3.2). No γ-2/γ-7 calibration on this tier yet; profile reflects the registry's tier intent rather than measured evidence. See registry.ts DefaultAnthropicRouting.",
+  },
+  {
+    model: "claude-sonnet-4-6",
+    preferredFor: ["structured_extraction"],
+    notes:
+      "Balanced tier — primary route for semantic_parse (onto ingest extraction) and node_expand / test_generate. The Anthropic side of the Phase ε Move 3 ceiling probe dispatches Sonnet 4.6 for verify, picked over Opus on $/quality grounds (the schema does the heavy lifting). No dedicated γ-2/γ-7 calibration on Sonnet specifically yet (γ-2 used Opus end-to-end on hash.ts); Move 3 will produce the first numbers. See registry.ts DefaultAnthropicRouting.",
+  },
+  {
+    model: "claude-opus-4-7",
+    preferredFor: ["code_generation", "critique"],
+    notes:
+      "Critic tier — code_sketch (compile-back / verify-homeomorphism) and node_critique. γ-2 calibration on src/core/integrity/hash.ts (2026-05-12, HASH_TS_2026-05-12.md) ran Opus end-to-end as both extractor and compiler: 5/5 functions semantically equivalent at ~$0.08/round-trip. γ-7 (VIBE_REASONING_GAMMA_7_2026-05-12.md) Vibe-Reasoning corpus measurement also used Opus throughout, with the MANDATORY EXPORTS block lifting the ε-equivalent fraction +29pp. The publishable code-generation tier today.",
+  },
 ];
 
 // ── LlmTask ⇒ LlmTaskKind mapping ───────────────────────────────────────────

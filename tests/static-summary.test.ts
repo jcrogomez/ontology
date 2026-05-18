@@ -17,9 +17,24 @@ import type {
 
 // Mirror of ExtractionResultSchema from src/commands/ingest/index.ts.
 // Imported separately here (rather than from the commands module) to
-// keep the unit test free of CLI coupling — the contract under test
-// is that buildStaticSummary outputs validate against the same Zod
-// shape the proposal layer enforces.
+// keep the unit test free of CLI / runtime coupling — the contract
+// under test is that buildStaticSummary outputs validate against the
+// same Zod shape the proposal layer enforces.
+//
+// IMPORTANT: keep the refine on requires/provides in sync with the
+// real SymbolNameSchema in src/commands/ingest/index.ts. Phase ε β′
+// (2026-05-16) Move 1b added a vocabulary-domain guard that rejects
+// module paths and source-file specifiers; the mirror enforces it
+// here so buildStaticSummary regressions surface in this suite, not
+// only in the heavier integration tests.
+const SymbolNameMirror = z
+  .string()
+  .min(1)
+  .refine(
+    (s) => !/^\.\.?\//.test(s) && !/\.(js|ts|tsx|jsx|mjs|cjs)$/.test(s),
+    { message: "requires/provides must be symbol names, not module paths" },
+  );
+
 const ExtractionResultSchema = z.object({
   label: z.string().min(1).max(256),
   level: AbstractionLevelSchema,
@@ -27,8 +42,8 @@ const ExtractionResultSchema = z.object({
   manifestation: ManifestationSchema.optional(),
   language: z.string().optional(),
   prompt: z.string().min(1),
-  requires: z.array(z.string()).optional(),
-  provides: z.array(z.string()).optional(),
+  requires: z.array(SymbolNameMirror).optional(),
+  provides: z.array(SymbolNameMirror).optional(),
   forbids: z.array(z.string()).optional(),
   rules: z.array(z.string()).optional(),
 });
@@ -93,17 +108,19 @@ describe("buildStaticSummary — barrel (with vocabulary)", () => {
     expect(summary.provides).toEqual(["io", "result", "laws"]);
   });
 
-  it("requires lists every upstream module specifier (named + wildcard)", () => {
+  it("requires lists imported SYMBOL NAMES (not module paths — Move 1b)", () => {
     const summary = buildStaticSummary({
       filePath: "src/runtime/effects/index.ts",
       classification: barrelClassification,
     });
-    expect(summary.requires).toEqual([
-      "./io.js",
-      "./result.js",
-      "./laws.js",
-      "./async.js",
-    ]);
+    // Post-Move-1b (Phase ε 2026-05-18): requires carries symbol
+    // names so the gluing check (which compares against upstream
+    // `provides` arrays of symbol names) can resolve. Wildcard
+    // re-exports (`./async.js` with `symbols: []`) contribute zero
+    // entries — the AST does not surface their symbol set. The prompt
+    // still mentions module paths separately for compile-back context
+    // (see the prompt assertion below).
+    expect(summary.requires).toEqual(["io", "result", "laws"]);
   });
 
   it("prompt mentions specific re-export module specifiers and names", () => {
@@ -247,7 +264,9 @@ describe("buildStaticSummary — declaration_only (with vocabulary)", () => {
       filePath: "src/runtime/context/types.ts",
       classification: typesClassification,
     });
-    expect(summary.requires).toEqual(["../../schemas/ontology.js"]);
+    // Post-Move-1b: requires carries imported SYMBOL NAMES, not
+    // module paths — matches the gluing check's vocabulary.
+    expect(summary.requires).toEqual(["AbstractionLevel", "NodeKind"]);
   });
 
   it("prompt mentions the declared type names AND the imported symbols", () => {
@@ -414,8 +433,12 @@ describe("β-self-ingest regression — vocabulary is preserved end-to-end", () 
     });
     // Named re-exports surface as provides — exact AST order.
     expect(summary.provides).toEqual(["foo", "bar", "baz"]);
-    // Every upstream module path lands in requires (named + wildcard).
-    expect(summary.requires).toEqual(["./alpha.js", "./beta.js", "./gamma.js"]);
+    // Post-Move-1b: requires carries imported SYMBOL NAMES from
+    // named re-exports. Wildcard re-exports (`export * from
+    // "./gamma.js"`) have no symbols at the AST layer and
+    // contribute zero entries — gamma is still mentioned in the
+    // prompt below for compile-back context.
+    expect(summary.requires).toEqual(["foo", "bar", "baz"]);
     // Prompt mentions all three upstream specifiers + the named symbols.
     expect(summary.prompt).toContain("./alpha.js");
     expect(summary.prompt).toContain("./beta.js");
@@ -451,7 +474,8 @@ describe("β-self-ingest regression — vocabulary is preserved end-to-end", () 
       "OntologyNode",
       "LlmTask",
     ]);
-    expect(summary.requires).toEqual(["./foo.js"]);
+    // Post-Move-1b: imported symbol names, not module paths.
+    expect(summary.requires).toEqual(["Foo"]);
     expect(summary.prompt).toContain("UserConfig");
     expect(summary.prompt).toContain("OntologyNode");
     expect(summary.prompt).toContain("LlmTask");
@@ -464,12 +488,15 @@ describe("β-self-ingest regression — vocabulary is preserved end-to-end", () 
     const content = `export { realName } from "./real-module.js";\n`;
     const classification = classifySourceFile({ path: filePath, content });
     const summary = buildStaticSummary({ filePath, classification });
-    // Only what's literally in the source surfaces.
+    // Only what's literally in the source surfaces. Post-Move-1b:
+    // requires carries the imported symbol from the re-export's
+    // implicit import (not the module path).
     expect(summary.provides).toEqual(["realName"]);
-    expect(summary.requires).toEqual(["./real-module.js"]);
+    expect(summary.requires).toEqual(["realName"]);
     // Nothing fictional shows up.
     expect(summary.provides).not.toContain("invented");
     expect(summary.requires).not.toContain("./invented.js");
+    expect(summary.requires).not.toContain("invented");
   });
 });
 
@@ -500,5 +527,117 @@ describe("β-self-ingest regression — large barrel doesn't blow up the prompt"
     expect(summary.provides!.length).toBe(32);
     // The prompt's inline list of import-target symbols is bounded.
     expect(summary.prompt).toMatch(/and \d+ more/);
+  });
+});
+
+// ── Move 1b regression — requires must carry symbol names ──────────────────
+//
+// Phase ε β′ (2026-05-16) revealed that buildStaticSummary emitted
+// MODULE PATHS into `requires` while the gluing check expected
+// SYMBOL NAMES. Result: six of seven static-summary deflected files
+// moved from `divergent_*` to `unrecoverable` because the gluing
+// check silently rejected every requires entry. Move 1b (Phase ε
+// 2026-05-18) swapped the source from `i.modulePath` to
+// `i.symbols.flatMap`. The tests below pin that contract.
+
+describe("Move 1b — requires carries symbol names, never module paths", () => {
+  it("barrel with named re-exports → requires is symbol names", () => {
+    const classification = fixtureClassification({
+      path: "src/runtime/effects/index.ts",
+      shape: "barrel",
+      vocabulary: {
+        exports: [
+          { name: "io", kind: "value", reExportedFrom: "./io.js" },
+          { name: "result", kind: "value", reExportedFrom: "./result.js" },
+        ],
+        imports: [
+          { modulePath: "./io.js", kind: "value", symbols: ["io"] },
+          { modulePath: "./result.js", kind: "value", symbols: ["result"] },
+        ],
+      },
+    });
+    const summary = buildStaticSummary({
+      filePath: "src/runtime/effects/index.ts",
+      classification,
+    });
+    expect(summary.requires).toEqual(["io", "result"]);
+    // None of the entries are module paths or end in a source extension.
+    for (const req of summary.requires ?? []) {
+      expect(req).not.toMatch(/^\.\.?\//);
+      expect(req).not.toMatch(/\.(js|ts|tsx|jsx|mjs|cjs)$/);
+    }
+  });
+
+  it("declaration_only with type imports → requires is imported type names", () => {
+    const classification = fixtureClassification({
+      path: "src/runtime/context/types.ts",
+      shape: "declaration_only",
+      vocabulary: {
+        exports: [
+          { name: "ContextRequirement", kind: "type" },
+        ],
+        imports: [
+          {
+            modulePath: "../../schemas/ontology.js",
+            kind: "type",
+            symbols: ["AbstractionLevel", "NodeKind"],
+          },
+        ],
+      },
+    });
+    const summary = buildStaticSummary({
+      filePath: "src/runtime/context/types.ts",
+      classification,
+    });
+    expect(summary.requires).toEqual(["AbstractionLevel", "NodeKind"]);
+    for (const req of summary.requires ?? []) {
+      expect(req).not.toMatch(/^\.\.?\//);
+      expect(req).not.toMatch(/\.(js|ts|tsx|jsx|mjs|cjs)$/);
+    }
+  });
+
+  // §4.7 — Defensive regression. Even if some future refactor
+  // re-introduces a code path that reaches for `i.modulePath`, this
+  // sweep over diverse fixtures catches the leak.
+  it("never emits a requires entry shaped like a module path (defensive)", () => {
+    const fixtures: StructuralClassification[] = [
+      fixtureClassification({
+        path: "src/a/index.ts",
+        shape: "barrel",
+        vocabulary: {
+          exports: [{ name: "x", kind: "value", reExportedFrom: "./x.ts" }],
+          imports: [{ modulePath: "./x.ts", kind: "value", symbols: ["x"] }],
+        },
+      }),
+      fixtureClassification({
+        path: "src/b/types.tsx",
+        shape: "declaration_only",
+        vocabulary: {
+          exports: [{ name: "T", kind: "type" }],
+          imports: [
+            { modulePath: "./x.tsx", kind: "type", symbols: ["X"] },
+            { modulePath: "./y.jsx", kind: "type", symbols: ["Y"] },
+          ],
+        },
+      }),
+      fixtureClassification({
+        path: "src/c/index.ts",
+        shape: "barrel",
+        vocabulary: {
+          exports: [{ name: "a", kind: "value", reExportedFrom: "./mjs-mod.mjs" }],
+          imports: [{ modulePath: "./mjs-mod.mjs", kind: "value", symbols: ["a"] }],
+        },
+      }),
+    ];
+    for (const classification of fixtures) {
+      const summary = buildStaticSummary({
+        filePath: classification.path,
+        classification,
+      });
+      for (const req of summary.requires ?? []) {
+        expect(req).not.toMatch(/^\.\.?\//);
+        expect(req).not.toMatch(/\.(js|ts|tsx|jsx|mjs|cjs)$/);
+      }
+    }
   });
 });

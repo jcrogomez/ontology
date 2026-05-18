@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { scoreExtractionCompleteness } from "../src/commands/ingest/index.js";
+import {
+  ensembleCountsOnFatal,
+  scoreExtractionCompleteness,
+} from "../src/commands/ingest/index.js";
 
 // Phase ε E6 step 4 — score-by-completeness is the function that
 // picks among multiple valid ensemble candidates. Required fields
@@ -87,5 +90,73 @@ describe("scoreExtractionCompleteness", () => {
     expect(scoreExtractionCompleteness(rich)).toBeGreaterThan(
       scoreExtractionCompleteness(sparse),
     );
+  });
+});
+
+// ── ensembleCountsOnFatal — bug fix MR_2026-05-18 §4.3 ─────────────────────
+//
+// extractIntentEnsemble runs N reps; if one of {read_failed,
+// binary_content, empty_file} fires, it short-circuits and tags the
+// returned fatal result with ensemble metadata. The pre-fix path
+// emitted validCount: 0 + failedCount: reps.length + 1 regardless of
+// how many of the pre-fatal reps had actually succeeded — making the
+// report telemetry undercount valid extractions and overcount
+// failures whenever a fatal hit landed after at least one ok rep.
+
+describe("ensembleCountsOnFatal", () => {
+  it("rep-1-fatal: 0 reps before fatal → 0 valid + 1 failed (the fatal itself)", () => {
+    expect(ensembleCountsOnFatal([])).toEqual({
+      repetitions: 1,
+      validCount: 0,
+      failedCount: 1,
+    });
+  });
+
+  it("rep-1-ok, rep-2-fatal → 1 valid + 1 failed (the fatal)", () => {
+    expect(ensembleCountsOnFatal([{ ok: true }])).toEqual({
+      repetitions: 2,
+      validCount: 1,
+      failedCount: 1,
+    });
+  });
+
+  it("rep-1-ok, rep-2-ok, rep-3-fatal → 2 valid + 1 failed (the fatal)", () => {
+    expect(ensembleCountsOnFatal([{ ok: true }, { ok: true }])).toEqual({
+      repetitions: 3,
+      validCount: 2,
+      failedCount: 1,
+    });
+  });
+
+  it("rep-1-failed, rep-2-fatal → 0 valid + 2 failed (pre + fatal)", () => {
+    expect(ensembleCountsOnFatal([{ ok: false }])).toEqual({
+      repetitions: 2,
+      validCount: 0,
+      failedCount: 2,
+    });
+  });
+
+  it("rep-1-ok, rep-2-failed, rep-3-fatal → 1 valid + 2 failed", () => {
+    expect(
+      ensembleCountsOnFatal([{ ok: true }, { ok: false }]),
+    ).toEqual({
+      repetitions: 3,
+      validCount: 1,
+      failedCount: 2,
+    });
+  });
+
+  it("validCount + failedCount always equals repetitions (accounting invariant)", () => {
+    for (const reps of [
+      [],
+      [{ ok: true }],
+      [{ ok: false }],
+      [{ ok: true }, { ok: true }],
+      [{ ok: true }, { ok: false }],
+      [{ ok: false }, { ok: false }],
+    ] as const) {
+      const r = ensembleCountsOnFatal(reps);
+      expect(r.validCount + r.failedCount).toBe(r.repetitions);
+    }
   });
 });
