@@ -172,8 +172,11 @@ are the highest-priority hardening item — see
 
 ## What is *not* in the architecture
 
-- **No PromptAST rewriting.** Markers are parsed; nothing rewrites
-  the body based on them.
+- **No PromptAST rewriting today.** Markers are parsed; nothing
+  rewrites the body based on them. [`PROMPT_GENERATORS.md`](PROMPT_GENERATORS.md)
+  (RFC) introduces `@expand: gen_xxx` as real substitution in
+  *generator bodies only*, leaving node-level `@expand:` as
+  metadata until separate work picks it up.
 - **No `compare` / `propose` context modes.** `assembleContext` rejects
   any mode other than `strict`.
 - **No `onto branch` CLI.** Branch fibration is a programmatic
