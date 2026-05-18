@@ -320,6 +320,12 @@ Full design in [`docs/RULES_TOPOS.md`](docs/RULES_TOPOS.md).
   `describeCartesianLift` into a proposal.
 - 🟡 **`onto query` extensions** — negation in shapes (`!hasIncoming`), exact
   edge profiles, multi-shape OR queries.
+- 🟡 **Prompt Generators** ([`PROMPT_GENERATORS.md`](PROMPT_GENERATORS.md))
+  — `@expand: gen_xxx` substitution in generator bodies makes Axiom 4
+  operational rewriting in the generator domain. Lifts
+  [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §Axiom 4 from T3
+  (metadata marker) to T2 in that domain; node-level `@expand:`
+  remains metadata until separate work picks it up.
 
 Each of these items has a one-line entry in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
