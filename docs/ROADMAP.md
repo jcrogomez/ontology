@@ -283,6 +283,24 @@ Bootstrap history table above.
   stream against a published intent network, surface any artefact that
   would have failed the validator.
 
+**Post-Phase ζ — self-maintaining intent network (RFCs drafted):**
+- 🟡 **Wakeup Scanners** — system-initiated proposals via topology and
+  LLM scanners that traverse the graph and emit typed Intents (orphan,
+  missing edge, split, merge, extract canon, supersede). Intents
+  desugar to sequences of atomic proposals already supported by the
+  current Proposal System; grouping is transactional via a new Bundle
+  artifact. Fase 1 (topological scanners, no LLM) is independent of any
+  other work and is the smallest unit that exercises system-initiated
+  proposals end-to-end. Spec: [`WAKEUP_SCANNERS.md`](WAKEUP_SCANNERS.md).
+- 🟡 **Prompt Generators** — content-addressed, composable prompt
+  templates so scanner-dispatched runs carry a verifiable causal chain
+  back to the parameterised template that produced their `promptHash`.
+  Reuses the existing `@expand:` marker in `parsePromptAST` (today
+  metadata only) as substitution primitive; the path that lifts
+  [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) Axiom 4 from T3 to
+  T2 in the generator domain. Prerequisite for Wakeup Fase 3 (LLM
+  scanners). Spec: [`PROMPT_GENERATORS.md`](PROMPT_GENERATORS.md).
+
 **Longer-term:**
 - 🔵 **Branch-merge proposals** — natural transformation between two
   fibers. Library-level work; needs a `BranchMergeProposal` shape and a
