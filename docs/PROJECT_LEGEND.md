@@ -449,6 +449,7 @@ infrastructure stack sits on top:
 | 6 | Verification framework (`verify-homeomorphism`, dual-distance + verdict folder) | **shipped** δ-2 (`29b330c`) | ~150 |
 | 7 | The `onto ingest <path>` command itself | **shipped** γ-1 single-file (`b670ca3`) + γ-5 directory (`a25ade9`) | ~250 |
 | 8 | Open-Prompt signing + replay (out of scope for v1) | future | ~260 |
+| 9 | Self-maintaining intent network — wakeup scanners ([`WAKEUP_SCANNERS.md`](WAKEUP_SCANNERS.md)) + content-addressed prompt templates ([`PROMPT_GENERATORS.md`](PROMPT_GENERATORS.md)) | future (RFCs drafted) | see RFCs |
 
 ### Per-layer detail
 
