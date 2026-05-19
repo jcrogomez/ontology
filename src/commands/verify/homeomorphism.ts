@@ -253,13 +253,19 @@ export async function verifyHomeomorphismCommand(
       const node = loadNodeById(r.nodeId, cwd);
       const literal: boolean | undefined =
         node?.literal !== undefined ? true : false;
-      // The cost record's provider/model fall back to the resolved
-      // verify provider when the per-result usage is sparse (cache
-      // hits, mock dispatches). Task is "code_sketch" since this is
-      // the compile-back direction.
+      // The cost record's provider/model come from the persisted run
+      // record when available (r.dispatchModel — the actually-resolved
+      // identity, fix for milestone review 2026-05-19 §3.1) and fall
+      // back through the caller's overrides only if no run was
+      // persisted (cache hits, mock dispatches). Task is "code_sketch"
+      // since this is the compile-back direction.
       const cost = buildMatrixCost({
-        provider: provider ?? "unknown",
-        model: options.model ?? node?.model?.ref ?? "unknown",
+        provider: r.dispatchModel?.provider ?? provider ?? "unknown",
+        model:
+          r.dispatchModel?.model ??
+          options.model ??
+          node?.model?.ref ??
+          "unknown",
         task: "code_sketch",
         usage: r.usage,
       });
@@ -488,6 +494,7 @@ async function verifyOne(
   // Compile-back (skipped under --dry-run; we still try to read any
   // existing regen below).
   let usage: VerificationUsage | undefined;
+  let dispatchModel: { provider: string; model: string } | undefined;
   if (!ctx.dryRun) {
     const compileResult = await runCompilePlan({
       focalId: nodeId,
@@ -511,6 +518,18 @@ async function verifyOne(
       };
     }
     const focalStep = compileResult.steps.find((s) => s.nodeId === nodeId);
+    // Read the actually-resolved provider+model from the persisted run
+    // so the matrix Pareto pivot doesn't bucket every dispatch under
+    // the node-level `mock_default` schema fallback. See VerificationResult.dispatchModel.
+    const focalRun = focalStep?.runId
+      ? loadPersistedRun(focalStep.runId, ctx.cwd)
+      : null;
+    if (focalRun) {
+      dispatchModel = {
+        provider: focalRun.model.provider,
+        model: focalRun.model.model,
+      };
+    }
     usage = collectUsage(focalStep?.runId, focalStep?.cached, ctx.cwd);
   } else if (!fs.existsSync(regenPath)) {
     return {
@@ -547,6 +566,7 @@ async function verifyOne(
     verdict,
     thresholds: ctx.thresholds,
     ...(usage ? { usage } : {}),
+    ...(dispatchModel ? { dispatchModel } : {}),
   };
 }
 

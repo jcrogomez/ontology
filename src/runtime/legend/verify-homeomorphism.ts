@@ -234,6 +234,16 @@ export interface VerificationResult {
   thresholds: VerdictThresholds;
   /** Token + approximate cost telemetry for the compile-back dispatch. Surfaced so the JSON report carries the per-node bill — Vibe-Reasoning γ-7 calibration tooling gap #1. */
   usage?: VerificationUsage;
+  /**
+   * Actually-resolved provider+model of the compile-back dispatch, read
+   * from the persisted run record. Distinct from the caller's --model
+   * override (which may be undefined and fall back through the registry
+   * to whatever the node's `model.ref` resolves to — defaulting to
+   * `mock_default`). Surfaced so the matrix Pareto pivot can bucket by
+   * the actual model that ran, not by the node-level schema default.
+   * Milestone review 2026-05-19 §3.1.
+   */
+  dispatchModel?: { provider: string; model: string };
 }
 
 export interface AggregateReport {
