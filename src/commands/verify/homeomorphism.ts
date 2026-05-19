@@ -135,6 +135,14 @@ export interface VerifyHomeomorphismOptions {
   // not-measured / untested / not-reviewed. Off by default so legacy
   // callers see the unchanged report shape.
   matrix?: boolean;
+  // Phase ε Move 3α — AST grounding for code_sketch. When set, each
+  // compile-back dispatch receives a deterministic MANDATORY EXPORTS
+  // section (built from the source AST) appended to the system
+  // prompt, and the run-cache contextHash folds in the grounding
+  // identity so grounded and un-grounded runs cache distinctly. Off
+  // by default; pre-3α runs and Sonnet ceiling probes can opt in or
+  // out independently to isolate the AST-grounding contribution.
+  astGrounding?: boolean;
   json?: boolean;
 }
 
@@ -207,6 +215,7 @@ export async function verifyHomeomorphismCommand(
             thresholds,
             dryRun: !!options.dryRun,
             cwd,
+            astGrounding: options.astGrounding,
           });
           results.push(r);
         }
@@ -458,6 +467,8 @@ interface VerifyOneCtx {
   thresholds: VerdictThresholds;
   dryRun: boolean;
   cwd: string;
+  /** Phase ε Move 3α — forward AST grounding flag to runCompilePlan. */
+  astGrounding?: boolean;
 }
 
 async function verifyOne(
@@ -506,6 +517,7 @@ async function verifyOne(
       openWorld: ctx.openWorld,
       maxTokens: ctx.maxTokens,
       thinking: ctx.thinking,
+      astGrounding: ctx.astGrounding,
     });
     if (!compileResult.ok) {
       return {

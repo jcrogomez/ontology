@@ -25,6 +25,14 @@ import {
   hashUpstreamContext,
   type UpstreamContextItem,
 } from "./upstream-context.js";
+import {
+  buildAstGroundingSystemSection,
+  hashAstGrounding,
+  joinSystemSections,
+  composeContextHash,
+} from "./ast-grounding.js";
+import { scanFileSymbols } from "../legend/ast-symbol-scanner.js";
+import * as path from "node:path";
 import { getOntologyPaths } from "../../core/project/paths.js";
 import { appendJsonl } from "../../core/fs/json.js";
 import { readState, writeState } from "../../core/state/state-store.js";
@@ -141,6 +149,17 @@ export interface CompileNodeOptions {
   // budget and the response comes back as empty text. Adapters that
   // do not support thinking ignore the field.
   thinking?: "adaptive" | "disabled";
+  // Phase ε Move 3α — AST grounding for code_sketch (compile-back).
+  // When true and the focal node has a source file at outputs.files[0]
+  // that the AST scanner can read, the compile pipeline appends a
+  // deterministic MANDATORY EXPORTS section to the system prompt
+  // listing every identifier the source AST exports. The grounding
+  // also folds into the run-cache contextHash so grounded and
+  // un-grounded runs of the same (prompt, model, upstream) cache as
+  // distinct entries. Off by default — legacy compiles and pre-3α
+  // calibrations are unaffected. See `ast-grounding.ts` for the
+  // section format and hash semantics.
+  astGrounding?: boolean;
 }
 
 export type CompileNodeFailureReason =
@@ -256,8 +275,38 @@ function buildPreludeE(
     const promptAst = parsePromptAST(rawPrompt);
     const promptForDispatch = promptAst.body.length > 0 ? promptAst.body : rawPrompt;
     const upstream = options.upstream ?? [];
-    const systemPrompt = buildUpstreamSystemPrompt(upstream);
-    const contextHash = hashUpstreamContext(upstream);
+    const upstreamSystemPrompt = buildUpstreamSystemPrompt(upstream);
+
+    // Phase ε Move 3α — AST grounding for code_sketch. Reads the focal
+    // node's source file (outputs.files[0]) and folds the deterministic
+    // export list into both the system prompt and the run-cache
+    // contextHash. Skipped silently when the option is off, the node
+    // has no source path, or the AST scan fails — the legacy run-cache
+    // identity stays bit-for-bit unchanged in those cases.
+    let groundingSection: string | null = null;
+    let groundingHash: string | null = null;
+    if (options.astGrounding === true) {
+      const sourceRel = options.node.outputs?.files?.[0];
+      if (sourceRel !== undefined && sourceRel.length > 0) {
+        const sourceAbs = path.isAbsolute(sourceRel)
+          ? sourceRel
+          : path.resolve(options.cwd ?? process.cwd(), sourceRel);
+        const scan = scanFileSymbols(sourceAbs);
+        if (scan.ok && scan.mandatoryExports.length > 0) {
+          groundingSection = buildAstGroundingSystemSection(scan.mandatoryExports);
+          groundingHash = hashAstGrounding(scan.mandatoryExports);
+        }
+      }
+    }
+
+    const systemPrompt = joinSystemSections([
+      upstreamSystemPrompt,
+      groundingSection,
+    ]);
+    const contextHash = composeContextHash(
+      hashUpstreamContext(upstream),
+      groundingHash,
+    );
 
     // Dispatch knobs that influence the model's output. Only emit the
     // `dispatch` sub-object when at least one knob is set, so legacy

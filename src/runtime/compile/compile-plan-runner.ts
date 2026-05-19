@@ -62,6 +62,9 @@ export interface CompilePlanRunOptions {
   // "disabled" suppresses adaptive thinking on providers that support
   // it. Applied uniformly to every step.
   thinking?: "adaptive" | "disabled";
+  // Phase ε Move 3α — AST grounding for code_sketch. Forwarded to each
+  // compileNode step uniformly. See CompileNodeOptions.astGrounding.
+  astGrounding?: boolean;
 }
 
 export interface CompilePlanStepResult {
@@ -219,6 +222,7 @@ export async function runCompilePlan(options: CompilePlanRunOptions): Promise<Co
       openWorld: options.openWorld,
       maxTokens: options.maxTokens,
       thinking: options.thinking,
+      astGrounding: options.astGrounding,
     });
 
     if (!stepResult.ok) {
