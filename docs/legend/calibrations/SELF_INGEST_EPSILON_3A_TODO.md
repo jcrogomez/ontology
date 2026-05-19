@@ -1,0 +1,152 @@
+# Move 3α — TODO + pick-up notes
+
+> *Running document for the Phase ε Move 3α calibration.
+> Use this as the entry point when resuming work.
+> Companion to
+> [SELF_INGEST_EPSILON_3A_2026-05-19_HYPOTHESIS.md](./SELF_INGEST_EPSILON_3A_2026-05-19_HYPOTHESIS.md).*
+
+**Session paused:** 2026-05-19 (post pre-flight; hardware bottleneck found before 3-arm run)
+
+## Status snapshot
+
+| Phase | State |
+|---|---|
+| Bug 3.1 (Pareto label) fix | ✅ landed `4a2feb7`, pushed |
+| AST symbol scanner | ✅ landed `515fd92`, pushed (16 tests verdes) |
+| Move 1c safety net (ingest) | ✅ landed `748025e`, pushed |
+| AST grounding at code_sketch | ✅ landed `35ac998`, pushed (17 tests verdes) |
+| ExportRecoveryRate metric | ✅ landed `ca5e002`, pushed (10 tests verdes) |
+| Failure-mode tagger v0 | ✅ landed `e493b40`, pushed (12 tests verdes) |
+| MOVE_3A_HYPOTHESIS preregistration | ✅ landed `fab66e2`, pushed |
+| TARGET_ARCHITECTURE blueprint | ✅ landed `4837936`, pushed |
+| **Pre-flight: pulls** | ✅ qwen2.5-coder:7b + granite4.1:8b + devstral-small-2:24b all pulled |
+| **Pre-flight: characterization** | ⚠️ done — **revealed hardware bottleneck** (see below) |
+| **3-arm run** | 🟡 **BLOCKED on substitute decision** |
+
+Aggregate tests on the 3α tooling: **55 new tests** in 4 files; **227 Phase ε pre-flight tests** still green; `tsc --noEmit` clean.
+
+## Hardware bottleneck — measured numbers
+
+The user's primary dev machine has **8 GB RAM** ([[user_hardware_constraint]]).
+After macOS + apps, ~3-4 GB is available for inference. Pre-flight measured tok/s with the canonical Move 3α-style prompt (241 prompt tokens, ~120 output tokens, AST grounding system block included):
+
+| Arm | Model | Size | Load (s) | Prompt eval (tok/s) | Output gen (tok/s) | Verdict |
+|---|---|---:|---:|---:|---:|---|
+| A (control) | qwen2.5-coder:7b | 4.7 GB | 7.0 | 85 | **1.1** | **degraded** — even alone, in swap |
+| B (structured-output) | granite4.1:8b | 5.3 GB | 8.9 | 4 | **0.2** | **marginal** — heavy swap |
+| C (coding-specialised) | devstral-small-2:24b | 15 GB | 35.4 | 1 | **~0.02** | **INFEASIBLE** — 15 GB > available RAM, total wall-clock 6452 s for a 128-token response |
+
+Reference (Apple Silicon at memory headroom): qwen 7b should run at 30-50 tok/s.
+The 1.1 tok/s on this machine = swap floor, not model floor.
+
+`memory_pressure` at measurement time: 151M swapins / 153M swapouts (system has been in heavy swap throughout the session).
+
+## Pending decision: Arm C substitution
+
+Path forward (user's lean as of pause): **substitute Arm C with a smaller coding-specialised model now; queue devstral-small-2:24b for cloud/rented-GPU later**.
+
+Substitute search criteria:
+- Available on `ollama.com/library` (catalog is source of truth — [[feedback_provider_catalog_trust]])
+- Quantised file size ≤ 4 GB so it runs at usable tok/s on 8 GB RAM
+- Coding-specialised tuning (otherwise the H3 / Arm C hypothesis loses its point)
+- Q4 or higher (avoid sub-Q4 to keep instruction-following on the MANDATORY EXPORTS block)
+
+**Candidates worth investigating in next session:**
+- `qwen2.5-coder:3b` (already pulled, 1.9 GB) — same family as Arm A but smaller; weak signal for "coding-specialised vs generalist" hypothesis since A is also qwen-coder
+- Other coding-tuned ≤ 7B on ollama.com — verify catalog (don't pre-name without checking) before designing substitute arm
+
+**Cloud path for original Arm C (not blocking, deferred):**
+- Run devstral-small-2:24b on a GPU host with ≥ 24 GB VRAM via Ollama Cloud, RunPod, Modal, or similar
+- Costs: ~$0.50-2.00 per hour for an A10 / L4 class GPU; full 125-node verify run estimated 1-2 h on a real GPU
+- Total estimated cloud spend for a clean Arm C run: **~$5-10** if scheduled to one continuous session
+
+## Backlog (priority-ordered for next session)
+
+```txt
+NEXT:
+  2. Substitute Arm C analysis (~30 min)
+     - Walk ollama.com/library for coding-spec models ≤ 4 GB
+     - Pull the best 1-2 candidates; brief tok/s pre-flight
+     - Update MOVE_3A_HYPOTHESIS.md with chosen substitute
+       and note "Arm C (devstral) deferred to cloud"
+
+THEN, in parallel where possible:
+  1. Bake-off synthesis generator (~3-4 h)
+     - Reads N AggregateReport JSONs (one per arm)
+     - Emits cross-arm comparison:
+         exportRecovery (micro + macro deltas)
+         failureModes (per-mode delta)
+         Pareto positions
+         per-file rebuild status
+     - Deterministic, testable, no LLM
+     - Lives in src/runtime/legend/bakeoff-synthesis.ts (new module)
+     - Saves manual synthesis work post-3α
+
+  3. δ' template smoke fixture (~1 h)
+     Milestone 4.3: tests/ingest-prompt-template.test.ts
+     - Asserts MANDATORY block contents stable
+     - Asserts every name in a representative provides[] appears
+       in rendered prompt
+     - Asserts FORBIDDEN narrative phrases do not appear
+
+  4. perimeterHash + dispatchModel on homeomorphism_verified event (~1 h)
+     Milestone 3.2 + 4.4
+     - Adds model: { provider, model } to the event payload
+     - Adds perimeterHash over (sorted node sourceFile paths)
+     - Closes audit-chain replayability from event log alone
+
+  5. n=3 rep distribution on Jaccard ≥ 0.5 cohort (~2 h + corrida corta)
+     Milestone 4.2
+     - --reps N --aggregator median wiring
+     - Run on llm/mock.ts + effects/async.ts + prompt/types.ts
+       (γ-era Jaccard 1.0 file)
+     - Confirms whether δ''s 2 high-Jaccard files survive median-of-3
+
+  6. Cloud path sketch (~30 min)
+     - Document Ollama Cloud / RunPod / Modal workflow for
+       devstral-small-2:24b Arm C, queued for later
+     - Concrete commands, estimated cost, gates
+
+FINAL:
+  10. Run Move 3α — 2-arm local + (later) deferred 24B cloud arm
+      Estimated: ~5 h per local arm overnight
+      Output: SELF_INGEST_EPSILON_3A_2026-05-19_ARM_{A,B,C}.md
+              + SELF_INGEST_EPSILON_3A_2026-05-19_SYNTHESIS.md
+```
+
+## Pick-up procedure for next session
+
+1. Read this doc + [[SELF_INGEST_EPSILON_3A_2026-05-19_HYPOTHESIS]] for context.
+2. Verify the build is still green:
+   ```sh
+   npm run check
+   npx vitest run tests/legend-matrix.test.ts tests/legend-matrix-intersections.test.ts \
+                  tests/frontier-tagger.test.ts tests/legend-fixture-tagger.test.ts \
+                  tests/verify-report-markdown.test.ts tests/ingest-cli.test.ts \
+                  tests/ast-symbol-scanner.test.ts tests/ast-grounding.test.ts \
+                  tests/export-recovery.test.ts tests/failure-mode-tagger.test.ts
+   ```
+3. Confirm git state: should be at `4837936` on `main` (or whatever the latest is — push happened, so check `git log origin/main`).
+4. Start with backlog item **(2)** — Arm C substitute analysis. Open `ollama.com/library` and look for coding-specialised ≤ 4 GB.
+5. After substitute is selected and pulled, update MOVE_3A_HYPOTHESIS.md with the explicit substitute + "Arm C cloud deferred" note.
+6. Then proceed through items (1) → (6), then run.
+
+## What is NOT in this TODO (intentionally)
+
+- The actual ε pre-pilot run (β / β' / γ / δ' ran on the old qwen 7b without Move 3α tooling). Their numbers are the baselines the 3α report will compare against — captured in the existing synthesis docs, do not re-run.
+- Move 4 (Opus 4.7 ceiling) — fires after 3α + 3γ produce data per the preregistration's decision tree. Not on the immediate backlog.
+- modelRouter implementation — see TARGET_ARCHITECTURE.md. Not until 3γ produces enough cells in the model × file_kind × failure_mode tensor.
+
+## Key files to consult on resume
+
+| File | Purpose |
+|---|---|
+| `docs/legend/calibrations/SELF_INGEST_EPSILON_3A_2026-05-19_HYPOTHESIS.md` | Pre-registered hypotheses H1-H6, decision tree, candados |
+| `docs/legend/architecture/TARGET_ARCHITECTURE.md` | Where we're going (destination, not route) |
+| `docs/legend/calibrations/SELF_INGEST_DELTA_2026-05-18_SYNTHESIS.md` | The δ' baseline 3α compares against |
+| `docs/legend/calibrations/MILESTONE_REVIEW_2026-05-19.md` | Open issues; bugs 3.2 / 4.2 / 4.3 / 4.4 are still in backlog |
+| `src/runtime/legend/ast-symbol-scanner.ts` | Move 1c + 3α grounding source |
+| `src/runtime/legend/export-recovery.ts` | The principal 3α metric module |
+| `src/runtime/legend/failure-mode-tagger.ts` | Per-node mode labels (v0) |
+| `src/runtime/compile/ast-grounding.ts` | The 3α intervention itself |
+| `src/cli.ts` (line ~882) | The `--ast-grounding` CLI flag |
