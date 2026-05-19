@@ -289,6 +289,16 @@ export interface AggregateReport {
    * delivers) and vice-versa. Undefined when `matrix` is undefined.
    */
   vocabGaps?: import("./vocab-gap.js").VocabGapAggregate;
+  /**
+   * Phase ε Move 3α: export-recovery aggregate — exact set
+   * preservation between the source AST's mandatoryExports and the
+   * regen's actual top-level declarations. Complementary to
+   * vocabGaps (which is loose word-token overlap on conceptual
+   * provides keys); exportRecovery is exact identifier-level
+   * preservation, the principal axis 3α measures. Undefined when
+   * `matrix` is undefined.
+   */
+  exportRecovery?: import("./export-recovery.js").ExportRecoveryAggregate;
 }
 
 export function emptyVerdictCounts(): Record<HomeomorphismVerdict, number> {

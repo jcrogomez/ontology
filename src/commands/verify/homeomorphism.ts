@@ -58,6 +58,13 @@ import {
   type VocabGapAggregate,
   type VocabGapReport,
 } from "../../runtime/legend/vocab-gap.js";
+import {
+  computeExportRecovery,
+  aggregateExportRecovery,
+  type CompileBackExportIntegration,
+  type ExportRecoveryAggregate,
+} from "../../runtime/legend/export-recovery.js";
+import { scanFileSymbols } from "../../runtime/legend/ast-symbol-scanner.js";
 
 // `onto verify-homeomorphism` — Project Legend δ-2.
 //
@@ -246,9 +253,18 @@ export async function verifyHomeomorphismCommand(
   let matrix: PerNodeMatrix[] | undefined;
   let byAxis: ByAxis | undefined;
   let vocabGaps: VocabGapAggregate | undefined;
+  let exportRecovery: ExportRecoveryAggregate | undefined;
   // Per-node gap reports — kept around for the aggregate roll-up
   // below the matrix-building loop.
   const perNodeGapReports: Array<{ nodeId: string; gap: VocabGapReport }> = [];
+  // Per-node export-recovery reports — same pattern as gaps. Source
+  // AST is scanned per node so the metric measures the OUTPUT (regen)
+  // against the deterministic source ground truth, not the LLM-
+  // extracted contract (Move 3α candado #2).
+  const perNodeRecoveryReports: Array<{
+    nodeId: string;
+    recovery: CompileBackExportIntegration;
+  }> = [];
   if (options.matrix) {
     matrix = [];
     for (const r of results) {
@@ -286,6 +302,17 @@ export async function verifyHomeomorphismCommand(
       const regenExports = r.metrics?.regenDeclarations ?? [];
       const gap = detectVocabGaps(providedKeys, regenExports);
       perNodeGapReports.push({ nodeId: r.nodeId, gap });
+      // Phase ε Move 3α: exact export-recovery against the source AST.
+      // Complementary to vocab-gap (loose word-token overlap on
+      // conceptual provides) — this measures whether the regen
+      // preserved the source AST's actual identifier surface. Scans
+      // the source file (already on disk per resolveCandidates).
+      const astScan = scanFileSymbols(r.sourceFile);
+      const recovery = computeExportRecovery(
+        astScan.ok ? astScan.mandatoryExports : [],
+        regenExports,
+      );
+      perNodeRecoveryReports.push({ nodeId: r.nodeId, recovery });
       const extraDerivedTags = hasVocabGap(gap) ? (["vocab-gap"] as const) : [];
       matrix.push(
         buildPerNodeMatrix({
@@ -302,6 +329,7 @@ export async function verifyHomeomorphismCommand(
     }
     byAxis = aggregateByAxis(matrix.map((m) => m.cell));
     vocabGaps = aggregateVocabGaps(perNodeGapReports);
+    exportRecovery = aggregateExportRecovery(perNodeRecoveryReports);
   }
   // Phase ε prework D: intersection counts. Always present when the
   // matrix is, with the seven required keys initialised to zero.
@@ -321,6 +349,7 @@ export async function verifyHomeomorphismCommand(
     ...(byIntersection ? { byIntersection } : {}),
     ...(paretoByTaskModel ? { paretoByTaskModel } : {}),
     ...(vocabGaps ? { vocabGaps } : {}),
+    ...(exportRecovery ? { exportRecovery } : {}),
   };
 
   // 5. Append a `homeomorphism_verified` event so the temporal log
