@@ -249,6 +249,12 @@ Return ONLY valid JSON matching the expected schema. No markdown fence, no pream
 
 Required fields: label, level, kind, prompt. Optional fields: manifestation, language, requires, provides, forbids, rules.
 
+JSON FIELD TYPES (critical — type mismatches fail validation):
+- label, level, kind, manifestation, language, prompt: STRINGS
+- requires, provides, forbids, rules: ARRAYS OF STRINGS
+
+The "prompt" field MUST be a single JSON STRING. When you write bullets for per-symbol enumeration, format them INSIDE the string using newline characters (\\n) between items — never emit "prompt" as a JSON array, never emit it as a JSON object. The bullet structure is text formatting WITHIN one string, not JSON structure.
+
 CRITICAL SCHEMA RULE:
 You MUST use only the enum values allowed by the schema.
 Invented values will fail validation.
@@ -331,17 +337,35 @@ FORBIDDEN descriptive phrases in "prompt":
 - "allows working with"
 - "supports functionality for"
 
-Good prompt example:
+Complete JSON output example (notice "prompt" is ONE STRING containing newline-separated bullets, not an array):
 
-- add(a: number, b: number) -> number: MUST return the arithmetic sum of a and b. Invariant: add(a, 0) equals a.
-- subtract(a: number, b: number) -> number: MUST return a minus b. Invariant: subtract(a, 0) equals a and subtract(a, a) equals 0.
+{
+  "label": "Arithmetic Operations",
+  "level": "artifact",
+  "kind": "function",
+  "manifestation": "code",
+  "language": "typescript",
+  "prompt": "- add(a: number, b: number) -> number: MUST return the arithmetic sum of a and b. Invariant: add(a, 0) equals a.\\n- subtract(a: number, b: number) -> number: MUST return a minus b. Invariant: subtract(a, 0) equals a and subtract(a, a) equals 0.",
+  "provides": ["add", "subtract"],
+  "requires": [],
+  "forbids": [],
+  "rules": []
+}
 
-Bad prompt example:
+Bad prompt example (do NOT do this):
 
-Provides arithmetic utilities for adding and subtracting numbers.
+"prompt": "Provides arithmetic utilities for adding and subtracting numbers."
 
-Why bad:
-The bad prompt does not name add or subtract. A downstream generator would have to guess the exported names.
+Why bad: the bad prompt does not name add or subtract. A downstream generator would have to guess the exported names.
+
+Also bad — wrong JSON shape (do NOT do this):
+
+"prompt": [
+  "- add(a, b) MUST return...",
+  "- subtract(a, b) MUST return..."
+]
+
+Why bad: "prompt" must be a JSON STRING, not a JSON ARRAY. The δ extraction failure mode (Phase ε 2026-05-18) was this exact mistake: the model interpreted the bullet formatting as a JSON array, failing schema validation on 47% of files. Use \\n separators inside one string.
 
 Concrete example for a monad law re-export/helper file:
 
@@ -899,6 +923,7 @@ function buildRetryPrompt(
     `- "kind" MUST be exactly one of: canon, decision, rule, constraint, definition, entity, action, function, asset, view, component, token, artifact. For files that only declare TypeScript / Python types or interfaces, use "definition". For Zod schemas, use "constraint". For barrel / index re-export files, use "artifact". Never invent values like "meta", "type", "module", "schema", "interface".`,
     `- "level" MUST be exactly one of: canon, project, target, stack, architecture, domain, workflow, interface, unit, token, artifact. For most concrete source files use "artifact" or "unit". The interface level is for INTERFACE specs (the architectural tier), not TypeScript interface declarations.`,
     `- All of label, level, kind, prompt are REQUIRED. Empty or missing values fail the schema.`,
+    `- "prompt" MUST be a single JSON STRING — never a JSON array, never an object. When writing bullets, format them as newline-separated text INSIDE the string: "- bullet1\\n- bullet2". This was the dominant δ failure mode (Phase ε 2026-05-18): 47% of files failed because the model emitted prompt as ["- bullet1", "- bullet2"] (array) instead of "- bullet1\\n- bullet2" (string).`,
     ``,
     `Output ONLY the corrected JSON. No preamble, no markdown fence, no explanation.`,
   ].join("\n");
