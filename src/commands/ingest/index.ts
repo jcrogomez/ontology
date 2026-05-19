@@ -38,6 +38,10 @@ import {
 } from "../../runtime/legend/structural-classifier.js";
 import { buildStaticSummary } from "../../runtime/legend/static-summary.js";
 import {
+  scanFileSymbols,
+  patchProvidesWithAST,
+} from "../../runtime/legend/ast-symbol-scanner.js";
+import {
   decideStaticClassifierIngestAction,
   type IngestAction,
   type StaticClassifierMode,
@@ -495,6 +499,18 @@ export interface ExtractTelemetry {
   dispatchAttempts: number;
   /** True iff the H1 schema-failure retry path fired. */
   schemaRetried: boolean;
+  /**
+   * True iff the Move 1c AST safety net replaced an empty
+   * `provides` with the AST-derived export list. Phase ε Move 1c —
+   * the schemas/ontology.ts straggler diagnosis showed that some
+   * files exceed the LLM extractor's working-memory budget and emit
+   * `provides: []` rather than partial lists; this flag surfaces
+   * whenever the deterministic fallback rescued the contract.
+   */
+  astProvidesPatched: boolean;
+  /** Count of AST exports rescued when astProvidesPatched fired.
+   * Zero when not patched. Surfaces the magnitude of the LLM dropout. */
+  astProvidesRescuedCount: number;
   /** num_ctx requested for Ollama (forwarded as contextWindow). undefined for non-Ollama adapters. */
   contextWindowRequested: number | undefined;
   /** num_predict requested (forwarded as maxTokens). undefined when not set. */
@@ -572,6 +588,8 @@ async function extractIntentFromFile(
   const telemetry: ExtractTelemetry = {
     dispatchAttempts: 0,
     schemaRetried: false,
+    astProvidesPatched: false,
+    astProvidesRescuedCount: 0,
     contextWindowRequested: undefined,
     maxTokensRequested: undefined,
     firstFailureKind: undefined,
@@ -1029,6 +1047,11 @@ async function extractIntentEnsemble(
       0,
     ),
     schemaRetried: innerTelemetries.some((t) => t.schemaRetried),
+    astProvidesPatched: innerTelemetries.some((t) => t.astProvidesPatched),
+    astProvidesRescuedCount: innerTelemetries.reduce(
+      (s, t) => s + t.astProvidesRescuedCount,
+      0,
+    ),
     contextWindowRequested: innerTelemetries[0]?.contextWindowRequested,
     maxTokensRequested: innerTelemetries[0]?.maxTokensRequested,
     firstFailureKind: innerTelemetries.find((t) => t.firstFailureKind)
@@ -1133,6 +1156,8 @@ function buildStaticSummaryExtractResult(args: {
   const telemetry: ExtractTelemetry = {
     dispatchAttempts: 0,
     schemaRetried: false,
+    astProvidesPatched: false,
+    astProvidesRescuedCount: 0,
     contextWindowRequested: undefined,
     maxTokensRequested: undefined,
     firstFailureKind: undefined,
@@ -1191,6 +1216,31 @@ async function extractWithRouting(args: {
     };
   }
   const result = await extractWithStrategy(args.inputs, args.ensemble);
+  // Move 1c safety net: when the LLM path succeeds but emits no
+  // `provides`, fall back to the AST-derived export list so downstream
+  // gluing has names to match against. Discovered via the
+  // context/types.ts + fibration/types.ts straggler diagnosis — their
+  // upstream supplier (schemas/ontology.ts, ~600 LOC / ~60 exports)
+  // emitted provides=[] from qwen 3b because the file exceeded the
+  // model's working-memory budget. See ast-symbol-scanner.ts +
+  // patchProvidesWithAST docs for the conservative guards.
+  if (result.ok) {
+    const astScan = scanFileSymbols(args.inputs.filePath);
+    if (astScan.ok) {
+      const patch = patchProvidesWithAST(
+        result.extracted.provides,
+        astScan.mandatoryExports,
+      );
+      if (patch.applied) {
+        result.extracted = {
+          ...result.extracted,
+          provides: patch.provides,
+        };
+        result.telemetry.astProvidesPatched = true;
+        result.telemetry.astProvidesRescuedCount = patch.rescuedCount;
+      }
+    }
+  }
   return { result, action };
 }
 
