@@ -299,6 +299,15 @@ export interface AggregateReport {
    * `matrix` is undefined.
    */
   exportRecovery?: import("./export-recovery.js").ExportRecoveryAggregate;
+  /**
+   * Phase ε Move 3α: structured failure-mode tags per node + roll-up
+   * counts. Labels are derived from the verdict, failure message, and
+   * export-recovery report — pure labelling pass, no new measurement.
+   * Used to populate the model × file_kind × failure_mode tensor that
+   * 3γ's bake-off mines for routing decisions. Undefined when
+   * `matrix` is undefined.
+   */
+  failureModes?: import("./failure-mode-tagger.js").FailureModeAggregate;
 }
 
 export function emptyVerdictCounts(): Record<HomeomorphismVerdict, number> {

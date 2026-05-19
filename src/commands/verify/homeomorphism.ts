@@ -65,6 +65,12 @@ import {
   type ExportRecoveryAggregate,
 } from "../../runtime/legend/export-recovery.js";
 import { scanFileSymbols } from "../../runtime/legend/ast-symbol-scanner.js";
+import {
+  tagFailureModes,
+  aggregateFailureModes,
+  type FailureMode,
+  type FailureModeAggregate,
+} from "../../runtime/legend/failure-mode-tagger.js";
 
 // `onto verify-homeomorphism` — Project Legend δ-2.
 //
@@ -254,6 +260,7 @@ export async function verifyHomeomorphismCommand(
   let byAxis: ByAxis | undefined;
   let vocabGaps: VocabGapAggregate | undefined;
   let exportRecovery: ExportRecoveryAggregate | undefined;
+  let failureModes: FailureModeAggregate | undefined;
   // Per-node gap reports — kept around for the aggregate roll-up
   // below the matrix-building loop.
   const perNodeGapReports: Array<{ nodeId: string; gap: VocabGapReport }> = [];
@@ -264,6 +271,13 @@ export async function verifyHomeomorphismCommand(
   const perNodeRecoveryReports: Array<{
     nodeId: string;
     recovery: CompileBackExportIntegration;
+  }> = [];
+  // Per-node failure-mode tags — populated from verdict + failure
+  // message + recovery; aggregated for the structured table that 3γ
+  // will mine (model × file_kind × failure_mode).
+  const perNodeFailureModeReports: Array<{
+    nodeId: string;
+    modes: FailureMode[];
   }> = [];
   if (options.matrix) {
     matrix = [];
@@ -313,6 +327,14 @@ export async function verifyHomeomorphismCommand(
         regenExports,
       );
       perNodeRecoveryReports.push({ nodeId: r.nodeId, recovery });
+      // Phase ε Move 3α: failure-mode tagging. Pure labelling pass
+      // over verdict + failure + recovery — no new measurement.
+      const modes = tagFailureModes({
+        ok: r.ok,
+        failure: r.failure,
+        recovery,
+      });
+      perNodeFailureModeReports.push({ nodeId: r.nodeId, modes });
       const extraDerivedTags = hasVocabGap(gap) ? (["vocab-gap"] as const) : [];
       matrix.push(
         buildPerNodeMatrix({
@@ -330,6 +352,7 @@ export async function verifyHomeomorphismCommand(
     byAxis = aggregateByAxis(matrix.map((m) => m.cell));
     vocabGaps = aggregateVocabGaps(perNodeGapReports);
     exportRecovery = aggregateExportRecovery(perNodeRecoveryReports);
+    failureModes = aggregateFailureModes(perNodeFailureModeReports);
   }
   // Phase ε prework D: intersection counts. Always present when the
   // matrix is, with the seven required keys initialised to zero.
@@ -350,6 +373,7 @@ export async function verifyHomeomorphismCommand(
     ...(paretoByTaskModel ? { paretoByTaskModel } : {}),
     ...(vocabGaps ? { vocabGaps } : {}),
     ...(exportRecovery ? { exportRecovery } : {}),
+    ...(failureModes ? { failureModes } : {}),
   };
 
   // 5. Append a `homeomorphism_verified` event so the temporal log
