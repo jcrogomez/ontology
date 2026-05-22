@@ -27,6 +27,7 @@ import { graphPathCommand } from "./commands/graph/path.js";
 import { graphSubgraphCommand } from "./commands/graph/subgraph.js";
 import { graphInferEdgesCommand } from "./commands/graph/infer-edges.js";
 import { graphMetricsCommand } from "./commands/graph/metrics.js";
+import { graphHierarchizeCommand } from "./commands/graph/hierarchize.js";
 import { branchListCommand } from "./commands/branch/list.js";
 import { branchFiberCommand } from "./commands/branch/fiber.js";
 import { linkCommand } from "./commands/link/index.js";
@@ -515,7 +516,21 @@ program
 
 const graph = program
   .command("graph")
-  .description("Read-only traversal queries over the typed graph (neighbors, path, subgraph, metrics).");
+  .description("Read-only traversal queries over the typed graph (neighbors, path, subgraph, metrics, hierarchize).");
+
+graph
+  .command("hierarchize")
+  .description("Read-only preview of a deterministic hierarchization plan: promote outputs.files[0] directory structure into first-class intermediate nodes. Pure, no LLM, no mutation. Reparenting via proposals is not yet possible (see plan.proposalCapability.blockedBy); the command always runs in preview mode.")
+  .option("--ontology-dir <path>", "Plan against an arbitrary ontology directory instead of the active project.")
+  .option("--json", "Output the plan in JSON format")
+  .action(async (options) => {
+    try {
+      await graphHierarchizeCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error planning hierarchization: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
 
 graph
   .command("metrics")
@@ -580,6 +595,8 @@ graph
   .command("infer-edges <dir>")
   .description("Project Legend γ-4 (preview) / γ-6 (proposals): walk a source directory and report the import-derived edges (depends_on for value imports, uses_token for type imports). Pure static analysis — no LLM. TypeScript uses the TS compiler API; Python uses a regex-based import parser. With --create-proposals, also emit one edge_create proposal per resolved edge by matching outputs.files[0] on each endpoint — the post-apply step of the multi-file ingest cycle.")
   .option("--create-proposals", "γ-6: resolve each inferred edge to applied node IDs via outputs.files[0] and emit edge_create proposals. Skips edges whose endpoints are not yet on the graph and edges that already exist.")
+  .option("--metrics-preview", "Phase ε hierarchizer-followup: resolve the inferred edges the same way --create-proposals does but, instead of writing proposals, simulate the resulting edge fabric and report before/after metrics (especially closedWorldContextReachableSatisfaction — the brújula). Pure: no mutation.")
+  .option("--ontology-dir <path>", "Score --metrics-preview against an arbitrary ontology directory instead of the active project. Mutually exclusive with --create-proposals.")
   .option("--include <exts>", "Comma-separated file extensions to scan (default: ts,tsx). Use --include py for a Python project, --include py,ts,tsx for a mixed-language repo.")
   .option("--json", "Output results in JSON format")
   .action(async (dir, options) => {

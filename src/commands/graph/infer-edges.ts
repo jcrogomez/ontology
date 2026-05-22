@@ -1,13 +1,24 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { z } from "zod";
 import {
   inferEdgesAutoFromDirectory,
   type InferredEdge,
 } from "../../runtime/static/edges.js";
 import { loadEdges, loadNodes, loadState } from "../../core/project/load.js";
 import { createProposal } from "../../core/proposals/persist.js";
-import type { OntologyNode } from "../../schemas/ontology.js";
+import {
+  OntologyEdgeSchema,
+  OntologyNodeSchema,
+  OntologyStateSchema,
+  type OntologyEdge,
+  type OntologyNode,
+} from "../../schemas/ontology.js";
 import { errorMessage } from "../../core/errors.js";
+import {
+  planEdgeMaterialization,
+  type EdgeMaterializationPreview,
+} from "../../runtime/graph/edge-materialization-preview.js";
 
 // `onto graph infer-edges <dir>` — Project Legend γ-4 (preview) + γ-6
 // (create proposals).
@@ -54,6 +65,18 @@ export interface InferEdgesOptions {
   // for a mixed-language repo. Static-edge inference dispatches
   // per-language and concatenates the results.
   include?: string;
+  // Phase ε hierarchizer-followup — when set, run resolution like
+  // --create-proposals does but produce a pure metrics-preview report
+  // (before / after `computeHierarchyMetrics`). No proposals written,
+  // no mutation. Designed to decide whether materializing these edges
+  // actually moves `closedWorldContextReachableSatisfaction` before
+  // committing to apply them.
+  metricsPreview?: boolean;
+  // Score a non-active ontology snapshot (e.g.
+  // `.ontology.self-ingest-gamma-result`). Honoured by --metrics-preview
+  // only; --create-proposals always targets the active project because
+  // proposals are written under cwd.
+  ontologyDir?: string;
 }
 
 interface ResolvedEdge {
@@ -102,6 +125,21 @@ export async function graphInferEdgesCommand(
     );
     return;
   }
+  if (options.createProposals && options.metricsPreview) {
+    fail(
+      `--metrics-preview and --create-proposals are mutually exclusive. --metrics-preview reports only; --create-proposals writes.`,
+      options.json,
+    );
+    return;
+  }
+  if (options.ontologyDir && options.createProposals) {
+    fail(
+      `--ontology-dir is honoured by --metrics-preview only (proposals always write under cwd).`,
+      options.json,
+    );
+    return;
+  }
+
   const edges = inferEdgesAutoFromDirectory(absDir, extensions);
 
   // Render paths relative to the scanned root so the *display* reads
@@ -113,6 +151,11 @@ export async function graphInferEdgesCommand(
     type: e.type,
     tokens: e.tokens,
   }));
+
+  if (options.metricsPreview) {
+    runMetricsPreview(dirPath, edges, options);
+    return;
+  }
 
   if (!options.createProposals) {
     printPreview(dirPath, displayEdges, options.json);
@@ -405,6 +448,239 @@ function fail(msg: string, json?: boolean): void {
     console.error(`✖ ${msg}`);
   }
   process.exit(1);
+}
+
+// ── Phase ε hierarchizer-followup: --metrics-preview ───────────────────────
+//
+// Runs the resolver (same skip taxonomy as --create-proposals) and the
+// simulation (`planEdgeMaterialization`) without writing anything.
+// Useful gate before `proposal apply` to confirm the inferred edges
+// would actually move closedWorldContextReachableSatisfaction.
+function runMetricsPreview(
+  dirPath: string,
+  edges: InferredEdge[],
+  options: InferEdgesOptions,
+): void {
+  let nodes: OntologyNode[];
+  let existingEdges: OntologyEdge[];
+  let rootNodeId: string | null = null;
+  let sourceLabel: string;
+
+  try {
+    if (options.ontologyDir) {
+      const dir = path.resolve(options.ontologyDir);
+      const loaded = loadFromOntologyDir(dir);
+      nodes = loaded.nodes;
+      existingEdges = loaded.edges;
+      rootNodeId = loaded.rootNodeId;
+      sourceLabel = dir;
+    } else {
+      const state = loadState();
+      nodes = loadNodes();
+      existingEdges = loadEdges();
+      rootNodeId = state.rootNodeId;
+      sourceLabel = path.join(process.cwd(), ".ontology");
+    }
+  } catch (err: unknown) {
+    fail(
+      `Failed to load ontology: ${err instanceof Error ? err.message : String(err)}`,
+      options.json,
+    );
+    return;
+  }
+
+  const preview = planEdgeMaterialization({
+    nodes,
+    edges: existingEdges,
+    inferredEdges: edges,
+    relativize: computeCwdRelative,
+    rootNodeId,
+  });
+
+  if (options.json) {
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          rootDir: path.resolve(dirPath),
+          ontologySource: sourceLabel,
+          preview,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
+  printMetricsPreview(dirPath, sourceLabel, preview);
+}
+
+// Direct ontology-dir loader for --metrics-preview. Mirrors the helper
+// in commands/graph/metrics.ts; not extracted into a shared loader yet
+// because the third consumer would clarify the right contract.
+function loadFromOntologyDir(dir: string): {
+  nodes: OntologyNode[];
+  edges: OntologyEdge[];
+  rootNodeId: string | null;
+} {
+  if (!fs.existsSync(dir)) throw new Error(`Directory not found: ${dir}`);
+  const stat = fs.statSync(dir);
+  if (!stat.isDirectory()) throw new Error(`Not a directory: ${dir}`);
+
+  const nodesDir = path.join(dir, "nodes");
+  if (!fs.existsSync(nodesDir)) {
+    throw new Error(`Missing nodes/ inside ${dir}`);
+  }
+
+  const nodes: OntologyNode[] = [];
+  const nodeFiles = fs
+    .readdirSync(nodesDir)
+    .filter((f) => f.endsWith(".json"))
+    .sort();
+  for (const file of nodeFiles) {
+    const fullPath = path.join(nodesDir, file);
+    try {
+      const parsed = JSON.parse(fs.readFileSync(fullPath, "utf-8"));
+      nodes.push(OntologyNodeSchema.parse(parsed));
+    } catch (err: unknown) {
+      if (err instanceof z.ZodError) {
+        const summary = err.issues
+          .slice(0, 3)
+          .map((it) => `${it.path.join(".")}: ${it.message}`)
+          .join(", ");
+        throw new Error(`Failed to parse node ${file}: ${summary}`);
+      }
+      throw new Error(
+        `Failed to parse node ${file}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  const edges: OntologyEdge[] = [];
+  const edgesPath = path.join(dir, "edges.jsonl");
+  if (fs.existsSync(edgesPath)) {
+    const content = fs.readFileSync(edgesPath, "utf-8");
+    const lines = content.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i]!.trim();
+      if (!trimmed) continue;
+      try {
+        edges.push(OntologyEdgeSchema.parse(JSON.parse(trimmed)));
+      } catch (err: unknown) {
+        if (err instanceof z.ZodError) {
+          const summary = err.issues
+            .slice(0, 3)
+            .map((it) => `${it.path.join(".")}: ${it.message}`)
+            .join(", ");
+          throw new Error(
+            `Failed to parse edge on line ${i + 1} of edges.jsonl: ${summary}`,
+          );
+        }
+        throw new Error(
+          `Failed to parse edge on line ${i + 1} of edges.jsonl: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+  }
+
+  let rootNodeId: string | null = null;
+  const statePath = path.join(dir, "state.json");
+  if (fs.existsSync(statePath)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(statePath, "utf-8"));
+      const state = OntologyStateSchema.parse(parsed);
+      rootNodeId = state.rootNodeId;
+    } catch {
+      rootNodeId = null;
+    }
+  }
+  return { nodes, edges, rootNodeId };
+}
+
+function printMetricsPreview(
+  dirPath: string,
+  ontologySource: string,
+  preview: EdgeMaterializationPreview,
+): void {
+  console.log(`=== ONTOLOGY GRAPH INFER-EDGES (metrics preview) ===`);
+  console.log(`Source dir:       ${dirPath}`);
+  console.log(`Ontology source:  ${ontologySource}`);
+  console.log(``);
+  console.log(`Resolution`);
+  console.log(`  resolved edges:  ${preview.resolved.length}`);
+  console.log(`  skipped edges:   ${preview.skipped.length}`);
+  if (preview.skipped.length > 0) {
+    const byReason = new Map<string, number>();
+    for (const s of preview.skipped) {
+      byReason.set(s.reason, (byReason.get(s.reason) ?? 0) + 1);
+    }
+    for (const [reason, count] of Array.from(byReason.entries()).sort()) {
+      console.log(`    ${reason.padEnd(28)} ${count}`);
+    }
+  }
+  console.log(``);
+
+  console.log(`Before / after`);
+  renderDeltaRow("edgeCount", preview.before.edgeCount, preview.after.edgeCount);
+  renderDeltaRow(
+    "maxDepth",
+    preview.before.maxDepth,
+    preview.after.maxDepth,
+  );
+  renderDeltaRow(
+    "isolatedNodeRatio",
+    formatNum(preview.before.isolatedNodeRatio),
+    formatNum(preview.after.isolatedNodeRatio),
+  );
+  renderDeltaRow("verdict", preview.before.verdict, preview.after.verdict);
+  renderDeltaRow(
+    "closedWorldGlobalSatisfaction",
+    formatNum(preview.before.closedWorldGlobalSatisfactionRatio),
+    formatNum(preview.after.closedWorldGlobalSatisfactionRatio),
+  );
+  renderDeltaRow(
+    "closedWorldContextReachable (brújula)",
+    formatNum(preview.before.closedWorldContextReachableSatisfactionRatio),
+    formatNum(preview.after.closedWorldContextReachableSatisfactionRatio),
+  );
+  console.log(``);
+  console.log(
+    `Δ closedWorldContextReachableSatisfaction: ${signed(preview.deltas.closedWorldContextReachableSatisfactionRatio)}`,
+  );
+  console.log(`Δ edgeCount: ${signed(preview.deltas.edgeCount)}`);
+  console.log(``);
+
+  if (preview.after.topClosedWorldUnreachableRequires.length > 0) {
+    console.log(`Top closed-world unreachable AFTER materialization:`);
+    for (const entry of preview.after.topClosedWorldUnreachableRequires) {
+      console.log(
+        `  ${entry.source.padEnd(40)} consumers=${entry.consumers}`,
+      );
+    }
+  } else {
+    console.log(`No closed-world unreachable requires remain.`);
+  }
+}
+
+function renderDeltaRow(
+  label: string,
+  before: number | string,
+  after: number | string,
+): void {
+  console.log(
+    `  ${label.padEnd(42)} ${String(before).padStart(8)}  →  ${after}`,
+  );
+}
+
+function formatNum(n: number): string {
+  if (Number.isInteger(n)) return n.toString();
+  return n.toFixed(3);
+}
+
+function signed(n: number): string {
+  if (n > 0) return `+${formatNum(n)}`;
+  return formatNum(n);
 }
 
 // Mirrors `onto ingest --include` parsing: comma-separated, lowercased,
