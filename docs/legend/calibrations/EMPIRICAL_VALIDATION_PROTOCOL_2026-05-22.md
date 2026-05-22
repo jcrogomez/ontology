@@ -206,8 +206,137 @@ sweep.
   report drawn from the data. A full sweep removes the bias at the
   cost of $2.94.
 
-## 7. Next decision the operator owns
+## 7. Local Ollama dry run — actual findings (2026-05-22)
+
+Ran the protocol against `node_0025` (src/runtime/graph/edges.ts —
+consumer of `loadEdges` and `OntologyEdge`, both top closed-world
+unreachables in the gamma baseline) with `qwen2.5-coder:7b`. Two
+architectural blockers surfaced during prep; the result inverts the
+hypothesis.
+
+### 7.1 Blocker 1 — closed-world gluing on ingest-derived contracts
+
+`validateIntent` (`src/runtime/context/intent-validator.ts`)
+unconditionally failed the `gluing_ok` rule whenever any
+`missing_requirement` conflict appeared. Ingest-derived contracts
+always carry external imports (`fs`, `crypto`, `zod`, …) that no
+ontology node provides — closed-world is structurally incompatible.
+
+**Fix landed**: extended the existing `openWorld` flag (default true
+on `verify-homeomorphism`) so it also tolerates `missing_requirement`
+conflicts, downgrading them from violations to warnings. Other
+conflict types (`duplicate_provider`, `unsatisfiable`, etc.) still
+fail strictly. The change preserves closed-world semantics when the
+caller asks for them.
+
+### 7.2 Blocker 2 — compile-plan transitive cascade
+
+With `depends_on` / `uses_token` edges materialised, the compile plan
+(`computeCompilePlan` in `src/runtime/graph/compile-plan.ts`) extends
+the focal step to its full transitive closure across
+`HARD_DEPENDENCY_EDGE_TYPES`. Each transitive step compiles
+independently and must pass its own validation. For gamma this
+expanded `node_0025` (one node) into `node_0025 + node_0071 +
+node_0126 + …`, and the deeper steps hit `duplicate_provider`
+(two source files both providing `failWith`) and `forbidden_match`
+conflicts that `openWorld` does not relax.
+
+A short-lived attempt to bring edge neighbours into the focal's
+gluing (`includeEdges: true` at `compile-node.ts:627`) made the
+problem worse by enlarging the per-step conflict surface. Reverted.
+
+### 7.3 What the LLM dispatch actually saw
+
+The smoke test ran the dispatch in both cells from a warm
+content-addressed cache (`promptTokens: 56`, `completionTokens: 883`,
+`cached: true`). The LLM input is built by `buildPreludeE` from
+`upstream` (refinement parents' compiled outputs) plus the focal's
+own prompt. **Edges of type `depends_on` / `uses_token` are not
+threaded into the prompt at all** — they affect the compile plan
+(`HARD_DEPENDENCY_EDGE_TYPES`) and, with the validator-side fix,
+the post-dispatch validation, but they never reach the model.
+
+Cell A (gamma baseline, no edges) and Cell B (gamma + 348 edges)
+therefore produced **identical** verdicts:
+
+| metric                | Cell A                | Cell B                |
+| --------------------- | --------------------- | --------------------- |
+| verdict               | divergent_structural  | divergent_structural  |
+| locDistance           | 0.138                 | 0.138                 |
+| structuralJaccard     | 0.000                 | 0.000                 |
+| originalDeclarations  | 4 (getEdgesByType, …) | 4 (getEdgesByType, …) |
+| regenDeclarations     | 0                     | 0                     |
+| dispatch              | ollama qwen2.5-coder:7b cached | (same cache hit) |
+
+The local model emitted 50 lines of output with zero top-level
+declarations — the loc threshold passed, the structural jaccard
+failed. Same input, same cache, same output. The empirical question
+"do materialised edges improve regeneration quality" gets a clean
+**no, with the current compile architecture**.
+
+### 7.4 What this means for the brújula
+
+The brújula
+(`closedWorldContextReachableSatisfaction`) measures whether the
+assembler *could* route a require to a provider, given
+`includeEdges: true`. The compile pipeline never asks the assembler
+for that walk; the LLM prompt is built from `upstream` only. So the
+metric was tracking a capability the production path does not
+exercise.
+
+This does not refute the metric — it refutes the *interpretation*
+that brújula movement automatically translates to regeneration
+quality. The right reading: brújula is a **prerequisite** signal
+(the network has the routes the assembler could walk *if* the
+compile pipeline were to use them). It is not a predictor on its
+own.
+
+### 7.5 What would actually move regeneration quality
+
+Three candidates, in increasing scope:
+
+1. **Thread edge-neighbour artefacts into `upstream`.** The
+   `collectUpstream` helper in `compile-plan-runner.ts` only walks
+   `refines` edges. Extending it to include `depends_on` / `uses_token`
+   targets' compiled responses (when available) would put the
+   neighbour's text into the system prompt for the focal step. Cost
+   surface: ~50 lines plus tests; behavioural change because every
+   focal step would suddenly see more system-prompt context.
+
+2. **Replace the upstream-only prompt with `assembleContext.prompt`.**
+   The assembler already builds a full edge-aware prompt (canon →
+   ancestors → contract → focal). The compile dispatch could use that
+   text directly instead of building its own upstream system prompt.
+   Cleaner integration; bigger refactor (cache invalidation, prompt
+   length budget management).
+
+3. **Both — plus open-world dispatch defaults.** The above changes
+   would land naturally with the validator-side `openWorld` relaxation
+   from §7.1, so ingest-derived contracts compile end-to-end without
+   tripping the gluing's closed-world strict rules.
+
+None of (1)–(3) is in scope for this protocol; documenting them so
+the next planning pass can size each.
+
+### 7.6 Hypothesis to refute / confirm
+
+The lesson is the same shape as the §1 / §2 finding, just one layer
+deeper:
+
+> The brújula measures *what the network makes reachable*. Moving it
+> is necessary but not sufficient. The sufficient question — *what
+> the prompt actually contains* — has its own measurement, and the
+> current production path does not exercise it.
+
+The next baseline pass should add that measurement: per-compile,
+report what fraction of the focal's closed-world requires appear as
+named symbols in the dispatched prompt. Today that fraction is zero
+across the board; any of the three candidates above would move it.
+
+## 8. Next decision the operator owns
 
 Pull the trigger or pre-register the sample list and wait. This doc is
 the $0 prework; the $0.20–$2.94 spend is intentionally not folded
-into a CLI flag.
+into a CLI flag — and given §7.7 (the dispatch does not see edges),
+spending money on a full A/B before changing the prompt construction
+would just buy 250 identical dispatches.

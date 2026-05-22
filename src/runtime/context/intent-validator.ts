@@ -136,8 +136,29 @@ export function buildEvaluationContext(input: IntentValidationInput): Evaluation
   const denied = new Set<string>();
   const openWorld = input.openWorld === true;
 
-  if (input.glued.ok) provided.add(TOKEN_GLUING_OK);
-  else denied.add(TOKEN_GLUING_OK);
+  // Phase ε edge-materialization follow-up. The gluing pipeline UNIONS
+  // requires/provides across every fragment in the assembled context
+  // (focal + ancestors + edge neighbours when includeEdges:true). For an
+  // ingest-derived contract — every node carries the external imports
+  // its source file pulled in (`fs`, `crypto`, `zod`, …) — the
+  // closed-world gluing always fails because no ontology node can ever
+  // provide an external module. The brújula already classifies those as
+  // `open_world` requires (schema 1.1); this matches that policy at the
+  // gluing layer when the caller opts in via openWorld. The relaxation
+  // applies only to `missing_requirement` conflicts; other gluing
+  // failure modes (e.g. duplicate definitions, unsatisfiable contracts)
+  // still fail the rule unconditionally because they are not external-
+  // dependency cases.
+  const onlyMissingRequirementConflicts =
+    !input.glued.ok &&
+    input.glued.conflicts.length > 0 &&
+    input.glued.conflicts.every((c) => c.type === "missing_requirement");
+
+  if (input.glued.ok || (openWorld && onlyMissingRequirementConflicts)) {
+    provided.add(TOKEN_GLUING_OK);
+  } else {
+    denied.add(TOKEN_GLUING_OK);
+  }
 
   if (isCandidateNonEmpty(input.candidate.text)) provided.add(TOKEN_CANDIDATE_NONEMPTY);
   else denied.add(TOKEN_CANDIDATE_NONEMPTY);
@@ -206,6 +227,23 @@ export function validateIntent(input: IntentValidationInput): IntentValidationRe
 
   const violations: string[] = [];
   const warnings: string[] = [...input.glued.warnings];
+  // When openWorld is on and the gluing only failed on
+  // `missing_requirement` conflicts, those are now downgraded to
+  // warnings (so the operator still sees them) and the gluing_ok rule
+  // evaluates true via buildEvaluationContext above. Without this the
+  // conflict messages would silently disappear from the report.
+  if (
+    input.openWorld === true &&
+    !input.glued.ok &&
+    input.glued.conflicts.length > 0 &&
+    input.glued.conflicts.every((c) => c.type === "missing_requirement")
+  ) {
+    for (const c of input.glued.conflicts) {
+      warnings.push(
+        `Open-world tolerated gluing conflict: ${c.type} - ${c.message}`,
+      );
+    }
+  }
   let score = 1.0;
 
   for (const rule of rules) {
