@@ -29,6 +29,7 @@ import { graphInferEdgesCommand } from "./commands/graph/infer-edges.js";
 import { graphMetricsCommand } from "./commands/graph/metrics.js";
 import { graphHierarchizeCommand } from "./commands/graph/hierarchize.js";
 import { graphReadinessCommand } from "./commands/graph/readiness.js";
+import { graphMaterializeEdgesCommand } from "./commands/graph/materialize-edges.js";
 import { branchListCommand } from "./commands/branch/list.js";
 import { branchFiberCommand } from "./commands/branch/fiber.js";
 import { linkCommand } from "./commands/link/index.js";
@@ -517,7 +518,22 @@ program
 
 const graph = program
   .command("graph")
-  .description("Read-only traversal queries over the typed graph (neighbors, path, subgraph, metrics, hierarchize, readiness).");
+  .description("Read-only traversal queries over the typed graph (neighbors, path, subgraph, metrics, hierarchize, readiness, materialize-edges).");
+
+graph
+  .command("materialize-edges <src-ontology-dir> <dst-ontology-dir>")
+  .description("Phase ε empirical-validation harness: clone an ontology directory and apply the statically-inferred edges into the copy. Read-only on the source; the destination is a self-consistent ontology with the new edges + edge_created events appended. No LLM, no proposal writes. Use this to set up the gamma-with-edges copy before running `verify-homeomorphism` to test whether the simulated brújula movement predicts regeneration quality.")
+  .requiredOption("--source-root <code-dir>", "Directory to scan for static imports (the same path `onto ingest <dir>` would have used).")
+  .option("--include <exts>", "Comma-separated file extensions to scan (default: ts,tsx).")
+  .option("--json", "Output the report in JSON format")
+  .action(async (srcDir, dstDir, options) => {
+    try {
+      await graphMaterializeEdgesCommand(srcDir, dstDir, options.sourceRoot, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error materializing edges: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
 
 graph
   .command("readiness")
