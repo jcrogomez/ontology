@@ -26,6 +26,7 @@ import { graphNeighborsCommand } from "./commands/graph/neighbors.js";
 import { graphPathCommand } from "./commands/graph/path.js";
 import { graphSubgraphCommand } from "./commands/graph/subgraph.js";
 import { graphInferEdgesCommand } from "./commands/graph/infer-edges.js";
+import { graphMetricsCommand } from "./commands/graph/metrics.js";
 import { branchListCommand } from "./commands/branch/list.js";
 import { branchFiberCommand } from "./commands/branch/fiber.js";
 import { linkCommand } from "./commands/link/index.js";
@@ -514,7 +515,21 @@ program
 
 const graph = program
   .command("graph")
-  .description("Read-only traversal queries over the typed graph (neighbors, path, subgraph).");
+  .description("Read-only traversal queries over the typed graph (neighbors, path, subgraph, metrics).");
+
+graph
+  .command("metrics")
+  .description("Read-only baseline metrics over the typed graph: topology, parent distribution, edges, requires/provides satisfaction (global + context-reachable), path fibers, and a flatness verdict. Pure: no LLM, no mutation.")
+  .option("--ontology-dir <path>", "Score an arbitrary ontology directory (one containing nodes/, edges.jsonl, state.json) instead of the active project. Used to baseline archived snapshots like .ontology.self-ingest-gamma-result.")
+  .option("--json", "Output results in JSON format")
+  .action(async (options) => {
+    try {
+      await graphMetricsCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error computing metrics: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
 
 graph
   .command("neighbors <id>")
