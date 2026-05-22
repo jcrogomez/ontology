@@ -475,9 +475,108 @@ signals the report watches at the same time:
 - `internalPathMismatchRequireCount = 0` stays at zero — the vocab
   extractor does not regress.
 
+## 9. Edge materialization preview — confirmación de la brújula
+
+After the schema-1.1 classification narrowed the brújula to closed-world
+and the hierarchizer preview showed that depth alone does not move it,
+the natural next step was to measure the *other* intervention: what
+happens when the static-import edges (`depends_on` / `uses_token`,
+already produced by `onto graph infer-edges`) are materialised against
+each snapshot? `onto graph infer-edges <dir> --metrics-preview
+--ontology-dir <snapshot>` runs the resolver and simulates the
+resulting edge fabric without writing any proposal.
+
+### 9.1 Side-by-side: hierarchize vs. edges
+
+`closedWorldContextReachableSatisfaction.ratio`. Hierarchize numbers
+from §6 / §8; edges numbers from `--metrics-preview src` (TS extension
+set, current `src/` tree) against each archived snapshot.
+
+| snapshot     | floor | hierarchize Δ | edges Δ | resolved | skipped |
+| ------------ | ----: | ------------: | ------: | -------: | ------: |
+| `beta`       | 0.000 |         0.000 |   0.974 |      345 |     207 |
+| `beta_prime` | 0.000 |         0.000 |   1.000 |      338 |     214 |
+| `gamma`      | 0.519 |         0.519 |   1.000 |      348 |     204 |
+| `delta`      | 0.438 |         0.438 |   0.967 |      360 |     192 |
+
+Four for four crossing the `> 0.7` target. Three of four landing at
+`≥ 0.97`, one at exactly `1.000`. The hierarchizer column does not
+move at all — the structural pass adds depth without giving the
+assembler new neighbours to walk.
+
+### 9.2 What this changes about the project's theory of failure
+
+The bullets the §8 brújula declared as candidates are now testable
+claims:
+
+- **The brújula moves with `depends_on` / `uses_token` edges.** Both
+  edge types are members of the assembler's default context set; once
+  they exist the consumer's one-hop neighbourhood includes its
+  providers. That is the entire mechanism — no semantic re-extraction,
+  no new requires.
+- **Semantic extraction was already largely sufficient.** Gamma's
+  `closedGlobalSat = 1.000` proved each closed-world require had a
+  provider somewhere in the graph. The intervention here adds zero
+  providers and zero requires; it only routes what was already there.
+- **The primary failure was the absence of materialised morphisms.**
+  The flat-bag-of-children topology had no edges at all. With the
+  edges in place the brújula resolves; without them the assembler
+  walks parent → canon and sees no relevant siblings.
+- **The hierarchizer is for the walker, not for precision.** It is
+  still the right second move (the verdict needs depth so the TUI can
+  navigate, and so prompts gain layered intent above the file leaves)
+  but it is not the lever that closes the routing gap. Decoupling the
+  two halves keeps the cost of each clear: edges first for precision,
+  hierarchy after for legibility and human navigation.
+
+### 9.3 Caveats kept honest
+
+The `→ 1.000` numbers are real but must be read with intent:
+
+- **brújula = 1.000 is a structural proxy**, not a quality measure. It
+  says "every closed-world require has a reachable provider," not
+  "the LLM regenerates the right code." Validation against a compile
+  + homeomorphism gate is the next empirical step (see §10).
+- **Gamma's `1.000` is partly backward-fit.** The static analyser sees
+  the same import graph the ingest extractor saw. The two are
+  separate passes but they read the same source files, so a 100%
+  match measures internal consistency, not external coverage. A
+  fresh repo where ingest and infer-edges are run for the first time
+  would be the cleaner test.
+- **The skipped count (≈200 per snapshot) is drift, not bug.** The
+  current `src/` tree has files the snapshot's ingest never saw, so
+  they appear as `from_node_missing` / `to_node_missing`. In a live
+  project the equivalent drift grows with every commit until the
+  next ingest sweep — by itself the count is a health signal, not
+  an error.
+- **The verdict still says `flat`**. The flatness rule fires before
+  `edge_starved` and depends on `directChildrenRatio`, which the
+  edge intervention does not touch. A network at brújula 1.0 with
+  verdict `flat` is structurally walkable but visually flat — the
+  hierarchizer is what reconciles those two views.
+
+## 10. Updated roadmap (replaces §8's tentative ordering)
+
+1. **Edge materialization gate.** Land a structural readiness check
+   that refuses to declare a self-ingest "complete" when the brújula
+   says otherwise. Suggested rules (read-only first, warn before
+   fail):
+   - `nodeCount > 50 && edgeCount == 0`
+   - `closedWorldGlobalSatisfaction == 1.0 && closedWorldContextReachableSatisfaction < 0.7`
+   - `nonRootDirectChildrenOfRootRatio >= 0.8`
+2. **Compile-validation on a real copy.** Take gamma or delta, apply
+   the inferred edges in a controlled copy, run `onto verify-homeomorphism`
+   and/or `onto compile run` over a sample node. Confirms (or refutes)
+   that the brújula's structural movement predicts regeneration quality.
+3. **`node_update_parent` proposal kind.** The schema extension the
+   hierarchizer preview is blocked on. Worth doing — the walker and
+   the TUI need it — but with the precision lever already identified,
+   it is no longer the first cost to spend.
+
 ## Reproducibility
 
 ```bash
+# Section 1–8: schema-1.1 metrics over the active project + archived snapshots.
 onto graph metrics --json                                                    \
   > active.json
 onto graph metrics --ontology-dir .ontology.self-ingest-beta-result --json   \
@@ -488,6 +587,15 @@ onto graph metrics --ontology-dir .ontology.self-ingest-gamma-result --json  \
   > gamma.json
 onto graph metrics --ontology-dir .ontology.self-ingest-delta-result --json  \
   > delta.json
+
+# Section 6 / hierarchizer column: read-only structural plan.
+onto graph hierarchize --ontology-dir .ontology.self-ingest-gamma-result --json \
+  > gamma-hierarchize.json    # repeat per snapshot
+
+# Section 9 / edges column: read-only edge materialization preview.
+onto graph infer-edges src --metrics-preview                                   \
+  --ontology-dir .ontology.self-ingest-gamma-result --json                     \
+  > gamma-edges.json          # repeat per snapshot
 ```
 
 Module: `src/runtime/graph/hierarchy-metrics.ts` (pure, deterministic).
