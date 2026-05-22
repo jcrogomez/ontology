@@ -28,6 +28,7 @@ import { graphSubgraphCommand } from "./commands/graph/subgraph.js";
 import { graphInferEdgesCommand } from "./commands/graph/infer-edges.js";
 import { graphMetricsCommand } from "./commands/graph/metrics.js";
 import { graphHierarchizeCommand } from "./commands/graph/hierarchize.js";
+import { graphReadinessCommand } from "./commands/graph/readiness.js";
 import { branchListCommand } from "./commands/branch/list.js";
 import { branchFiberCommand } from "./commands/branch/fiber.js";
 import { linkCommand } from "./commands/link/index.js";
@@ -516,7 +517,21 @@ program
 
 const graph = program
   .command("graph")
-  .description("Read-only traversal queries over the typed graph (neighbors, path, subgraph, metrics, hierarchize).");
+  .description("Read-only traversal queries over the typed graph (neighbors, path, subgraph, metrics, hierarchize, readiness).");
+
+graph
+  .command("readiness")
+  .description("Structural-readiness gate: evaluates three rules over the typed graph (nodes-without-edges, global-satisfied-unreachable, topologically-flat) and exits non-zero when any rule fails. Read-only. Use after an ingest sweep — or in CI — to prevent declaring a self-ingest complete when the brújula says otherwise.")
+  .option("--ontology-dir <path>", "Evaluate readiness against an arbitrary ontology directory instead of the active project.")
+  .option("--json", "Output the report in JSON format")
+  .action(async (options) => {
+    try {
+      await graphReadinessCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error evaluating readiness: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
 
 graph
   .command("hierarchize")

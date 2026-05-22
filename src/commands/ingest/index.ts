@@ -1874,6 +1874,9 @@ async function runDirectoryIngest(
     console.log(`Next:`);
     console.log(`  onto proposal list                # review the ${okCount} proposals`);
     console.log(`  # apply them individually with: onto proposal apply <id>`);
+    console.log(``);
+    console.log(`After applying — verify structural readiness:`);
+    console.log(`  onto graph readiness              # gate: nodes-without-edges, routing gap, flatness`);
   }
   if (opts.dryRun) {
     console.log(``);
@@ -2162,6 +2165,9 @@ async function runMultiInputIngest(
     console.log(``);
     console.log(`Next:`);
     console.log(`  onto proposal list                # review the ${okCount} proposals`);
+    console.log(``);
+    console.log(`After applying — verify structural readiness:`);
+    console.log(`  onto graph readiness              # gate: nodes-without-edges, routing gap, flatness`);
   }
   if (opts.dryRun) {
     console.log(``);
