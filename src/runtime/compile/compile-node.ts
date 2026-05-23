@@ -4,7 +4,8 @@ import { OntologyEventSchema } from "../../schemas/ontology.js";
 import { dispatchLlmRequest } from "../llm/dispatcher.js";
 import { resolveNodeModel } from "../llm/resolve-node-model.js";
 import type { LlmProvider, LlmTask } from "../llm/types.js";
-import { hashPrompt } from "../../core/integrity/hash.js";
+import { hashPrompt, hashContext } from "../../core/integrity/hash.js";
+import type { ContextAssemblyOutput } from "../context/types.js";
 import { createPersistedRun, computeRunId, loadPersistedRun } from "../../core/runs/persist.js";
 import {
   writeArtifactPending,
@@ -266,6 +267,24 @@ function resolveModelE(options: CompileNodeOptions): EffectWithLog<ResolvedModel
 }
 
 // (b) Parse the prompt AST + build the run envelope. Cannot fail.
+// Edge types the assembler walks when buildPreludeE asks for an
+// edge-aware context. Same set the validator-side assembleContext call
+// uses; same set hierarchy-metrics.ts treats as "context-reachable".
+// Kept in lock-step so the compile-dispatch / validate / brújula
+// triangle all see the same subgraph.
+const COMPILE_CONTEXT_EDGE_TYPES = [
+  "depends_on",
+  "validates_against",
+  "uses_token",
+  "documents",
+  "tests",
+] as const;
+
+// Marker the assembler emits before the focal's prompt text. Used to
+// split `assembled.prompt` so we can substitute the parsed body
+// (markers stripped) for the raw prompt at dispatch time.
+const ASSEMBLED_TARGET_MARKER = "Target Prompt:";
+
 function buildPreludeE(
   options: CompileNodeOptions,
   handle: ResolvedModelHandle,
@@ -273,9 +292,70 @@ function buildPreludeE(
   return () => {
     const rawPrompt = options.node.prompt.raw ?? "";
     const promptAst = parsePromptAST(rawPrompt);
-    const promptForDispatch = promptAst.body.length > 0 ? promptAst.body : rawPrompt;
+    const promptForDispatchBody = promptAst.body.length > 0 ? promptAst.body : rawPrompt;
     const upstream = options.upstream ?? [];
     const upstreamSystemPrompt = buildUpstreamSystemPrompt(upstream);
+
+    // Phase ε edge-materialization integration (HIERARCHY_BASELINE
+    // §7.5 option 2). The dispatch prompt is built from
+    // `assembleContext` — the same canonical functor the validator
+    // and the brújula use — so compile-dispatch and validate share
+    // a single context-builder. Without this the validator could
+    // pass on a context the dispatch never saw, or vice versa; the
+    // categorical commutation argument is documented in
+    // EMPIRICAL_VALIDATION_PROTOCOL_2026-05-22.md §7.5.
+    //
+    // `includeEdges: true` brings depends_on / uses_token / … edge
+    // neighbours into the assembled context. `upstream` is still
+    // surfaced as the system prompt (it carries the *compiled
+    // artifacts* of refinement parents — orthogonal to intent), so
+    // both signals reach the LLM.
+    //
+    // assembleContext throws when the parent chain is malformed or
+    // when the focal lives on a non-default branch the project state
+    // hasn't been switched to. We fall back to the legacy body-only
+    // dispatch shape so bootstrap graphs and test fixtures that
+    // omit a full parent chain still compile — the contextHash
+    // chain naturally records the fallback (assembledHash = null).
+    const cwd = options.cwd ?? process.cwd();
+    let assembled: ContextAssemblyOutput | null = null;
+    try {
+      assembled = assembleContext(
+        {
+          targetNodeId: options.node.id,
+          branch: options.node.coordinates.branch,
+          mode: "strict",
+          includeEdges: true,
+          edgeTypes: [...COMPILE_CONTEXT_EDGE_TYPES],
+        },
+        cwd,
+      );
+    } catch {
+      assembled = null;
+    }
+
+    // The assembled context goes into the SYSTEM prompt, the focal's
+    // parsed body stays as the user-facing dispatch prompt. Reasons:
+    //   1. Aligns with how real LLM APIs use system vs user — context
+    //      is system, task is user.
+    //   2. Preserves the mock-adapter `code_sketch` identity-functor
+    //      contract: it echoes the user prompt verbatim, which must
+    //      still parse as the focal artifact. Putting context in user
+    //      would have the mock emit the assembled envelope into the
+    //      artifact and the language validator would reject it.
+    //   3. Keeps `runInput.promptHash` (axiom 9 — provenance) anchored
+    //      to the focal's own intent, not to ancestor-context bytes.
+    // We strip the trailing "Target Prompt:" section from the assembled
+    // text because the user prompt already plays that role.
+    const promptForDispatch = promptForDispatchBody;
+    let assembledSystemSection: string | null = null;
+    if (assembled !== null) {
+      const lastIdx = assembled.prompt.lastIndexOf(ASSEMBLED_TARGET_MARKER);
+      assembledSystemSection =
+        lastIdx >= 0
+          ? assembled.prompt.slice(0, lastIdx).trimEnd()
+          : assembled.prompt;
+    }
 
     // Phase ε Move 3α — AST grounding for code_sketch. Reads the focal
     // node's source file (outputs.files[0]) and folds the deterministic
@@ -301,12 +381,23 @@ function buildPreludeE(
 
     const systemPrompt = joinSystemSections([
       upstreamSystemPrompt,
+      assembledSystemSection,
       groundingSection,
     ]);
-    const contextHash = composeContextHash(
+
+    // contextHash composes three ingredients now:
+    //   • upstream:  refinement-parents' compiled artifacts (system prompt)
+    //   • assembled: the assembleContext.prompt the dispatch sees
+    //   • grounding: AST mandatory-exports section
+    // Any subset can be null. Chained via composeContextHash so the
+    // existing two-arg helper handles each pair correctly (the second
+    // slot's "grounding" name is positional, not semantic).
+    const assembledHash = assembled !== null ? hashContext(assembled) : null;
+    const upstreamPlusAssembled = composeContextHash(
       hashUpstreamContext(upstream),
-      groundingHash,
+      assembledHash,
     );
+    const contextHash = composeContextHash(upstreamPlusAssembled, groundingHash);
 
     // Dispatch knobs that influence the model's output. Only emit the
     // `dispatch` sub-object when at least one knob is set, so legacy
@@ -327,8 +418,13 @@ function buildPreludeE(
       branch: options.node.coordinates.branch,
       time: null,
       task: COMPILE_TASK as string,
-      includeEdges: false,
-      edgeTypes: null,
+      // Reflects the assembleContext call above. When assembled is null
+      // (fallback path) we still record the *intent* (true / default
+      // edge types) because the cache miss happens via the assembledHash
+      // change anyway — keeping these constant means the run record is
+      // self-describing for any future inspection.
+      includeEdges: true,
+      edgeTypes: [...COMPILE_CONTEXT_EDGE_TYPES],
       ...(hasDispatch ? { dispatch: dispatchKnobs } : {}),
     };
     const runModel: PersistedRunModel = {
@@ -340,9 +436,10 @@ function buildPreludeE(
     const markersTag = (promptAst.markers.requires.length || promptAst.markers.provides.length || promptAst.markers.expand.length)
       ? ` (markers: ${promptAst.markers.requires.length}R/${promptAst.markers.provides.length}P/${promptAst.markers.expand.length}E)`
       : "";
+    const assembledTag = assembled !== null ? ` assembled=${assembled.nodes.length}n` : ` assembled=fallback`;
     return {
       value: ok({ rawPrompt, promptForDispatch, systemPrompt, runInput, runModel }),
-      logs: [{ level: "info", message: `buildPrelude: ${rawPrompt.length} bytes raw, ${promptForDispatch.length} bytes dispatch${markersTag}, upstream=${upstream.length}` }],
+      logs: [{ level: "info", message: `buildPrelude: ${rawPrompt.length} bytes raw, ${promptForDispatch.length} bytes dispatch${markersTag}, upstream=${upstream.length}${assembledTag}` }],
     };
   };
 }

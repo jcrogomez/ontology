@@ -93,19 +93,26 @@ describe("onto compile run", () => {
     expect(artifact).toBe(node.prompt.raw);
   });
 
-  it("threads upstream refinement parents into the run's contextHash, leaf inherits non-null", () => {
+  it("threads the assembled context + upstream refinement parents into the run's contextHash; every focal node gets a distinct, non-null hash", () => {
     runCli(tempDir, ["compile", "run", "node_0002", "--provider", "mock"]);
     const runs = fs.readdirSync(path.join(tempDir, ".ontology/runs"))
       .map(f => JSON.parse(fs.readFileSync(path.join(tempDir, ".ontology/runs", f), "utf-8")));
     const byTarget = Object.fromEntries(runs.map((r: any) => [r.input.targetNodeId, r]));
-    // canon has no refinement parent → contextHash stays null.
-    expect(byTarget["node_0000_canon"].input.contextHash).toBeNull();
-    // The domain (node_0001) refines canon → contextHash set, ctx:hash:<sha>.
+    // After the assembleContext-driven prompt refactor every successful
+    // compile records a non-null contextHash — it hashes the assembled
+    // context (canon → ancestors → contract → edge neighbours) the
+    // dispatch system prompt was built from. Canon's assembled context
+    // is the trivial single-node case but still has identity, so its
+    // hash is non-null too.
+    expect(byTarget["node_0000_canon"].input.contextHash).toMatch(/^ctx:hash:[0-9a-f]{64}$/);
     expect(byTarget["node_0001"].input.contextHash).toMatch(/^ctx:hash:[0-9a-f]{64}$/);
-    // The leaf (node_0002) refines node_0001 → its contextHash is distinct
-    // from node_0001's (the upstream content differs).
     expect(byTarget["node_0002"].input.contextHash).toMatch(/^ctx:hash:[0-9a-f]{64}$/);
+    // Each focal's assembled context is distinct (different path,
+    // different contract block, different upstream parents), so the
+    // hashes must differ pairwise.
+    expect(byTarget["node_0001"].input.contextHash).not.toBe(byTarget["node_0000_canon"].input.contextHash);
     expect(byTarget["node_0002"].input.contextHash).not.toBe(byTarget["node_0001"].input.contextHash);
+    expect(byTarget["node_0002"].input.contextHash).not.toBe(byTarget["node_0000_canon"].input.contextHash);
   });
 
   it("changing an upstream node's prompt invalidates the leaf's run id", () => {

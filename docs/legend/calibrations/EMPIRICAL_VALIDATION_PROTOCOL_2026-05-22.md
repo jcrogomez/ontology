@@ -318,6 +318,63 @@ Three candidates, in increasing scope:
 None of (1)–(3) is in scope for this protocol; documenting them so
 the next planning pass can size each.
 
+### 7.5.bis Option 2 landed — the local Ollama follow-up
+
+Option 2 from §7.5 was implemented in a follow-up to this protocol:
+`buildPreludeE` now calls `assembleContext({includeEdges: true})` and
+threads the resulting context (canon → ancestors → contract → edge
+neighbours) into the **system** prompt next to `upstreamSystemPrompt`
+and the AST grounding. The dispatch user prompt stays as the focal's
+parsed body — this preserves the mock-as-identity-functor convention
+and aligns with how real LLM APIs separate system from user. The
+contextHash now hashes the union (upstream + assembled + grounding),
+so the run cache invalidates correctly when any of the three changes.
+
+Re-running the local Ollama dry run on `node_0025` under the new
+prompt shape — same protocol as §7.3, fresh dispatches (no cache):
+
+| metric                | Cell A (no edges)     | Cell B (with edges)   |
+| --------------------- | --------------------- | --------------------- |
+| verdict               | divergent_structural  | divergent_both        |
+| locDistance           | 0.172                 | 0.862                 |
+| structuralJaccard     | 0.000                 | 0.000                 |
+| originalLineCount     | 58                    | 58                    |
+| regenLineCount        | 48                    | 8                     |
+| promptTokens          | 450                   | 701                   |
+| completionTokens      | 861                   | 1,104                 |
+| wall time             | 1h 02m                | 3h 04m                |
+| cached                | false                 | false                 |
+
+Two confirmations and one inversion:
+
+- **Confirmed: the prompt now sees edges.** 56 → 450 tokens between
+  cells means the edges + contract are actually reaching the model.
+- **Confirmed: option 2 is mathematically aligned.** Dispatch and
+  validate now read the same assembled context; the brújula
+  measurement and the compile context are the same object.
+- **Inverted: the local 7B model degraded with the richer prompt.**
+  Cell B's regen collapsed from 48 to 8 lines, locDistance jumped
+  from 0.172 to 0.862, verdict went from divergent_structural to
+  divergent_both. qwen2.5-coder:7b on an 8 GB Mac cannot exploit
+  the additional context — it stalls in the larger window. Wall time
+  also tripled (3h vs 1h per dispatch).
+
+What this means for the protocol's empirical question:
+
+- The architectural fix that §7.5 asked for is in place. The brújula
+  measurement and the dispatch context are now provably the same
+  functor (see [[hierarchizer-brujula]]).
+- The local profile (Ollama, qwen2.5-coder:7b) **cannot answer**
+  whether the brújula predicts regeneration quality. The model is
+  not strong enough to use the extra signal, and the wall-time cost
+  (1–3 h per dispatch) makes a 7-node sample a 15-hour run.
+- The 5–10 node Sonnet 4.6 profile (~$0.20) is the next viable
+  experiment. Pre-registration: with the option 2 refactor in place,
+  the expected signal in Cell B is more `ε_equivalent` verdicts on
+  nodes whose closed-world unreachable requires were highest in the
+  baseline (`loadEdges`, `loadNodeById`, `loadState`, `errorMessage`,
+  `loadNodes`).
+
 ### 7.6 Hypothesis to refute / confirm
 
 The lesson is the same shape as the §1 / §2 finding, just one layer
