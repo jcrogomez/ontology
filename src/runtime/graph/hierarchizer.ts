@@ -351,17 +351,16 @@ export function planHierarchization(
   });
 
   // ── 6. Proposal capability declaration ─────────────────────────────────
-  // Directory nodes alone can be expressed (node_create), but emitting
-  // them without the reparent step would worsen the flatness verdict.
-  // We refuse to surface a half-plan as proposals; the report explains
-  // the schema extension required.
+  // Both kinds are now expressible: `node_create` for directoriesToCreate
+  // and the schema-1.2 `node_update_parent` for reparentings. The
+  // `--create-proposals` wiring is the remaining piece — proposals must
+  // be emitted in topological order so each directory's parentHash is
+  // captured against its already-existing parent, and reparentings only
+  // emit after all directories they target have been applied.
   const proposalCapability: ProposalCapability = {
     canCreateDirectories: true,
-    canReparentExistingNodes: false,
-    blockedBy: [
-      "ProposalMutationSchema lacks a `node_update_parent` (or equivalent) variant; existing file nodes' `graph.parentId` cannot be changed via a proposal.",
-      "Emitting only the `node_create` proposals for directories without paired reparenting would add structure that increases flatness rather than reducing it (more direct children of canon).",
-    ],
+    canReparentExistingNodes: true,
+    blockedBy: [],
   };
 
   return {

@@ -40,6 +40,13 @@ export async function proposalShowCommand(id: string, options: ProposalShowOptio
     console.log(`  Branch:       ${p.branch ?? "(active)"}`);
     console.log(`  From hash:    ${proposal.mutation.fromHash}`);
     console.log(`  To hash:      ${proposal.mutation.toHash}`);
+  } else if (proposal.mutation.kind === "node_update_parent") {
+    const p = proposal.mutation.payload;
+    console.log(`Mutation (node_update_parent):`);
+    console.log(`  Node:           ${p.nodeId}`);
+    console.log(`  New parent:     ${p.newParentNodeId}`);
+    console.log(`  Node hash:      ${proposal.mutation.nodeHash}`);
+    console.log(`  New parent hash:${proposal.mutation.newParentHash}`);
   }
 
   console.log("");

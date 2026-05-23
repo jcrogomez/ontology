@@ -155,14 +155,17 @@ export function rejectProposalFromWalker(
  * fits on screen without scrolling per item.
  */
 export function summarizeProposalRow(p: Proposal): string {
-  const kind = p.mutation.kind === "node_create" ? "node" : "edge";
   if (p.mutation.kind === "node_create") {
     const payload = p.mutation.payload;
     const label = payload.label ?? "(unlabelled)";
     const level = payload.level ?? "—";
-    return `${p.id}  ${kind}  [${level}]  ${label}`;
+    return `${p.id}  node  [${level}]  ${label}`;
   }
-  // edge_create
+  if (p.mutation.kind === "edge_create") {
+    const payload = p.mutation.payload;
+    return `${p.id}  edge  ${payload.from} → ${payload.to}  (${payload.type})`;
+  }
+  // node_update_parent — the hierarchizer's reparenting kind.
   const payload = p.mutation.payload;
-  return `${p.id}  ${kind}  ${payload.from} → ${payload.to}  (${payload.type})`;
+  return `${p.id}  reparent  ${payload.nodeId} → ${payload.newParentNodeId}`;
 }

@@ -300,15 +300,12 @@ describe("planHierarchization — skipped buckets", () => {
 });
 
 describe("planHierarchization — proposal capability", () => {
-  it("declares preview-only and explains the blocker", () => {
+  it("declares both kinds applicable now that node_update_parent shipped (schema 1.2)", () => {
     const nodes = [node({ id: "node_canon", abstraction: "canon" })];
     const plan = planHierarchization({ nodes, edges: [] });
     expect(plan.proposalCapability.canCreateDirectories).toBe(true);
-    expect(plan.proposalCapability.canReparentExistingNodes).toBe(false);
-    expect(plan.proposalCapability.blockedBy.length).toBeGreaterThan(0);
-    expect(plan.proposalCapability.blockedBy.join(" ")).toMatch(
-      /node_update_parent|ProposalMutationSchema/,
-    );
+    expect(plan.proposalCapability.canReparentExistingNodes).toBe(true);
+    expect(plan.proposalCapability.blockedBy).toEqual([]);
   });
 });
 

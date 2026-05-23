@@ -260,6 +260,12 @@ export const OntologyEventSchema = z.object({
     "system_init",
     "node_created",
     "node_updated",
+    // Hierarchizer §10 item 3 / `node_update_parent` proposal kind:
+    // emitted by `updateNodeParent` after a leaf-node reparent. Carries
+    // { nodeId, oldParentId, newParentId, oldHash, newHash } so the
+    // audit chain reconstructs the parent edge that changed without
+    // re-loading every node.
+    "node_parent_updated",
     "node_removed",
     "node_frozen",
     "edge_created",
@@ -501,6 +507,21 @@ export const ProposalEdgeCreatePayloadSchema = z.object({
   branch: z.string().nullable().default(null),
 });
 
+// node_update_parent: propose moving an existing node under a different
+// parent. The hierarchizer's reparenting plan emits one of these per
+// leaf node that needs to land under a freshly-created directory ancestor;
+// the walker / TUI uses the same kind for any future manual reparent
+// action. The schema-extension closes the §10 item 3 blocker that kept
+// `onto graph hierarchize --create-proposals` un-shipped.
+//
+// Both the node's and the new parent's hashes are captured so the apply
+// path stales the proposal on any out-of-band mutation to either side —
+// matching the edge_create dual-endpoint hash semantics.
+export const ProposalNodeUpdateParentPayloadSchema = z.object({
+  nodeId: z.string().startsWith("node_"),
+  newParentNodeId: z.string().startsWith("node_"),
+});
+
 export const ProposalMutationSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("node_create"),
@@ -517,6 +538,18 @@ export const ProposalMutationSchema = z.discriminatedUnion("kind", [
     // both nodes and stales the proposal if either has diverged.
     fromHash: z.string(),
     toHash: z.string(),
+  }),
+  z.object({
+    kind: z.literal("node_update_parent"),
+    payload: ProposalNodeUpdateParentPayloadSchema,
+    // The node being reparented: its hash at proposal-creation time.
+    // Stales the proposal if the node was independently mutated.
+    nodeHash: z.string(),
+    // The new parent node's hash at proposal-creation time. Stales the
+    // proposal if the new parent was mutated (e.g. another reparent
+    // changed its children, which doesn't affect this proposal directly
+    // but would still indicate the planner's assumptions have shifted).
+    newParentHash: z.string(),
   }),
 ]);
 
@@ -555,6 +588,7 @@ export type ProposalSource = z.infer<typeof ProposalSourceSchema>;
 export type ProposalMutation = z.infer<typeof ProposalMutationSchema>;
 export type ProposalNodeCreatePayload = z.infer<typeof ProposalNodeCreatePayloadSchema>;
 export type ProposalEdgeCreatePayload = z.infer<typeof ProposalEdgeCreatePayloadSchema>;
+export type ProposalNodeUpdateParentPayload = z.infer<typeof ProposalNodeUpdateParentPayloadSchema>;
 export type ProposalValidationSnapshot = z.infer<typeof ProposalValidationSnapshotSchema>;
 export type ProposalProvenance = z.infer<typeof ProposalProvenanceSchema>;
 export type ProposalStatus = z.infer<typeof ProposalStatusSchema>;

@@ -19,6 +19,7 @@ import { readState, writeState } from "../state/state-store.js";
 import { loadNodeById } from "../project/load.js";
 import { createNode } from "../nodes/create-node.js";
 import { createEdge } from "../edges/create-edge.js";
+import { updateNodeParent, wouldCreateCycle } from "../nodes/update-parent.js";
 
 // Proposal persistence module.
 //
@@ -315,6 +316,9 @@ export function applyProposal(
   if (current.mutation.kind === "edge_create") {
     return applyEdgeCreate(id, current, dryRun, cwd);
   }
+  if (current.mutation.kind === "node_update_parent") {
+    return applyNodeUpdateParent(id, current, dryRun, cwd);
+  }
 
   return {
     ok: false,
@@ -542,6 +546,148 @@ function applyEdgeCreate(
     proposalEvent: result.event,
     mutationEvent: edgeResult.event,
     createdEntityId: edgeResult.edge.edgeId,
+    dryRun: false,
+  };
+}
+
+// node_update_parent: re-validate both the target node and the new parent
+// hashes (mirrors edge_create's dual-endpoint pattern), then dispatch via
+// updateNodeParent. The kernel re-checks cross-branch and cycle invariants
+// at apply time; this handler re-checks them in dry-run so a `--dry-run`
+// preview surfaces "would cycle" before any state mutates.
+function applyNodeUpdateParent(
+  id: string,
+  current: Proposal,
+  dryRun: boolean,
+  cwd: string,
+): ApplyProposalResult {
+  if (current.mutation.kind !== "node_update_parent") {
+    throw new Error(
+      "internal: applyNodeUpdateParent called with non-node_update_parent mutation",
+    );
+  }
+
+  const nodeId = current.mutation.payload.nodeId;
+  const newParentId = current.mutation.payload.newParentNodeId;
+  const targetNode = loadNodeById(nodeId, cwd);
+  const newParent = loadNodeById(newParentId, cwd);
+  if (!targetNode) {
+    return {
+      ok: false,
+      kind: "missing_parent",
+      message: `Target node referenced by proposal no longer exists: ${nodeId}`,
+    };
+  }
+  if (!newParent) {
+    return {
+      ok: false,
+      kind: "missing_parent",
+      message: `New parent node referenced by proposal no longer exists: ${newParentId}`,
+    };
+  }
+
+  // Dual-hash divergence check, identical pattern to applyEdgeCreate.
+  const targetDiverged = targetNode.integrity.hash !== current.mutation.nodeHash;
+  const newParentDiverged = newParent.integrity.hash !== current.mutation.newParentHash;
+  if (targetDiverged || newParentDiverged) {
+    const detail = targetDiverged && newParentDiverged
+      ? `both ${nodeId} and ${newParentId} hashes diverged`
+      : targetDiverged
+      ? `${nodeId} hash diverged (expected ${current.mutation.nodeHash}, found ${targetNode.integrity.hash})`
+      : `${newParentId} hash diverged (expected ${current.mutation.newParentHash}, found ${newParent.integrity.hash})`;
+    if (dryRun) {
+      return {
+        ok: false,
+        kind: "stale",
+        message: `Proposal ${id} is stale: ${detail}.`,
+      };
+    }
+    const result = transitionProposal(id, current, "staled", {
+      reason: "endpoint_hash_diverged",
+      nodeId,
+      newParentNodeId: newParentId,
+      expectedNodeHash: current.mutation.nodeHash,
+      actualNodeHash: targetNode.integrity.hash,
+      expectedNewParentHash: current.mutation.newParentHash,
+      actualNewParentHash: newParent.integrity.hash,
+    }, cwd, "proposal_staled");
+    return {
+      ok: false,
+      kind: "stale",
+      message: `Proposal ${id} marked staled: ${detail}.`,
+      proposal: result.proposal,
+      proposalEvent: result.event,
+    };
+  }
+
+  // Surface dry-run cycle/branch failures so the user sees them before
+  // any state mutates. The kernel still re-checks at apply time — these
+  // are not authoritative, just early signal.
+  if (targetNode.coordinates.branch !== newParent.coordinates.branch) {
+    return {
+      ok: false,
+      kind: "mutation_failed",
+      message:
+        `Cross-branch reparenting refused: node ${nodeId} is on branch ` +
+        `"${targetNode.coordinates.branch}" but new parent ${newParentId} is on ` +
+        `"${newParent.coordinates.branch}".`,
+    };
+  }
+  if (wouldCreateCycle(nodeId, newParentId, cwd)) {
+    return {
+      ok: false,
+      kind: "mutation_failed",
+      message:
+        `Reparenting ${nodeId} under ${newParentId} would create a cycle ` +
+        `(${newParentId} is currently a descendant of ${nodeId}).`,
+    };
+  }
+  if (targetNode.graph.parentId === newParentId) {
+    return {
+      ok: false,
+      kind: "mutation_failed",
+      message: `Node ${nodeId} is already a child of ${newParentId}; reparenting would be a no-op.`,
+    };
+  }
+
+  if (dryRun) {
+    return {
+      ok: true,
+      proposal: current,
+      proposalEvent: null as unknown as OntologyEvent,
+      mutationEvent: null,
+      createdEntityId: null,
+      dryRun: true,
+    };
+  }
+
+  let mutationResult;
+  try {
+    mutationResult = updateNodeParent({
+      id: nodeId,
+      newParentNodeId: newParentId,
+      cwd,
+      eventMetadata: { sourceProposalId: id },
+    });
+  } catch (err: unknown) {
+    return {
+      ok: false,
+      kind: "mutation_failed",
+      message: `Mutation failed during apply: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  const result = transitionProposal(id, current, "applied", {
+    resultingNodeId: mutationResult.node.id,
+    resultingEventId: mutationResult.event.eventId,
+  }, cwd, "proposal_applied");
+
+  return {
+    ok: true,
+    proposal: result.proposal,
+    proposalEvent: result.event,
+    mutationEvent: mutationResult.event,
+    createdEntityId: mutationResult.node.id,
     dryRun: false,
   };
 }

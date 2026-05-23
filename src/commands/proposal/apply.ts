@@ -78,7 +78,9 @@ export async function proposalApplyCommand(id: string, options: ProposalApplyOpt
   // Label the created entity by mutation kind so an edge proposal does not
   // claim "Created node: edge_xxxx" and confuse the human reader.
   const createdLabel =
-    result.proposal.mutation.kind === "edge_create" ? "Created edge:" : "Created node:";
+    result.proposal.mutation.kind === "edge_create" ? "Created edge:"
+    : result.proposal.mutation.kind === "node_update_parent" ? "Reparented node:"
+    : "Created node:";
   console.log(`${createdLabel}  ${result.createdEntityId}`);
   if (result.mutationEvent) {
     console.log(`Mutation evt:  ${result.mutationEvent.eventId}`);
