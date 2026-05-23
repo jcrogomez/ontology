@@ -244,6 +244,17 @@ export interface VerificationResult {
    * Milestone review 2026-05-19 §3.1.
    */
   dispatchModel?: { provider: string; model: string };
+  /**
+   * Per-node multi-rep telemetry. Populated when the verify command
+   * ran with `--reps N` (N > 1) and the per-rep results were folded
+   * via {@link import("./reps-aggregator.js").aggregateRepResults}.
+   * Carries the per-rep metric + verdict sequence so the JSON report
+   * stays transparent about the underlying draws — the headline
+   * `metrics` and `verdict` fields are the aggregated values. Design
+   * item §4.2 (Phase ε): defang single-draw Jaccard variance before
+   * the Opus 4.7 ceiling probe.
+   */
+  reps?: import("./reps-aggregator.js").RepsTelemetry;
 }
 
 export interface AggregateReport {

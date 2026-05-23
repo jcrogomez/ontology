@@ -943,6 +943,8 @@ program
   .option("--report <path>", "Also write a markdown report of the verdict + per-node usage to the given path (in addition to stdout / --json). Shape mirrors docs/legend/calibrations/* reports.")
   .option("--matrix", "Phase ε prework C: emit the six-axis matrix (contract, structural, behavior, intent, literalRequired, cost) per node + per-axis aggregate counts alongside the legacy verdict report. The pilot fills structural + cost + literalRequired with measured data; the other axes report explicit not-measured / untested / not-reviewed until their checkers ship.")
   .option("--ast-grounding", "Phase ε Move 3α: append a deterministic MANDATORY EXPORTS section (from the source AST) to the code_sketch system prompt for every compile-back dispatch, and fold the grounding identity into the run-cache contextHash. Off by default — opt in to test the AST-grounding lift independently of model swaps; pre-3α calibrations and Sonnet ceiling probes choose to include or exclude this independently.")
+  .option("--reps <n>", "Phase ε design §4.2: run N compile-back dispatches per node and aggregate the per-rep metrics (default 1 — point estimate). N > 1 defangs single-draw Jaccard variance (γ observed 1.0 → 0.0 on the same node across two draws), at the cost of N× LLM spend. Use before any Opus 4.7 ceiling probe to make the verdict robust.", (v) => parseInt(v, 10))
+  .option("--aggregator <mode>", "Aggregator over per-rep numeric metrics when --reps > 1: 'median' (default — variance-resistant for the H1 floor read) or 'mean'. Ignored when --reps is 1.")
   .option("--no-lock", "Skip the .ontology/.lock advisory lock — see compile run for semantics.")
   .option("--json", "Output results in JSON format.")
   .action(async (focal, rawOptions) => {

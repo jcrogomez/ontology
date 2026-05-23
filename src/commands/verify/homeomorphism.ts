@@ -71,6 +71,7 @@ import {
   type FailureMode,
   type FailureModeAggregate,
 } from "../../runtime/legend/failure-mode-tagger.js";
+import { aggregateRepResults } from "../../runtime/legend/reps-aggregator.js";
 
 // `onto verify-homeomorphism` — Project Legend δ-2.
 //
@@ -156,6 +157,17 @@ export interface VerifyHomeomorphismOptions {
   // by default; pre-3α runs and Sonnet ceiling probes can opt in or
   // out independently to isolate the AST-grounding contribution.
   astGrounding?: boolean;
+  // Phase ε design §4.2 — per-node multi-rep aggregation. When > 1,
+  // each candidate is verified N times (N fresh dispatches), the per-
+  // rep metrics are folded under the chosen aggregator (median by
+  // default), and the verdict is re-classified from the aggregated
+  // metrics. Defangs single-draw Jaccard variance (γ observed
+  // 1.0 → 0.0 on the same node across two draws) before the Opus 4.7
+  // ceiling probe spends money on a non-robust signal. Spend scales
+  // linearly with reps; cache hits across reps still count as reps
+  // (each rep is a fresh dispatch attempt, not a fresh cache write).
+  reps?: number;
+  aggregator?: "median" | "mean";
   json?: boolean;
 }
 
@@ -211,31 +223,68 @@ export async function verifyHomeomorphismCommand(
     fs.mkdirSync(stagingDir, { recursive: true });
   }
 
+  // Phase ε design §4.2: per-node multi-rep aggregation. Clamp reps
+  // to ≥ 1 so a negative or NaN CLI value behaves like the single-rep
+  // path. The aggregator only matters when reps > 1.
+  const reps = Math.max(1, Number.isFinite(options.reps) ? Number(options.reps) : 1);
+  const aggregator = options.aggregator ?? "median";
+
   const results: VerificationResult[] = [];
   try {
     await withLock(
       cwd,
       async () => {
         for (const c of candidates) {
-          const r = await verifyOne(c, {
-            stagingDir,
-            provider,
-            model: options.model,
-            ollamaHost: options.ollamaHost,
-            maxTokens: options.maxTokens,
-            thinking: options.thinking,
-            openWorld: options.openWorld ?? true, // verify defaults to open-world
-            thresholds,
-            dryRun: !!options.dryRun,
-            cwd,
-            astGrounding: options.astGrounding,
-          });
-          results.push(r);
+          if (reps === 1) {
+            // Single-draw path — unchanged, no telemetry overhead.
+            const r = await verifyOne(c, {
+              stagingDir,
+              provider,
+              model: options.model,
+              ollamaHost: options.ollamaHost,
+              maxTokens: options.maxTokens,
+              thinking: options.thinking,
+              openWorld: options.openWorld ?? true,
+              thresholds,
+              dryRun: !!options.dryRun,
+              cwd,
+              astGrounding: options.astGrounding,
+            });
+            results.push(r);
+          } else {
+            // Multi-rep path: run verifyOne N times for this candidate
+            // (each rep is a fresh dispatch — the LLM cache layer decides
+            // whether each rep actually pays). The staging file is
+            // overwritten between reps; per-rep metrics are captured
+            // before the next rep runs, so only the last rep's regen
+            // survives on disk (which is also what the aggregate
+            // regenPath points at).
+            const perRep: VerificationResult[] = [];
+            for (let i = 0; i < reps; i++) {
+              const r = await verifyOne(c, {
+                stagingDir,
+                provider,
+                model: options.model,
+                ollamaHost: options.ollamaHost,
+                maxTokens: options.maxTokens,
+                thinking: options.thinking,
+                openWorld: options.openWorld ?? true,
+                thresholds,
+                dryRun: !!options.dryRun,
+                cwd,
+                astGrounding: options.astGrounding,
+              });
+              perRep.push(r);
+            }
+            results.push(
+              aggregateRepResults(perRep, { aggregator, thresholds }),
+            );
+          }
         }
       },
       {
         skipLock: options.noLock,
-        command: `verify-homeomorphism (${candidates.length} candidates)`,
+        command: `verify-homeomorphism (${candidates.length} candidates${reps > 1 ? `, ${reps} reps each` : ""})`,
       },
     );
   } catch (err: unknown) {
@@ -405,6 +454,12 @@ export async function verifyHomeomorphismCommand(
           // replayable from events.jsonl alone.
           model: dominantDispatchModel(results, provider, options.model),
           perimeterHash: computePerimeterHash(results),
+          // Design §4.2: reps + aggregator on the event so a replay
+          // can tell whether the headline metrics are a single draw or
+          // a folded N-draw aggregate. Omitted when reps=1 to keep the
+          // single-draw event payload unchanged (audit-log diff
+          // friendliness for legacy replay tooling).
+          ...(reps > 1 ? { reps, aggregator } : {}),
           ...(totalUsage ? { totalUsage } : {}),
         },
       });
