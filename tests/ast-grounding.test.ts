@@ -3,6 +3,7 @@ import {
   buildAstGroundingSystemSection,
   joinSystemSections,
   hashAstGrounding,
+  hashRepCacheBypass,
   composeContextHash,
 } from "../src/runtime/compile/ast-grounding.js";
 
@@ -104,5 +105,78 @@ describe("composeContextHash (backward compat)", () => {
     const a = composeContextHash("ctx:hash:up1", "grounding:hash:gr");
     const b = composeContextHash("ctx:hash:up2", "grounding:hash:gr");
     expect(a).not.toBe(b);
+  });
+});
+
+describe("hashRepCacheBypass — per-rep cache-bypass token (review §3 fix)", () => {
+  it("returns null when the token is undefined (legacy single-draw path)", () => {
+    expect(hashRepCacheBypass(undefined)).toBeNull();
+  });
+
+  it("returns null when the token is an empty string (no-op equivalent)", () => {
+    expect(hashRepCacheBypass("")).toBeNull();
+  });
+
+  it("returns a `rep:hash:` prefixed digest for a non-empty token", () => {
+    const h = hashRepCacheBypass("rep_0_of_3");
+    expect(h).not.toBeNull();
+    expect(h).toMatch(/^rep:hash:[0-9a-f]+$/);
+  });
+
+  it("is deterministic across calls with the same token", () => {
+    expect(hashRepCacheBypass("rep_2_of_5")).toBe(hashRepCacheBypass("rep_2_of_5"));
+  });
+
+  it("distinct tokens produce distinct hashes — the heart of the cache-bypass fix", () => {
+    const r0 = hashRepCacheBypass("rep_0_of_3");
+    const r1 = hashRepCacheBypass("rep_1_of_3");
+    const r2 = hashRepCacheBypass("rep_2_of_3");
+    expect(r0).not.toBe(r1);
+    expect(r1).not.toBe(r2);
+    expect(r0).not.toBe(r2);
+  });
+
+  it("uses a distinct namespace from grounding (no `rep:hash:` collision)", () => {
+    const grounding = hashAstGrounding(["Foo"]);
+    const rep = hashRepCacheBypass("Foo");
+    expect(grounding).toMatch(/^grounding:hash:/);
+    expect(rep).toMatch(/^rep:hash:/);
+    expect(grounding).not.toBe(rep);
+  });
+});
+
+describe("composeContextHash + rep token — end-to-end cache-key behaviour", () => {
+  // The fix wires `composeContextHash` a second time, layering the rep
+  // hash over the upstream+grounding chain. Verifies that the
+  // composition is sensitive to the rep token in the same way it's
+  // sensitive to grounding.
+  it("two reps with distinct tokens produce distinct contextHashes", () => {
+    const upstreamPlusGrounding = composeContextHash(
+      "ctx:hash:upstream",
+      "grounding:hash:exports",
+    );
+    const rep0 = composeContextHash(
+      upstreamPlusGrounding,
+      hashRepCacheBypass("rep_0_of_3"),
+    );
+    const rep1 = composeContextHash(
+      upstreamPlusGrounding,
+      hashRepCacheBypass("rep_1_of_3"),
+    );
+    expect(rep0).not.toBeNull();
+    expect(rep1).not.toBeNull();
+    expect(rep0).not.toBe(rep1);
+    // And both differ from the no-rep (single-draw legacy) contextHash:
+    expect(rep0).not.toBe(upstreamPlusGrounding);
+    expect(rep1).not.toBe(upstreamPlusGrounding);
+  });
+
+  it("undefined rep token preserves the legacy contextHash byte-for-byte", () => {
+    const baseline = composeContextHash(
+      "ctx:hash:upstream",
+      "grounding:hash:exports",
+    );
+    const noRep = composeContextHash(baseline, hashRepCacheBypass(undefined));
+    expect(noRep).toBe(baseline);
   });
 });

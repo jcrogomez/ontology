@@ -65,6 +65,12 @@ export interface CompilePlanRunOptions {
   // Phase ε Move 3α — AST grounding for code_sketch. Forwarded to each
   // compileNode step uniformly. See CompileNodeOptions.astGrounding.
   astGrounding?: boolean;
+  // Phase ε design §4.2 — per-rep cache-bypass token. Forwarded to each
+  // compileNode step uniformly so a --reps N sweep can pass the rep
+  // index (or any deterministic per-rep token) and obtain distinct
+  // runIds across reps. Undefined preserves the legacy single-draw
+  // cache identity. See CompileNodeOptions.repCacheBypassToken.
+  repCacheBypassToken?: string;
 }
 
 export interface CompilePlanStepResult {
@@ -223,6 +229,12 @@ export async function runCompilePlan(options: CompilePlanRunOptions): Promise<Co
       maxTokens: options.maxTokens,
       thinking: options.thinking,
       astGrounding: options.astGrounding,
+      // Apply the per-rep cache-bypass token only at the focal step.
+      // Upstream parents already share a cache across the sweep — they
+      // never change per rep and re-dispatching them would waste tokens
+      // without changing the variance signal the focal is measuring.
+      repCacheBypassToken:
+        step.nodeId === options.focalId ? options.repCacheBypassToken : undefined,
     });
 
     if (!stepResult.ok) {

@@ -227,7 +227,33 @@ export async function verifyHomeomorphismCommand(
   // to ≥ 1 so a negative or NaN CLI value behaves like the single-rep
   // path. The aggregator only matters when reps > 1.
   const reps = Math.max(1, Number.isFinite(options.reps) ? Number(options.reps) : 1);
+  // Validate the aggregator at the CLI boundary (design §4.1). A typo
+  // like `--aggregator banana` used to fall silently through to mean;
+  // now it fails fast so the user notices instead of getting a
+  // surprising aggregate.
+  if (options.aggregator !== undefined &&
+      options.aggregator !== "median" &&
+      options.aggregator !== "mean") {
+    fail(
+      `--aggregator must be 'median' or 'mean', got '${String(options.aggregator)}'.`,
+      options.json,
+    );
+    return;
+  }
   const aggregator = options.aggregator ?? "median";
+  // Even-N median warning (design §4.2): median over an even rep count
+  // synthesises a midpoint that no real draw produced — e.g. for the γ
+  // case median([0.0, 1.0]) = 0.5, which is the same as the mean and
+  // doesn't reflect any actual measurement. Odd N ≥ 3 is the intended
+  // use. Surface a single warning so the user can choose to bump reps
+  // by 1 (cheap) instead of getting a misleading verdict.
+  if (reps > 1 && reps % 2 === 0 && aggregator === "median" && !options.json) {
+    console.warn(
+      `⚠ --reps ${reps} with --aggregator median synthesises a midpoint ` +
+        `that no draw produced; the median equals the mean. Use an odd ` +
+        `rep count (e.g. --reps ${reps + 1}) for a real-draw aggregate.`,
+    );
+  }
 
   const results: VerificationResult[] = [];
   try {
@@ -252,13 +278,15 @@ export async function verifyHomeomorphismCommand(
             });
             results.push(r);
           } else {
-            // Multi-rep path: run verifyOne N times for this candidate
-            // (each rep is a fresh dispatch — the LLM cache layer decides
-            // whether each rep actually pays). The staging file is
-            // overwritten between reps; per-rep metrics are captured
-            // before the next rep runs, so only the last rep's regen
-            // survives on disk (which is also what the aggregate
-            // regenPath points at).
+            // Multi-rep path: run verifyOne N times for this candidate.
+            // Each rep passes a distinct `repCacheBypassToken` so the
+            // deterministic run-cache (computeRunId hashes input+model)
+            // produces a distinct runId per rep — without this token,
+            // checkCacheE would return rep 1's persisted text for reps
+            // 2..N and the aggregator would fold N identical values,
+            // defeating the variance-defang purpose of --reps. The
+            // staging file is overwritten between reps; per-rep metrics
+            // are captured before the next rep runs.
             const perRep: VerificationResult[] = [];
             for (let i = 0; i < reps; i++) {
               const r = await verifyOne(c, {
@@ -273,6 +301,11 @@ export async function verifyHomeomorphismCommand(
                 dryRun: !!options.dryRun,
                 cwd,
                 astGrounding: options.astGrounding,
+                // Stable per-rep token (the index suffices — the focal
+                // node id is already part of contextHash via the prompt
+                // upstream chain, so the same index across nodes still
+                // produces per-node-distinct runIds).
+                repCacheBypassToken: `rep_${i}_of_${reps}`,
               });
               perRep.push(r);
             }
@@ -636,6 +669,14 @@ interface VerifyOneCtx {
   cwd: string;
   /** Phase ε Move 3α — forward AST grounding flag to runCompilePlan. */
   astGrounding?: boolean;
+  /**
+   * Phase ε design §4.2 — per-rep cache-bypass token. Set by the
+   * multi-rep loop so each rep gets a distinct deterministic runId
+   * (and therefore a fresh dispatch + a separate persisted run record).
+   * Undefined for the single-draw path so the legacy runId is
+   * byte-identical. See compile-node.ts repCacheBypassToken.
+   */
+  repCacheBypassToken?: string;
 }
 
 async function verifyOne(
@@ -685,6 +726,7 @@ async function verifyOne(
       maxTokens: ctx.maxTokens,
       thinking: ctx.thinking,
       astGrounding: ctx.astGrounding,
+      repCacheBypassToken: ctx.repCacheBypassToken,
     });
     if (!compileResult.ok) {
       return {

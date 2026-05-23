@@ -105,6 +105,29 @@ export function hashAstGrounding(
 }
 
 /**
+ * Hash a per-rep cache-bypass token so distinct reps produce distinct
+ * run-cache identities (design item §4.2). Returns null when the token
+ * is undefined / empty — preserving the byte-identical single-draw
+ * runId. The distinct `rep:hash:` prefix prevents collision with the
+ * `grounding:hash:` namespace.
+ *
+ * Mirrors `hashAstGrounding`'s "fold an explicit knob into contextHash
+ * via composeContextHash" pattern: a non-null return changes the runId,
+ * forcing checkCacheE to miss and dispatch the next rep fresh. The
+ * underlying provider's non-zero sampling temperature is what surfaces
+ * draw-to-draw variance once the cache no longer collapses them.
+ */
+export function hashRepCacheBypass(
+  token: string | undefined,
+): string | null {
+  if (token === undefined || token.length === 0) return null;
+  const digest = createHash("sha256")
+    .update(stringify({ repToken: token }))
+    .digest("hex");
+  return `rep:hash:${digest}`;
+}
+
+/**
  * Compose the run-cache contextHash from the upstream-context hash and
  * the AST-grounding hash, mirroring the `null when nothing to say`
  * contract of both inputs. The output always carries the `ctx:hash:`

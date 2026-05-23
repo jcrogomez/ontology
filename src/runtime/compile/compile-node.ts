@@ -29,6 +29,7 @@ import {
 import {
   buildAstGroundingSystemSection,
   hashAstGrounding,
+  hashRepCacheBypass,
   joinSystemSections,
   composeContextHash,
 } from "./ast-grounding.js";
@@ -161,6 +162,22 @@ export interface CompileNodeOptions {
   // calibrations are unaffected. See `ast-grounding.ts` for the
   // section format and hash semantics.
   astGrounding?: boolean;
+  // Phase ε design §4.2 — per-rep cache-bypass token. When `--reps N`
+  // re-runs the same focal N times to defang single-draw Jaccard
+  // variance, every rep would otherwise hit the run-cache (computeRunId
+  // is a pure hash of input+model, so identical options → identical
+  // expectedId → loadPersistedRun returns rep 1's text for every later
+  // rep, and the median folds N copies of the same value). Folding a
+  // distinct token per rep into the contextHash forces each rep to a
+  // distinct runId — a fresh dispatch and a separate persisted run
+  // record, so the audit chain captures N real draws and the
+  // aggregator measures the variance it was built to defang. Mirrors
+  // the astGrounding hash-fold pattern. Off / undefined preserves the
+  // single-draw runId byte-for-byte. Callers should pass a stable,
+  // deterministic token (typically the rep index as a string, or a
+  // (verifySweepId, repIndex) pair if a single sweep needs distinct
+  // identities from earlier sweeps).
+  repCacheBypassToken?: string;
 }
 
 export type CompileNodeFailureReason =
@@ -385,19 +402,32 @@ function buildPreludeE(
       groundingSection,
     ]);
 
-    // contextHash composes three ingredients now:
+    // contextHash composes four ingredients now:
     //   • upstream:  refinement-parents' compiled artifacts (system prompt)
     //   • assembled: the assembleContext.prompt the dispatch sees
-    //   • grounding: AST mandatory-exports section
+    //   • grounding: AST mandatory-exports section (Move 3α)
+    //   • repToken:  per-rep cache-bypass token (design §4.2), undefined
+    //                for single-draw runs so the legacy runId is byte-
+    //                identical; set for reps 2..N under --reps so each
+    //                rep gets a distinct runId, a fresh dispatch, and a
+    //                separate persisted run record.
     // Any subset can be null. Chained via composeContextHash so the
     // existing two-arg helper handles each pair correctly (the second
-    // slot's "grounding" name is positional, not semantic).
+    // slot's name is positional, not semantic).
     const assembledHash = assembled !== null ? hashContext(assembled) : null;
+    const repHash = hashRepCacheBypass(options.repCacheBypassToken);
     const upstreamPlusAssembled = composeContextHash(
       hashUpstreamContext(upstream),
       assembledHash,
     );
-    const contextHash = composeContextHash(upstreamPlusAssembled, groundingHash);
+    const upstreamPlusAssembledPlusGrounding = composeContextHash(
+      upstreamPlusAssembled,
+      groundingHash,
+    );
+    const contextHash = composeContextHash(
+      upstreamPlusAssembledPlusGrounding,
+      repHash,
+    );
 
     // Dispatch knobs that influence the model's output. Only emit the
     // `dispatch` sub-object when at least one knob is set, so legacy

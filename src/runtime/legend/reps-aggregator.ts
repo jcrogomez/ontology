@@ -193,7 +193,10 @@ export interface RepsTelemetry {
   perRepMetrics: Array<DistanceMetrics | null>;
   /** Per-rep verdicts, in run order. */
   perRepVerdicts: HomeomorphismVerdict[];
-  /** Count of reps where compile-back succeeded (ok=true). */
+  /** Count of reps where compile-back both succeeded (ok=true) AND produced
+   * comparable metrics — the cohort `aggregateDistanceMetrics` actually
+   * folded. Equal to the total when no rep was unrecoverable; lower
+   * otherwise. */
   successCount: number;
 }
 
