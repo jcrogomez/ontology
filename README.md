@@ -183,7 +183,9 @@ If you want to **contribute or extend**:
 - **Cross-provider per-task routing** — `LlmTask × provider → preferred model` resolved automatically via `DefaultAnthropicRouting` + `DefaultOllamaRouting`. `--provider anthropic` (no `--model`) routes `inspect` → Haiku 4.5, `semantic_parse` → Sonnet 4.6, `code_sketch` → Opus 4.7. Mixed plans (some nodes on Ollama, some on Anthropic, some pinned via `node.literal`) work in the same compile run.
 - **Walker AI indicator** — the focal-cell TUI shows which AI service is configured (`anthropic` / `ollama (local)` / `ollama (cloud)` / `none — mock fallback`) at the top of the panel, so a user knows at a glance which provider `:run` and `:compile` will route through.
 
-The remaining Legend work is ε (self-ingestion of the Ontology repo for the publishable adjunction claim, gated on API credit) and ζ (release + Open-Prompt seeds: sign, verify-published, replay). Branch-aware compile (`onto compile run --branch <name>`) and the branch fibration CLI (`onto branch list / fiber`) cover the temporal-fiber surface; the spatial path fibration helper is ready for ingest's per-directory token vocabulary normalisation.
+The remaining Legend work is ε (self-ingestion of the Ontology repo) and ζ (release + Open-Prompt seeds: sign, verify-published, replay). **Phase ε publishable target is a fidelity-cartography matrix, not a single percentage** — orthogonal axes (contract / structural / behavior / intent / literal × Ollama / Anthropic cost) with the *intent-faithful vs intent-resistant* boundary pre-registered as a falsifiable hypothesis before the run, not described post-hoc. Expected intent-resistant zones: IO adapters, CLI parsing, prompt strings, literal config; expected intent-faithful: pure transformations, schema-driven code. Tools promising 100 % intent-fidelity always lie — admitting the resistant zones (with kept traceability) makes the faithful zones credible. Branch-aware compile (`onto compile run --branch <name>`) and the branch fibration CLI (`onto branch list / fiber`) cover the temporal-fiber surface; the spatial path fibration helper is ready for ingest's per-directory token vocabulary normalisation.
+
+**A note on mathematical claims in this README.** Every load-bearing term below — "functor", "presheaf", "Yoneda", "topos", "fibration" — is graded T1 (strictly implemented and tested against a law), T2 (operational mapping without a property test), T3 (useful analogy, not a formal claim), or T4 (aspirational) in [`MATHEMATICAL_CLAIMS.md`](docs/MATHEMATICAL_CLAIMS.md). Read that document alongside this section to know how literally each claim holds. The README uses the unqualified noun for readability; the audit lives in the linked document. The intent is to neither hide the mathematical content nor oversell it.
 
 | Axiom | Implementation |
 | --- | --- |
@@ -197,13 +199,20 @@ The remaining Legend work is ε (self-ingestion of the Ontology repo for the pub
 
 Compiler-plan hardening (Bootstrap 0.9): `computeCompilePlan` now rejects `contradicts` edges as plan errors and halts BFS on `supersedes` with a `superseded` warning, so contradictions surface as failures instead of silent compiles.
 
-The four additive categorical extensions (`CATEGORICAL_VISION.md`) ship as runtime libraries with first-line surfaces:
+The four additive categorical extensions (`CATEGORICAL_VISION.md`) ship as runtime libraries with first-line surfaces. T-tiers per [`MATHEMATICAL_CLAIMS.md`](docs/MATHEMATICAL_CLAIMS.md):
 
-| Extension | Library | Surface |
-| --- | --- | --- |
-| Yoneda query | `src/runtime/query/representable.ts` | `onto query` CLI, walker `:query` |
-| Effect monad | `src/runtime/effects/io.ts` | concrete use inside `compileNode` and `runFromWalker` (both post-0.9) |
-| Branch fibration | `src/runtime/fibration/branch-fiber.ts` | `onto branch list` / `onto branch fiber <name>` CLI, walker `:branch list`, and `onto compile run --branch <name>` for fiber-scoped compiles |
-| Topos predicate algebra | `src/runtime/topos/predicate.ts` | `intent-validator.ts` ported onto the algebra; `validateIntent({openWorld: true})` exposes the three-valued verdict end-to-end through `semanticLink` |
+| Extension | Library | Surface | Tier |
+| --- | --- | --- | --- |
+| Yoneda query | `src/runtime/query/representable.ts` | `onto query` CLI, walker `:query` | T2 (operational Hom-profile matcher; not proven to recover all isomorphic objects) |
+| Effect monad | `src/runtime/effects/io.ts` | concrete use inside `compileNode` and `runFromWalker` (both post-0.9) | **T1** (monad laws — left identity, right identity, associativity — pinned as property tests) |
+| Branch fibration | `src/runtime/fibration/branch-fiber.ts` | `onto branch list` / `onto branch fiber <name>` CLI, walker `:branch list`, and `onto compile run --branch <name>` for fiber-scoped compiles | T2 (partition + projection shipped; cartesian-lift universal property not yet formalised) |
+| Topos predicate algebra | `src/runtime/topos/predicate.ts` | `intent-validator.ts` ported onto the algebra; `validateIntent({openWorld: true})` exposes the three-valued verdict end-to-end through `semanticLink` | T2-T3 (three-valued algebra implemented; "topos" is analogy-grade — no proven Ω-classifier ↔ subobjects iso) |
 
-Ontology is alpha-quality. The append-only log is single-writer (CLI single-shot); concurrent writes from multiple processes are not yet protected, and `state.json` writes are not yet atomic on crash. Everything else is meant to fail loudly and exit `1` rather than silently corrupt.
+Ontology is alpha-quality. Durability + atomicity status as of `5d70f3b` (2026-05-23):
+
+- ✅ `state.json` writes are **atomic** (write-to-tmp + `rename(2)`) and **durable** (`fsync` on the file fd before rename, `fsync` on the parent directory after — POSIX rename + dir-fsync gives both atomicity and rename-durability).
+- ✅ `events.jsonl` appends are **durable** — single-buffer `write(2)` via `O_APPEND` (kernel-atomic for typical event payloads ≪ 4 KB) followed by `fsync` on the fd before close, so a power loss between append and the next OS flush can no longer vanish a recorded event.
+- ⚠ Concurrent writers from multiple processes are protected by `.ontology/.lock` only on the paths that opt in (`onto compile run`, `onto verify-homeomorphism`); raw-kernel calls and a few legacy paths still trust single-writer invariants.
+- ⚠ Replay-as-rebuild — reconstructing `state.json` from `events.jsonl` alone — is roadmap, not shipped. `state.json` remains authoritative for the in-memory snapshot; if it diverges from the event log there is no recovery primitive yet.
+
+Everything else is meant to fail loudly and exit `1` rather than silently corrupt.
