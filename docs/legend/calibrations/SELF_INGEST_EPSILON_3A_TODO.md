@@ -6,6 +6,113 @@
 > [SELF_INGEST_EPSILON_3A_2026-05-19_HYPOTHESIS.md](./SELF_INGEST_EPSILON_3A_2026-05-19_HYPOTHESIS.md).*
 
 **Session paused:** 2026-05-19 (post pre-flight; hardware bottleneck found before 3-arm run)
+**Session resumed:** 2026-05-22 → 2026-05-23 (backlog burst — see "Ready to run" below)
+
+---
+
+## 🟢 Ready to run (status as of 2026-05-23)
+
+Every blocker the 05-19 → 05-22 reviews flagged is closed in `main`:
+
+| Blocker | State | Commit |
+|---|---|---|
+| bakeoff-synthesis generator | ✅ shipped | `ddfe266` |
+| `homeomorphism_verified` event audit (model + perimeterHash) | ✅ shipped | `00b8100` |
+| `--reps N --aggregator median` wiring (design §4.2) | ✅ shipped | `6c6e368` |
+| `tests/ingest-prompt-template.test.ts` smoke (design §4.3) | ✅ shipped | `54cd2f0` |
+| Arm C substitute decision | ✅ resolved → **`starcoder2:7b` (4.0 GB)** | this doc |
+
+### Arm C choice — `starcoder2:7b`
+
+Researched against `ollama.com/library`:
+
+| Candidate | File size | Family | Verdict |
+|---|---:|---|---|
+| **`starcoder2:7b`** | **4.0 GB** | BigCode (HF + ServiceNow) | ✅ fits ≤ 4.5 GB cap, coding-pure, distinct family |
+| `codellama:7b` | 3.8 GB | Meta | ✅ fits, but 2023 (stale) |
+| `opencoder:8b` | 4.7 GB | Infly | ⚠️ borderline |
+| `codegemma:7b` | 5.0 GB | Google | ❌ over cap |
+| `yi-coder:9b` | 5.0 GB | 01-ai | ❌ over cap |
+| `deepseek-coder-v2` (min 16b) | 8.9 GB | DeepSeek | ❌ infeasible |
+
+**Note on H3 calibration:** the pre-registered H3 / H4 thresholds (e.g.
+"Devstral leads qwen by ≥ 0.10 mean Jaccard") were sized against
+**devstral-small-2:24b** (SWE-bench Verified 65.8%). `starcoder2:7b` is
+~3× smaller; if it fails to beat Arm A, **the failure is not diagnostic
+of "coding-specialization doesn't transfer"** — it only says
+"coding-specialization at the 7B class doesn't transfer here." Devstral
+in cloud (Move 6) remains the only clean H3 / H4 test. Update
+`SELF_INGEST_EPSILON_3A_2026-05-19_HYPOTHESIS.md` before running to
+rename Arm C accordingly:
+- **Arm C-local:** `starcoder2:7b` (this session's substitute)
+- **Arm C-cloud:** `devstral-small-2:24b` (deferred, Move 6, ~$5–10)
+
+### Commands to run, in order
+
+**Pre-flight (5 min) — pull starcoder2:7b for Arm C and re-verify build:**
+
+```sh
+cd ~/Development/ontology
+rm -f .git/index.lock              # idempotent; the automated review re-creates it
+git push origin main               # 14 commits ahead as of this writing
+ollama pull starcoder2:7b          # 4.0 GB download
+npx tsc --noEmit                   # expect exit 0
+npx vitest run                     # expect 100% green
+```
+
+**Arm A — overnight, ~5 h wall-clock at reps=1 (point estimate, pre-registered):**
+
+```sh
+onto verify-homeomorphism \
+  --all-artifacts \
+  --matrix \
+  --ast-grounding \
+  --provider ollama \
+  --model qwen2.5-coder:7b \
+  --report docs/legend/calibrations/SELF_INGEST_EPSILON_3A_2026-05-19_ARM_A.md \
+  --json > .ontology.self-ingest-epsilon-3a-arm-a.json
+```
+
+The single-draw report is what the pre-registered H1 floor compares
+against. If H1 fires ambiguous (Arm A mean Jaccard within ε of the
+floor), re-run targeted nodes with `--reps 3 --aggregator median` to
+defang variance before reaching for the Opus 4.7 ceiling.
+
+**Arm B — next night, ~10–25 h at reps=1 (re-measure tok/s after reboot):**
+
+```sh
+onto verify-homeomorphism \
+  --all-artifacts \
+  --matrix \
+  --ast-grounding \
+  --provider ollama \
+  --model granite4.1:8b \
+  --report docs/legend/calibrations/SELF_INGEST_EPSILON_3A_2026-05-19_ARM_B.md \
+  --json > .ontology.self-ingest-epsilon-3a-arm-b.json
+```
+
+**Arm C-local — third night, ~5 h:**
+
+```sh
+onto verify-homeomorphism \
+  --all-artifacts \
+  --matrix \
+  --ast-grounding \
+  --provider ollama \
+  --model starcoder2:7b \
+  --report docs/legend/calibrations/SELF_INGEST_EPSILON_3A_2026-05-19_ARM_C_LOCAL.md \
+  --json > .ontology.self-ingest-epsilon-3a-arm-c-local.json
+```
+
+**Synthesis — after all three arms finish (mechanical, no LLM, ~1 s):**
+
+```sh
+# (the bakeoff-synthesis CLI surface lands in the next session; today
+# the module is invokable as a library — see src/runtime/legend/bakeoff-synthesis.ts.
+# Hand-roll a tiny driver until then.)
+```
+
+---
 
 ## Status snapshot
 
