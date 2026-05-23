@@ -238,7 +238,7 @@ export interface IngestCommandOptions {
 // (kind / level / manifestation, requires-is-project-internal — all
 // preserved from the pre-δ template so the schema does not break).
 // Pre-registered hypothesis at SELF_INGEST_DELTA_2026-05-18_HYPOTHESIS.md.
-const EXTRACTION_SYSTEM_PROMPT = `
+export const EXTRACTION_SYSTEM_PROMPT = `
 You are the Ontology contract extractor.
 
 Given ONE source file, produce a JSON object that captures the file's constructive contract.
