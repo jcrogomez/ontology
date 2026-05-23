@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { randomBytes } from "node:crypto";
+import { randomBytes, createHash } from "node:crypto";
 import { loadNodes, loadNodeById } from "../../core/project/load.js";
 import { runCompilePlan } from "../../runtime/compile/compile-plan-runner.js";
 import { loadPersistedRun } from "../../core/runs/persist.js";
@@ -400,6 +400,11 @@ export async function verifyHomeomorphismCommand(
           total: results.length,
           byVerdict: counts,
           thresholds,
+          // Milestone §3.2 + design §4.4: the actually-dispatched model
+          // and a hash of the perimeter, so the audit chain is fully
+          // replayable from events.jsonl alone.
+          model: dominantDispatchModel(results, provider, options.model),
+          perimeterHash: computePerimeterHash(results),
           ...(totalUsage ? { totalUsage } : {}),
         },
       });
@@ -500,6 +505,60 @@ function aggregateUsage(results: VerificationResult[]): VerificationUsage | unde
   if (t > 0) agg.totalTokens = t;
   if (hadCost) agg.costUSD = cost;
   return agg;
+}
+
+/**
+ * Resolve the dispatch identity to record on the `homeomorphism_verified`
+ * event (milestone review §3.2 + design item §4.4). Reads the
+ * actually-resolved provider/model from each persisted run record
+ * (`r.dispatchModel`); when results disagree (a mixed-model run) the
+ * most frequent identity wins. Falls back to the caller's overrides
+ * when no run was persisted (cache hits, mock dispatches). The event
+ * needs this so an audit-chain replay from `events.jsonl` alone can
+ * name which model produced the results — previously the payload
+ * carried only verdict counts and usage.
+ */
+export function dominantDispatchModel(
+  results: VerificationResult[],
+  fallbackProvider: string | undefined,
+  fallbackModel: string | undefined,
+): { provider: string; model: string } {
+  const counts = new Map<string, { provider: string; model: string; n: number }>();
+  for (const r of results) {
+    if (!r.dispatchModel) continue;
+    const key = `${r.dispatchModel.provider} ${r.dispatchModel.model}`;
+    const cur = counts.get(key);
+    if (cur) cur.n += 1;
+    else counts.set(key, { ...r.dispatchModel, n: 1 });
+  }
+  let dominant: { provider: string; model: string } | undefined;
+  let best = 0;
+  for (const c of counts.values()) {
+    if (c.n > best) {
+      best = c.n;
+      dominant = { provider: c.provider, model: c.model };
+    }
+  }
+  return (
+    dominant ?? {
+      provider: fallbackProvider ?? "unknown",
+      model: fallbackModel ?? "unknown",
+    }
+  );
+}
+
+/**
+ * Stable hash of the verify perimeter — sha256 over the sorted list of
+ * source-file paths. Recorded on the `homeomorphism_verified` event
+ * (design item §4.4) so a replay can confirm the exact perimeter the
+ * run measured against, without reconstructing it from the node list.
+ */
+export function computePerimeterHash(results: VerificationResult[]): string {
+  const perimeter = results
+    .map((r) => r.sourceFile)
+    .sort()
+    .join("\n");
+  return createHash("sha256").update(perimeter).digest("hex");
 }
 
 // ── Per-node verify pipeline ────────────────────────────────────────────────
