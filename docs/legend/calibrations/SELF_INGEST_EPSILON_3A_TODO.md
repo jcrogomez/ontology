@@ -54,11 +54,71 @@ rename Arm C accordingly:
 ```sh
 cd ~/Development/ontology
 rm -f .git/index.lock              # idempotent; the automated review re-creates it
-git push origin main               # 14 commits ahead as of this writing
+git push origin main               # 14+ commits ahead as of this writing
 ollama pull starcoder2:7b          # 4.0 GB download
+ollama serve &                     # if not running; pre-warm needed by Arm A
 npx tsc --noEmit                   # expect exit 0
 npx vitest run                     # expect 100% green
 ```
+
+### Final Arm A pre-flight checklist (2026-05-23 update — post-hardening)
+
+Done in commits leading up to Arm A:
+
+- [x] `--reps` cache-collision fixed (`5d70f3b`) + integration test confirms 3 distinct runIds end-to-end (`2591179`).
+- [x] `state.json` writes atomic AND durable (`fsync` on file + parent dir, `2591179`); `events.jsonl` appends fsynched per write — power loss / SIGKILL during the 5h run no longer loses cadena.
+- [x] `homeomorphism_verified` event carries `model` + `perimeterHash` (`00b8100`); replay from `events.jsonl` alone identifies which model produced the results and over what perimeter.
+- [x] `bakeoff-synthesis.ts` generator + tests (`ddfe266`); post-Arm-A/B/C synthesis is mechanical, no cherry-picking surface.
+- [x] README honesty pass (`2591179`): Phase ε framed as cartography matrix, every load-bearing categorical term annotated with its `MATHEMATICAL_CLAIMS.md` tier.
+
+Still required before launch (user side, local machine):
+
+- [ ] `git push origin main` (publish the burst — the sandbox can't reach GitHub).
+- [ ] `ollama pull qwen2.5-coder:7b` (verify it's local; ~4.7 GB).
+- [ ] Confirm ingest is complete — the perimeter `src/runtime src/core src/commands src/schemas` (~126 files) must already have applied nodes. If `.ontology/nodes/` is empty or stale, ingest is the prior step (~100-115 min wall-clock per the cost prediction in the hypothesis doc).
+- [ ] Free RAM: close browser tabs / heavy apps. The 1.1 tok/s figure assumed ~3-4 GB headroom; less means longer wall-clock.
+
+### Arm A critical-path map (what the verify command actually exercises)
+
+Useful for future-self pruning. Arm A = `onto verify-homeomorphism --all-artifacts --matrix --ast-grounding --provider ollama --model qwen2.5-coder:7b`. The modules this command actually touches:
+
+```
+src/commands/verify/homeomorphism.ts        ← entry, candidate resolution, event emission
+src/runtime/legend/
+  verify-homeomorphism.ts                   ← distance math, verdict folder
+  matrix.ts + matrix-intersections.ts       ← --matrix six-axis output
+  frontier-tagger.ts                        ← per-file kind tagging for matrix
+  pareto.ts                                 ← Pareto pivot from matrix
+  vocab-gap.ts                              ← gap aggregate
+  export-recovery.ts                        ← Move 3α candado #2
+  ast-symbol-scanner.ts                     ← AST source for grounding
+  failure-mode-tagger.ts                    ← Move 3α v0 tags
+src/runtime/compile/                        ← compile-back pipeline
+  ast-grounding.ts                          ← MANDATORY EXPORTS block
+  compile-node.ts, compile-plan-runner.ts   ← dispatch + cache
+src/runtime/llm/ollama/                     ← provider
+src/core/{nodes,edges,runs,state,fs}/       ← kernel basics
+```
+
+NOT in Arm A's critical path (legacy / scaffolding / other entries):
+
+```
+src/runtime/legend/bakeoff-synthesis.ts     ← runs AFTER all arms, deterministic
+src/runtime/legend/reps-aggregator.ts       ← only if --reps > 1; Arm A is reps=1
+src/runtime/legend/translator.ts            ← onto node inspect (Inspector / Lupa)
+src/runtime/legend/materialize-edges.ts     ← setup phase, not verify
+src/runtime/query/representable.ts          ← onto query (Yoneda)
+src/runtime/fibration/branch-fiber.ts       ← onto branch (Grothendieck fibration)
+src/runtime/graph/hierarchizer.ts           ← onto graph hierarchize preview
+src/core/nodes/update-parent.ts             ← node_update_parent kernel (no
+                                              --create-proposals consumer yet)
+src/commands/ingest/                        ← already-done setup
+```
+
+**Implication for project discipline:** the ε run depends on a much
+smaller surface than the project has accumulated. If a post-ε review
+finds zones with no measured contribution to the cartography matrix,
+they are candidates for pruning, not preservation.
 
 **Arm A — overnight, ~5 h wall-clock at reps=1 (point estimate, pre-registered):**
 
