@@ -65,6 +65,7 @@ import {
   type ExportRecoveryAggregate,
 } from "../../runtime/legend/export-recovery.js";
 import { scanFileSymbols } from "../../runtime/legend/ast-symbol-scanner.js";
+import { inferManifestationFromSourcePath } from "../../runtime/compile/manifestation-mapper.js";
 import {
   tagFailureModes,
   aggregateFailureModes,
@@ -851,6 +852,32 @@ function resolveCandidates(
   const artifacts = nodes.filter(
     (n) => n.coordinates.manifestation === "code",
   );
+  // Silent-exclusion guard: warn (don't reject) when a node carries
+  // outputs.files pointing at a code-extension file but its
+  // manifestation is something other than "code". Without this, the
+  // verified perimeter shrinks invisibly — the node_0094 failure mode
+  // caught post-Arm-A. We do not promote these into the candidate
+  // list: an explicit manifestation override remains the source of
+  // truth, and the operator decides how to fix.
+  if (options.json !== true) {
+    const excluded = nodes.filter(
+      (n) =>
+        n.coordinates.manifestation !== "code" &&
+        (n.outputs?.files ?? []).some(
+          (f) => inferManifestationFromSourcePath(f) === "code",
+        ),
+    );
+    if (excluded.length > 0) {
+      const sample = excluded
+        .slice(0, 5)
+        .map((n) => `${n.id} (${n.coordinates.manifestation} → ${n.outputs?.files?.[0] ?? "?"})`)
+        .join(", ");
+      const more = excluded.length > 5 ? `, +${excluded.length - 5} more` : "";
+      console.warn(
+        `[verify] warning: ${excluded.length} node(s) have outputs.files pointing at code-extension files but manifestation !== "code" — excluded from --all-artifacts. Sample: ${sample}${more}`,
+      );
+    }
+  }
   return artifacts.map((n) => makeCandidate(n, cwdReal));
 }
 

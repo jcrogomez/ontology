@@ -24,6 +24,14 @@ src/generated/
 # Phase ε self-ingestion + archive snapshots — never staged
 .ontology.archive-*/
 .ontology.self-ingest-*-result/
+.ontology.*-backup/
+.ontology.scratch-*/
+# Self-ingest sidecar JSONs are intentionally NOT ignored — they are
+# the raw pre-registered output of Move 3α (Arm A/B/C-local + synthesis)
+# and live next to the corresponding reports in docs/legend/calibrations/.
+# In-flight sidecars (e.g. the Arm A0 control run) are excluded until
+# their run completes and a co-located report lands:
+.ontology.self-ingest-*.stderr.log
 
 # Workspace artifacts
 .claude/

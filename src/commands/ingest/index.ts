@@ -46,6 +46,7 @@ import {
   type IngestAction,
   type StaticClassifierMode,
 } from "./static-classifier-policy.js";
+import { inferManifestationFromSourcePath } from "../../runtime/compile/manifestation-mapper.js";
 
 // `onto ingest <paths...>` — Project Legend Phase γ-1 + γ-5 + Phase ε prework A.
 //
@@ -2220,10 +2221,32 @@ function createNodeProposalForExtraction(
   // rich extracted fields live on the payload directly (γ-3).
   // sourceFiles tracks the file path so γ-6 can resolve file-path
   // edges back to node IDs after apply.
+  // Guard: when the extractor omits manifestation (schema default
+  // → "intent") or explicitly says "intent" for a file whose path
+  // implies code/test/build, override. Without this, a code module
+  // is silently excluded from `verify-homeomorphism --all-artifacts`
+  // (its candidate resolver filters by manifestation === "code"),
+  // shrinking the verified perimeter without warning — the
+  // node_0094 failure mode caught post-Arm-A.
+  const inferredManifestation = inferManifestationFromSourcePath(filePathRelative);
+  const effectiveManifestation =
+    inferredManifestation !== undefined &&
+    (extracted.manifestation === undefined || extracted.manifestation === "intent")
+      ? inferredManifestation
+      : extracted.manifestation;
   const rationalePayload = {
     extractedFrom: filePathRelative,
     extractorModel: response.model,
     extractorProvider: response.provider,
+    ...(inferredManifestation !== undefined &&
+    extracted.manifestation !== inferredManifestation
+      ? {
+          manifestationOverride: {
+            extractorSaid: extracted.manifestation ?? null,
+            pathImplies: inferredManifestation,
+          },
+        }
+      : {}),
   };
 
   try {
@@ -2236,7 +2259,7 @@ function createNodeProposalForExtraction(
           prompt: extracted.prompt,
           label: extracted.label,
           parentNodeId,
-          ...(extracted.manifestation !== undefined ? { manifestation: extracted.manifestation } : {}),
+          ...(effectiveManifestation !== undefined ? { manifestation: effectiveManifestation } : {}),
           ...(extracted.language !== undefined ? { language: extracted.language } : {}),
           ...(extracted.requires !== undefined ? { requires: extracted.requires } : {}),
           ...(extracted.provides !== undefined ? { provides: extracted.provides } : {}),

@@ -1,0 +1,2993 @@
+{
+  "baselineLabel": "A",
+  "armCount": 3,
+  "arms": [
+    {
+      "label": "A",
+      "provider": "ollama",
+      "model": "qwen2.5-coder:7b",
+      "total": 125,
+      "byVerdict": {
+        "epsilon_equivalent": 12,
+        "divergent_loc": 71,
+        "divergent_structural": 5,
+        "divergent_both": 37,
+        "unrecoverable": 0
+      },
+      "microRecoveryRate": 0.6855439642324889,
+      "macroRecoveryRate": 0.6996661064425769,
+      "exactMatchCount": 43,
+      "nodesWithMandatory": 125,
+      "failureModeCounts": {
+        "missing_exports": 35,
+        "hallucinated_exports": 44,
+        "empty_regen": 21,
+        "compile_back_failed": 0,
+        "gluing_rejected": 0,
+        "schema_invalid": 0
+      },
+      "affectedNodes": 82,
+      "meanStructuralJaccard": 0.58077616892911,
+      "meanLocDistance": 0.5885935091150538,
+      "nodesWithMetrics": 125,
+      "paretoFrontier": [
+        {
+          "task": "code_sketch",
+          "provider": "ollama",
+          "model": "qwen2.5-coder:7b",
+          "meanHonestyStructural": 0.4960913299070281,
+          "meanUsdPerNode": 0
+        }
+      ]
+    },
+    {
+      "label": "B",
+      "provider": "ollama",
+      "model": "granite4.1:8b",
+      "total": 125,
+      "byVerdict": {
+        "epsilon_equivalent": 0,
+        "divergent_loc": 0,
+        "divergent_structural": 1,
+        "divergent_both": 0,
+        "unrecoverable": 124
+      },
+      "microRecoveryRate": 0,
+      "macroRecoveryRate": 0,
+      "exactMatchCount": 0,
+      "nodesWithMandatory": 125,
+      "failureModeCounts": {
+        "missing_exports": 0,
+        "hallucinated_exports": 0,
+        "empty_regen": 1,
+        "compile_back_failed": 124,
+        "gluing_rejected": 0,
+        "schema_invalid": 0
+      },
+      "affectedNodes": 125,
+      "meanStructuralJaccard": 0,
+      "meanLocDistance": 0.06666666666666667,
+      "nodesWithMetrics": 1,
+      "paretoFrontier": [
+        {
+          "task": "code_sketch",
+          "provider": "ollama",
+          "model": "granite4.1:8b",
+          "meanHonestyStructural": 0.4666666666666667,
+          "meanUsdPerNode": 0
+        }
+      ]
+    },
+    {
+      "label": "C-local",
+      "provider": "ollama",
+      "model": "starcoder2:7b",
+      "total": 125,
+      "byVerdict": {
+        "epsilon_equivalent": 0,
+        "divergent_loc": 0,
+        "divergent_structural": 0,
+        "divergent_both": 57,
+        "unrecoverable": 68
+      },
+      "microRecoveryRate": 0,
+      "macroRecoveryRate": 0,
+      "exactMatchCount": 0,
+      "nodesWithMandatory": 125,
+      "failureModeCounts": {
+        "missing_exports": 0,
+        "hallucinated_exports": 0,
+        "empty_regen": 57,
+        "compile_back_failed": 68,
+        "gluing_rejected": 0,
+        "schema_invalid": 0
+      },
+      "affectedNodes": 125,
+      "meanStructuralJaccard": 0,
+      "meanLocDistance": 0.9333767562192907,
+      "nodesWithMetrics": 57,
+      "paretoFrontier": [
+        {
+          "task": "code_sketch",
+          "provider": "ollama",
+          "model": "starcoder2:7b",
+          "meanHonestyStructural": 0.03331162189035464,
+          "meanUsdPerNode": 0
+        }
+      ]
+    }
+  ],
+  "exportRecovery": {
+    "baselineLabel": "A",
+    "rows": [
+      {
+        "label": "A",
+        "microRecoveryRate": 0.6855439642324889,
+        "macroRecoveryRate": 0.6996661064425769,
+        "microDeltaVsBaseline": 0,
+        "macroDeltaVsBaseline": 0,
+        "exactMatchCount": 43
+      },
+      {
+        "label": "B",
+        "microRecoveryRate": 0,
+        "macroRecoveryRate": 0,
+        "microDeltaVsBaseline": -0.6855439642324889,
+        "macroDeltaVsBaseline": -0.6996661064425769,
+        "exactMatchCount": 0
+      },
+      {
+        "label": "C-local",
+        "microRecoveryRate": 0,
+        "macroRecoveryRate": 0,
+        "microDeltaVsBaseline": -0.6855439642324889,
+        "macroDeltaVsBaseline": -0.6996661064425769,
+        "exactMatchCount": 0
+      }
+    ]
+  },
+  "failureModes": {
+    "baselineLabel": "A",
+    "modes": [
+      "missing_exports",
+      "hallucinated_exports",
+      "empty_regen",
+      "compile_back_failed",
+      "gluing_rejected",
+      "schema_invalid"
+    ],
+    "rows": [
+      {
+        "label": "A",
+        "counts": {
+          "missing_exports": 35,
+          "hallucinated_exports": 44,
+          "empty_regen": 21,
+          "compile_back_failed": 0,
+          "gluing_rejected": 0,
+          "schema_invalid": 0
+        },
+        "deltaVsBaseline": {
+          "missing_exports": 0,
+          "hallucinated_exports": 0,
+          "empty_regen": 0,
+          "compile_back_failed": 0,
+          "gluing_rejected": 0,
+          "schema_invalid": 0
+        }
+      },
+      {
+        "label": "B",
+        "counts": {
+          "missing_exports": 0,
+          "hallucinated_exports": 0,
+          "empty_regen": 1,
+          "compile_back_failed": 124,
+          "gluing_rejected": 0,
+          "schema_invalid": 0
+        },
+        "deltaVsBaseline": {
+          "missing_exports": -35,
+          "hallucinated_exports": -44,
+          "empty_regen": -20,
+          "compile_back_failed": 124,
+          "gluing_rejected": 0,
+          "schema_invalid": 0
+        }
+      },
+      {
+        "label": "C-local",
+        "counts": {
+          "missing_exports": 0,
+          "hallucinated_exports": 0,
+          "empty_regen": 57,
+          "compile_back_failed": 68,
+          "gluing_rejected": 0,
+          "schema_invalid": 0
+        },
+        "deltaVsBaseline": {
+          "missing_exports": -35,
+          "hallucinated_exports": -44,
+          "empty_regen": 36,
+          "compile_back_failed": 68,
+          "gluing_rejected": 0,
+          "schema_invalid": 0
+        }
+      }
+    ]
+  },
+  "perFile": [
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/branch/fiber.ts",
+      "nodeId": "node_0079",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.5
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/branch/list.ts",
+      "nodeId": "node_0080",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.5
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/compile/plan.ts",
+      "nodeId": "node_0081",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0.3333333333333333
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/compile/run-batch.ts",
+      "nodeId": "node_0082",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0.25
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/compile/run.ts",
+      "nodeId": "node_0083",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/context/assemble.ts",
+      "nodeId": "node_0084",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/doctor.ts",
+      "nodeId": "node_0085",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.5
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/edge/remove.ts",
+      "nodeId": "node_0086",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/edge/update.ts",
+      "nodeId": "node_0087",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.6666666666666666
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/frontier/index.ts",
+      "nodeId": "node_0088",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/graph/infer-edges.ts",
+      "nodeId": "node_0089",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0.25
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/graph/neighbors.ts",
+      "nodeId": "node_0090",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.5
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/graph/path.ts",
+      "nodeId": "node_0091",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/graph/subgraph.ts",
+      "nodeId": "node_0092",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/ingest/cost-estimate.ts",
+      "nodeId": "node_0093",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.6
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/ingest/static-classifier-policy.ts",
+      "nodeId": "node_0095",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.5
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/init.ts",
+      "nodeId": "node_0096",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/inspect.ts",
+      "nodeId": "node_0097",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0.07692307692307693
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/link/index.ts",
+      "nodeId": "node_0098",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.5
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/model/doctor.ts",
+      "nodeId": "node_0099",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/model/list.ts",
+      "nodeId": "node_0100",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/node/create.ts",
+      "nodeId": "node_0101",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/node/inspect.ts",
+      "nodeId": "node_0102",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0.2857142857142857
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/node/link.ts",
+      "nodeId": "node_0103",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.5
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/node/list.ts",
+      "nodeId": "node_0104",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/node/remove.ts",
+      "nodeId": "node_0105",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "epsilon_equivalent",
+          "structuralJaccard": 0.6666666666666666
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/node/show.ts",
+      "nodeId": "node_0106",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/open.tsx",
+      "nodeId": "node_0107",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0.2
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/projects/forget.ts",
+      "nodeId": "node_0108",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.5
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/projects/list.ts",
+      "nodeId": "node_0109",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "epsilon_equivalent",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/proposal/apply.ts",
+      "nodeId": "node_0110",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.5
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/proposal/list.ts",
+      "nodeId": "node_0111",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "epsilon_equivalent",
+          "structuralJaccard": 0.5
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/proposal/propose-link.ts",
+      "nodeId": "node_0112",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.6666666666666666
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/proposal/propose-node.ts",
+      "nodeId": "node_0113",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/proposal/reject.ts",
+      "nodeId": "node_0114",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.6666666666666666
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/proposal/show.ts",
+      "nodeId": "node_0115",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0.3333333333333333
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/query/index.ts",
+      "nodeId": "node_0116",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/query/run-query.ts",
+      "nodeId": "node_0117",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0.2
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/run/context.ts",
+      "nodeId": "node_0118",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0.3333333333333333
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/run/prompt.ts",
+      "nodeId": "node_0119",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.5
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/runs/list.ts",
+      "nodeId": "node_0120",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/runs/show.ts",
+      "nodeId": "node_0121",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/runs/verify.ts",
+      "nodeId": "node_0122",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.5
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/validate.ts",
+      "nodeId": "node_0123",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/verify/homeomorphism.ts",
+      "nodeId": "node_0124",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.5294117647058824
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/commands/walk.ts",
+      "nodeId": "node_0125",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "epsilon_equivalent",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/drafts/persist.ts",
+      "nodeId": "node_0058",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "epsilon_equivalent",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/edges/create-edge.ts",
+      "nodeId": "node_0059",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "epsilon_equivalent",
+          "structuralJaccard": 0.6666666666666666
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/edges/remove-edge.ts",
+      "nodeId": "node_0060",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_structural",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/edges/update-edge.ts",
+      "nodeId": "node_0061",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/errors.ts",
+      "nodeId": "node_0062",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "epsilon_equivalent",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "divergent_structural",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/fs/json.ts",
+      "nodeId": "node_0063",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/fs/lock.ts",
+      "nodeId": "node_0064",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0.4
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/integrity/hash.ts",
+      "nodeId": "node_0065",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/nodes/create-node.ts",
+      "nodeId": "node_0066",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.5
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/nodes/node-id.ts",
+      "nodeId": "node_0067",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/nodes/remove-node.ts",
+      "nodeId": "node_0068",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/nodes/update-node.ts",
+      "nodeId": "node_0069",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0.3333333333333333
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/project/load.ts",
+      "nodeId": "node_0070",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_structural",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/project/paths.ts",
+      "nodeId": "node_0071",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_structural",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/projects/registry.ts",
+      "nodeId": "node_0072",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/proposals/persist.ts",
+      "nodeId": "node_0073",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/render/box.ts",
+      "nodeId": "node_0074",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/render/style.ts",
+      "nodeId": "node_0075",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.6666666666666666
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/render/table.ts",
+      "nodeId": "node_0076",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "epsilon_equivalent",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/runs/persist.ts",
+      "nodeId": "node_0077",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.6666666666666666
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/core/state/state-store.ts",
+      "nodeId": "node_0078",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "epsilon_equivalent",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/compile/artifact-writer.ts",
+      "nodeId": "node_0001",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/compile/compile-node.ts",
+      "nodeId": "node_0002",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.6
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/compile/compile-plan-runner.ts",
+      "nodeId": "node_0003",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/compile/manifestation-mapper.ts",
+      "nodeId": "node_0004",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0.25
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/compile/post/extract-code-fence.ts",
+      "nodeId": "node_0005",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/compile/post/runtime-check.ts",
+      "nodeId": "node_0006",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/compile/post/validate-language.ts",
+      "nodeId": "node_0007",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.5
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/compile/upstream-context.ts",
+      "nodeId": "node_0008",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/context/assembler.ts",
+      "nodeId": "node_0009",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/context/edge-suggester.ts",
+      "nodeId": "node_0010",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.75
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/context/gluing.ts",
+      "nodeId": "node_0011",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/context/intent-validator.ts",
+      "nodeId": "node_0012",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.5
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/context/presheaf.ts",
+      "nodeId": "node_0013",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_structural",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/context/semantic-linker.ts",
+      "nodeId": "node_0014",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0.21428571428571427
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/context/types.ts",
+      "nodeId": "node_0015",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/effects/async.ts",
+      "nodeId": "node_0016",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.6666666666666666
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/effects/index.ts",
+      "nodeId": "node_0017",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/effects/laws.ts",
+      "nodeId": "node_0018",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/effects/result.ts",
+      "nodeId": "node_0019",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/errors.ts",
+      "nodeId": "node_0020",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/fibration/branch-fiber.ts",
+      "nodeId": "node_0021",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/fibration/index.ts",
+      "nodeId": "node_0022",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "epsilon_equivalent",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/fibration/types.ts",
+      "nodeId": "node_0023",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/graph/compile-plan.ts",
+      "nodeId": "node_0024",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.7142857142857143
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/graph/edges.ts",
+      "nodeId": "node_0025",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.6
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/graph/poset.ts",
+      "nodeId": "node_0026",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/graph/traversal.ts",
+      "nodeId": "node_0027",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/legend/frontier-tagger.ts",
+      "nodeId": "node_0028",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.875
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/legend/matrix-intersections.ts",
+      "nodeId": "node_0029",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.8
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/legend/matrix.ts",
+      "nodeId": "node_0030",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/legend/pareto.ts",
+      "nodeId": "node_0031",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.75
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/legend/progress-report.ts",
+      "nodeId": "node_0032",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/legend/render-ascii.ts",
+      "nodeId": "node_0033",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.8333333333333334
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/legend/static-summary.ts",
+      "nodeId": "node_0034",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0.16666666666666666
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/legend/structural-classifier.ts",
+      "nodeId": "node_0035",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0.06666666666666667
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/legend/translator.ts",
+      "nodeId": "node_0036",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/legend/verify-homeomorphism.ts",
+      "nodeId": "node_0037",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0.2857142857142857
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/legend/vocab-gap.ts",
+      "nodeId": "node_0038",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/llm/anthropic/adapter.ts",
+      "nodeId": "node_0039",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0.2
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/llm/dispatcher.ts",
+      "nodeId": "node_0040",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.8
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/llm/mock.ts",
+      "nodeId": "node_0041",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/llm/model-capabilities.ts",
+      "nodeId": "node_0042",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/llm/ollama/adapter.ts",
+      "nodeId": "node_0043",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_structural",
+          "structuralJaccard": 0.25
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/llm/registry.ts",
+      "nodeId": "node_0044",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/llm/resolve-node-model.ts",
+      "nodeId": "node_0045",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0.3333333333333333
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/llm/types.ts",
+      "nodeId": "node_0046",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "epsilon_equivalent",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/prompt/parse.ts",
+      "nodeId": "node_0047",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.6666666666666666
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/prompt/types.ts",
+      "nodeId": "node_0048",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/query/representable.ts",
+      "nodeId": "node_0049",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.5
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/query/types.ts",
+      "nodeId": "node_0050",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "epsilon_equivalent",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/static/edges.ts",
+      "nodeId": "node_0051",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.5
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/static/python.ts",
+      "nodeId": "node_0052",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/static/typescript.ts",
+      "nodeId": "node_0053",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0.25
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/topos/index.ts",
+      "nodeId": "node_0054",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/topos/omega.ts",
+      "nodeId": "node_0055",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 1
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/topos/predicate.ts",
+      "nodeId": "node_0056",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.8823529411764706
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/runtime/topos/rule-compiler.ts",
+      "nodeId": "node_0057",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.75
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        }
+      ],
+      "trend": "regressed"
+    },
+    {
+      "sourceFile": "/Users/juancarlosromero/Development/ontology/src/schemas/ontology.ts",
+      "nodeId": "node_0126",
+      "perArm": [
+        {
+          "label": "A",
+          "verdict": "divergent_loc",
+          "structuralJaccard": 0.6
+        },
+        {
+          "label": "B",
+          "verdict": "unrecoverable",
+          "structuralJaccard": null
+        },
+        {
+          "label": "C-local",
+          "verdict": "divergent_both",
+          "structuralJaccard": 0
+        }
+      ],
+      "trend": "regressed"
+    }
+  ],
+  "h1": {
+    "jaccardFloor": 0.1,
+    "perArm": [
+      {
+        "label": "A",
+        "meanStructuralJaccard": 0.58077616892911,
+        "passes": true
+      },
+      {
+        "label": "B",
+        "meanStructuralJaccard": 0,
+        "passes": false
+      },
+      {
+        "label": "C-local",
+        "meanStructuralJaccard": 0,
+        "passes": false
+      }
+    ],
+    "allPass": false,
+    "anyPass": true
+  }
+}
