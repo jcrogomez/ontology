@@ -200,3 +200,99 @@ El bug titular de la revisión 05-23 (`--reps` inerte por colisión de caché) e
 ---
 
 *Generado por la tarea programada `ontology-pr-suggestions` el 2026-05-24. HEAD: `103d3c2` (0 adelante / 0 atrás de `origin/main`). Build: `tsc --noEmit` limpio (verificado). `git pull` bloqueado por proxy en el sandbox y discutible (local sincronizado). `vitest` no disponible in-sandbox (binding rolldown); toda verificación vía `tsc` + lectura de código + recómputo del JSON de Arm A.*
+
+---
+
+## 10. Addendum 2026-05-24 (tarde) — qué aterrizó en respuesta a esta revisión
+
+> *La revisión de arriba se generó por la mañana sobre HEAD `103d3c2`. En la sesión que siguió se ejecutó la cadena Move 1 → Move 2 que recomienda §7, más higiene adicional. Este addendum resume lo aterrizado en orden de commit; HEAD pasó a `4697e4e` (`origin/main` sincronizado). El estado del repo discrepa ahora del que la revisión describe — y ese es el cierre que se merece.*
+
+### 10.1 Notas sobre la propia revisión (lo que ya estaba stale al generarse)
+
+- §4.2 afirmaba que `.ontology.self-ingest-epsilon-3a-arm-b.json` pesaba **0 bytes**. En realidad pesaba **200 KB** — la corrida de Arm B completó la noche del 23 → mañana del 24 (10h 27min, 124/125 unrecoverable por HW veto). La revisión auditó el directorio antes de inspeccionar tamaños o ver el reporte `SELF_INGEST_EPSILON_3A_2026-05-19_ARM_B.md` (que ya existía, 30 KB).
+- §4.2 también afirmaba que **no existían** los reportes Arm B / Arm C-local / synthesis. Los tres ya estaban en disco (29 KB / 26 KB / 23 KB respectivamente), aterrizados antes del mediodía. El TODO incluso ya los documentaba.
+- `.ontology.toy-pre-arm-b-backup/` (§4.3) ya no existía al inicio de la sesión — se había limpiado.
+
+**Implicación operativa:** las revisiones automáticas pueden ir a contramano de un working tree que ya avanzó. Tratarlas como "hipótesis sobre el estado, no estado". El siguiente review (05-25) debería ver `git log --since=2026-05-24` y reportar el delta sin asumir continuidad lineal con el HEAD de la mañana.
+
+### 10.2 Move 1 hygiene + structural guards (commit `e6141b1`)
+
+Resuelve §4.1 (silent perimeter under-count) y §5.1 (gitignore) en una sola pieza estructural. Tres cambios de código + un addendum publicable:
+
+- `inferManifestationFromSourcePath(filePath)` en `src/runtime/compile/manifestation-mapper.ts` — extensión → manifestation (`*.ts/*.py/...` → `code`; `*.test.ts/*.spec.ts/...` → `test`; `build.sh` → `build`; prosa/data → `undefined`). 5 tests nuevos, 11/11 verde en `tests/manifestation-mapper.test.ts`.
+- Guard en `createNodeProposalForExtraction` (`src/commands/ingest/index.ts`) — si el extractor dejó `manifestation` en `undefined` o `"intent"` y el path implica otra cosa, override; el override se registra en `provenance.rationale.manifestationOverride` para auditabilidad.
+- Warning en `verify-homeomorphism --all-artifacts` candidate resolver — emite `[verify] warning: N node(s) have outputs.files pointing at code-extension files but manifestation !== "code" — excluded` (suprimido bajo `--json` para no contaminar sidecars). El under-count silencioso ya no es invisible.
+- Addendum en `SELF_INGEST_EPSILON_3A_2026-05-19_ARM_A.md` documenta la distinción 125 vs 126: coverage real 99.2 % (no 100 %); headline metrics cambian al tercer decimal; H1 sigue confirmado en 6/6.
+- `.gitignore` extendido defensivamente (`.ontology.*-backup/`, `.ontology.scratch-*/`, `.ontology.self-ingest-*.stderr.log`); los sidecars `.json` se **versionan** intencionalmente como output pre-registrado.
+- Tests focalizados: 107/107 verde (ingest-cli + homeomorphism-event-audit + verify-report-markdown + verify-reps-cache-bypass + extraction-vocab-guard + compile-cli-run-batch + manifestation-mapper). `tsc --noEmit` limpio.
+
+§7 Move 1 al completo, modulo "re-correr verify para 126/126" — explícitamente diferido (workspace shuffling + el extractor original produjo una extracción degenerada de `node_0094` con `prompt.raw: "- example"`, así que el re-verify casi seguro devuelve `unrecoverable`; valor científico marginal de unos décimos en el tercer decimal).
+
+### 10.3 CALIBRATION_LOG (commit `783b5b1`)
+
+§6 cerrado. `docs/legend/calibrations/CALIBRATION_LOG.md` aterriza como índice canónico del corpus de calibración (33 archivos + Arm A0 después). Cinco secciones: §0 "Start here" para lectores fríos · §1 runs ε con tripletas linkeadas (β / β′ / γ / δ / Move 3α) · §2 pre-ε (HASH_TS, VIBE_REASONING, BAKEOFF, SMOKE) · §3 hierarchizer prework · §4 milestone reviews diarias · §5 convenciones (estructura tripleta, naming, política de sidecars). Ya no hace falta `grep -r SELF_INGEST` para reconstruir el hilo.
+
+### 10.4 ROADMAP refresh y simplificación (commits `2fd1c17` → `5a72af8`)
+
+§6 ítem ROADMAP cerrado. Primer pase expandió a 506 líneas (12 días de arco ε commit-por-commit); el siguiente lo simplificó a **89 líneas** (-78 %) tras feedback explícito del usuario. Detalle commit-por-commit se reubica en `RELEASE_NOTES.md` + `CALIBRATION_LOG.md`; el ROADMAP responde "dónde estamos, hacia dónde vamos, qué está abierto" en una lectura de tres minutos. Memoria guardada para que futuros refreshes defaulteen a encoger.
+
+### 10.5 Move 2 — Arm A0 control (commit `4697e4e`)
+
+§3.1 resuelto con datos. Arm A0 = `qwen2.5-coder:7b` + safety-net **sin** `--ast-grounding`, perímetro idéntico al de Arm A (workspace clonado de `.ontology.self-ingest-epsilon-3a-arm-a-result/`). Wall-clock **2h 29min** (vs Arm A 1h 33min, +60 % — sin el bloque MANDATORY EXPORTS el modelo emite más tokens libres por respuesta, output 53 K → 75 K).
+
+Headline (Arm A − Arm A0):
+
+| Métrica | Arm A (con grounding) | Arm A0 (control) | Δ |
+|---|---:|---:|---:|
+| Mean Jaccard | 0.581 | **0.226** | **−0.355** |
+| Mean LoC dist | 0.589 | 0.563 | −0.026 (~estable) |
+| Structural honesty | 0.496 | 0.332 | −0.164 |
+| ExportRecovery micro | 68.6 % | 25.6 % | **−43.0 pp** |
+| Missing-export keys | 106 | 297 | +191 (3× más drops sin grounding) |
+| Hallucinated exports | 116 | **16** | −100 (grounding **causa** 7× over-stuffing) |
+| `empty_regen` tag | 21 | 77 | +56 (intent validator rechaza más sin contract block) |
+| ε-equivalent | 12 (10 %) | 6 (5 %) | −6 |
+| divergent_both | 37 (30 %) | 78 (62 %) | +41 |
+| Unrecoverable | 0 | 0 | 0 |
+
+**§3.1 recalibrado, no refutado.** El 28× de Arm A sobre el piso δ' (0.581 vs 0.021) descompone como:
+
+- ~0.205 baseline-qwen-7b + safety-net (A0 − δ') — capacidad del modelo + safety-net.
+- ~0.355 grounding-intervention lift (A − A0) — el aporte real de inyectar AST.
+
+La intervención **sí** es load-bearing; **no** es artefacto de circularidad. Sorpresa secundaria: **A0 también pasa el piso H1 = 0.1** (0.226 ≥ 0.1). El falsador H1 estaba calibrado contra δ' (qwen-3b sin safety-net) y ya no es informativo contra arms modernos; **futuros falsadores H1 deben recalibrarse contra A0**, no contra δ'.
+
+Encuadre publicable defendible:
+
+> *"AST grounding at compile-back contributes ~0.355 mean Jaccard lift over a strong qwen-7b + safety-net baseline. The lift is real and not pure metric circularity. Honest costs of the intervention: (1) it does NOT improve LoC accuracy; (2) it causes the model to hallucinate 7× more exports trying to satisfy the contract block (over-stuffing, not deeper understanding); (3) behaviour / contract / intent axes remain unmeasured."*
+
+Synthesis driver `scripts/run-3a-bakeoff-synthesis.ts` extendido de 3 → 4 brazos (baseline sigue siendo A para preservar la lectura "qué pasa cuando cambias ingrediente X relativo a qwen grounded"). Re-renderizado `SELF_INGEST_EPSILON_3A_2026-05-19_SYNTHESIS.md` incluye A0 con per-mode failure deltas. Workspace archivado en `.ontology.self-ingest-epsilon-3a-arm-a0-result/`; scratch `.ontology/` restaurado desde stash.
+
+### 10.6 Lo que NO se hizo (y por qué)
+
+- **§7 Move 3 (relanzar B / C-local)**: no aplica — ambos ya habían corrido antes de que se generara la revisión (Arm B 2026-05-24T05:11 local, Arm C-local 2026-05-24T13:05 local). El synthesis 3-arm ya estaba en disco. El re-síntesis 4-arm (con A0) **sí** se hizo.
+- **Re-verify de `node_0094`**: §4.1 lo pedía; se difirió por costo/beneficio (extracción de origen degenerada → re-verify casi seguro `unrecoverable`; cambia métricas al tercer decimal). El guard estructural en ingest impide que la misma misclasificación recurra en futuras ingests.
+- **Checker behaviour axis** (§5.2): identificado como el siguiente checker de mayor valor (ortogonal al grounding → inmune a §3.1); queda en open follow-ups del ROADMAP. No bloqueante para Phase ε.
+- **CLI `onto legend bakeoff-synthesis`** (§5.3): queda en open follow-ups. El driver hand-rolled (`scripts/run-3a-bakeoff-synthesis.ts`) sigue siendo idempotente y suficiente.
+
+### 10.7 Estado de cierre de Phase ε al final del día
+
+| Item | Estado |
+|---|---|
+| Arm A (grounded baseline) | ✅ landed 2026-05-23 |
+| Arm B (granite HW veto) | ✅ landed 2026-05-24 |
+| Arm C-local (starcoder contract violation) | ✅ landed 2026-05-24 |
+| Arm A0 (grounding ablation control) | ✅ landed 2026-05-24 |
+| 4-arm synthesis | ✅ landed 2026-05-24 |
+| §3.1 metric-circularity worry | ✅ resuelto (grounding contributes real Δ = +0.355) |
+| §4.1 silent perimeter under-count | ✅ structural guards shipped |
+| `node_0094` data point in Arm A report | 🟡 deferred (data correction noted in addendum; re-verify not run) |
+| Behaviour-axis checker | 🟡 open follow-up |
+| Arm C-cloud (devstral-24b en GPU rentado, ~$5-10) | 🟡 último gate para clean ε close |
+| `MATHEMATICAL_CLAIMS.md` §3.10 adjoint T4 → T2 | 🟡 gated en Arm C-cloud |
+
+5 commits del día (`e6141b1` Move 1 hygiene · `783b5b1` CALIBRATION_LOG · `2fd1c17` ROADMAP refresh · `5a72af8` ROADMAP simplification · `4697e4e` Arm A0). Todos en `origin/main`. HEAD final `4697e4e`.
+
+### 10.8 Una corrección al resumen ejecutivo (§9)
+
+El §9 ejecutivo cierra con "la recomendación científica nueva es un Arm A0 de control sin grounding". El día siguiente al texto: la recomendación se ejecutó, y la lectura terminó **fortaleciendo** la claim original (no rebajándola). El encuadre §9 — "the grounding closes the gap of names, not the gap of size or behaviour" — sigue siendo el correcto, ahora con número exacto del aporte aislado (+0.355 Jaccard) y costo cuantificado (7× over-stuffing de exports). Cuando aparezca el milestone review 05-25, la columna `structural` de la cartografía estará sólida con **descomposición causal** (no solo magnitud); las otras cuatro siguen vacías y `behaviour` sigue siendo el próximo checker de mayor valor.
