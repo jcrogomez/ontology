@@ -1,28 +1,45 @@
 # Ontology Roadmap
 
-## Current State: 0.4.0-rc.1 — Project Legend Phases α–δ shipped (`0.4.0-rc.1`)
+## Current State: 0.4.0-rc.1 — Project Legend Phase ε mid-flight (multi-arm bake-off)
 
-Ontology has reached **post-Bootstrap 0.9** with the **plasticity layer** in
-place. The seven axioms of the canon all run concrete code (axiom 4 is now
-structural via `parsePromptAST`), and four additive categorical extensions
-(Yoneda query, effect monad, branch fibration, topos predicate algebra)
-ship as runtime libraries with full CLI / Walker surfaces. Iteration
-primitives — `node update`, `node remove`, `edge update`, `edge remove`,
-contract flags on `node create`, validator gate on `compile run` — closed
-the loop the iterative workflow was missing. **All milestone-review items
-§3.1 through §3.15 are resolved** (some closed as no-op when the bug was
-not present in current code; tests pin every invariant). The compiler is
+Ontology has reached **post-Bootstrap 0.9** with the **plasticity layer**
+shipped, **Project Legend Phases α–δ closed end-to-end**, and **Phase ε
+(self-ingestion on the Ontology repo) actively producing data**. The
+seven axioms of the canon all run concrete code (axiom 4 is structural
+via `parsePromptAST`), four additive categorical extensions (Yoneda
+query, effect monad, branch fibration, topos predicate algebra) ship as
+runtime libraries with full CLI / Walker surfaces, iteration primitives
+(`node update`, `node remove`, `edge update`, `edge remove`, contract
+flags on `node create`, validator gate on `compile run`) close the
+iterative-workflow loop, and **all milestone-review items §3.1 through
+§3.15 are resolved** (tests pin every invariant). The compiler is
 hardened end-to-end: code-fence stripping, language parse-check + intent
-gate on every artifact, optional `--runtime-check`, refinement-parent
-context threading + structured contract in the system prompt, per-node
-`model.ref` routing, and a top-level `EffectWithLog` that retires the
-legacy try/catch tower across both compile *and* `runFromWalker`.
-`computeCompilePlan` rejects `contradicts` and halts BFS on `supersedes`
-(transitively, pinned by test). The next chapter is
-**[Project Legend](PROJECT_LEGEND.md)** — the inverse direction of the
-compile functor: `onto ingest <path>` lifts existing source into an
-intent network, verifies the homeomorphism $F \circ G \approx \mathrm{id}$
-on a measured subcategory, and reports the intent-resistant complement.
+gate, optional `--runtime-check`, refinement-parent context threading +
+structured contract in the system prompt, per-node `model.ref` routing,
+and a top-level `EffectWithLog` that retires the legacy try/catch tower
+across compile *and* `runFromWalker`. `computeCompilePlan` rejects
+`contradicts` and halts BFS on `supersedes` (transitively, pinned).
+
+**Phase ε is no longer "the next active stream":** five self-ingest
+runs (β / β′ / γ / δ / δ′) have landed on the Ontology core perimeter
+(~125 files), and Move 3α — the multi-arm bake-off testing AST grounding
+at compile-back — is mid-flight. Arm A (`qwen2.5-coder:7b`) verified
+125/126 nodes (mean Jaccard 0.581, structural honesty 0.496, 0
+unrecoverable) and confirmed H1 on all six pre-registered falsifiers;
+Arm B (`granite4.1:8b`) was hardware-vetoed (8 GB RAM swap →
+`fetch failed` on 124/125 nodes); Arm C-local (`starcoder2:7b`, a
+substitute for the deferred cloud devstral-small-2:24b) confirmed that
+coding-base-at-7B does not satisfy the MANDATORY EXPORTS contract; the
+mechanical cross-arm `bakeoff-synthesis` reads H1 as "partial signal".
+An Arm A0 control run (qwen + safety-net **without** `--ast-grounding`)
+is currently in flight to isolate grounding's marginal contribution
+from a metric-circularity confound that the AST-injection intervention
+introduces (see `legend/calibrations/MILESTONE_REVIEW_2026-05-24.md` §3.1).
+
+The full calibration corpus — pre-ε prework, the canonical β / β′ / γ
+/ δ / ε self-ingest run triplets (HYPOTHESIS / raw report / SYNTHESIS),
+the daily automated milestone reviews, and conventions — is indexed in
+[`legend/calibrations/CALIBRATION_LOG.md`](legend/calibrations/CALIBRATION_LOG.md).
 
 ## Near-term tactical roadmap
 
@@ -184,7 +201,10 @@ Phase plan (estimates from PROJECT_LEGEND.md §6):
 | γ-4/5/6 | Layer 3 (TS-first static-edge inference) + `onto ingest <directory>` + `infer-edges --create-proposals` + walker AI indicator + `--include` flag | ✅ shipped 2026-05-12 (commits `62d8c86` / `a25ade9` / `9c16b9d` / `69424af` / `bc350ce`); Vibe-Reasoning runbook at [`legend/calibrations/VIBE_REASONING_PROCEDURE.md`](legend/calibrations/VIBE_REASONING_PROCEDURE.md) | actual ~6 h |
 | δ | Layer 4 (Inspector / translator) + Layer 6 (verification + report) | ✅ shipped 2026-05-12 (`8779acc` δ-1 + `29b330c` δ-2); γ-7 prompt invariants (`2e8853e`) + 5 tooling-gap fixes (`6ea7e94`) + 5 reviewer fixes (`b035ce7`) + cross-provider routing (`f80163d`) all in main | actual ~12 h |
 | γ-7 + δ measurement | Vibe-Reasoning corpus calibration with γ-7 invariants | ✅ shipped 2026-05-12 (`7abd73e`); +29pp ε-equiv, `divergent_both` eliminated. Report at [`legend/calibrations/VIBE_REASONING_GAMMA_7_2026-05-12.md`](legend/calibrations/VIBE_REASONING_GAMMA_7_2026-05-12.md) | actual ~3 h |
-| ε | Self-ingestion — Legend run on the Ontology repo itself | 🟡 next active stream (gated on API credit) | ~6–10 h |
+| ε — β / β′ / γ / δ / δ′ baseline | Self-ingest of the Ontology core perimeter (~125 files); five iterative runs each pre-registered. Move 1 (export-vocab preservation in `static_summary`), Move 1b (vocab-domain flatmap of `i.symbols`), Move 1c (ingest safety net), δ EXTRACTION_SYSTEM_PROMPT rewrite (descriptive → constructive) all shipped during this arc | ✅ shipped 2026-05-16 → 2026-05-18; see triplets in [`CALIBRATION_LOG.md`](legend/calibrations/CALIBRATION_LOG.md) §1 | actual ~10 h |
+| ε — Move 3α tooling burst (2026-05-22) | Bake-off-synthesis generator (`ddfe266`), `homeomorphism_verified` event audit with `model` + `perimeterHash` (`00b8100`), `--reps N --aggregator median` for variance defang (`6c6e368`), `ingest-prompt-template.test.ts` invariants (`54cd2f0`), hierarchizer baseline + empirical-validation protocol | ✅ shipped 2026-05-22 (10-commit burst) | actual ~6 h |
+| ε — Move 3α multi-arm bake-off | AST grounding at compile-back; Arm A `qwen2.5-coder:7b`, Arm B `granite4.1:8b`, Arm C-local `starcoder2:7b` (Arm C-cloud `devstral-small-2:24b` deferred); H1 falsifiers pre-registered, decision tree fires "partial signal" | 🟡 active — Arm A `2026-05-23` confirms H1 on 6/6; Arm B HW-vetoed; Arm C-local contract-violation; **Arm A0 control in flight 2026-05-24**; Arm C-cloud (~$5–10) gates clean H3 | actual to-date ~12 h |
+| ε — close + adjoint upgrade | Land Arm A0 + cloud Arm C, recalibrate hypotheses if synthesis warrants, upgrade [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §3.10 adjoint claim from T4 → T2 | 🟡 pending Arm A0 + cloud Arm C | ~3–5 h |
 | ζ | Release + Open-Prompt seeds (sign, verify-published, replay) | pending | ~3–5 h |
 
 **Known limitations (as of plasticity layer completion):**
@@ -235,6 +255,13 @@ work is in [Open follow-ups](#open-follow-ups).
 | post-0.9 | Project Legend Phase β | `onto compile run-batch` + `compile run --target <path>` (β-1, `a09e1d7`); `node.literal` escape hatch (β-2, `04f730c`); `computeFiberBy(input, projection)` for path fibration (β-3, `881506a`); post-β review blockers — atomic write + clobber gate + binary guard (`157d367`); two-phase commit for `writeArtifact` so failed validator no longer clobbers `--target` (`2cbaa32`). |
 | post-0.9 | Project Legend Phase γ (extraction core) | γ-0 Anthropic provider with prompt caching, default `claude-opus-4-7` (`aad0fed`); γ-1 `onto ingest <file>` with `--dry-run` (`b670ca3`); γ-3 rich proposal payload — manifestation/language/requires/provides/forbids/rules/literal/sourceFiles on `node_create` (`7d50c91`); γ-4 TS-first static-edge inference + `onto graph infer-edges <dir>` preview (`62d8c86`); γ-5 `onto ingest <directory>` multi-file (`a25ade9`); γ-6 `infer-edges --create-proposals` for edge proposals against applied nodes (`9c16b9d`); walker AI provider status indicator (`69424af`); `--include` flag for non-TS source extensions + Vibe-Reasoning runbook (`bc350ce`). γ-2 calibration: 5/5 ε-equivalent on `hash.ts` with Opus 4.7 (commit `ac0a45f`, report at [`legend/calibrations/HASH_TS_2026-05-12.md`](legend/calibrations/HASH_TS_2026-05-12.md)). |
 | post-0.9 | Project Legend Phase γ-7 + δ (Vibe-Reasoning hardening) | `eee5610` `onto ingest --cost-estimate` (zero-API pre-flight); `bad6840` γ-4 Python static-edge parser (regex-based; `src/runtime/static/python.ts` + language-agnostic dispatcher); `4dd59b1` `--open-world` flag + ingest prompt fix (stale `kind` enum + project-internal-only contract tokens); `23ac144` configurable `--max-tokens` (Anthropic default 4096 → 8192, exposed on `compile run` / `run-batch`); `2e8853e` γ-7 MANDATORY EXPORTS block in `assembleContext` + extractor prompt teaches comprehensive `provides` capture; `29b330c` δ-2 `onto verify-homeomorphism` — dual-distance (LoC + structural Jaccard) + five-label verdict folder, the `MATHEMATICAL_CLAIMS.md` §3.10 publishable measurement; `8779acc` δ-1 `onto node inspect` (Inspector / Lupa) — translator cached on `node.translator` with automatic `sourceHash` invalidation, `--regenerate` override, one LLM call per node lifetime. |
+| post-0.9 | Project Legend Phase ε — β / β′ baseline (2026-05-16) | First end-to-end self-ingest of the Ontology core perimeter. β: `qwen2.5-coder:3b` both ways (single-model baseline). β′: drop `--model` override on `verify-homeomorphism` so registry per-task routing actually runs; also lands **Move 1** (export-vocabulary preservation in `static_summary`). β′ surfaced a routing-architecture bug mid-flight + first Jaccard 1.0 file proving Move 1's mechanism works in isolation. Triplet siblings under [`legend/calibrations/`](legend/calibrations/). |
+| post-0.9 | Project Legend Phase ε — γ + Move 1b vocab-domain fix (2026-05-18) | β′ proved Move 1 worked in isolation but aggregate regressed because `static_summary` emitted module specifiers into `requires` while gluing demanded symbol names. **Move 1b** (`9eb9211`) flatmaps `i.symbols` instead — recovered 13 unrecoverable nodes (32 → 19) but mean Jaccard stayed at 0.003, pointing the diagnosis at the extraction prompt. |
+| post-0.9 | Project Legend Phase ε — δ / δ′ EXTRACTION_SYSTEM_PROMPT rewrite (2026-05-18) | Same schema/models as γ; only EXTRACTION_SYSTEM_PROMPT changed, from descriptive ("describe the SHAPE") to constructive ("MUST export/return …"). Mean Jaccard 7× off γ floor; vocab gap −12% only (488 missing exports / 115 of 125 nodes). Sets up Move 3α as the compile-back-side intervention. |
+| post-0.9 | Project Legend Phase ε — Move 3α tooling burst (2026-05-22, 10 commits) | `ddfe266` `src/runtime/legend/bakeoff-synthesis.ts` deterministic no-LLM cross-arm synthesizer (per-arm summaries, micro/macro export-recovery deltas, signed per-mode failure deltas, Pareto roll-up, per-file rebuild status, H1 mean-Jaccard decision gate, markdown renderer); `00b8100` `homeomorphism_verified` event audit — `model: { provider, model }` + `perimeterHash = sha256(sorted source files)` so the audit chain replays from `events.jsonl` alone; `6c6e368` `--reps N --aggregator median` defangs single-draw Jaccard variance; `54cd2f0` `tests/ingest-prompt-template.test.ts` pins the δ′ EXTRACTION_SYSTEM_PROMPT invariants (MANDATORY block contents, provides-in-prompt, forbidden narrative phrases); hierarchizer baseline + empirical-validation protocol (`HIERARCHY_BASELINE_2026-05-22.md`, `EMPIRICAL_VALIDATION_PROTOCOL_2026-05-22.md`) establish `closedWorldContextReachableSatisfaction` as the brújula. |
+| post-0.9 | Project Legend Phase ε — Move 3α Arm A (2026-05-23, qwen2.5-coder:7b) | First arm of the multi-arm bake-off. AST-extracted MANDATORY EXPORTS injected into compile-back system prompt. 125 nodes verified, structural honesty mean 0.496 (100% coverage), 10% epsilon_equivalent / 57% divergent_loc / 4% divergent_structural / 30% divergent_both / **0 unrecoverable**. Wall-clock 1h 33min (15:46 → 17:20 local; 3.2× faster than the pre-registered 5h forecast — the 1.1 tok/s swap-floor measurement overestimated). Confirms H1 on all six pre-registered falsifiers, each by ~10×. Pre-Arm-A hardening: `5d70f3b` fixes the `--reps` cache-collision (per-rep token folded into `runId`) + `2591179` adds `fsync` on `state.json` + integration test + README honesty pass; `103d3c2` Arm A pre-flight checklist + critical-path map. |
+| post-0.9 | Project Legend Phase ε — Move 3α Arms B / C-local + synthesis (2026-05-24) | Arm B (`granite4.1:8b`, 5.3 GB) — hardware-vetoed: 124/125 unrecoverable from HTTP `fetch failed` as the 5.3 GB model swapped on 8 GB RAM; wall-clock 10h 27min (mid pre-registered 10-25h band). Verdict: "inoperative on this hardware, not structured-output specialist fails to lead qwen" — clean Arm B requires cloud / ≥16 GB RAM. Arm C-local (`starcoder2:7b`, 4.0 GB) — substitute for the deferred cloud `devstral-small-2:24b`: 54% unrecoverable + 46% divergent_both; wall-clock ~12 min (short-circuit on intent validation). Verdict: "coding-base-at-7B does not satisfy the MANDATORY EXPORTS contract" — NOT diagnostic of the broader H3. Synthesis driver `scripts/run-3a-bakeoff-synthesis.ts` lands; H1 decision-tree gate fires "partial signal" (A clears 0.1 floor; B/C-local don't). `0313ebc` ships `node_update_parent` kernel primitive (schema + apply path + planner unblock; consumed by `hierarchizer.ts`, no CLI verb yet). |
+| post-0.9 | Project Legend Phase ε — Move 1 hygiene + manifestation guard (2026-05-24, `e6141b1`) | Closes [`MILESTONE_REVIEW_2026-05-24.md`](legend/calibrations/MILESTONE_REVIEW_2026-05-24.md) §4.1 silent-perimeter under-count. `node_0094` (entry point of `src/commands/ingest/index.ts`) was ingested with `manifestation: "intent"` (the schema default the LLM extractor fell into for a degenerate extraction) and silently excluded from `verify-homeomorphism --all-artifacts`, shrinking Arm A from 126 to 125 with no warning. Fix shipped as: `inferManifestationFromSourcePath` helper in `runtime/compile/manifestation-mapper.ts` (extension → manifestation: `*.ts/*.py/...` → `code`, `*.test.ts/...` → `test`, `build.sh` → `build`); ingest guard in `createNodeProposalForExtraction` overrides extractor manifestation when it is `undefined` or `"intent"` and the path implies otherwise, recording the override in `provenance.rationale.manifestationOverride`; verify warning in `--all-artifacts` candidate resolver lists silently-excluded code-extension nodes (suppressed under `--json`). Move 1 also lands the Arm A/B/C-local + synthesis reports + sidecar JSONs (the pre-registered output), the synthesis driver, the daily milestone-review series, [`CALIBRATION_LOG.md`](legend/calibrations/CALIBRATION_LOG.md) as the index, and an Arm A post-publication addendum documenting the 125 vs 126 distinction. Companion: Arm A0 control run (qwen + safety-net **without** `--ast-grounding`) launched same day to isolate grounding's marginal contribution from the §3.1 metric-circularity confound. |
 
 Per-PR detail lives in [`RELEASE_NOTES.md`](RELEASE_NOTES.md).
 
@@ -247,19 +274,40 @@ Bootstrap) or 🔵 (longer-term / shape still to be decided). Items
 shipped today have been promoted out of this list and into the
 Bootstrap history table above.
 
-**Project Legend core (remaining ε):**
-- 🟡 **Self-ingestion on the Ontology repo** (Phase ε). Run Legend on
-  this codebase, measure $\varepsilon$ on the divergent set, upgrade
-  the §3.10 adjoint claim from T4 → T2 in
-  [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md). All prerequisites
-  are shipped: δ-1 (`onto node inspect`, `8779acc`) for human reading
-  of the ingested network, δ-2 (`onto verify-homeomorphism`, `29b330c`)
-  for the automated round-trip measurement, γ-7 prompt invariants
-  (`2e8853e`) for export-signature preservation. The Vibe-Reasoning
-  runbook ([`legend/calibrations/VIBE_REASONING_PROCEDURE.md`](legend/calibrations/VIBE_REASONING_PROCEDURE.md))
-  is the smaller out-of-tree pilot whose remaining steps (re-run
-  verify-homeomorphism over the 22 existing nodes; re-ingest + measure)
-  are the immediate next API spend.
+**Project Legend core — Phase ε remaining work:**
+- 🟡 **Arm A0 control run** (in flight 2026-05-24). qwen2.5-coder:7b
+  with safety-net **without** `--ast-grounding`, identical perimeter to
+  Arm A. Isolates grounding's marginal contribution from the metric-
+  circularity confound surfaced in
+  [`MILESTONE_REVIEW_2026-05-24.md`](legend/calibrations/MILESTONE_REVIEW_2026-05-24.md)
+  §3.1 (the intervention injects exactly the declaration names that
+  `structuralJaccard` / `exportRecoveryRate` score). ~1.5 h wall-clock,
+  $0. Report: `SELF_INGEST_EPSILON_3A_2026-05-19_ARM_A0_CONTROL.md`.
+- 🟡 **Arm C-cloud — `devstral-small-2:24b`** on rented GPU. The clean
+  H3 test ("coding-specialisation doesn't transfer") needs a coding-
+  tuned 24B that fits in ≥24 GB VRAM; local 8 GB Mac is infeasible
+  (measured 0.02 tok/s). ~1-2 h on an A10/L4-class GPU at ~$0.50-2.00/h
+  = total ~$5-10 if scheduled to one continuous session. Output triplet
+  follows the same convention.
+- 🟡 **Behaviour-axis checker** (next-highest cartography column). The
+  current matrix has only `structural` (+ `cost`) filled across 125
+  nodes; `contract`, `behaviour`, `intent` are all explicitly
+  not-measured / untested / not-reviewed. `behaviour` is the most
+  valuable next checker because it is **orthogonal to AST grounding**
+  and so immune to the §3.1 metric-circularity concern — a smoke
+  `--runtime-check` over the subset that compiles would already be
+  diagnostic.
+- 🟡 **Bake-off-synthesis CLI surface**. The library
+  (`src/runtime/legend/bakeoff-synthesis.ts`) and the markdown renderer
+  are tested and used in production; the cross-arm synthesis still
+  needs a hand-rolled driver (`scripts/run-3a-bakeoff-synthesis.ts`).
+  An `onto legend bakeoff-synthesis <jsons…>` verb removes the last
+  manual cherry-picking surface.
+- 🟡 **`MATHEMATICAL_CLAIMS.md` §3.10 adjoint upgrade — T4 → T2**.
+  Gated on a clean ε close (Arm A0 + Arm C-cloud at minimum). The
+  cartography matrix becomes the publishable measurement; the
+  fidelity-axis honesty (structural + at least one orthogonal column)
+  decides whether to upgrade or report the gap honestly.
 
 **Plasticity follow-ups:**
 - 🟡 **Advisory lock under `.ontology/.lock`** for multi-process safety.
@@ -324,14 +372,27 @@ Bootstrap history table above.
 *This roadmap is kept in sync with `main` after every commit that
 ships a new surface or closes a follow-up. Stale items move to the
 Bootstrap history table; new items land here under their phase
-heading. Last refresh: 2026-05-12 (late), after Project Legend
-Phase δ shipped end-to-end on top of Phase γ-7 hardening — `eee5610`
-`onto ingest --cost-estimate`, `bad6840` γ-4 Python static-edge
-parser, `4dd59b1` `--open-world` flag + ingest prompt fix, `23ac144`
-configurable `--max-tokens`, `2e8853e` γ-7 MANDATORY EXPORTS block,
-`29b330c` δ-2 `onto verify-homeomorphism` (dual-distance LoC +
-structural Jaccard, five-label verdict folder), `8779acc` δ-1 `onto
-node inspect` (translator cached on `node.translator`, one LLM call
-per node lifetime). Phase ε (self-ingestion on the Ontology codebase
-itself) is now the next active stream — all prerequisites in place;
-remaining gating step is the API spend to measure $\varepsilon$.*
+heading. Last refresh: **2026-05-24**, after a twelve-day Phase ε
+arc that took the project from "ε is next, gated on API credit" to
+"ε is mid-flight with concrete data". Five self-ingest runs landed
+(β / β′ / γ / δ / δ′; perimeter ~125 files); Move 1 / 1b / 1c
+shipped the export-vocabulary preservation, vocab-domain flatmap, and
+ingest safety net; the EXTRACTION_SYSTEM_PROMPT rewrote from
+descriptive to constructive; the Move 3α tooling burst (`ddfe266`,
+`00b8100`, `6c6e368`, `54cd2f0`, + hierarchizer baseline +
+empirical-validation protocol) made the multi-arm bake-off
+mechanical and audit-replayable; Move 3α Arm A confirmed H1 on 6/6
+falsifiers (`qwen2.5-coder:7b`, mean Jaccard 0.581, 0 unrecoverable);
+Arm B hardware-vetoed (`granite4.1:8b`, 124/125 unrecoverable on
+8 GB RAM); Arm C-local contract-violation (`starcoder2:7b`, coding-
+base-at-7B fails the MANDATORY EXPORTS contract); synthesis fired
+"partial signal"; Move 1 hygiene (`e6141b1`) shipped the
+`inferManifestationFromSourcePath` guard + verify silent-exclusion
+warning that closes the `node_0094` 125/126 perimeter under-count;
+[`CALIBRATION_LOG.md`](legend/calibrations/CALIBRATION_LOG.md)
+landed as the canonical index of the calibration corpus
+(`783b5b1`). **Arm A0 control** (qwen + safety-net **without**
+`--ast-grounding`) is currently in flight to disentangle the §3.1
+metric-circularity confound; **Arm C-cloud (devstral-small-2:24b on
+rented GPU, ~$5-10)** is the remaining gate for a clean ε close and
+the §3.10 adjoint claim's T4 → T2 upgrade.*
