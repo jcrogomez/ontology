@@ -615,7 +615,7 @@ export function dominantDispatchModel(
   const counts = new Map<string, { provider: string; model: string; n: number }>();
   for (const r of results) {
     if (!r.dispatchModel) continue;
-    const key = `${r.dispatchModel.provider} ${r.dispatchModel.model}`;
+    const key = `${r.dispatchModel.provider}|${r.dispatchModel.model}`;
     const cur = counts.get(key);
     if (cur) cur.n += 1;
     else counts.set(key, { ...r.dispatchModel, n: 1 });
