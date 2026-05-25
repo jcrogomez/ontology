@@ -2,15 +2,22 @@
 
 // Move 3α bake-off synthesis driver.
 //
-// Reads the three verify-homeomorphism --json sidecars (Arm A qwen,
+// Reads the four verify-homeomorphism --json sidecars (Arm A qwen
+// with --ast-grounding, Arm A0 qwen control WITHOUT --ast-grounding,
 // Arm B granite, Arm C-local starcoder), feeds them to the
 // synthesizeBakeoff reducer in src/runtime/legend/bakeoff-synthesis.ts,
 // and writes both a markdown report and a JSON sidecar under
 // docs/legend/calibrations/. Pure read+write — no LLM dispatch.
 //
-// This is the "tiny hand-rolled driver" the TODO mentions (line 172):
-// the synthesis module is fully tested as a library; once a CLI
-// surface ships, this script is the migration path.
+// Baseline (synthesis `arms[0]`) is Arm A — the canonical Move 3α
+// treatment — so all deltas read as "what happens when you change
+// ingredient X relative to the grounded qwen run". Arm A0 specifically
+// reads as a *removal* of the AST-grounding intervention (negative
+// Jaccard delta is the expected "this is what grounding contributed").
+//
+// This is the "tiny hand-rolled driver" the TODO mentions: the
+// synthesis module is fully tested as a library; once a CLI surface
+// ships, this script is the migration path.
 
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -32,6 +39,15 @@ const arms = [
     provider: "ollama",
     model: "qwen2.5-coder:7b",
     sidecar: path.join(repoRoot, ".ontology.self-ingest-epsilon-3a-arm-a.json"),
+  },
+  {
+    label: "A0-control",
+    provider: "ollama",
+    model: "qwen2.5-coder:7b (no --ast-grounding)",
+    sidecar: path.join(
+      repoRoot,
+      ".ontology.self-ingest-epsilon-3a-arm-a0.json",
+    ),
   },
   {
     label: "B",

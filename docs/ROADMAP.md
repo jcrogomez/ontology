@@ -27,7 +27,7 @@ hardening sweep §3.1–§3.15) is closed.
 | γ | `onto ingest <file/dir>`, Anthropic provider, static-edge inference, rich proposal payload | ✅ shipped |
 | δ | Inspector / translator (`onto node inspect`) + verification (`onto verify-homeomorphism`) | ✅ shipped |
 | **ε baseline** | β / β′ / γ / δ / δ′ self-ingest runs; Move 1 / 1b / 1c (export-vocab + vocab-domain + safety net); EXTRACTION_SYSTEM_PROMPT rewrite | ✅ shipped |
-| **ε Move 3α** | AST grounding at compile-back; multi-arm bake-off (qwen / granite / starcoder local + devstral cloud deferred) | 🟡 active — Arm A confirms H1 on 6/6; Arm B HW-vetoed; Arm C-local contract-violation; Arm A0 control in flight |
+| **ε Move 3α** | AST grounding at compile-back; multi-arm bake-off (qwen / granite / starcoder local + devstral cloud deferred) | 🟡 active — Arm A confirms H1 on 6/6; Arm B HW-vetoed; Arm C-local contract-violation; Arm A0 control landed — grounding contributes Δ = +0.355 mean Jaccard over a strong qwen-7b + safety-net baseline (0.226 → 0.581), §3.1 circularity worry resolved as "real lift, not artefact" |
 | **ε close** | Land Arm A0 + cloud Arm C (~$5–10 GPU rental), recalibrate hypotheses, upgrade `MATHEMATICAL_CLAIMS.md` §3.10 adjoint T4 → T2 | 🟡 pending Arm A0 + cloud Arm C |
 | ζ | Release + Open-Prompt seeds (sign, verify-published, replay) | pending |
 
@@ -35,7 +35,7 @@ hardening sweep §3.1–§3.15) is closed.
 
 ### Phase ε remaining
 
-- 🟡 **Arm A0 control** (in flight 2026-05-24). qwen + safety-net **without** `--ast-grounding`. Isolates grounding's marginal contribution from the metric-circularity confound flagged in [`MILESTONE_REVIEW_2026-05-24.md`](legend/calibrations/MILESTONE_REVIEW_2026-05-24.md) §3.1. ~1.5 h, $0.
+- ✅ **Arm A0 control** landed 2026-05-24 (mean Jaccard 0.226; grounding Δ = +0.355). §3.1 circularity worry resolved as "real lift, not artefact". Promoted to bootstrap history.
 - 🟡 **Arm C-cloud — `devstral-small-2:24b`** on rented GPU (A10/L4 class, ~$5–10 for the full perimeter). The clean H3 test; local 8 GB Mac is infeasible.
 - 🟡 **Behaviour-axis checker.** Cartography matrix currently fills only `structural` (+ `cost`); `contract` / `behaviour` / `intent` are explicit no-data. Behaviour is the next-highest-value checker because it is **orthogonal to AST grounding** and so immune to §3.1 circularity.
 - 🟡 **`onto legend bakeoff-synthesis` CLI.** Library + renderer ship; cross-arm synthesis still runs through a hand-rolled driver (`scripts/run-3a-bakeoff-synthesis.ts`). Verb removes the last manual cherry-picking surface.
@@ -86,4 +86,4 @@ Detail per PR is in [`RELEASE_NOTES.md`](RELEASE_NOTES.md); the table below is a
 
 ---
 
-*Last refresh: **2026-05-24**. Phase ε is mid-flight; Arm A0 control is in flight; cloud Arm C is the remaining gate for a clean ε close and the §3.10 adjoint T4 → T2 upgrade. The roadmap is kept in sync with `main` — when a follow-up ships, promote it out of the open list and into the bootstrap-history table or `RELEASE_NOTES.md`.*
+*Last refresh: **2026-05-24** (late). Phase ε is mid-flight; Arm A0 control landed (grounding Δ = +0.355 mean Jaccard, circularity worry resolved); cloud Arm C is the remaining gate for a clean ε close and the §3.10 adjoint T4 → T2 upgrade. The roadmap is kept in sync with `main` — when a follow-up ships, promote it out of the open list and into the bootstrap-history table or `RELEASE_NOTES.md`.*

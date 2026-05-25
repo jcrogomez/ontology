@@ -4,7 +4,7 @@
 > Add a line here when you land a new calibration; one-liner first,
 > link second. If you're new to the project, start with §0.*
 
-**Maintained:** 2026-05-24 (initial cut covering 33 files).
+**Maintained:** 2026-05-24 (initial cut covering 33 files; +1 Arm A0 control landed same day).
 **Why this exists:** the calibration corpus grew past 30 files and a
 newcomer was forced to `grep -r SELF_INGEST` to reconstruct the
 narrative. Flagged in `MILESTONE_REVIEW_2026-05-24.md` §6 as a Baja
@@ -84,8 +84,8 @@ devstral cloud deferred).
 - [`SELF_INGEST_EPSILON_3A_2026-05-19_ARM_A.md`](./SELF_INGEST_EPSILON_3A_2026-05-19_ARM_A.md) — `qwen2.5-coder:7b`. 125 nodes, mean Jaccard 0.581, structural honesty 0.496, 0 unrecoverable. Carries a 2026-05-24 post-publication addendum documenting the silent 125/126 perimeter under-count (node_0094) and the structural fixes that closed it.
 - [`SELF_INGEST_EPSILON_3A_2026-05-19_ARM_B.md`](./SELF_INGEST_EPSILON_3A_2026-05-19_ARM_B.md) — `granite4.1:8b`. Hardware-vetoed (124/125 unrecoverable, `fetch failed`); a proper Arm B comparison still requires cloud / ≥16 GB RAM.
 - [`SELF_INGEST_EPSILON_3A_2026-05-19_ARM_C_LOCAL.md`](./SELF_INGEST_EPSILON_3A_2026-05-19_ARM_C_LOCAL.md) — `starcoder2:7b` (substitute for the deferred devstral-small-2:24b cloud arm). 54% unrecoverable; coding-base-at-7B does not satisfy the MANDATORY EXPORTS contract.
-- [`SELF_INGEST_EPSILON_3A_2026-05-19_SYNTHESIS.md`](./SELF_INGEST_EPSILON_3A_2026-05-19_SYNTHESIS.md) — cross-arm bake-off synthesis (driver `scripts/run-3a-bakeoff-synthesis.ts`). H1 decision-tree gate fires "partial signal" (Arm A clears, B/C-local don't).
-- **In flight (2026-05-24):** Arm A0 control — qwen 7b + safety-net **without** `--ast-grounding`, identical perimeter; isolates the marginal contribution of grounding from the metric-circularity confound surfaced in [`MILESTONE_REVIEW_2026-05-24.md`](./MILESTONE_REVIEW_2026-05-24.md) §3.1.
+- [`SELF_INGEST_EPSILON_3A_2026-05-19_ARM_A0_CONTROL.md`](./SELF_INGEST_EPSILON_3A_2026-05-19_ARM_A0_CONTROL.md) — Arm A0 control (landed 2026-05-24): `qwen2.5-coder:7b` + safety-net **without** `--ast-grounding`, identical perimeter to Arm A. Mean Jaccard 0.226, structural honesty 0.332, exportRecovery 25.6%, 0 unrecoverable. Decomposes Arm A's 28× margin over the δ' floor into ~0.205 baseline-qwen-7b + ~0.355 grounding-intervention lift; resolves the §3.1 circularity worry as "real lift, not artefact".
+- [`SELF_INGEST_EPSILON_3A_2026-05-19_SYNTHESIS.md`](./SELF_INGEST_EPSILON_3A_2026-05-19_SYNTHESIS.md) — cross-arm bake-off synthesis over 4 arms (driver `scripts/run-3a-bakeoff-synthesis.ts`). H1 anyPass=true, allPass=false (A and A0 both clear 0.1 floor; B and C-local don't). Per-mode failure deltas decompose the grounding contribution exactly.
 
 ---
 
