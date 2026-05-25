@@ -19,6 +19,17 @@
 compilable subset of the perimeter. Sufficient to lift the matrix from
 **1 of 5** to **2 of 5** columns; not sufficient to claim full
 behavioural fidelity.
+
+> **Spelling note.** Prose in this spec (and the rest of the docs) uses
+> British **`behaviour`** — the project convention. Code identifiers
+> use American **`behavior`** to match what already shipped in
+> `src/runtime/legend/matrix.ts`: `HONESTY_AXES` declares `behavior`
+> and `MatrixCell.behavior` / `AxisHonesty.behavior` are American.
+> When this spec names a code-level thing (CLI flag, type, function,
+> matrix key, fixture directory) it uses the American form; in prose
+> it uses British. An earlier draft was inconsistent — the false
+> claim that `HONESTY_AXES` declares `behaviour` was a spelling drift,
+> not a missing wiring. The axis is wired; it's spelled `behavior`.
 **Companion docs:** `legend/calibrations/CALIBRATION_LOG.md` §1 for
 the cartography history; `MATHEMATICAL_CLAIMS.md` §3.10 for the
 adjoint claim that this checker contributes to lifting T4 → T2.
@@ -44,7 +55,7 @@ and compare the outputs.
 | At least one artefact fails to compile / load | `untested` |
 | No registered call-sites for this node | `untested` |
 
-The matrix axis `behaviour` was already wired into the matrix
+The matrix axis `behavior` was already wired into the matrix
 infrastructure (`src/runtime/legend/matrix.ts`); v0 just fills it with
 real data instead of always reporting `untested`.
 
@@ -74,11 +85,11 @@ operationalise; defer to v1.
 
 ### 3.1 Call-site fixtures
 
-A new directory `tests/behaviour-fixtures/` holds per-node call-site
+A new directory `tests/behavior-fixtures/` holds per-node call-site
 manifests:
 
 ```
-tests/behaviour-fixtures/
+tests/behavior-fixtures/
   node_0001.fixture.ts   // exports: name + inputs + expected output OR oracle source
   node_0007.fixture.ts
   ...
@@ -87,7 +98,7 @@ tests/behaviour-fixtures/
 Each fixture exports an array of cases:
 
 ```ts
-export const cases: BehaviourCase[] = [
+export const cases: BehaviorCase[] = [
   {
     name: "writeArtifactPending — happy path",
     setup: () => ({ path: tmpPath(), content: "foo" }),
@@ -104,19 +115,19 @@ export const cases: BehaviourCase[] = [
 most likely to compile cleanly under regen). NOT all 125 — v0's value
 is the column, not the saturation.
 
-### 3.2 Runner — `verify-homeomorphism --behaviour-check`
+### 3.2 Runner — `verify-homeomorphism --behavior-check`
 
 New flag on the existing CLI. Pseudocode:
 
 ```ts
 for (const node of candidates) {
   const fixture = loadFixture(node.id);
-  if (!fixture) { tagBehaviour(node, "untested"); continue; }
+  if (!fixture) { tagBehavior(node, "untested"); continue; }
 
   const srcMod   = await importIsolated(node.sourcePath);
   const regenMod = await importIsolated(regenPath(node));
   if (!srcMod.ok || !regenMod.ok) {
-    tagBehaviour(node, "untested");
+    tagBehavior(node, "untested");
     continue;
   }
 
@@ -130,7 +141,7 @@ for (const node of candidates) {
       allPass = false; break;
     }
   }
-  tagBehaviour(node, allPass ? "pass" : "fail");
+  tagBehavior(node, allPass ? "pass" : "fail");
 }
 ```
 
@@ -141,13 +152,13 @@ a wall-clock + memory cap (same pattern as compile-side
 ### 3.3 Matrix axis wiring
 
 `src/runtime/legend/matrix.ts:HONESTY_AXES` already declares
-`behaviour`. The checker just supplies values; the existing
+`behavior`. The checker just supplies values; the existing
 `meanHonesty` computation folds them into the per-axis honesty
 report. **One-line change** in `aggregateByAxis` to count
 `pass` / `fail` / `untested` per arm.
 
 Per-axis honesty formula (matches existing convention in the docs):
-`behaviour = pass→1, fail→0, untested→null` (excluded from mean).
+`behavior = pass→1, fail→0, untested→null` (excluded from mean).
 
 ## 4. Pre-registered v0 predictions (when shipped)
 
@@ -190,10 +201,10 @@ the intervention earns more credit than current Move 3α data shows.
 | Module / file | Change |
 |---|---|
 | `src/runtime/legend/verify-homeomorphism.ts` | Add `BehaviourCheckResult` to per-node result shape; thread through `compareFiles`. |
-| `src/commands/verify/homeomorphism.ts` | Add `--behaviour-check` flag; load fixtures from `tests/behaviour-fixtures/`; invoke runner per candidate. |
-| `src/runtime/legend/matrix.ts` | `aggregateByAxis` already counts `behaviour`; ensure the new `pass` / `fail` / `untested` strings are accepted. |
-| `tests/behaviour-fixtures/` | New directory. v0 ships with ≥ 20 fixtures targeting Arm A's high-Jaccard cohort. |
-| `tests/behaviour-checker.test.ts` | New file. Tests: (a) fixture-less node → `untested`; (b) src + regen identity → `pass`; (c) deliberate behavioural divergence → `fail`; (d) compile failure on regen → `untested`. |
+| `src/commands/verify/homeomorphism.ts` | Add `--behavior-check` flag; load fixtures from `tests/behavior-fixtures/`; invoke runner per candidate. |
+| `src/runtime/legend/matrix.ts` | `aggregateByAxis` already counts `behavior`; ensure the new `pass` / `fail` / `untested` strings are accepted. |
+| `tests/behavior-fixtures/` | New directory. v0 ships with ≥ 20 fixtures targeting Arm A's high-Jaccard cohort. |
+| `tests/behavior-checker.test.ts` | New file. Tests: (a) fixture-less node → `untested`; (b) src + regen identity → `pass`; (c) deliberate behavioural divergence → `fail`; (d) compile failure on regen → `untested`. |
 
 Estimated v0 effort: ~4–6 h (runner + matrix wiring + 20 fixtures +
 tests).
