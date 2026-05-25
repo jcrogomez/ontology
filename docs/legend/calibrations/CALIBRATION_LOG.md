@@ -79,7 +79,7 @@ The current multi-arm bake-off. Intervention: AST-extracted
 prompt. Arms vary model only (qwen / granite / starcoder local;
 devstral cloud deferred).
 
-- [`SELF_INGEST_EPSILON_3A_2026-05-19_HYPOTHESIS.md`](./SELF_INGEST_EPSILON_3A_2026-05-19_HYPOTHESIS.md) — pre-registered hypotheses H1–H6, decision tree, Candados.
+- [`SELF_INGEST_EPSILON_3A_2026-05-19_HYPOTHESIS.md`](./SELF_INGEST_EPSILON_3A_2026-05-19_HYPOTHESIS.md) — pre-registered hypotheses H1–H6, decision tree, Candados. **Carries a 2026-05-24 addendum** that recalibrates H1 → H1' (against Arm A0's 0.226 measured baseline) and H3 → H3' (against Arm A's 0.581 grounded incumbent) for any new arm launched from 2026-05-24 onward (notably Arm C-cloud). Original H1–H5 stays as the original pre-registration; recalibrated H1'/H3' carries the data-grounded floors and an updated post-Arm-C decision tree.
 - [`SELF_INGEST_EPSILON_3A_TODO.md`](./SELF_INGEST_EPSILON_3A_TODO.md) — **running document**; canonical resume point. Updated continuously.
 - [`SELF_INGEST_EPSILON_3A_2026-05-19_ARM_A.md`](./SELF_INGEST_EPSILON_3A_2026-05-19_ARM_A.md) — `qwen2.5-coder:7b`. 125 nodes, mean Jaccard 0.581, structural honesty 0.496, 0 unrecoverable. Carries a 2026-05-24 post-publication addendum documenting the silent 125/126 perimeter under-count (node_0094) and the structural fixes that closed it.
 - [`SELF_INGEST_EPSILON_3A_2026-05-19_ARM_B.md`](./SELF_INGEST_EPSILON_3A_2026-05-19_ARM_B.md) — `granite4.1:8b`. Hardware-vetoed (124/125 unrecoverable, `fetch failed`); a proper Arm B comparison still requires cloud / ≥16 GB RAM.

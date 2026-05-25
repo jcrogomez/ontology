@@ -277,3 +277,124 @@ The `.ontology.self-ingest-epsilon-3a-*` run dirs are gitignored per the existin
 ```
 
 Move 4 uses Opus 4.7, not Sonnet — see [[feedback_sota_ceiling_use_opus]].
+
+---
+
+## Addendum 2026-05-24 — falsifier recalibration post-A0
+
+> *The original H1–H4 falsifiers in this document were calibrated
+> against the **δ' baseline** (qwen-3b without safety-net, mean
+> Jaccard 0.021). After Arm A landed (2026-05-23) and Arm A0
+> control landed (2026-05-24), the H1 falsifier ceased to
+> discriminate — A0 trivially passes 0.226 ≥ 0.1, and so does A.
+> Per project memory `feedback_h1_floor_recalibration`, falsifier
+> thresholds must reference the strongest current control arm, not
+> the original baseline. The recalibrated falsifiers below apply to
+> **any new arm launched from 2026-05-24 onward**, including Arm
+> C-cloud (`devstral-small-2:24b`). The original §H1–§H5 stay in git
+> history as the original pre-registration and are confirmed
+> 6-of-6 for Arm A (see `SELF_INGEST_EPSILON_3A_2026-05-19_ARM_A.md`
+> post-publication addendum for the recalibrated reading).*
+
+**Strongest current controls** (measured, not predicted):
+
+| Arm | Mean Jaccard | Mean LoC dist | Structural honesty | ExportRecovery (micro) | Missing exports | Hallucinated exports |
+|---|---:|---:|---:|---:|---:|---:|
+| δ' (qwen-3b, no safety-net) | 0.021 | — | 0.246 | n/a (≤ 0.30 retro) | 488 | — |
+| A0 (qwen-7b + safety-net, **no grounding**) | **0.226** | 0.563 | **0.332** | **25.6 %** | 297 | 16 |
+| A (qwen-7b + safety-net + grounding) | **0.581** | 0.589 | **0.496** | **68.6 %** | 106 | 116 |
+
+A0 is the **floor any new arm must clear to count as informative**.
+A is the **target any new arm must beat to count as a promotion
+candidate**. Both bars are now data-grounded, not modelled.
+
+### H1' — recalibrated "intervention not inert" falsifier
+
+For any new arm X (e.g., Arm C-cloud), the H1' falsifier replaces the
+original H1:
+
+| Metric | A0 (control) | New-arm-X falsifier | Reading if missed |
+|---|---:|---|---|
+| Mean Jaccard | 0.226 | **< 0.30** (A0 + 0.07 ≈ 1σ over noise) | Arm X adds nothing measurable over the strong qwen-7b baseline |
+| Structural honesty | 0.332 | **< 0.40** (A0 + 0.07) | Same reading |
+| ExportRecovery (micro) | 25.6 % | **< 40 %** (A0 + ~14 pp) | Same reading |
+| Missing exports | 297 | **> 250** (A0 − 47, i.e., the arm fails to recover at least ~15 % more exports than the no-grounding control) | Same reading |
+| `unrecoverable` | 0 | **> 6** (more than A0's distribution allows) | Arm X regresses on stability vs the qwen control |
+
+If any falsifier fires for Arm X, the arm did not earn its cost; the
+right next move is **not** to launch another arm but to interrogate
+why the intervention failed at this tier.
+
+### H3' — recalibrated "coding-spec earns its premium" falsifier (Arm C-cloud)
+
+H3 (original) predicted Arm C exportRecovery ≥ 0.60 with falsifier
+< 0.50 — both numbers **below** Arm A's actual 68.6 %, so they no
+longer discriminate "coding-spec transfers" from "the model just
+matches the strong incumbent". Recalibrate:
+
+| Metric | A (grounded incumbent) | Arm C-cloud target | Falsifier |
+|---|---:|---|---|
+| Mean Jaccard | 0.581 | **≥ 0.65** (A + 0.07; A0 + 0.42) | < A's 0.581 → coding-spec does not transfer; H3 falsified independent of H4 |
+| ExportRecovery (micro) | 68.6 % | **≥ 75 %** (A + 6.4 pp) | < A's 68.6 % → coding-spec earns no premium over qwen + grounding |
+| Files Jaccard ≥ 0.5 | 83 / 125 | **≥ 95** (A + 12) | < 83 → no decisive lift; ties Arm A |
+| `unrecoverable` | 0 | **= 0** | > 0 → Devstral regresses on stability |
+| Hallucinated exports | 116 | **≤ 80** (A − 36; ~30 % less over-stuffing) | > 130 → Devstral inherits the over-stuffing problem worse |
+
+The hallucination falsifier is new and important: Arm A's 7×
+over-stuffing of exports (16 → 116, A0 → A) is a real cost of the
+grounding intervention; a coding-specialised model should be able to
+satisfy the contract block without inventing exports. If Devstral
+matches or exceeds A's over-stuffing rate while only modestly lifting
+Jaccard, the verdict is "Devstral pays for a 24B model to get
+qwen-7b's behaviour" — no promotion.
+
+### H4 — promotion criterion (unchanged from original)
+
+H4's "Devstral leads qwen by ≥ 0.10 mean Jaccard + 0.15 export-recovery
+to promote" stays as-is. The threshold is against Arm A (the grounded
+incumbent), which is the right comparator for promotion (we want
+Devstral to beat the best local combo, not the no-grounding control).
+
+The new wrinkle: a 0.10 Jaccard lift over A = 0.681 mean Jaccard for
+Arm C-cloud. That's a high bar; if H4 fires, the cartography claim
+becomes substantially stronger because it would be the **first arm
+that simultaneously beats A on Jaccard AND avoids A's hallucination
+cost**.
+
+### Pre-registered decision tree post-Arm-C-cloud
+
+```
+                          Arm C-cloud result
+                                 │
+   ┌─────────────────────────────┼─────────────────────────────┐
+   │                             │                             │
+H1' confirmed                 H1' partial                  H1' falsified
+(Arm C clears                 (clears some,                (misses on all)
+ A0 by margins                 misses others)                    │
+ on all metrics)                    │                            ▼
+   │                                ▼                       Arm C does NOT
+   ▼                           Inspect per-mode             earn a slot
+H3'?  (does C earn its         deltas; partial signal.      in the matrix.
+premium over grounded A?)      Likely "grounding +          Coding-spec at
+   │                            model both contribute,      24B fails to
+   ├── confirmed ──► H4 fires? safety-net is the floor".    transfer; the
+   │                  │                                     bottleneck is
+   │              ┌───┴───┐                                 the prompt /
+   │            yes      no                                  representation,
+   │             │        │                                 not the model.
+   │             ▼        ▼                                 Move 4 (Opus
+   │       Devstral   No promotion;                         ceiling) on A's
+   │       promotes   matrix records                        graph is the
+   │       per H4.    "coding-spec adds                     next experiment.
+   │                  marginal lift only".
+   │
+   └── falsified ──► matrix records "coding-spec adds nothing beyond
+                     the strong qwen + grounding baseline".
+                     Cost-without-benefit at this perimeter; no promotion.
+```
+
+The §3.10 adjoint claim T4 → T2 upgrade (`MATHEMATICAL_CLAIMS.md`)
+is gated on at least H1' confirming for Arm C-cloud **and** the
+behaviour-axis checker landing per [[cartography-matrix-status]]
+(otherwise the cartography matrix is still 1 of 5 columns and the
+"orthogonal axes" claim is unearned).
