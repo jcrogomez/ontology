@@ -1,0 +1,105 @@
+{
+  "name": "imo-verify-refine",
+  "description": "Verify-refine workflow modelled on Huang & Yang 2025 (arXiv:2507.15855v4) Figure 1. Generate → improve → verify → loop through correction OR accept after 5 consecutive passes OR reject after 10 steps of unbroken major issues. Model-agnostic by construction: the per-node prompts work against any provider the Ontology dispatcher supports (mock for graph-shape testing, ollama for local, anthropic for production).",
+  "entry": "step1_initial_generation",
+  "nodes": [
+    {
+      "id": "step1_initial_generation",
+      "kind": "generator",
+      "prompt": "You are a careful mathematical solver. Produce an initial complete attempt at solving the problem stated in INPUT. Use rigorous reasoning; show your work step-by-step; state every non-trivial intermediate claim with a short justification. End with a clearly labelled final answer."
+    },
+    {
+      "id": "step2_self_improvement",
+      "kind": "generator",
+      "prompt": "You are reviewing your own draft solution. Take the prior solution from INPUT and produce an IMPROVED version that: (a) fixes any logical gaps, (b) tightens notation, (c) adds missing justifications, (d) preserves the original mathematical argument unless you have a strong reason to change it. Return the full improved solution, not just edits."
+    },
+    {
+      "id": "step3_verification",
+      "kind": "verifier",
+      "verifierSchema": "with-severity",
+      "prompt": "You are a strict mathematical referee. Read the candidate solution in INPUT and decide whether it is correct AND complete. Respond with ONLY a single JSON object matching this shape:\n\n{\n  \"verdict\": \"pass\" | \"fail\",\n  \"severity\": \"minor\" | \"major\",\n  \"issues\": [\"...\", \"...\"]\n}\n\nVerdict semantics:\n- \"pass\" means the solution is correct and complete; \"fail\" means at least one step is wrong, missing, or unjustified.\nSeverity (only meaningful for fail):\n- \"minor\" — local issues such as a typo, an unjustified algebraic step that is easily fixed, an off-by-one in a small case enumeration.\n- \"major\" — a structural issue such as an incorrect final answer, a load-bearing claim with no justification, a misread of the problem statement, or a logical gap that breaks the proof.\nIssues:\n- An array of short strings naming each issue you found. Empty array when verdict is \"pass\".\n\nRespond with the JSON object only. Do not wrap it in prose or code fences."
+    },
+    {
+      "id": "step3b_revisit",
+      "kind": "generator",
+      "passThrough": true
+    },
+    {
+      "id": "step4_bug_report_review",
+      "kind": "generator",
+      "prompt": "The verifier flagged issues with the prior solution. The INPUT below contains the verifier's structured critique (JSON object with verdict, severity, and issues). Analyse the issues, decide which are real bugs versus surface issues, and produce a concise BUG REPORT enumerating the load-bearing problems the corrector should address. Order them by priority (most critical first). Do NOT attempt to fix anything yourself; only enumerate."
+    },
+    {
+      "id": "step5_correction",
+      "kind": "generator",
+      "prompt": "You are correcting a flawed mathematical solution. The INPUT below contains the bug report from the prior step. Apply the corrections implied by the bug report to the solution as you remember it from the conversation context. Preserve correct parts of the prior argument; rewrite only what needs rewriting. Return the full corrected solution."
+    },
+    {
+      "id": "step6_accept",
+      "kind": "terminal",
+      "terminalVerdict": "accept",
+      "metadata": {
+        "reason": "5 consecutive verification passes"
+      }
+    },
+    {
+      "id": "step6_prime_reject",
+      "kind": "terminal",
+      "terminalVerdict": "reject",
+      "metadata": {
+        "reason": "10 consecutive major-issue verifications with no intervening pass"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "step1_initial_generation",
+      "to": "step2_self_improvement",
+      "type": "feeds"
+    },
+    {
+      "from": "step2_self_improvement",
+      "to": "step3_verification",
+      "type": "feeds"
+    },
+    {
+      "from": "step3_verification",
+      "to": "step6_accept",
+      "type": "branches_on",
+      "predicate": "consecutive(verdict == \"pass\", 5)"
+    },
+    {
+      "from": "step3_verification",
+      "to": "step6_prime_reject",
+      "type": "branches_on",
+      "predicate": "since_last(verdict == \"pass\") >= 10 && severity == \"major\""
+    },
+    {
+      "from": "step3_verification",
+      "to": "step3b_revisit",
+      "type": "branches_on",
+      "predicate": "verdict == \"pass\""
+    },
+    {
+      "from": "step3_verification",
+      "to": "step4_bug_report_review",
+      "type": "branches_on",
+      "predicate": "verdict == \"fail\""
+    },
+    {
+      "from": "step3b_revisit",
+      "to": "step3_verification",
+      "type": "feeds"
+    },
+    {
+      "from": "step4_bug_report_review",
+      "to": "step5_correction",
+      "type": "feeds"
+    },
+    {
+      "from": "step5_correction",
+      "to": "step3_verification",
+      "type": "feeds"
+    }
+  ]
+}

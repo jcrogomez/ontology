@@ -1,0 +1,1 @@
+Find all positive integers n such that n^2 + 1 divides n + 1.

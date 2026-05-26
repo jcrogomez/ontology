@@ -48,6 +48,7 @@ import { modelDoctorCommand } from "./commands/model/doctor.js";
 import { modelListCommand } from "./commands/model/list.js";
 import { registerQueryCommand } from "./commands/query/index.js";
 import { verifyHomeomorphismCommand } from "./commands/verify/homeomorphism.js";
+import { workflowRunCommand } from "./commands/workflow/run.js";
 import { openCommand } from "./commands/open.js";
 import { projectsListCommand } from "./commands/projects/list.js";
 import { projectsForgetCommand } from "./commands/projects/forget.js";
@@ -963,6 +964,30 @@ program
       await verifyHomeomorphismCommand(focal, options);
     } catch (err: unknown) {
       console.error(`✖ Error during verify-homeomorphism: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+const workflowCmd = program
+  .command("workflow")
+  .description("Phase ζ — workflow-runtime commands (load + execute typed-node workflow graphs with branches_on edges, structured verifier verdicts, and loop-with-stopping-criterion semantics). See docs/legend/WORKFLOW_RUNTIME_SPEC.md.");
+
+workflowCmd
+  .command("run <graph>")
+  .description("Run a workflow graph against an input file. Walks the graph node-by-node, dispatches each generator/verifier through the existing LLM dispatcher (model-agnostic), branches on verifier verdicts via the v0 predicate DSL, and emits a trace + accept/reject result.")
+  .requiredOption("--input <path>", "Path to the input file whose contents seed the workflow's entry node.")
+  .option("--max-steps <n>", "Maximum total node visits before the workflow rejects with `step_budget_exhausted`. Default 100.", (v) => parseInt(v, 10))
+  .option("--trace <path>", "Write the full JSON trace to this path (in addition to the human-readable summary on stdout).")
+  .option("--provider <provider>", "LLM provider override for every dispatch (mock, ollama, or anthropic). When omitted, per-node `model` fields and the dispatcher's task-default routing decide.")
+  .option("--model <model>", "Model override for every dispatch (overrides per-node `model` fields).")
+  .option("--ollama-host <host>", "Host for Ollama provider.")
+  .option("--dry-run", "Validate the graph + input and emit a canned trace without any LLM dispatch. Useful for testing graph shapes before paying for tokens.")
+  .option("--json", "Output the result as JSON to stdout.")
+  .action(async (graph, rawOptions) => {
+    try {
+      await workflowRunCommand(graph, rawOptions);
+    } catch (err: unknown) {
+      console.error(`✖ Error during workflow run: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
