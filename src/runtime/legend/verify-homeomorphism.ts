@@ -319,6 +319,16 @@ export interface AggregateReport {
    * `matrix` is undefined.
    */
   failureModes?: import("./failure-mode-tagger.js").FailureModeAggregate;
+  /**
+   * Phase ε behaviour-axis checker (v0): per-node behaviour check
+   * results, one entry per node the runner produced evidence for.
+   * Nodes with an `unrecoverable` verdict are absent (no regen exists
+   * to import); nodes that ran without a fixture appear with
+   * `verdict: "untested"` and `reason: "no_fixture"`. Undefined when
+   * --behavior-check was not passed. See
+   * docs/legend/BEHAVIOUR_AXIS_CHECKER_SPEC.md §3.2.
+   */
+  behaviorResults?: import("./behavior-checker.js").BehaviorCheckResult[];
 }
 
 export function emptyVerdictCounts(): Record<HomeomorphismVerdict, number> {

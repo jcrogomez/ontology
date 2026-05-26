@@ -945,6 +945,9 @@ program
   .option("--ast-grounding", "Phase ε Move 3α: append a deterministic MANDATORY EXPORTS section (from the source AST) to the code_sketch system prompt for every compile-back dispatch, and fold the grounding identity into the run-cache contextHash. Off by default — opt in to test the AST-grounding lift independently of model swaps; pre-3α calibrations and Sonnet ceiling probes choose to include or exclude this independently.")
   .option("--reps <n>", "Phase ε design §4.2: run N compile-back dispatches per node and aggregate the per-rep metrics (default 1 — point estimate). N > 1 defangs single-draw Jaccard variance (γ observed 1.0 → 0.0 on the same node across two draws), at the cost of N× LLM spend. Use before any Opus 4.7 ceiling probe to make the verdict robust.", (v) => parseInt(v, 10))
   .option("--aggregator <mode>", "Aggregator over per-rep numeric metrics when --reps > 1: 'median' (default — variance-resistant for the H1 floor read) or 'mean'. Ignored when --reps is 1.")
+  .option("--behavior-check", "Phase ε behaviour-axis checker (v0): for each node, import the source file and the regen, run the registered fixture's call-sites against both, and override the matrix's `behavior` axis with the measured pass/fail/untested state. Requires --matrix. See docs/legend/BEHAVIOUR_AXIS_CHECKER_SPEC.md.")
+  .option("--behavior-fixtures-dir <path>", "Override the fixtures directory (default tests/behavior-fixtures/). Path is relative to cwd or absolute. Used with --behavior-check.")
+  .option("--behavior-timeout-ms <n>", "Per-case wall-clock cap for the behaviour checker. Clamped to [100, 60000]. Default 5000.", (v) => parseInt(v, 10))
   .option("--no-lock", "Skip the .ontology/.lock advisory lock — see compile run for semantics.")
   .option("--json", "Output results in JSON format.")
   .action(async (focal, rawOptions) => {

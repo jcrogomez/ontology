@@ -221,22 +221,39 @@ export interface VerdictToCellInputs {
   /** node.literal flag from the canonical state. Undefined → false. */
   literal: boolean | undefined;
   cost: MatrixCost;
+  /**
+   * Phase ε behaviour-axis checker (v0) supplies a measured state per
+   * node. When provided, it replaces the verdict-derived default
+   * `untested`. Reserved guard: an unrecoverable verdict keeps the
+   * `not-applicable` state regardless of override — the regen artifact
+   * does not exist, so no runtime equivalence can have been measured.
+   * See docs/legend/BEHAVIOUR_AXIS_CHECKER_SPEC.md §3.3.
+   */
+  behaviorOverride?: BehaviorState;
 }
 
 // Builds the six-axis cell from a verdict + node metadata + cost. The
 // unmeasured axes are explicit:
 //   - contract: "not-measured" (no contract checker in the pilot)
 //   - behavior: "untested" (or "not-applicable" when compile-back never
-//     produced an artifact)
+//     produced an artifact); a measured `behaviorOverride` replaces the
+//     default once the behaviour-axis checker runs
 //   - intent: "not-reviewed" (or "needs-human" when the verdict is
 //     unrecoverable — a human needs to decide what to do with that file)
 export function verdictToMatrixCell(inputs: VerdictToCellInputs): MatrixCell {
   const structural = verdictToStructural(inputs.verdict);
   const isUnrecoverable = inputs.verdict === "unrecoverable";
+  // Unrecoverable nodes never get a runtime equivalence reading —
+  // there is no regen artifact to import. The override is honoured
+  // only when the regen actually exists (every non-unrecoverable
+  // verdict guarantees a regen path on disk).
+  const behavior: BehaviorState = isUnrecoverable
+    ? "not-applicable"
+    : (inputs.behaviorOverride ?? "untested");
   return {
     contract: "not-measured",
     structural,
-    behavior: isUnrecoverable ? "not-applicable" : "untested",
+    behavior,
     intent: isUnrecoverable ? "needs-human" : "not-reviewed",
     literalRequired: inputs.literal === true ? "true" : "false",
     cost: inputs.cost,
@@ -420,11 +437,22 @@ export function buildPerNodeMatrix(args: {
    * into the final frontier alongside tagger + verdict-derived tags.
    */
   extraDerivedTags?: readonly FrontierAttribute[];
+  /**
+   * Phase ε behaviour-axis checker (v0) override. When supplied, the
+   * cell's `behavior` axis is set to this measured state instead of
+   * the verdict-derived default `untested`. See `verdictToMatrixCell`
+   * for the unrecoverable-verdict guard. Undefined when the checker
+   * was not run (legacy verify-homeomorphism --matrix call).
+   */
+  behaviorOverride?: BehaviorState;
 }): PerNodeMatrix {
   const cell = verdictToMatrixCell({
     verdict: args.verdict,
     literal: args.literal,
     cost: args.cost,
+    ...(args.behaviorOverride !== undefined
+      ? { behaviorOverride: args.behaviorOverride }
+      : {}),
   });
   const derived = verdictDerivedTags(cell);
   const union = new Set<FrontierAttribute>([

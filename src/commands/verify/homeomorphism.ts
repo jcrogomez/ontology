@@ -73,6 +73,12 @@ import {
   type FailureModeAggregate,
 } from "../../runtime/legend/failure-mode-tagger.js";
 import { aggregateRepResults } from "../../runtime/legend/reps-aggregator.js";
+import {
+  behaviorVerdictToMatrixState,
+  loadFixture,
+  runBehaviorCheck,
+  type BehaviorCheckResult,
+} from "../../runtime/legend/behavior-checker.js";
 
 // `onto verify-homeomorphism` — Project Legend δ-2.
 //
@@ -169,6 +175,20 @@ export interface VerifyHomeomorphismOptions {
   // (each rep is a fresh dispatch attempt, not a fresh cache write).
   reps?: number;
   aggregator?: "median" | "mean";
+  // Phase ε behaviour-axis checker (v0). When set, loads per-node
+  // fixtures from `behaviorFixturesDir` (default `tests/behavior-
+  // fixtures/`), runs each fixture's cases against the source artefact
+  // and the regen, and overrides the matrix cell's `behavior` axis
+  // with the measured pass/fail/untested state. Requires --matrix;
+  // off by default. See docs/legend/BEHAVIOUR_AXIS_CHECKER_SPEC.md.
+  behaviorCheck?: boolean;
+  // Override the fixtures directory. Path is relative to cwd or
+  // absolute. Useful for tests that want to point at an ad-hoc fixture
+  // set without touching the canonical tests/behavior-fixtures/ tree.
+  behaviorFixturesDir?: string;
+  // Per-case wall-clock cap for the behaviour checker. Clamped to
+  // [100ms, 60s] inside the runner. Default 5s.
+  behaviorTimeoutMs?: number;
   json?: boolean;
 }
 
@@ -362,6 +382,74 @@ export async function verifyHomeomorphismCommand(
     nodeId: string;
     modes: FailureMode[];
   }> = [];
+  // Phase ε behaviour-axis checker (v0): when --behavior-check is set,
+  // pre-run the per-node checker so the matrix-build loop below has
+  // measured states ready to inject. Behaviour-check requires --matrix:
+  // without it the override has nowhere to land. Tracked separately
+  // so the per-node result can be surfaced in the JSON report.
+  const behaviorResults: Map<string, BehaviorCheckResult> = new Map();
+  if (options.behaviorCheck) {
+    if (!options.matrix) {
+      fail(
+        "--behavior-check requires --matrix (the behaviour axis lives on the matrix cell).",
+        options.json,
+      );
+      return;
+    }
+    const fixturesDir = path.resolve(
+      cwd,
+      options.behaviorFixturesDir ?? "tests/behavior-fixtures",
+    );
+    if (!fs.existsSync(fixturesDir)) {
+      // Empty directory → every node will resolve to fixture-missing
+      // → `untested`. That is a valid signal (the checker is wired but
+      // nothing was registered yet) but a non-existent directory is
+      // more likely a typo, so we surface it explicitly.
+      fail(
+        `--behavior-check: fixtures directory not found: ${fixturesDir}`,
+        options.json,
+      );
+      return;
+    }
+    for (const r of results) {
+      // Unrecoverable verdicts never get a regen artefact on disk, so
+      // the checker has nothing to import. Skip — the cell builder
+      // will keep the `not-applicable` state for these nodes.
+      if (r.verdict === "unrecoverable" || !r.regenPath) continue;
+      let fixtureLoad: Awaited<ReturnType<typeof loadFixture>>;
+      try {
+        fixtureLoad = await loadFixture(fixturesDir, r.nodeId);
+      } catch (err) {
+        behaviorResults.set(r.nodeId, {
+          nodeId: r.nodeId,
+          verdict: "untested",
+          reason: `fixture_load_failed: ${errorMessage(err)}`,
+          durationMs: 0,
+        });
+        continue;
+      }
+      if (!fixtureLoad) {
+        behaviorResults.set(r.nodeId, {
+          nodeId: r.nodeId,
+          verdict: "untested",
+          reason: "no_fixture",
+          durationMs: 0,
+        });
+        continue;
+      }
+      const checkResult = await runBehaviorCheck({
+        nodeId: r.nodeId,
+        sourcePath: r.sourceFile,
+        regenPath: r.regenPath,
+        fixture: fixtureLoad.fixture,
+        ...(options.behaviorTimeoutMs !== undefined
+          ? { perCaseTimeoutMs: options.behaviorTimeoutMs }
+          : {}),
+      });
+      behaviorResults.set(r.nodeId, checkResult);
+    }
+  }
+
   if (options.matrix) {
     matrix = [];
     for (const r of results) {
@@ -419,6 +507,14 @@ export async function verifyHomeomorphismCommand(
       });
       perNodeFailureModeReports.push({ nodeId: r.nodeId, modes });
       const extraDerivedTags = hasVocabGap(gap) ? (["vocab-gap"] as const) : [];
+      // Phase ε behaviour-axis checker (v0): inject the measured state
+      // when --behavior-check supplied one. Absent → the matrix
+      // builder keeps the verdict-derived default (untested for
+      // non-unrecoverable verdicts, not-applicable for unrecoverable).
+      const behaviorResult = behaviorResults.get(r.nodeId);
+      const behaviorOverride = behaviorResult
+        ? behaviorVerdictToMatrixState(behaviorResult.verdict)
+        : undefined;
       matrix.push(
         buildPerNodeMatrix({
           nodeId: r.nodeId,
@@ -429,6 +525,7 @@ export async function verifyHomeomorphismCommand(
           cost,
           metrics: r.metrics,
           extraDerivedTags,
+          ...(behaviorOverride !== undefined ? { behaviorOverride } : {}),
         }),
       );
     }
@@ -457,6 +554,9 @@ export async function verifyHomeomorphismCommand(
     ...(vocabGaps ? { vocabGaps } : {}),
     ...(exportRecovery ? { exportRecovery } : {}),
     ...(failureModes ? { failureModes } : {}),
+    ...(options.behaviorCheck
+      ? { behaviorResults: Array.from(behaviorResults.values()) }
+      : {}),
   };
 
   // 5. Append a `homeomorphism_verified` event so the temporal log
