@@ -1,0 +1,12 @@
+{
+  "id": "usamo2026_p1",
+  "source": "USAMO 2026, Problem 1 (Day 1)",
+  "proposer": "Titu Andreescu and Gabriel Dospinescu",
+  "domain": "algebra / floor functions",
+  "contamination_status": "low — USAMO 2026 was held 2026-03-21/22, after the January 2026 knowledge cutoff of Claude Opus 4.7 / Sonnet 4.6. Problems were public by late March 2026 (AoPS, MathArena 2026-03-28; Evan Chen's notes 2026-05-16), so models with cutoffs after that date may have it. Verify the cutoff of whichever model you run.",
+  "problem_statement": "**Problem 1.** Fix an integer $n \\geq 2$. For which real numbers $x$ is\n$$\\left\\lfloor nx \\right\\rfloor - \\sum_{k=1}^{n} \\frac{\\lfloor kx \\rfloor}{k}$$\nmaximal, and what is the maximal value that this expression can take?",
+  "official_answer": "Maximum value: $\\frac{1}{2} + \\frac{1}{3} + \\cdots + \\frac{1}{n} = H_n - 1$, where $H_n$ is the $n$-th harmonic number. Achieved exactly when the fractional part of $x$ satisfies $\\{x\\} \\geq 1 - \\frac{1}{n}$.",
+  "official_answer_natural": "The maximum value of the expression is the partial harmonic sum starting from k=2: 1/2 + 1/3 + ... + 1/n. This maximum is attained exactly when the fractional part of x is at least 1 - 1/n.",
+  "grading_notes": "A complete solution must (1) identify the correct maximum value (1/2 + 1/3 + ... + 1/n, equivalently H_n - 1) and (2) characterize the full set of x values achieving it (fractional part of x at least 1 - 1/n). Partial credit if only one direction is proven (upper bound vs construction). Common pitfalls: solving only specific small n; conflating the floor sum with the harmonic series identity; sign errors on the harmonic sum index.",
+  "external_reference": "Solutions in Evan Chen's USAMO 2026 notes §1.1 (2026-05-16): https://web.evanchen.cc/exams/USAMO-2026-notes.pdf"
+}

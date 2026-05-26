@@ -1,0 +1,12 @@
+{
+  "id": "usamo2026_p3",
+  "source": "USAMO 2026, Problem 3 (Day 1)",
+  "proposer": "Rogelio Guerrero",
+  "domain": "geometry",
+  "contamination_status": "low — USAMO 2026 was held 2026-03-21/22, after the January 2026 knowledge cutoff of Claude Opus 4.7 / Sonnet 4.6.",
+  "problem_statement": "**Problem 3.** Let $ABC$ be an acute scalene triangle with no angle equal to $60^{\\circ}$. Let $\\omega$ be the circumcircle of $ABC$. Let $\\triangle_B$ be the equilateral triangle with three vertices on $\\omega$, one of which is $B$. Let $\\ell_B$ be the line through the two vertices of $\\triangle_B$ other than $B$. Let $\\triangle_C$ and $\\ell_C$ be defined analogously. Let $Y$ be the intersection of $AC$ and $\\ell_B$, and let $Z$ be the intersection of $AB$ and $\\ell_C$.\n\nLet $N$ be the midpoint of minor arc $BC$ on $\\omega$. Let $\\mathcal{R}$ be the triangle formed by $\\ell_B$, $\\ell_C$, and the tangent to $\\omega$ through $N$. Prove that the circumcircle of $AYZ$ and the incircle of $\\mathcal{R}$ are tangent.",
+  "official_answer": "Proof problem — no closed-form answer. The required conclusion is: the circumcircle of triangle $AYZ$ and the incircle of triangle $\\mathcal{R}$ are tangent (i.e., they share exactly one point and have a common tangent line at that point).",
+  "official_answer_natural": "This is a proof problem. A correct solution rigorously establishes that the circumcircle of triangle AYZ and the incircle of triangle R are tangent to each other.",
+  "grading_notes": "A complete solution must rigorously demonstrate the tangency. Standard techniques include: trigonometric identities on the circumcircle (using arc measures), inversion centered at a strategic point, projective transformations preserving the configuration, or directed-angle chasing. Partial credit for: a correct configuration analysis without completing the tangency argument; a proof for a specific sub-case (e.g., isoceles triangles) without general proof. Be alert to configuration assumptions implicitly made — 'acute scalene with no 60° angle' is in the hypothesis precisely because edge cases break naive arguments.",
+  "external_reference": "Problem listed in Evan Chen's USAMO 2026 notes §1.3 (solution placeholder as of 2026-05-16): https://web.evanchen.cc/exams/USAMO-2026-notes.pdf"
+}

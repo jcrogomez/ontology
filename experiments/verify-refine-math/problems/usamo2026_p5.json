@@ -1,0 +1,12 @@
+{
+  "id": "usamo2026_p5",
+  "source": "USAMO 2026, Problem 5 (Day 2)",
+  "proposer": "Serena An",
+  "domain": "geometry",
+  "contamination_status": "low — USAMO 2026 was held 2026-03-21/22, after the January 2026 knowledge cutoff of Claude Opus 4.7 / Sonnet 4.6.",
+  "problem_statement": "**Problem 5.** Let $ABC$ be a triangle. Points $D$, $E$, and $F$ lie on sides $BC$, $CA$, and $AB$, respectively, such that\n$$\\angle AFE = \\angle BDF = \\angle CED.$$\nLet $O_A$, $O_B$, and $O_C$ be the circumcenters of triangles $AFE$, $BDF$, and $CED$, respectively. Let $M$, $N$, and $O$ be the circumcenters of triangles $ABC$, $DEF$, and $O_A O_B O_C$, respectively. Prove that $OM = ON$.",
+  "official_answer": "Proof problem — no closed-form answer. The required conclusion is the equality $OM = ON$ of two distances.",
+  "official_answer_natural": "This is a proof problem. A correct solution proves that the distance from O to M equals the distance from O to N, where O is the circumcenter of triangle O_A O_B O_C, M is the circumcenter of triangle ABC, and N is the circumcenter of triangle DEF.",
+  "grading_notes": "A complete solution must rigorously prove $OM = ON$. The standard approach uses Miquel's theorem (the circumcircles of $AEF$, $BFD$, $CDE$ concur at a point $Q$, the second Brocard point of $ABC$) and identifies a spiral similarity centered at $Q$ mapping $\\triangle ABC \\to \\triangle DEF \\to \\triangle O_A O_B O_C$ — the similarity extends to map their circumcenters, giving $\\triangle M \\to N \\to O$ as similar, hence $OM = ON$. Partial credit for: identifying the Miquel point but failing to extract the similarity; proving the result by coordinates without explicit completion of the algebra; proving for a special configuration only.",
+  "external_reference": "Solutions in Evan Chen's USAMO 2026 notes §2.2 (2026-05-16): https://web.evanchen.cc/exams/USAMO-2026-notes.pdf"
+}

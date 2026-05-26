@@ -1,0 +1,9 @@
+{
+  "id": "imo2025_p1",
+  "source": "IMO 2025, Problem 1",
+  "contamination_status": "high — IMO 2025 happened July 2025; the paper Huang & Yang (arXiv 2507.15855) was first posted that same month with full solutions in the appendix; both the problem and reference solutions are in the training data of any frontier model released after that date. Use this problem for plumbing validation only. A correct verdict here does NOT support any lift claim.",
+  "problem_statement": "**Problem 1.** A line in the plane is called *sunny* if it is not parallel to any of the $x$-axis, the $y$-axis, and the line $x+y=0$.\n\nLet $n \\geq 3$ be a given integer. Determine all nonnegative integers $k$ such that there exist $n$ distinct lines in the plane satisfying both the following:\n\n* For all positive integers $a$ and $b$ with $a+b \\leq n+1$, the point $(a, b)$ is on at least one of the lines; and\n* Exactly $k$ of the lines are sunny.",
+  "official_answer": "k \\in \\{0, 1, 3\\}",
+  "official_answer_natural": "The complete set of valid values is k = 0, k = 1, and k = 3.",
+  "grading_notes": "A solution is correct iff it (a) proves that k = 0, 1, 3 are achievable for every n >= 3 by construction, and (b) proves that no other value of k is achievable. Common failure modes: solving only the n=3 case and claiming generality; constructing examples without proving the negative cases."
+}

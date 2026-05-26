@@ -1,0 +1,12 @@
+{
+  "id": "usamo2026_p2",
+  "source": "USAMO 2026, Problem 2 (Day 1)",
+  "proposer": "Andrew Dittmer",
+  "domain": "combinatorics / game theory",
+  "contamination_status": "low — USAMO 2026 was held 2026-03-21/22, after the January 2026 knowledge cutoff of Claude Opus 4.7 / Sonnet 4.6. Problems were public by late March 2026 (AoPS, MathArena 2026-03-28; Evan Chen's notes 2026-05-16, though P2 solution marked 'to be added later'), so models with cutoffs after that date may have it.",
+  "problem_statement": "**Problem 2.** Annie is playing a game where she starts with a row of positive integers, written on a blackboard, each of which is a power of 2. On each turn, she can erase two adjacent numbers and replace them with a power of 2 that is greater than either of the erased numbers. This shortens the row of numbers, and she continues to take turns until only one number remains. Annie wins the game if the final remaining number is less than 4 times the sum of the original numbers. Is it always possible for Annie to win, regardless of the starting row of numbers?",
+  "official_answer": "Yes — Annie can always win regardless of the starting row.",
+  "official_answer_natural": "The answer is Yes. A winning strategy exists for every possible starting configuration of powers of 2.",
+  "grading_notes": "A complete solution must (1) state the correct answer (Yes — Annie can always win) and (2) exhibit a strategy that works for every starting row. Partial credit is plausible for: a correct strategy on a restricted family of inputs; a tight invariant or potential function that bounds the final value but without full strategy proof. A solution that proves only an upper bound of, say, 8× sum (rather than 4×) is incorrect.",
+  "external_reference": "Problem listed in Evan Chen's USAMO 2026 notes §1.2 (solution placeholder as of 2026-05-16): https://web.evanchen.cc/exams/USAMO-2026-notes.pdf. MathArena (2026-03-28) reports GPT-5.4 and Gemini-3.1-Pro solved this problem; verify the official solution if precise grading is required."
+}
