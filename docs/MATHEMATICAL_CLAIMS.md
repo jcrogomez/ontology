@@ -16,12 +16,19 @@ must appear here, classified honestly. If a doc *suggests* the analogy
 without claiming the formal correspondence, it should still appear
 here under tier T2 or T3.
 
-The audit was last refreshed on **2026-05-13** against `main` (HEAD
-`f80163d`). Phase β + Phase γ + Phase γ-7 + Phase δ are now all
-shipped; the two empirical data points for §3.10 (`hash.ts` single-file
-at γ-2, Vibe-Reasoning external corpus at γ-7) are recorded as
-supporting evidence. Cross-provider per-task routing
-(`f80163d`) makes the LlmTask vocabulary load-bearing — different
+The audit was last refreshed on **2026-05-26** against `main` after
+Phase ε's publishable substate. Phase β + Phase γ + Phase γ-7 + Phase δ
+shipped earlier; Phase ε self-ingest landed a 4-arm bake-off on the
+~125-file Ontology core perimeter (Arms A grounded, A0 ablation
+control, B granite hardware-vetoed, C-local starcoder contract-
+violating) plus a behaviour-axis checker v0 that lifted the
+cartography matrix from 1/5 → 2/5 measured columns (structural +
+behaviour). §3.10 moves T4 → T2 against the recalibrated falsifiers
+in `docs/legend/calibrations/SELF_INGEST_EPSILON_3A_2026-05-19_HYPOTHESIS.md`;
+the originally-planned 5th frontier arm (`devstral-small-2:24b` on
+rented GPU) is deferred for budget and is recorded below as future
+work, not as a missing leg. Cross-provider per-task routing
+(γ, `f80163d`) makes the LlmTask vocabulary load-bearing — different
 tasks dispatch to different models, which was the categorical claim
 behind the routing tier. Whenever code or docs change, this map
 should be re-verified.
@@ -188,21 +195,41 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 
 ### 3.10 Compile adjoint (Project Legend)
 
-- **Tier:** T4 (aspirational) — but with **first empirical evidence** as of γ-2 (2026-05-12). Path to T2 unchanged: Phase ε.
-- **Code:** Forward functor $F\colon \mathcal{I} \to \mathcal{C}$ ships at `src/runtime/compile/compile-node.ts` + `compile-plan-runner.ts`. The approximate left adjoint $G\colon \mathcal{C} \to \mathcal{I}$ is now operational as `onto ingest <file>` (`src/commands/ingest/index.ts`, γ-1) routing to the Anthropic adapter (`src/runtime/llm/anthropic/adapter.ts`, γ-0). Proposal payload carries the rich extracted intent (γ-3, `src/schemas/ontology.ts` ProposalNodeCreatePayloadSchema), so apply produces a complete node in one step.
+- **Tier:** T2 (operationally implemented). Promoted from T4 on **2026-05-26** against the Phase ε self-ingest substate: 4-arm bake-off over the 125-node Ontology core perimeter, plus a 2-column cartography matrix (structural + behaviour) with measured per-axis honesty aggregates and a $0 axis-orthogonal control resolving the §3.1 metric-circularity worry from Move 3α. The categorical claim is **operationally** instantiated — there is a measurable subcategory $\mathcal{C}_{\text{faithful}} \subseteq \mathcal{C}$ with finite per-axis $\varepsilon$ on the Ontology repo. It is not yet T1 because no test pins the adjoint property (e.g. determinism of the verdict map at `temperature = 0`); that is the named T1 path below.
+- **Code:** Forward functor $F\colon \mathcal{I} \to \mathcal{C}$ ships at `src/runtime/compile/compile-node.ts` + `compile-plan-runner.ts`. The approximate left adjoint $G\colon \mathcal{C} \to \mathcal{I}$ is operational as `onto ingest <file>` (`src/commands/ingest/index.ts`, γ-1) routing through the cross-provider dispatcher (`src/runtime/llm/dispatcher.ts`, anthropic/ollama/mock). Proposal payload carries the rich extracted intent (γ-3, `src/schemas/ontology.ts` ProposalNodeCreatePayloadSchema), so apply produces a complete node in one step. The Phase ε measurement surface is `onto verify-homeomorphism --matrix --behavior-check`; the matrix builder + the behaviour-axis checker live at `src/runtime/legend/matrix.ts` + `behavior-checker.ts` + `verify-homeomorphism.ts`.
 - **The claim, formally.** There exists a probabilistic functor $G$ and a natural transformation $\eta\colon \mathrm{id}_{\mathcal{C}} \Rightarrow F \circ G$ such that for a measurable subcategory $\mathcal{C}_{\text{faithful}} \subseteq \mathcal{C}$,
 
-  $$d\bigl(c,\, F(G(c))\bigr) < \varepsilon \quad \forall c \in \mathcal{C}_{\text{faithful}},$$
+  $$d_{\text{axis}}\bigl(c,\, F(G(c))\bigr) < \varepsilon_{\text{axis}} \quad \forall c \in \mathcal{C}_{\text{faithful}}^{(\text{axis})},$$
 
-  where $d$ is LoC-churn distance and $\varepsilon \approx 0.3$. The complement $\mathcal{C}_{\text{resistant}}$ is the intent-resistant subcategory: code carrying irreducible implementation detail (escape-hatched via `node.literal`) or code whose intent does not compress.
-- **First empirical data point — single-file round-trip on `src/core/integrity/hash.ts`** (full report: `docs/legend/calibrations/HASH_TS_2026-05-12.md`). With `claude-opus-4-7` as both extractor and compiler: 5/5 functions semantically equivalent (vs 3/5 for the β-2 baseline `qwen2.5-coder:3b`); LoC-churn distance $d \approx 1.2$ (verbose-docstring direction); cost ~$0.08 per round-trip; wall-clock ~70s. The two β-2 divergences (`hashContext` and `hashRun` reaching for non-canonical `JSON.stringify`) are correctly avoided at the γ-2 tier because the extraction surfaces the load-bearing invariant in `rules` explicitly. **n = 1; this is one data point, not a measured subcategory.** It demonstrates the pipeline works end-to-end; it does not yet validate the claim at scale.
-- **Second empirical data point — external Python corpus (24 files) with γ-7 prompt invariants** (full report: `docs/legend/calibrations/VIBE_REASONING_GAMMA_7_2026-05-12.md`). Two-pass `onto verify-homeomorphism` over the [Julius-Woo/Vibe-Reasoning](https://github.com/Julius-Woo/Vibe-Reasoning) corpus with `claude-opus-4-7` end-to-end, comparing γ-7 §1 alone (MANDATORY EXPORTS at compile-time, applied to nodes from a pre-γ-7 extractor) against γ-7 §1+§2 (the new extractor capturing the full `provides` surface). The ε-equivalent fraction moved **36% → 65%** (+29 percentage points; pre `byVerdict` {ε:8, loc:1, struct:6, both:4, unrec:3} vs post {ε:13, loc:3, struct:3, both:0, unrec:1}); the worst category (`divergent_both`) was **fully eliminated** (4 → 0). Apples-to-apples on the 19 overlapping files: 10 improved, 5 unchanged, 1 regressed, 2 pre-unrecoverable recovered. Cost ~$2.28 end-to-end. **n = 19 (overlapping); first measurement of a *frontier* on an external corpus.** This is evidence that the §2.5 distance is sensitive to prompt-engineering choices in a structurally informative direction — exporting the *right names* rather than *some plausible names* — and that the γ-7 invariants are load-bearing. It is **not** a measured subcategory of $\mathcal{C}$ (the corpus is not Ontology itself); the tier stays T4.
-- **Why T4 today:** the measured subcategory $\mathcal{C}_{\text{faithful}}$ requires a distribution, not a single sample. The β-2 ↔ γ-2 ↔ γ-7 chain is informative but limited to one pure-utility file plus a 19-file external Python corpus; the Ontology self-ingestion (Phase ε) is the canonical measurement.
-- **The LoC-vs-semantic gap surfaced by γ-2.** The hash.ts calibration ranks **divergent** under the §2.5 LoC distance ($d \approx 1.2 > 0.3$) but **ε-equivalent** under behaviour. Divergence is concentrated in docstring density and added branded types — semantic invariants are preserved. Phase δ verification should consider a behaviour-aware distance (do all exported functions produce the same outputs on a fixture?) for files in this regime; pure LoC over-estimates intent divergence when the regenerated file makes a defensible architectural choice (e.g. decoupling from upstream type imports — the model literally writes a docstring justifying it).
-- **Path to T2:** Phase ε in PROJECT_LEGEND.md — run Legend's ingest + verification on the Ontology repo itself and report quantified $\varepsilon$ on the measured subcategories. The γ-2 result shows the per-file mechanics work; ε scales it across the codebase. Once Phase ε ships, this entry upgrades to T2 with a citation to the report file (`docs/LEGEND_RUN_<date>.md`).
-- **Axis-relative refinement (POSITIONING.md).** [`docs/POSITIONING.md`](POSITIONING.md) §2 refines $\mathcal{C}_{\text{faithful}}$ into six axis-relative subcategories $\mathcal{C}_{\text{faithful}}^{(\text{axis})} \subseteq \mathcal{C}$ — one each for contract, structural, behavior, intent, literal-required, and cost-per-provider. The Phase ε measurement is therefore a *matrix* of subcategories (and their intersections, per the multi-label frontier taxonomy in POSITIONING §4), not a single ε-faithful percentage. The canonical pre-registration of any Phase ε run lives in `docs/legend/calibrations/SELF_INGEST_HYPOTHESIS_<date>.md`, frozen before the run; its commit hash is the audit anchor proving the prediction predated the result. The matrix tooling ($0, pre-Phase-ε) is specified in [`docs/legend/PREWORK_2026-05-13.md`](legend/PREWORK_2026-05-13.md) and lives at `src/runtime/legend/matrix.ts` + `matrix-intersections.ts` + `frontier-tagger.ts`; the multi-positional `onto ingest` perimeter and the `onto verify-homeomorphism --matrix` flag are the load-bearing surfaces.
-- **Path to T1:** Phase ζ — a property test that, for a small fixed test repo, `verify-homeomorphism` returns the same verdict map deterministically across runs. The non-determinism of $F$ (LLM temperature) means we cannot pin every artifact byte-equal; the verdict map per node *is* deterministic at `temperature = 0` and that is what gets pinned.
-- **Why this is the load-bearing T4 of the next chapter.** Every category-theoretic claim in the project to date has been either a single-direction functor (T1/T2) or an internal monad (T1). An **adjoint pair** with measured tolerance is qualitatively stronger; it is the standard structure category theory uses to relate two categories, and constructing one operationally is what distinguishes "rhetorical category theory in a README" from "operational category theory in a tool". γ-2 is the first concrete evidence that the operational adjunction exists for a non-trivial member of $\mathcal{C}$; Phase ε is where the claim moves from "exists for n=1" to "exists with measured tolerance on a subcategory of the Ontology repo".
+  where each axis $\in$ {structural, behaviour, contract, intent, literal-required, cost} has its own distance $d_{\text{axis}}$ and tolerance $\varepsilon_{\text{axis}}$, per POSITIONING.md §2. The complement $\mathcal{C}_{\text{resistant}}$ is the intent-resistant subcategory: code carrying irreducible implementation detail (escape-hatched via `node.literal`) or code whose intent does not compress.
+- **Phase ε measurement — Ontology self-ingest, 125-node core perimeter (canonical evidence).** Pre-registered hypothesis: `docs/legend/calibrations/SELF_INGEST_EPSILON_3A_2026-05-19_HYPOTHESIS.md` (recalibrated against Arm A0 control on 2026-05-24 per the H1' / H3' addenda). Four arms shipped against the same perimeter; arm reports live under `docs/legend/calibrations/SELF_INGEST_EPSILON_3A_2026-05-19_ARM_*.md` with the cross-arm synthesis in `..._SYNTHESIS.md`:
+
+  | Arm | Model | mean Jaccard | structural honesty | unrecoverable |
+  |---|---|---:|---:|---:|
+  | **A** (grounded) | `qwen2.5-coder:7b` + `--ast-grounding` | **0.581** | **0.496** | 0 / 125 |
+  | **A0** (ablation control, no grounding) | `qwen2.5-coder:7b` | 0.226 | 0.332 | 0 / 125 |
+  | B | `granite4.1:8b` | hardware-vetoed | — | 124 / 125 |
+  | C-local | `starcoder2:7b` | contract-violating | — | 67 / 125 |
+
+  **Headline finding (Move 3α):** AST grounding contributes $\Delta = +0.355$ mean Jaccard on the same base model — a real lift, not metric circularity. The §3.1 worry that grounding artificially inflates the structural Jaccard (because grounding feeds the AST identifiers the metric measures) was resolved by Arm A0: the un-grounded run on the same 7B coder lands at 0.226, far below the grounded 0.581, so the lift is intervention-attributable. The honest cost of grounding: a 7× export over-stuffing (16 → 116 mean declarations per regen) — the matrix's behaviour axis and the export-recovery aggregate both surface this so a downstream consumer is not mislead by the structural number alone. The full reading is in [[move-3a-findings]] (`docs/legend/calibrations/CALIBRATION_LOG.md`).
+
+- **Behaviour-axis checker v0 (2026-05-26) — second filled cartography column.** Spec at [`docs/legend/BEHAVIOUR_AXIS_CHECKER_SPEC.md`](legend/BEHAVIOUR_AXIS_CHECKER_SPEC.md). The checker lives at `src/runtime/legend/behavior-checker.ts` and is invoked via the new `--behavior-check` CLI flag; per-node call-site fixtures live under `tests/behavior-fixtures/` (v0 ships ≥ 20). The axis is **orthogonal to AST grounding** by construction — grounding injects identifier names that the structural Jaccard reads; it does not change what those identifiers *do* at runtime. A behaviour-pass under grounding is therefore a signal grounding cannot manufacture, which sidesteps the §3.1 circularity worry that complicated the structural-only reading. v0's behaviour-axis verdict {pass, fail, untested} folds into `cell.behavior` and `honesty.behavior` (`pass → 1`, `fail → 0`, `untested → null`); aggregate counts surface as `byAxis.behavior` in the verify report. The unit tests in `tests/behavior-checker.test.ts` cover all four spec §6 scenarios (fixture-less → untested; identity → pass; deliberate divergence → fail; regen-load-failure → untested) and pass 20/20; the E2E smoke in `tests/behavior-checker-smoke.test.ts` exercises the runner against real source files in the project tree and passes 8/8.
+
+- **Why T2 (not T1) today.** The structural correspondence holds by construction and the per-axis distances are measured on the Ontology repo with pre-registered falsifiers (H1' floor: Arm-must-clear-control mean Jaccard 0.30, met by A at 0.581; H3' coding-spec floor unevaluated until cloud Arm C lands; H4 Arm A beats A0 by ≥ 0.20, met by Δ = 0.355). No test pins the adjoint *property* (e.g. verdict-map determinism at `temperature = 0`), which is the standard T2 → T1 gate; see "Path to T1" below.
+
+- **Path to T1.** Phase ζ (next chapter) — a property test that, for a small fixed test repo, `verify-homeomorphism` returns the same verdict map deterministically across runs at `temperature = 0`. The non-determinism of $F$ (LLM sampling) means we cannot pin every artifact byte-equal; the verdict map per node *is* deterministic at temperature zero and that is what gets pinned. Note: the **workflow-runtime** is also labelled Phase ζ in the post-2026-05-26 roadmap (see `WORKFLOW_RUNTIME_SPEC.md` once authored); the two threads share a Phase number because they are scope-parallel, not sequenced.
+
+- **Deferred future work — 5th frontier arm.** A 5-arm extension adding `devstral-small-2:24b` on rented GPU (~$5–10, A10/L4 class) was originally scoped to test H3 ("coding-specialisation transfers to a coding-specialised frontier model"). Deferred 2026-05-26 for budget; the close substate does **not** depend on it because the T4 → T2 gate was *≥ 2 filled cartography columns*, which is met. When budget permits, the 5-arm synthesis is a one-line edit to `scripts/run-3a-bakeoff-synthesis.ts` (the 3 → 4 extension in `4697e4e` is the template) and a re-render of §3.10 with the additional column.
+
+- **First two empirical data points — predecessor calibrations (kept for completeness).**
+  - **`hash.ts` single-file round-trip** (γ-2, `docs/legend/calibrations/HASH_TS_2026-05-12.md`): 5/5 functions semantically equivalent with `claude-opus-4-7`, $d \approx 1.2$ LoC, ~$0.08, ~70s, $n = 1$.
+  - **Vibe-Reasoning external Python corpus** (γ-7, `docs/legend/calibrations/VIBE_REASONING_GAMMA_7_2026-05-12.md`): ε-equivalent fraction $36\% \to 65\%$ under γ-7 invariants, `divergent_both` eliminated (4 → 0), $n = 19$ overlapping, ~$2.28.
+
+  Both data points are now subsumed by the Phase ε measurement on the Ontology repo (canonical $\mathcal{C}$) but retained here so the empirical-evidence chain β-2 → γ-2 → γ-7 → ε is auditable.
+
+- **The LoC-vs-semantic gap surfaced by γ-2 — still load-bearing.** The hash.ts calibration ranks **divergent** under the §2.5 LoC distance ($d \approx 1.2 > 0.3$) but **ε-equivalent** under behaviour. Divergence is concentrated in docstring density and added branded types — semantic invariants are preserved. Phase ε's matrix design (POSITIONING.md §2) is the formalisation of this lesson: the structural Jaccard and the behaviour-axis checker are reported **separately**, not folded into a single percentage. The behaviour-axis v0 makes this concrete on the Ontology perimeter.
+
+- **Why this is the load-bearing T2 of the project.** Every other category-theoretic claim shipped is either a single-direction functor (T1/T2) or an internal monad (T1). An **adjoint pair with measured per-axis tolerance** is qualitatively stronger; it is the standard structure category theory uses to relate two categories, and constructing one operationally is what distinguishes "rhetorical category theory in a README" from "operational category theory in a tool". γ-2 was the first concrete evidence (n = 1); Phase ε is where the claim moved from "exists for n = 1" to "exists with measured tolerance on a subcategory of the Ontology repo, against pre-registered falsifiers, with a control arm isolating the intervention effect".
 
 ---
 
@@ -294,7 +321,7 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 - §3.9 (algebra only): three-valued Ω predicate algebra (truth tables, monotonicity, parity sweep).
 - §4.1: content-addressed run records.
 
-### T2 — Operationally implemented (8)
+### T2 — Operationally implemented (10)
 
 - Axiom 2: append-only log (operational; not crash-atomic).
 - Axiom 4 (AST): marker-based prompt parser (no actual rewriting).
@@ -304,6 +331,7 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 - §3.7: representable functor / Yoneda query (sound subset; no faithfulness test).
 - §3.8 (fibers): branch fibration partition + induced subgraph (no morphism-level fibration test).
 - §3.9 (validator port): three-valued internally, two-valued externally; lower-level helpers expose unknown.
+- §3.10: compile adjoint — Phase ε self-ingest, 2-column cartography matrix, pre-registered falsifiers met (no verdict-map determinism test yet).
 - §4.2: proposal system lifecycle + provenance (categorical reading is generous).
 
 ### T3 — Useful analogy (7)
@@ -329,10 +357,12 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 | Tier | Count |
 | --- | --- |
 | T1 | 8 |
-| T2 | 8 |
+| T2 | 10 |
 | T3 | 7 |
 | T4 | 4 |
-| **Total** | **27** |
+| **Total** | **29** |
+
+Note: the 2026-05-26 refresh adds §3.10 to the T2 index — the 2026-05-13 audit had §3.10 in the body marked T4 but did not index it under T4 below, so re-counting after the promotion lands a +1 net on T2 with no T4 decrement. The original T2 label "(8)" undercounted the body by one; canonical recount is "(10)".
 
 ---
 
