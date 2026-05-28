@@ -6,18 +6,18 @@
     {
       "id": "step1_initial_generation",
       "kind": "generator",
-      "prompt": "You are a careful mathematical solver. Produce an initial complete attempt at solving the problem stated in INPUT. Use rigorous reasoning; show your work step-by-step; state every non-trivial intermediate claim with a short justification. End with a clearly labelled final answer."
+      "prompt": "You are a careful mathematical solver. Produce an initial complete attempt at solving the problem stated below. Use rigorous reasoning; show your work step-by-step; state every non-trivial intermediate claim with a short justification. End with a clearly labelled final answer.\n\nPROBLEM:\n${INPUT}"
     },
     {
       "id": "step2_self_improvement",
       "kind": "generator",
-      "prompt": "You are reviewing your own draft solution. Take the prior solution from INPUT and produce an IMPROVED version that: (a) fixes any logical gaps, (b) tightens notation, (c) adds missing justifications, (d) preserves the original mathematical argument unless you have a strong reason to change it. Return the full improved solution, not just edits."
+      "prompt": "You are reviewing your own draft solution. Take the prior solution below and produce an IMPROVED version that: (a) fixes any logical gaps, (b) tightens notation, (c) adds missing justifications, (d) preserves the original mathematical argument unless you have a strong reason to change it. Return the full improved solution, not just edits.\n\nPRIOR SOLUTION:\n${ARTIFACT}"
     },
     {
       "id": "step3_verification",
       "kind": "verifier",
       "verifierSchema": "with-severity",
-      "prompt": "You are a strict mathematical referee. Read the candidate solution in INPUT and decide whether it is correct AND complete. Respond with ONLY a single JSON object matching this shape:\n\n{\n  \"verdict\": \"pass\" | \"fail\",\n  \"severity\": \"minor\" | \"major\",\n  \"issues\": [\"...\", \"...\"]\n}\n\nVerdict semantics:\n- \"pass\" means the solution is correct and complete; \"fail\" means at least one step is wrong, missing, or unjustified.\nSeverity (only meaningful for fail):\n- \"minor\" — local issues such as a typo, an unjustified algebraic step that is easily fixed, an off-by-one in a small case enumeration.\n- \"major\" — a structural issue such as an incorrect final answer, a load-bearing claim with no justification, a misread of the problem statement, or a logical gap that breaks the proof.\nIssues:\n- An array of short strings naming each issue you found. Empty array when verdict is \"pass\".\n\nRespond with the JSON object only. Do not wrap it in prose or code fences."
+      "prompt": "You are a strict mathematical referee. Read the candidate solution below and decide whether it is correct AND complete. Respond with ONLY a single JSON object matching this shape:\n\n{\n  \"verdict\": \"pass\" | \"fail\",\n  \"severity\": \"minor\" | \"major\",\n  \"issues\": [\"...\", \"...\"]\n}\n\nVerdict semantics:\n- \"pass\" means the solution is correct and complete; \"fail\" means at least one step is wrong, missing, or unjustified.\nSeverity (always required; only load-bearing when verdict is \"fail\" — emit \"minor\" on a pass):\n- \"minor\" — local issues such as a typo, an unjustified algebraic step that is easily fixed, an off-by-one in a small case enumeration.\n- \"major\" — a structural issue such as an incorrect final answer, a load-bearing claim with no justification, a misread of the problem statement, or a logical gap that breaks the proof.\nIssues:\n- An array of short strings naming each issue you found. Empty array when verdict is \"pass\".\n\nCANDIDATE SOLUTION:\n${ARTIFACT}\n\nRespond with the JSON object only. Do not wrap it in prose or code fences."
     },
     {
       "id": "step3b_revisit",
@@ -27,12 +27,13 @@
     {
       "id": "step4_bug_report_review",
       "kind": "generator",
-      "prompt": "The verifier flagged issues with the prior solution. The INPUT below contains the verifier's structured critique (JSON object with verdict, severity, and issues). Analyse the issues, decide which are real bugs versus surface issues, and produce a concise BUG REPORT enumerating the load-bearing problems the corrector should address. Order them by priority (most critical first). Do NOT attempt to fix anything yourself; only enumerate."
+      "emitsArtifact": false,
+      "prompt": "The verifier flagged issues with the current solution. Below is the verifier's structured critique (a JSON object with verdict, severity, and issues). Analyse the issues, decide which are real bugs versus surface issues, and produce a concise BUG REPORT enumerating the load-bearing problems the corrector should address. Order them by priority (most critical first). Do NOT attempt to fix anything yourself; only enumerate.\n\nVERIFIER CRITIQUE:\n${CRITIQUE}"
     },
     {
       "id": "step5_correction",
       "kind": "generator",
-      "prompt": "You are correcting a flawed mathematical solution. The INPUT below contains the bug report from the prior step. Apply the corrections implied by the bug report to the solution as you remember it from the conversation context. Preserve correct parts of the prior argument; rewrite only what needs rewriting. Return the full corrected solution."
+      "prompt": "You are correcting a flawed mathematical solution. Below is the current solution followed by a prioritised bug report. Apply the corrections implied by the bug report. Preserve the correct parts of the prior argument; rewrite only what needs rewriting. Return the full corrected solution.\n\nCURRENT SOLUTION:\n${ARTIFACT}\n\nBUG REPORT:\n${INPUT}"
     },
     {
       "id": "step6_accept",

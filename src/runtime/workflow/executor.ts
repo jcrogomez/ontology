@@ -23,6 +23,25 @@ import { edgePredicateKey, type LoadedGraph } from "./graph-load.js";
 // verdicts via the predicate DSL, and terminating on accept / reject
 // / no-matching-branch / step-budget-exhausted.
 //
+// Dataflow (spec §3.4.1). The executor threads three things, not one:
+//   - `currentInput`  — the immediate predecessor's output, exposed to
+//                       a node's prompt as `${INPUT}`.
+//   - `currentArtifact` — the evolving work product (the solution under
+//                       refinement), exposed as `${ARTIFACT}`. A
+//                       generator's output replaces it unless the node
+//                       is pass-through or sets `emitsArtifact: false`
+//                       (an intermediate scratch product such as a bug
+//                       report). Verifiers read the artefact, never the
+//                       previous verdict — this is what lets a
+//                       verify-refine loop re-verify the SAME solution
+//                       and lets a corrector see the solution it must
+//                       fix.
+//   - `lastCritique`  — the most recent verifier's verbatim output,
+//                       exposed as `${CRITIQUE}`.
+// A node that uses no `${…}` variable falls back to the legacy
+// behaviour: the predecessor's output is appended under an `INPUT:`
+// heading.
+//
 // The executor is intentionally serial — v0 picks exactly one
 // outgoing edge per verifier visit. Parallel fan-out + join is a v1
 // concern (spec §5).
@@ -111,6 +130,17 @@ export interface RunWorkflowOptions {
    * Useful for graph-shape testing without spending tokens.
    */
   dryRun?: boolean;
+  /**
+   * Test seam: override the LLM dispatch function. Defaults to the
+   * production `dispatchLlmRequest`. Lets tests script a deterministic
+   * verdict trajectory without a real provider, exercising the full
+   * dataflow — prompt composition, artefact threading, branch
+   * selection — that `dryRun` short-circuits past.
+   */
+  dispatch?: (
+    request: LlmRequest,
+    options: DispatchOptions,
+  ) => Promise<LlmResponse>;
 }
 
 const DEFAULT_MAX_STEPS = 100;
@@ -139,10 +169,20 @@ export async function runWorkflow(
     };
   }
   let currentInput = initialInput;
+  // The artefact slot starts as the workflow input (the entry
+  // generator's first output replaces it). The critique slot starts
+  // empty — no verifier has run yet.
+  let currentArtifact = initialInput;
+  let lastCritique: string | null = null;
 
   while (stepCount < maxSteps) {
     stepCount += 1;
-    const visit = await visitNode(currentNode, currentInput, options);
+    const visit = await visitNode(
+      currentNode,
+      currentInput,
+      { artifact: currentArtifact, critique: lastCritique },
+      options,
+    );
     visit.step = stepCount;
     trace.push(visit);
 
@@ -158,7 +198,11 @@ export async function runWorkflow(
                   : `terminal ${currentNode.id}`,
             }
           : {}),
-        output: currentInput,
+        // The workflow's result is the final artefact (the accepted or
+        // last-refined solution), not whatever text happened to be on
+        // the edge into the terminal (which, after a verifier branch,
+        // is the verdict JSON).
+        output: currentArtifact,
         trace,
         stepCount,
         durationMs: Date.now() - t0,
@@ -230,17 +274,19 @@ export async function runWorkflow(
         };
       }
       currentNode = nextNode;
-      // The next node's input is the verifier's verbatim output (the
-      // raw text response). Generators typically ignore most of it,
-      // but for "bug report review → correction" loops the verifier's
-      // critique is exactly what the corrector should read.
+      // Stash the verifier's verbatim output as the latest critique
+      // (read downstream via `${CRITIQUE}`) and pass it along the edge
+      // as `${INPUT}` too. The artefact slot is untouched — a verifier
+      // does not produce a work product.
+      lastCritique = visit.output;
       currentInput = visit.output;
       continue;
     }
 
     // Generator. Exactly one outgoing `feeds` edge per graph-load
     // structural check.
-    const outgoing = loaded.outgoingByNodeId.get(currentNode.id) ?? [];
+    const genNode = currentNode;
+    const outgoing = loaded.outgoingByNodeId.get(genNode.id) ?? [];
     const feeds = outgoing.find((e) => e.type === "feeds");
     if (!feeds) {
       return {
@@ -263,6 +309,13 @@ export async function runWorkflow(
         durationMs: Date.now() - t0,
       };
     }
+    // A generator's output replaces the artefact unless it is
+    // pass-through (pure routing, no work product) or explicitly
+    // marked as emitting no artefact (an intermediate scratch product
+    // such as a bug report).
+    if (genNode.passThrough !== true && genNode.emitsArtifact !== false) {
+      currentArtifact = visit.output;
+    }
     currentNode = nextNode;
     currentInput = visit.output;
   }
@@ -270,7 +323,7 @@ export async function runWorkflow(
   return {
     verdict: "reject",
     reason: `step_budget_exhausted (maxSteps = ${maxSteps})`,
-    output: currentInput,
+    output: currentArtifact,
     trace,
     stepCount,
     durationMs: Date.now() - t0,
@@ -279,12 +332,21 @@ export async function runWorkflow(
 
 // ── Per-node visit ──────────────────────────────────────────────────────────
 
+interface ComposeContext {
+  /** Current artefact slot — resolves `${ARTIFACT}`. */
+  artifact: string;
+  /** Latest verifier critique — resolves `${CRITIQUE}` (null → ""). */
+  critique: string | null;
+}
+
 async function visitNode(
   node: WorkflowNode,
   input: string,
+  ctx: ComposeContext,
   options: RunWorkflowOptions,
 ): Promise<WorkflowVisit> {
   const t0 = Date.now();
+  const dispatch = options.dispatch ?? dispatchLlmRequest;
   if (node.kind === "terminal") {
     return {
       step: 0, // filled in by caller
@@ -328,7 +390,7 @@ async function visitNode(
 
   const request: LlmRequest = {
     task: node.kind === "verifier" ? "node_critique" : "node_expand",
-    prompt: composePrompt(node, input),
+    prompt: composePrompt(node, input, ctx),
     ...(node.system !== undefined ? { system: node.system } : {}),
     ...(node.temperature !== undefined ? { temperature: node.temperature } : {}),
     metadata: {
@@ -337,7 +399,7 @@ async function visitNode(
   };
 
   if (node.kind === "generator") {
-    const response = await dispatchLlmRequest(request, dispatchOptions);
+    const response = await dispatch(request, dispatchOptions);
     const visit: WorkflowVisit = {
       step: 0,
       nodeId: node.id,
@@ -359,7 +421,7 @@ async function visitNode(
     );
   }
   const notes: string[] = [];
-  let response = await dispatchLlmRequest(request, dispatchOptions);
+  let response = await dispatch(request, dispatchOptions);
   let parsed = tryParseVerdict(node.verifierSchema, response.text);
   if (!parsed) {
     notes.push("first verifier response did not match schema; retrying once");
@@ -369,7 +431,7 @@ async function visitNode(
         request.prompt +
         `\n\n[your last response did not match the required schema; please respond with ONLY a JSON object matching the schema "${node.verifierSchema}"]`,
     };
-    response = await dispatchLlmRequest(retryRequest, dispatchOptions);
+    response = await dispatch(retryRequest, dispatchOptions);
     parsed = tryParseVerdict(node.verifierSchema, response.text);
   }
   let verdict: VerifierVerdict;
@@ -400,13 +462,29 @@ async function visitNode(
   return visit;
 }
 
-function composePrompt(node: WorkflowNode, input: string): string {
+const TEMPLATE_VAR_RE = /\$\{(?:INPUT|ARTIFACT|CRITIQUE)\}/;
+
+function composePrompt(
+  node: WorkflowNode,
+  input: string,
+  ctx: ComposeContext,
+): string {
   const body = node.prompt ?? "";
+  // Template composition: when the prompt body references any runtime
+  // variable, substitute and use the result verbatim. This lets a node
+  // place the incoming input, the evolving artefact, or the latest
+  // verifier critique exactly where it wants — e.g. a corrector that
+  // needs BOTH the original solution (`${ARTIFACT}`) and a bug report
+  // (`${INPUT}`).
+  if (TEMPLATE_VAR_RE.test(body)) {
+    return body
+      .replace(/\$\{INPUT\}/g, input)
+      .replace(/\$\{ARTIFACT\}/g, ctx.artifact)
+      .replace(/\$\{CRITIQUE\}/g, ctx.critique ?? "");
+  }
+  // Legacy composition (no template vars): append the incoming input
+  // after the node's own prompt under an `INPUT:` heading.
   if (!input) return body;
-  // The simplest composition: append the incoming input after the
-  // node's own prompt under an `INPUT:` heading. Workflows that
-  // need different composition can use `${INPUT}` in their prompt
-  // body and the runtime will substitute (v1).
   return `${body}\n\nINPUT:\n${input}`;
 }
 

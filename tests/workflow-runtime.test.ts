@@ -15,6 +15,7 @@ import {
   extractJsonObject,
   parseVerdict,
 } from "../src/runtime/workflow/verifier-schemas.js";
+import type { LlmRequest, LlmResponse } from "../src/runtime/llm/types.js";
 
 // Workflow runtime v0 tests (Phase ζ).
 //
@@ -518,5 +519,150 @@ describe("executor / dry-run end-to-end (spec §6 scenarios)", () => {
     // visit.
     const verifierVisit = r.trace.find((v) => v.nodeId === "v1");
     expect(verifierVisit?.notes?.some((n) => /schema parse failed/.test(n))).toBe(true);
+  });
+});
+
+// ── Executor dataflow (scripted, full prompt composition) ────────────────────
+
+describe("executor / artefact-slot dataflow (IMO example, scripted dispatch)", () => {
+  // Drive the IMO verify-refine graph with a deterministic verdict
+  // trajectory through the `dispatch` test seam — this exercises the
+  // real prompt composition + artefact threading that dry-run skips.
+  //
+  // Trajectory: the first verification fails (major) → bug report →
+  // correction → then 5 consecutive passes → accept. We capture every
+  // prompt each node receives so we can assert the dataflow is sound:
+  // the corrector sees the SOLUTION (not just the verdict), and the
+  // verifier re-verifies the corrected SOLUTION (not its own verdict).
+
+  function buildScriptedDispatch() {
+    const prompts: Record<string, string[]> = {};
+    let verifyCalls = 0;
+    const dispatch = async (request: LlmRequest): Promise<LlmResponse> => {
+      const workflow = request.metadata?.workflow as
+        | { nodeId: string; kind: string }
+        | undefined;
+      const nodeId = workflow?.nodeId ?? "<unknown>";
+      (prompts[nodeId] ??= []).push(request.prompt);
+      let text: string;
+      switch (nodeId) {
+        case "step1_initial_generation":
+          text = "SOLUTION_DRAFT_1";
+          break;
+        case "step2_self_improvement":
+          text = "SOLUTION_V2_IMPROVED";
+          break;
+        case "step4_bug_report_review":
+          text = "BUG_REPORT: the limit interchange is unjustified";
+          break;
+        case "step5_correction":
+          text = "SOLUTION_CORRECTED_FINAL";
+          break;
+        case "step3_verification": {
+          verifyCalls += 1;
+          // First pass fails (major), then everything passes so the
+          // consecutive(pass, 5) accept branch eventually fires.
+          text =
+            verifyCalls === 1
+              ? JSON.stringify({
+                  verdict: "fail",
+                  severity: "major",
+                  issues: ["the limit interchange is unjustified"],
+                })
+              : JSON.stringify({ verdict: "pass", severity: "minor", issues: [] });
+          break;
+        }
+        default:
+          text = `[unexpected node ${nodeId}]`;
+      }
+      return { text, model: "scripted", provider: "mock" };
+    };
+    return { dispatch, prompts: () => prompts };
+  }
+
+  it("threads the solution artefact to the corrector and verifier (not the verdict)", async () => {
+    const p = path.resolve(
+      __dirname,
+      "..",
+      "examples",
+      "workflow-imo-verify-refine",
+      "graph.json",
+    );
+    const loaded = loadWorkflowGraphFromFile(p);
+    const { dispatch, prompts } = buildScriptedDispatch();
+    const r = await runWorkflow(loaded, "Prove the toy lemma.", { dispatch });
+
+    expect(r.verdict).toBe("accept");
+    // Final result is the corrected solution (the artefact), not the
+    // verdict JSON that sat on the edge into the accept terminal.
+    expect(r.output).toBe("SOLUTION_CORRECTED_FINAL");
+
+    const seen = prompts();
+
+    // step2 improves the artefact produced by step1.
+    expect(seen["step2_self_improvement"]?.[0]).toContain("SOLUTION_DRAFT_1");
+
+    // §4.1 fix — the bug-report reviewer reads the verifier CRITIQUE
+    // (the structured verdict), not the solution.
+    expect(seen["step4_bug_report_review"]?.[0]).toContain('"verdict":"fail"');
+    expect(seen["step4_bug_report_review"]?.[0]).toContain(
+      "the limit interchange is unjustified",
+    );
+
+    // §4.1 fix — the corrector sees BOTH the solution it must fix
+    // (the artefact) AND the bug report. Previously it received only
+    // the verifier's verbatim text and was "blind to the solution".
+    const correctorPrompt = seen["step5_correction"]?.[0] ?? "";
+    expect(correctorPrompt).toContain("SOLUTION_V2_IMPROVED");
+    expect(correctorPrompt).toContain("BUG_REPORT");
+
+    // §4.1 fix — after correction, the verifier re-verifies the
+    // CORRECTED SOLUTION, never its own verdict JSON. The last
+    // verification prompt carries the artefact and not the prior
+    // failure's issue text (which only lives in the verdict).
+    const verifyPrompts = seen["step3_verification"] ?? [];
+    expect(verifyPrompts).toHaveLength(6); // 1 fail + 5 passes
+    expect(verifyPrompts[0]).toContain("SOLUTION_V2_IMPROVED");
+    const lastVerify = verifyPrompts[verifyPrompts.length - 1] ?? "";
+    expect(lastVerify).toContain("SOLUTION_CORRECTED_FINAL");
+    expect(lastVerify).not.toContain("the limit interchange is unjustified");
+  });
+
+  it("falls back to legacy INPUT-append composition when no template vars are present", async () => {
+    // A graph whose prompts use no ${…} variables must behave exactly
+    // as v0 did: the predecessor output is appended under INPUT:.
+    const graph = {
+      entry: "g1",
+      nodes: [
+        { id: "g1", kind: "generator", prompt: "generate" },
+        { id: "v1", kind: "verifier", prompt: "check it", verifierSchema: "simple-pass-fail" },
+        { id: "t_accept", kind: "terminal", terminalVerdict: "accept" },
+        { id: "t_reject", kind: "terminal", terminalVerdict: "reject" },
+      ],
+      edges: [
+        { from: "g1", to: "v1", type: "feeds" },
+        { from: "v1", to: "t_accept", type: "branches_on", predicate: `verdict == "pass"` },
+        { from: "v1", to: "t_reject", type: "branches_on", predicate: `verdict == "fail"` },
+      ],
+    };
+    const loaded = loadWorkflowGraph(graph);
+    const seen: Record<string, string> = {};
+    const dispatch = async (request: LlmRequest): Promise<LlmResponse> => {
+      const nodeId =
+        (request.metadata?.workflow as { nodeId: string } | undefined)?.nodeId ??
+        "<unknown>";
+      seen[nodeId] = request.prompt;
+      return {
+        text: nodeId === "v1" ? `{"verdict":"pass"}` : "GENERATED_TEXT",
+        model: "scripted",
+        provider: "mock",
+      };
+    };
+    const r = await runWorkflow(loaded, "the initial input", { dispatch });
+    expect(r.verdict).toBe("accept");
+    // Legacy composition: prompt body, then INPUT heading, then the
+    // incoming text.
+    expect(seen["g1"]).toBe("generate\n\nINPUT:\nthe initial input");
+    expect(seen["v1"]).toBe("check it\n\nINPUT:\nGENERATED_TEXT");
   });
 });

@@ -13,7 +13,7 @@ prompts and reference logs.
 | Step 1: Initial solution generation | `step1_initial_generation` | generator | Solve the problem from scratch. |
 | Step 2: Self-improvement | `step2_self_improvement` | generator | Refine the draft into a tighter solution. |
 | Step 3: Verification | `step3_verification` | verifier | Strict referee; emits `{verdict, severity, issues}` JSON. |
-| — *(state preservation)* | `step3b_revisit` | generator (pass-through) | Echo the candidate solution unchanged so the verifier can re-check the SAME artefact on the next iteration. v0 hack — see "Pass-through node" below. |
+| — *(loop-back)* | `step3b_revisit` | generator (pass-through) | A no-dispatch loop-back node on the pass branch so the verifier re-runs on the next iteration. The candidate solution is preserved by the executor's artefact slot, not by this node — see "Dataflow" below. |
 | Step 4: Bug report review (optional) | `step4_bug_report_review` | generator | Read the verifier's critique; enumerate load-bearing bugs. |
 | Step 5: Correction | `step5_correction` | generator | Apply the bug report; produce a corrected solution. |
 | Step 6: Accept | `step6_accept` | terminal | Reached after 5 consecutive verifier passes. |
@@ -34,32 +34,43 @@ match, the workflow rejects with `no_matching_branch`. The order in
    without any intervening pass AND the most-recent visit's severity
    is major.
 3. `verdict == "pass"` → `step3b_revisit` — a pass that does not yet
-   satisfy the 5-consecutive criterion; route through the pass-
-   through node to preserve the artefact for re-verification.
+   satisfy the 5-consecutive criterion; loop back through the
+   pass-through node to re-verify.
 4. `verdict == "fail"` → `step4_bug_report_review` — kick off the
    correction loop.
 
-## Pass-through node
+## Dataflow: the artefact slot and prompt variables
 
-The pass-through generator (`step3b_revisit`) exists because the v0
-executor's edge semantic is *output-forwards*: a node's text output
-becomes the next node's input. For a verifier that emits a JSON
-verdict, naively forwarding that JSON to a self-loop would have the
-verifier re-verifying its own verdict on the next iteration — a
-degenerate measurement.
+The executor threads three values through the run, and node prompts
+pull what they need via template variables (spec §3.4.1):
 
-The pass-through node, set with `"passThrough": true`, **does no LLM
-dispatch**. Its output equals its input verbatim. Wiring it between
-the verifier's pass-but-not-yet-5 branch and the verifier itself
-preserves the candidate solution across the loop, so each
-re-verification sees the SAME artefact and the LLM's per-call variance
-drives the 5-consecutive criterion.
+- `${ARTIFACT}` — the **current solution under refinement**. A
+  generator's output replaces it, *except* when the node is
+  pass-through or sets `"emitsArtifact": false`. Verifiers read the
+  artefact, never the previous verdict.
+- `${CRITIQUE}` — the most recent verifier's verbatim output.
+- `${INPUT}` — the immediate predecessor's output.
 
-This is a v0 design hack. v1 may add explicit state primitives (a
-"stash this input under name X" / "load X as input for the next
-visit" pair) that would let workflows preserve artefacts without
-needing dedicated pass-through nodes. For now, pass-through stays in
-the executor surface as a small, well-defined escape hatch.
+This is what makes the loop sound:
+
+- **Verifier** (`step3_verification`) reads `${ARTIFACT}`, so a
+  re-verification on the pass loop checks the SAME solution — never
+  its own verdict JSON — and the LLM's per-call variance drives the
+  5-consecutive criterion.
+- **Bug-report review** (`step4_bug_report_review`) is marked
+  `"emitsArtifact": false`: its output is a scratch bug report, so it
+  does NOT overwrite the solution. It reads `${CRITIQUE}`.
+- **Correction** (`step5_correction`) reads BOTH the solution it must
+  fix (`${ARTIFACT}`) and the bug report (`${INPUT}`), then emits the
+  corrected solution as the new artefact.
+
+The pass-through node (`step3b_revisit`, `"passThrough": true`) does no
+LLM dispatch — it just loops the pass branch back to the verifier.
+Artefact preservation is handled by the artefact slot above, so the
+pass-through node carries no state of its own; it exists only because
+the verifier needs an outgoing edge target to loop through. A node
+that uses no `${…}` variable falls back to legacy composition: the
+predecessor's output is appended under an `INPUT:` heading.
 
 ## How to run
 

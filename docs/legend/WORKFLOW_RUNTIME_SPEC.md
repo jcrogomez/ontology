@@ -202,6 +202,43 @@ response text; for `verifier` nodes the output is the Zod-validated
 verdict object; for `terminal` nodes no LLM call is made — the node
 just emits its accept/reject label.
 
+### 3.4.1 Dataflow: artefact slot + prompt variables
+
+The pseudocode above threads a single `input` (the predecessor's
+output). That is not enough for a verify-refine loop: the corrector
+needs the *solution* it must fix, and the verifier must re-check the
+*solution* — not its own just-emitted verdict. So the executor threads
+three values and exposes each to a node's prompt via a template
+variable:
+
+| Variable | Resolves to | Updated by |
+|---|---|---|
+| `${INPUT}` | the immediate predecessor's output | every visit |
+| `${ARTIFACT}` | the evolving work product (the solution under refinement) | a generator's output, unless the node is `passThrough` or sets `emitsArtifact: false` |
+| `${CRITIQUE}` | the most recent verifier's verbatim output | every verifier visit |
+
+Rules:
+
+- **Verifiers read `${ARTIFACT}`**, never the previous verdict. This
+  is what lets the pass-loop re-verify the SAME solution and lets a
+  corrector see the solution it must fix.
+- **`emitsArtifact: false`** marks a generator whose output is an
+  intermediate scratch product (e.g. a bug report) — it is forwarded
+  as `${INPUT}` to the next node but does NOT replace `${ARTIFACT}`.
+- **Pass-through nodes** (`passThrough: true`) never touch the
+  artefact; they exist only to loop a branch back.
+- A prompt that references **no** `${…}` variable falls back to legacy
+  composition: the predecessor's output is appended under an `INPUT:`
+  heading. Existing single-pass graphs keep working unchanged.
+- The workflow **result `output`** is the final artefact (the accepted
+  or last-refined solution), not the text on the edge into the
+  terminal.
+
+This subsumes the v0 "pass-through hack": the artefact is preserved by
+the slot, so a pass-through node carries no state — it is just a
+loop-back target. The earlier `output: input` in the pseudocode is
+therefore `output: artefact` in the implementation.
+
 ### 3.5 CLI command
 
 ```

@@ -109,6 +109,18 @@ export const WorkflowNodeSchema = z
      * branches_on edges from a verifier to itself.
      */
     passThrough: z.boolean().optional(),
+    /**
+     * Generators only. When `false`, the node's output is an
+     * intermediate scratch product (e.g. a bug report) and does NOT
+     * replace the workflow's current *artefact* — the evolving work
+     * product that `${ARTIFACT}` resolves to and that verifiers read.
+     * Defaults to `true`: a generator's output normally becomes the
+     * new artefact. Pass-through nodes never emit an artefact
+     * regardless of this flag. See the executor's prompt-composition
+     * variables (`${INPUT}` / `${ARTIFACT}` / `${CRITIQUE}`) and spec
+     * §3.4.1.
+     */
+    emitsArtifact: z.boolean().optional(),
   })
   .refine(
     (n) =>
