@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 
-const CLI_PATH = path.resolve(__dirname, "../src/cli.ts");
+const CLI_PATH = path.resolve(__dirname, "../dist/cli.js");
 
 describe("Context Assembler CLI", () => {
   let tempDir: string;
@@ -12,7 +12,7 @@ describe("Context Assembler CLI", () => {
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "ontology-test-"));
     // Run init to set up the network
-    spawnSync("npx", ["tsx", CLI_PATH, "init"], { cwd: tempDir });
+    spawnSync(process.execPath, [CLI_PATH,"init"], { cwd: tempDir });
   });
 
   afterEach(() => {
@@ -20,10 +20,10 @@ describe("Context Assembler CLI", () => {
   });
 
   function createTestNodeAndEdge(dir: string): string {
-    const createRes = spawnSync("npx", ["tsx", CLI_PATH, "node", "create", "--level", "domain", "--kind", "definition", "--prompt", "Example"], { cwd: dir, encoding: "utf8" });
+    const createRes = spawnSync(process.execPath, [CLI_PATH,"node", "create", "--level", "domain", "--kind", "definition", "--prompt", "Example"], { cwd: dir, encoding: "utf8" });
     const nodeIdMatch = createRes.stdout.match(/Node:\s+(node_[a-f0-9]+)/);
     const nodeId = nodeIdMatch ? nodeIdMatch[1] : "node_fail";
-    spawnSync("npx", ["tsx", CLI_PATH, "node", "link", "--from", "node_0000_canon", "--to", nodeId, "--type", "documents"], { cwd: dir, encoding: "utf8" });
+    spawnSync(process.execPath, [CLI_PATH,"node", "link", "--from", "node_0000_canon", "--to", nodeId, "--type", "documents"], { cwd: dir, encoding: "utf8" });
     return nodeId;
   }
 
@@ -37,7 +37,7 @@ describe("Context Assembler CLI", () => {
 
   it("context assemble default remains parent-path only", () => {
     const nodeId = createTestNodeAndEdge(tempDir);
-    const result = spawnSync("npx", ["tsx", CLI_PATH, "context", "assemble", nodeId], { cwd: tempDir, encoding: "utf8" });
+    const result = spawnSync(process.execPath, [CLI_PATH,"context", "assemble", nodeId], { cwd: tempDir, encoding: "utf8" });
 
     expect(result.status).toBe(0);
     expect(result.stdout).not.toContain("Edge Context:");
@@ -45,7 +45,7 @@ describe("Context Assembler CLI", () => {
 
   it("context assemble --include-edges includes edge context", () => {
     const nodeId = createTestNodeAndEdge(tempDir);
-    const result = spawnSync("npx", ["tsx", CLI_PATH, "context", "assemble", nodeId, "--include-edges"], { cwd: tempDir, encoding: "utf8" });
+    const result = spawnSync(process.execPath, [CLI_PATH,"context", "assemble", nodeId, "--include-edges"], { cwd: tempDir, encoding: "utf8" });
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("Edge Context:");
@@ -55,7 +55,7 @@ describe("Context Assembler CLI", () => {
 
   it("context assemble --include-edges --json outputs parseable edgeContext", () => {
     const nodeId = createTestNodeAndEdge(tempDir);
-    const result = spawnSync("npx", ["tsx", CLI_PATH, "context", "assemble", nodeId, "--include-edges", "--json"], { cwd: tempDir, encoding: "utf8" });
+    const result = spawnSync(process.execPath, [CLI_PATH,"context", "assemble", nodeId, "--include-edges", "--json"], { cwd: tempDir, encoding: "utf8" });
 
     expect(result.status).toBe(0);
     const parsed = JSON.parse(result.stdout);
@@ -65,7 +65,7 @@ describe("Context Assembler CLI", () => {
 
   it("context assemble --edge-types filters edge types", () => {
     const nodeId = createTestNodeAndEdge(tempDir);
-    const result = spawnSync("npx", ["tsx", CLI_PATH, "context", "assemble", nodeId, "--include-edges", "--edge-types", "tests"], { cwd: tempDir, encoding: "utf8" });
+    const result = spawnSync(process.execPath, [CLI_PATH,"context", "assemble", nodeId, "--include-edges", "--edge-types", "tests"], { cwd: tempDir, encoding: "utf8" });
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("Edges:   0");
@@ -73,7 +73,7 @@ describe("Context Assembler CLI", () => {
 
   it("context assemble rejects invalid edge type", () => {
     const nodeId = createTestNodeAndEdge(tempDir);
-    const result = spawnSync("npx", ["tsx", CLI_PATH, "context", "assemble", nodeId, "--include-edges", "--edge-types", "fake_type"], { cwd: tempDir, encoding: "utf8" });
+    const result = spawnSync(process.execPath, [CLI_PATH,"context", "assemble", nodeId, "--include-edges", "--edge-types", "fake_type"], { cwd: tempDir, encoding: "utf8" });
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("✖ Invalid edge type: fake_type");
@@ -83,14 +83,14 @@ describe("Context Assembler CLI", () => {
     const nodeId = createTestNodeAndEdge(tempDir);
     const beforeState = getDirState(tempDir);
 
-    spawnSync("npx", ["tsx", CLI_PATH, "context", "assemble", nodeId, "--include-edges"], { cwd: tempDir, encoding: "utf8" });
+    spawnSync(process.execPath, [CLI_PATH,"context", "assemble", nodeId, "--include-edges"], { cwd: tempDir, encoding: "utf8" });
 
     const afterState = getDirState(tempDir);
     expect(beforeState).toStrictEqual(afterState);
   });
 
   it("onto context assemble node_0000_canon works", () => {
-    const result = spawnSync("npx", ["tsx", CLI_PATH, "context", "assemble", "node_0000_canon"], { cwd: tempDir, encoding: "utf8" });
+    const result = spawnSync(process.execPath, [CLI_PATH,"context", "assemble", "node_0000_canon"], { cwd: tempDir, encoding: "utf8" });
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("=== ONTOLOGY CONTEXT PACKAGE ===");
@@ -107,7 +107,7 @@ describe("Context Assembler CLI", () => {
   });
 
   it("onto context assemble node_0000_canon --json outputs parseable JSON", () => {
-    const result = spawnSync("npx", ["tsx", CLI_PATH, "context", "assemble", "node_0000_canon", "--json"], { cwd: tempDir, encoding: "utf8" });
+    const result = spawnSync(process.execPath, [CLI_PATH,"context", "assemble", "node_0000_canon", "--json"], { cwd: tempDir, encoding: "utf8" });
 
     expect(result.status).toBe(0);
     const parsed = JSON.parse(result.stdout);
@@ -120,14 +120,14 @@ describe("Context Assembler CLI", () => {
   });
 
   it("onto context assemble missing node fails clearly", () => {
-    const result = spawnSync("npx", ["tsx", CLI_PATH, "context", "assemble", "missing_node"], { cwd: tempDir, encoding: "utf8" });
+    const result = spawnSync(process.execPath, [CLI_PATH,"context", "assemble", "missing_node"], { cwd: tempDir, encoding: "utf8" });
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("Target node not found: missing_node");
   });
 
   it("onto context assemble node_0000_canon --mode compare fails clearly", () => {
-    const result = spawnSync("npx", ["tsx", CLI_PATH, "context", "assemble", "node_0000_canon", "--mode", "compare"], { cwd: tempDir, encoding: "utf8" });
+    const result = spawnSync(process.execPath, [CLI_PATH,"context", "assemble", "node_0000_canon", "--mode", "compare"], { cwd: tempDir, encoding: "utf8" });
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("Unsupported context assembly mode: compare");

@@ -7,7 +7,7 @@ import os from "os";
 let tempDir: string;
 
 function runCli(args: string[]): ReturnType<typeof spawnSync> {
-  return spawnSync("npx", ["tsx", path.join(process.cwd(), "src/cli.ts"), ...args], {
+  return spawnSync(process.execPath, [path.join(process.cwd(), "dist/cli.js"), ...args], {
     cwd: tempDir,
     encoding: "utf-8",
     env: { ...process.env },

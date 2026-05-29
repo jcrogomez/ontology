@@ -29,7 +29,7 @@ import {
 
 const helperDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(helperDir, "..");
-const cliPath = path.join(repoRoot, "src", "cli.ts");
+const cliPath = path.join(repoRoot, "dist", "cli.js");
 
 // runCliScrubbed runs the CLI with ANTHROPIC_API_KEY explicitly
 // removed from the environment. Critical for the cost-estimate
@@ -40,7 +40,7 @@ function runCliScrubbed(
 ): { stdout: string; stderr: string; status: number | null } {
   const env: NodeJS.ProcessEnv = { ...process.env };
   delete env.ANTHROPIC_API_KEY;
-  const result = spawnSync("npx", ["tsx", cliPath, ...args], {
+  const result = spawnSync(process.execPath, [cliPath, ...args], {
     cwd,
     encoding: "utf-8",
     env,

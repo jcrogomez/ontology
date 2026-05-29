@@ -16,8 +16,8 @@ describe("Model CLI commands", () => {
   });
 
   const runCli = (args: string[]) => {
-    const cliPath = path.resolve(__dirname, "../src/cli.ts");
-    return spawnSync("npx", ["tsx", cliPath, ...args], {
+    const cliPath = path.resolve(__dirname, "../dist/cli.js");
+    return spawnSync(process.execPath, [cliPath, ...args], {
       cwd: tempDir,
       encoding: "utf-8",
       env: { ...process.env, OLLAMA_HOST: "" } // ensure not running a real ollama unexpectedly if we want to simulate unavailable, but wait, the tests shouldn't require Ollama running so it doesn't matter, we let it fail or succeed

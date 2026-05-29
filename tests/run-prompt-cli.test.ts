@@ -4,10 +4,10 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
-const CLI_PATH = join(__dirname, "../src/cli.ts");
+const CLI_PATH = join(__dirname, "../dist/cli.js");
 
 function runCli(args: string[]) {
-  return spawnSync("npx", ["tsx", CLI_PATH, ...args], { encoding: "utf-8" });
+  return spawnSync(process.execPath, [CLI_PATH, ...args], { encoding: "utf-8" });
 }
 
 describe("onto run prompt", () => {

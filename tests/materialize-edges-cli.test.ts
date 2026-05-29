@@ -10,7 +10,7 @@ import {
   OntologyStateSchema,
 } from "../src/schemas/ontology.js";
 
-const CLI = path.resolve(__dirname, "..", "src", "cli.ts");
+const CLI = path.resolve(__dirname, "..", "dist", "cli.js");
 const REPO_ROOT = path.resolve(__dirname, "..");
 
 // Tiny fixture: a 2-file source tree where a.ts imports b.ts, and a
@@ -151,8 +151,8 @@ function runCli(args: string[], cwd: string): {
   status: number | null;
 } {
   const result = spawnSync(
-    "npx",
-    ["tsx", CLI, ...args],
+    process.execPath,
+    [CLI, ...args],
     {
       cwd,
       encoding: "utf-8",
