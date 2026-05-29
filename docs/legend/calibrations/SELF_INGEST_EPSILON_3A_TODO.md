@@ -341,7 +341,7 @@ FINAL:
 | `docs/legend/calibrations/SELF_INGEST_EPSILON_3A_2026-05-19_HYPOTHESIS.md` | Pre-registered hypotheses H1-H6, decision tree, candados |
 | `docs/legend/architecture/TARGET_ARCHITECTURE.md` | Where we're going (destination, not route) |
 | `docs/legend/calibrations/SELF_INGEST_DELTA_2026-05-18_SYNTHESIS.md` | The δ' baseline 3α compares against |
-| `docs/legend/calibrations/MILESTONE_REVIEW_2026-05-19.md` | Open issues; bugs 3.2 / 4.2 / 4.3 / 4.4 are still in backlog |
+| `docs/ROADMAP.md` | Open issues + current backlog (single source of truth; dated milestone snapshots retired 2026-05-28) |
 | `src/runtime/legend/ast-symbol-scanner.ts` | Move 1c + 3α grounding source |
 | `src/runtime/legend/export-recovery.ts` | The principal 3α metric module |
 | `src/runtime/legend/failure-mode-tagger.ts` | Per-node mode labels (v0) |

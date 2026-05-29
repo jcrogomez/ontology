@@ -4,7 +4,7 @@
 > Add a line here when you land a new calibration; one-liner first,
 > link second. If you're new to the project, start with §0.*
 
-**Maintained:** 2026-05-24 (initial cut covering 33 files; +1 Arm A0 control landed same day).
+**Maintained:** 2026-05-28 (retired the dated milestone-review section — daily review findings now roll into `docs/ROADMAP.md`, the single source of truth for open work; the dated snapshots live in git history).
 **Why this exists:** the calibration corpus grew past 30 files and a
 newcomer was forced to `grep -r SELF_INGEST` to reconstruct the
 narrative. Flagged in `MILESTONE_REVIEW_2026-05-24.md` §6 as a Baja
@@ -18,7 +18,7 @@ If you are catching up cold, read in this order:
 
 1. **[`SELF_INGEST_HYPOTHESIS_2026-05-13.md`](./SELF_INGEST_HYPOTHESIS_2026-05-13.md)** — the canonical Phase ε pre-registration. Frames the whole self-ingest program: what the round-trip `F ∘ G` is, what the matrix axes are, what "honest failure" looks like.
 2. **[`SELF_INGEST_EPSILON_3A_TODO.md`](./SELF_INGEST_EPSILON_3A_TODO.md)** — the running Move 3α document. The current entry point for resuming work; always reflects the latest state of the multi-arm bake-off.
-3. The latest **[`MILESTONE_REVIEW_*.md`](#5-milestone-reviews-daily-automated)** — the daily automated review. Tells you what shipped, what's pending, what bugs are open today.
+3. **[`../../ROADMAP.md`](../../ROADMAP.md)** — current state, open work, and the highest-value validation gaps. Daily review findings roll in here.
 
 Then read the most recent self-ingest run's **HYPOTHESIS → main report → SYNTHESIS** triplet for the most current data point (today: Move 3α Arm A / B / C-local + synthesis).
 
@@ -114,18 +114,16 @@ network topology mutates.
 
 ---
 
-## 4. Milestone reviews (daily, automated)
+## 4. Milestone reviews — retired as dated snapshots (2026-05-28)
 
-Output of the scheduled `ontology-pr-suggestions` task. Each review
-audits HEAD against the pre-registered hypotheses, flags concrete
-bugs found in code/reports, and ranks recommended next moves.
-
-- [`MILESTONE_REVIEW_2026-05-19.md`](./MILESTONE_REVIEW_2026-05-19.md) — first written read of the δ result. Flags Move B (Sonnet probe) as top action with bug 3.1 + δ synthesis as prerequisites.
-- [`MILESTONE_REVIEW_2026-05-20.md`](./MILESTONE_REVIEW_2026-05-20.md) — notes the project chose to build Move 3α tooling prerequisites first instead of going straight to Sonnet; nine commits landed.
-- [`MILESTONE_REVIEW_2026-05-21.md`](./MILESTONE_REVIEW_2026-05-21.md) — static for two days at the pre-flight checkpoint; single blocker is the Arm C model substitution decision.
-- [`MILESTONE_REVIEW_2026-05-22.md`](./MILESTONE_REVIEW_2026-05-22.md) — carries the post-review session update that built `bakeoff-synthesis.ts` and closed bug §3.2 + design §4.4 (`homeomorphism_verified` event audit).
-- [`MILESTONE_REVIEW_2026-05-23.md`](./MILESTONE_REVIEW_2026-05-23.md) — situation flipped: 10-commit burst landed 05-22; HEAD `ab76a18`; in-progress `--reps`/`--aggregator` feature.
-- [`MILESTONE_REVIEW_2026-05-24.md`](./MILESTONE_REVIEW_2026-05-24.md) — first review with Arm A data in hand. Headline: H1 confirmed on 6/6 metrics; §3.1 flags a metric-circularity confound; §4.1 catches the `node_0094` silent perimeter under-count. Both addressed in commit `e6141b1`.
+The scheduled daily-ontology-review task used to land a dated
+`MILESTONE_REVIEW_<date>.md` here. Those snapshots accumulated faster
+than they earned their keep (10 files, ~2,400 LoC, mostly re-flagging
+the same open items on low-activity days). The convention is retired:
+**daily review findings now roll into [`../../ROADMAP.md`](../../ROADMAP.md)**,
+which is the single source of truth for open work. The historical
+snapshots (05-19 … 05-28) remain in git history if a specific day's
+read is ever needed.
 
 ---
 
@@ -146,8 +144,8 @@ Multi-arm runs (Move 3α) additionally land per-arm reports (`_ARM_<X>.md`), a c
 ### Naming
 
 - `SELF_INGEST_<GREEK>_<YYYY-MM-DD>[_<SUFFIX>].md` for canonical Phase ε runs (β, β′, γ, δ, δ′, ε).
-- `MILESTONE_REVIEW_<YYYY-MM-DD>.md` for daily automated reviews.
 - Pre-ε calibrations carry topic-prefixed names (`HASH_TS_*`, `VIBE_REASONING_*`, `BAKEOFF_*`, `SMOKE_*`, `HIERARCHY_*`, `EMPIRICAL_*`).
+- Daily automated reviews are no longer dated files — findings roll into `docs/ROADMAP.md` (see §4).
 
 ### Sidecar JSONs
 
@@ -162,6 +160,6 @@ sidecars and `.stderr.log` files are gitignored — see `.gitignore`.
 When you land a calibration artifact in this directory:
 
 1. Drop the file in place using the naming convention above.
-2. Add a one-line entry to the appropriate section here (`§1` for ε runs, `§2` for pre-ε, `§3` for hierarchizer, `§4` for milestone reviews).
+2. Add a one-line entry to the appropriate section here (`§1` for ε runs, `§2` for pre-ε, `§3` for hierarchizer). Daily reviews go to `docs/ROADMAP.md`, not here.
 3. Cross-link the triplet siblings if applicable.
 4. Bump the "Maintained:" date at the top.

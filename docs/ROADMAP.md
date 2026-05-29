@@ -2,20 +2,24 @@
 
 ## Current state
 
-Project Legend **Phases α–δ shipped**; **Phase ε (self-ingestion of the
-Ontology repo) is mid-flight** with concrete data. Five self-ingest
-runs (β / β′ / γ / δ / δ′) landed iterative interventions on the core
-perimeter (~125 files), and Move 3α — the multi-arm bake-off testing
-AST grounding at compile-back — is producing the publishable
-cartography matrix. The platform underneath (network kernel, proposal
-system, semantic linker, compiler with intent gate + `--runtime-check`,
-four categorical extensions, plasticity layer, atomic writes,
-hardening sweep §3.1–§3.15) is closed.
+Project Legend **Phases α–ε closed**; **Phase ζ (workflow runtime) is
+active.** Phase ε (self-ingestion) closed 2026-05-26 on a 4-arm +
+2-column substate: five iterative self-ingest runs (β / β′ / γ / δ / δ′)
+plus the Move 3α multi-arm bake-off established that AST grounding
+contributes a real Δ = +0.355 mean Jaccard, and the §3.10 adjoint claim
+was upgraded T4 → T2. The fidelity-cartography matrix fills **2 of 5
+columns** (structural + behaviour; contract / intent are explicit
+no-data). Phase ζ has shipped a workflow-runtime v0 (typed-node state
+machine, predicate DSL, artefact-slot dataflow). The platform
+underneath (network kernel, proposal system, semantic linker, compiler
+with intent gate + `--runtime-check`, four categorical extensions,
+plasticity layer, atomic writes, hardening sweep §3.1–§3.15) is closed.
 
 **Where to look:**
-- Run history, hypothesis triplets, and daily milestone reviews: [`legend/calibrations/CALIBRATION_LOG.md`](legend/calibrations/CALIBRATION_LOG.md).
+- This file is the single source of truth for what is open. Daily review findings roll in here, not into dated snapshots.
+- ε run history + hypothesis triplets: [`legend/calibrations/CALIBRATION_LOG.md`](legend/calibrations/CALIBRATION_LOG.md).
 - Per-PR / per-commit detail: [`RELEASE_NOTES.md`](RELEASE_NOTES.md).
-- Move 3α current TODO + resume point: [`legend/calibrations/SELF_INGEST_EPSILON_3A_TODO.md`](legend/calibrations/SELF_INGEST_EPSILON_3A_TODO.md).
+- Move 3α TODO + resume point: [`legend/calibrations/SELF_INGEST_EPSILON_3A_TODO.md`](legend/calibrations/SELF_INGEST_EPSILON_3A_TODO.md).
 - Design background: [`PROJECT_LEGEND.md`](PROJECT_LEGEND.md), [`POSITIONING.md`](POSITIONING.md), [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md).
 
 ## Phase plan (Project Legend)
@@ -26,20 +30,32 @@ hardening sweep §3.1–§3.15) is closed.
 | β | Multi-file compile + `--target`, `node.literal`, path fibration | ✅ shipped |
 | γ | `onto ingest <file/dir>`, Anthropic provider, static-edge inference, rich proposal payload | ✅ shipped |
 | δ | Inspector / translator (`onto node inspect`) + verification (`onto verify-homeomorphism`) | ✅ shipped |
-| **ε baseline** | β / β′ / γ / δ / δ′ self-ingest runs; Move 1 / 1b / 1c (export-vocab + vocab-domain + safety net); EXTRACTION_SYSTEM_PROMPT rewrite | ✅ shipped |
-| **ε Move 3α** | AST grounding at compile-back; multi-arm bake-off (qwen / granite / starcoder local + devstral cloud deferred) | 🟡 active — Arm A confirms H1 on 6/6; Arm B HW-vetoed; Arm C-local contract-violation; Arm A0 control landed — grounding contributes Δ = +0.355 mean Jaccard over a strong qwen-7b + safety-net baseline (0.226 → 0.581), §3.1 circularity worry resolved as "real lift, not artefact" |
-| **ε close** | Land Arm A0 + cloud Arm C (~$5–10 GPU rental), recalibrate hypotheses, upgrade `MATHEMATICAL_CLAIMS.md` §3.10 adjoint T4 → T2 | 🟡 pending Arm A0 + cloud Arm C |
-| ζ | Release + Open-Prompt seeds (sign, verify-published, replay) | pending |
+| ε | β / β′ / γ / δ / δ′ self-ingest runs + Move 3α multi-arm bake-off (AST grounding Δ = +0.355 mean Jaccard, §3.1 circularity resolved); §3.10 adjoint T4 → T2 | ✅ closed 2026-05-26 (4-arm + 2-column substate) |
+| **ζ** | Workflow runtime — typed-node state machine, predicate DSL, artefact-slot dataflow, behaviour-axis checker | 🟡 active — runtime v0 + §4.1 dataflow fix landed; never run end-to-end against a real LLM |
 
 ## Open follow-ups
 
-### Phase ε remaining
+### Highest-value validation gaps
 
-- ✅ **Arm A0 control** landed 2026-05-24 (mean Jaccard 0.226; grounding Δ = +0.355). §3.1 circularity worry resolved as "real lift, not artefact". Promoted to bootstrap history.
-- 🟡 **Arm C-cloud — `devstral-small-2:24b`** on rented GPU (A10/L4 class, ~$5–10 for the full perimeter). The clean H3 test; local 8 GB Mac is infeasible.
-- 🟡 **Behaviour-axis checker — v0 spec landed.** [`legend/BEHAVIOUR_AXIS_CHECKER_SPEC.md`](legend/BEHAVIOUR_AXIS_CHECKER_SPEC.md). Cartography matrix currently fills only `structural` (+ `cost`); `contract` / `behavior` / `intent` are explicit no-data (the axis is spelled American in `HONESTY_AXES` to match shipped code; prose uses British). Behaviour is next-highest-value because it is **orthogonal to AST grounding** and so immune to §3.1 circularity. v0 is a smoke runtime-equivalence check over a curated ~20-node subset; ~4–6 h estimated implementation; can ship before or after Arm C-cloud (backfill against archived workspaces is $0).
-- 🟡 **`onto legend bakeoff-synthesis` CLI.** Library + renderer ship; cross-arm synthesis still runs through a hand-rolled driver (`scripts/run-3a-bakeoff-synthesis.ts`). Verb removes the last manual cherry-picking surface.
-- 🟡 **`MATHEMATICAL_CLAIMS.md` §3.10 adjoint T4 → T2.** Gated on a clean ε close.
+These close the largest distance between what's *built* and what's
+*demonstrated*:
+
+- 🔴 **One real-LLM verify-refine run.** The ζ workflow runtime is validated only in dry-run (canned pass) and scripted-mock tests; it has never refined a real solution end-to-end. The §4.1 dataflow fix unblocks this — run [`examples/workflow-imo-verify-refine`](../examples/workflow-imo-verify-refine) against Anthropic and commit the trace.
+- 🔴 **Run the test suite.** Local Node is 18; vitest's rolldown needs Node ≥ 20.12 (`node:util.styleText`). The 144 test files cannot be executed here — get onto Node 20+ so the suite actually runs in-harness rather than via hand-rolled `tsx` checks.
+
+### Phase ζ — workflow runtime
+
+- 🟡 **Verdict-map determinism thread** (`MATHEMATICAL_CLAIMS.md` §3.10 T2 → T1). Scope-parallel to the runtime; can start independently.
+- 🟡 **Static branch-coverage lint** in `graph-loader.ts` — project the predicate set over `verdict × severity` and warn at load time on uncovered points, turning runtime `no_matching_branch` into a load-time hard error (spec §3.2).
+- 🔵 **Spec ↔ example reject-predicate drift** (§4.3): `WORKFLOW_RUNTIME_SPEC.md` and the IMO `graph.json` reject branch carry different semantics; pick the canonical one.
+- 🔵 **`severity` schema** (§4.2): `with-severity` requires `severity` on every verdict; prompt wording was tightened, but a `pass` that omits it still falls back to `fail/major`. Make it optional in the schema or retry-with-guidance.
+- 🔵 **Behaviour checker module eviction** (`behavior-checker.ts`): `?ts=` cache-bust never frees old instances. Fine at ~20 nodes; revisit at v1.
+
+### Cartography / ε tail (optional reinforcement)
+
+- 🔵 **Arm C-cloud — `devstral-small-2:24b`** on rented GPU (~$5–10). ε closed without it; this is a reinforcement of H3, not a blocker. Local 8 GB Mac is infeasible.
+- 🟡 **Contract / intent columns** — the matrix fills 2 of 5; these two remain explicit no-data.
+- 🟡 **`onto legend bakeoff-synthesis` CLI.** Cross-arm synthesis still runs through a hand-rolled driver (`scripts/run-3a-bakeoff-synthesis.ts`); the verb removes the last manual surface.
 
 ### Plasticity follow-ups
 
@@ -82,8 +98,9 @@ Detail per PR is in [`RELEASE_NOTES.md`](RELEASE_NOTES.md); the table below is a
 | Legend β | Multi-file compile (`run-batch`, `--target`), `node.literal`, path fibration, two-phase commit on writeArtifact. |
 | Legend γ | `onto ingest <file/dir>`, Anthropic provider, TS/Python static-edge inference, walker AI indicator, rich proposal payload. |
 | Legend γ-7 + δ | MANDATORY EXPORTS block, `onto verify-homeomorphism` (dual-distance LoC + Jaccard, five-label verdict), `onto node inspect` (Inspector / Lupa). |
-| Legend ε | Five self-ingest runs (β / β′ / γ / δ / δ′) on the Ontology core perimeter; Move 1 / 1b / 1c; Move 3α tooling burst (bakeoff-synthesis, perimeterHash audit, `--reps` median); Move 3α multi-arm bake-off (Arm A landed 2026-05-23, Arms B + C-local landed 2026-05-24 alongside cross-arm synthesis); Move 1 hygiene + manifestation guard closes the `node_0094` silent-exclusion. Full triplet history: [`CALIBRATION_LOG.md`](legend/calibrations/CALIBRATION_LOG.md). |
+| Legend ε | Five self-ingest runs (β / β′ / γ / δ / δ′) on the Ontology core perimeter; Move 1 / 1b / 1c; Move 3α tooling burst (bakeoff-synthesis, perimeterHash audit, `--reps` median); Move 3α multi-arm bake-off (Arm A 2026-05-23, Arms B + C-local + A0 control + cross-arm synthesis 2026-05-24); `node_0094` silent-exclusion fix. Closed 2026-05-26 with §3.10 adjoint T4 → T2. Full triplet history: [`CALIBRATION_LOG.md`](legend/calibrations/CALIBRATION_LOG.md). |
+| Legend ζ | Workflow runtime v0 — standalone workflow schema, graph loader with structural + predicate validation, predicate DSL (`consecutive` / `since_last` / `step_count`), typed-node executor, behaviour-axis checker (cartography matrix 1/5 → 2/5 columns), artefact-slot dataflow for verify-refine (§4.1). |
 
 ---
 
-*Last refresh: **2026-05-24** (late). Phase ε is mid-flight; Arm A0 control landed (grounding Δ = +0.355 mean Jaccard, circularity worry resolved); cloud Arm C is the remaining gate for a clean ε close and the §3.10 adjoint T4 → T2 upgrade. The roadmap is kept in sync with `main` — when a follow-up ships, promote it out of the open list and into the bootstrap-history table or `RELEASE_NOTES.md`.*
+*Last refresh: **2026-05-28**. Phase ε closed (4-arm + 2-column substate, §3.10 T4 → T2); Phase ζ active — workflow runtime v0 shipped, §4.1 dataflow fixed, but not yet run against a real LLM. This file is the single source of truth for open work; when a follow-up ships, promote it out of the open list into the bootstrap-history table or `RELEASE_NOTES.md`.*

@@ -386,4 +386,4 @@ Listed in priority order (cheapest-with-most-leverage first). Each item is a rou
 - Whenever a doc adds a new mathematical claim, add an entry here in the same PR.
 - Whenever a test pinning a categorical law lands, upgrade the relevant tier here.
 - Whenever a feature is removed or downgraded, downgrade the tier.
-- The `MILESTONE_REVIEW_*.md` series should reference this document by section number when reporting on rigor changes (rather than restating the audit).
+- The daily review (findings tracked in `docs/ROADMAP.md`) should reference this document by section number when reporting on rigor changes (rather than restating the audit).
