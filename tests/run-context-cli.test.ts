@@ -73,8 +73,15 @@ test("onto run context fails for missing target", () => {
   expect(result.stderr).toContain("Target node not found: node_missing");
 });
 
+// These --provider ollama tests pin the *soft-fail* contract. They
+// target an unreachable host (127.0.0.1:9999) so the dispatch fails
+// fast (connection refused) and the test is deterministic — without
+// it, a running local Ollama does a real (multi-second) generation
+// and the test times out. The accept-branch assertions remain for
+// documentation; in practice the unreachable host always takes the
+// soft-fail branch.
 test("onto run context --provider ollama soft-fails or returns response", () => {
-  const result = runCli(["run", "context", "node_0000_canon", "--provider", "ollama"]);
+  const result = runCli(["run", "context", "node_0000_canon", "--provider", "ollama", "--ollama-host", "http://127.0.0.1:9999"]);
   if (result.status === 0) {
     expect(result.stdout).toContain("=== ONTOLOGY RUN CONTEXT ===");
     expect(result.stdout).toContain("Provider:  ollama");
@@ -85,7 +92,7 @@ test("onto run context --provider ollama soft-fails or returns response", () => 
 });
 
 test("onto run context --provider ollama --json soft-fails or returns parseable JSON", () => {
-  const result = runCli(["run", "context", "node_0000_canon", "--provider", "ollama", "--json"]);
+  const result = runCli(["run", "context", "node_0000_canon", "--provider", "ollama", "--json", "--ollama-host", "http://127.0.0.1:9999"]);
   if (result.status === 0) {
     expect(() => JSON.parse(result.stdout)).not.toThrow();
     const parsed = JSON.parse(result.stdout);
@@ -101,7 +108,7 @@ test("onto run context --provider ollama --json soft-fails or returns parseable 
 });
 
 test("onto run context --provider ollama --validate soft-fails or validates response", () => {
-  const result = runCli(["run", "context", "node_0000_canon", "--provider", "ollama", "--validate"]);
+  const result = runCli(["run", "context", "node_0000_canon", "--provider", "ollama", "--validate", "--ollama-host", "http://127.0.0.1:9999"]);
   if (result.status === 0) {
     expect(result.stdout).toContain("Validation:");
   } else {
@@ -114,7 +121,7 @@ test("onto run context --provider ollama does not mutate .ontology", () => {
   const ontologyDir = path.join(tempDir, ".ontology");
   const beforeHash = hashDirectory(ontologyDir);
 
-  const result = runCli(["run", "context", "node_0000_canon", "--provider", "ollama"]);
+  const result = runCli(["run", "context", "node_0000_canon", "--provider", "ollama", "--ollama-host", "http://127.0.0.1:9999"]);
   // Whether it succeeds or soft-fails, it should not mutate
   const afterHash = hashDirectory(ontologyDir);
   expect(beforeHash).toBe(afterHash);
