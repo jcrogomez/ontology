@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createOllamaAdapter } from "../src/runtime/llm/ollama/adapter.js";
+import { isModelUnavailableError } from "../src/runtime/llm/dispatcher.js";
 
 describe("Ollama Adapter", () => {
   it("ollama adapter can be constructed", () => {
@@ -51,14 +52,18 @@ describe("Ollama Adapter", () => {
       expect(response).toBeDefined();
       expect(response.provider).toBe("ollama");
     } catch (err: unknown) {
-      // Soft-fail if Ollama is not running
+      // Soft-fail is legitimate in two states: Ollama is DOWN (a
+      // network error) OR Ollama is UP but the default model isn't
+      // pulled (a model-unavailable error like `model 'X' not found` —
+      // the common local-dev condition). Accept both.
       expect(err).toBeDefined();
       const message = err instanceof Error ? err.message : String(err);
       expect(
         message.includes("fetch failed") ||
         message.includes("ECONNREFUSED") ||
         message.includes("network") ||
-        message.includes("Failed to fetch")
+        message.includes("Failed to fetch") ||
+        isModelUnavailableError(err)
       ).toBe(true);
     }
   });
