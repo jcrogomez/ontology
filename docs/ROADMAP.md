@@ -41,7 +41,7 @@ These close the largest distance between what's *built* and what's
 *demonstrated*:
 
 - 🔴 **One real-LLM verify-refine run.** The ζ workflow runtime is validated only in dry-run (canned pass) and scripted-mock tests; it has never refined a real solution end-to-end. The §4.1 dataflow fix unblocks this — run [`examples/workflow-imo-verify-refine`](../examples/workflow-imo-verify-refine) against Anthropic and commit the trace.
-- 🔴 **Run the test suite.** Local Node is 18; vitest's rolldown needs Node ≥ 20.12 (`node:util.styleText`). The 144 test files cannot be executed here — get onto Node 20+ so the suite actually runs in-harness rather than via hand-rolled `tsx` checks.
+- 🟡 **Test suite runs on Node 20+, but is not all-green.** Default Node is 18 (vitest's rolldown needs ≥ 20.12 for `node:util.styleText`); the Homebrew `node@23` runs it. Running it surfaced **pre-existing failures unrelated to current work** — stale expectations in `tests/llm-dispatcher.test.ts` (3: model-precedence default drifted haiku→sonnet, two `isModelUnavailableError` match-string mismatches) and `tests/model-capabilities.test.ts` (1: a task's preferred list is no longer empty) — plus an **apparent hang** mid-run (likely `tests/ollama-adapter.test.ts` waiting on a real Ollama connect). Each dispatcher/capabilities failure needs a code-vs-test correctness call. The workflow + verify suites are green (`workflow-runtime` 56/56, `verify-determinism` 5/5).
 
 ### Phase ζ — workflow runtime
 
