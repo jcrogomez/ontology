@@ -12,7 +12,11 @@ import { fileURLToPath } from 'node:url';
 // across the whole worker lifetime.
 const helperDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(helperDir, '..', '..');
-const cliPath = path.join(repoRoot, 'src', 'cli.ts');
+// Spawn the COMPILED CLI (built once by tests/helpers/global-setup.ts)
+// instead of `npx tsx src/cli.ts`. `node dist/cli.js` starts in ~0.4s
+// with no per-spawn TypeScript transpile, vs ~1s for `npx tsx` — the
+// dominant cost across the suite's hundreds of CLI invocations.
+const cliPath = path.join(repoRoot, 'dist', 'cli.js');
 
 export interface RunCliResult {
   stdout: string;
@@ -27,7 +31,7 @@ export interface RunCliResult {
  * @returns The stdout, stderr, and exit code.
  */
 export function runCli(cwd: string, args: string[]): RunCliResult {
-  const result = spawnSync('npx', ['tsx', cliPath, ...args], {
+  const result = spawnSync(process.execPath, [cliPath, ...args], {
     cwd,
     encoding: 'utf-8',
     env: { ...process.env }, // Pass along environment variables
