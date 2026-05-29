@@ -7,7 +7,13 @@
 > functor; and the protocol layer that makes "what an organisation runs"
 > verifiable without exposing its source.
 
-Status: **Phases α + β + γ + δ shipped on `main` (2026-05-12, late).**
+Status: **Phases α–ε shipped; Phase ζ (workflow runtime) active.** Phase ε
+(self-ingestion) closed 2026-05-26; Phase ζ is the workflow runtime
+(`onto workflow run`, [`legend/WORKFLOW_RUNTIME_SPEC.md`](legend/WORKFLOW_RUNTIME_SPEC.md)),
+not the "release" placeholder the phase plan below still names. **Live phase
+state + open work: [`ROADMAP.md`](ROADMAP.md)** — the design narrative below
+is preserved as written and may lag. Original milestone:
+**Phases α + β + γ + δ shipped on `main` (2026-05-12, late).**
 Pre-foundation plasticity (§1–§6), Layer 1 (`compile run-batch` +
 `--target`), Layer 2 (`node.literal`), Layer 3 (static-edge inference,
 TS via compiler API and Python via regex), Layer 4 (`onto node inspect`

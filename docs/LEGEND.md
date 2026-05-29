@@ -1,5 +1,10 @@
 # LEGEND — release notes for the inverse-functor cycle
 
+> **Historical release note (0.4.0, 2026-05-13).** Preserved as written.
+> It predates the Phase ε close (2026-05-26) and Phase ζ (the workflow
+> runtime). For current phase state and open work see
+> [`ROADMAP.md`](ROADMAP.md); any "what's next" below is as-of-0.4.0.
+
 > *Legens* — "the one who reads." A legend, on a map, is the key that
 > tells you how to read the territory. This document is that key for
 > Project Legend: the operational construction of the inverse of the

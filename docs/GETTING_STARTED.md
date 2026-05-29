@@ -8,9 +8,19 @@ A 5-minute hands-on tour that takes you from a blank directory to a small, valid
 git clone https://github.com/jcrogomez/ontology.git
 cd ontology
 npm install
-npm run check     # typecheck — should be silent
-npm run test:run  # full suite — should be all green
+npm run check     # typecheck — should be silent (exit 0)
+npm run test:run  # test suite — see the Node note below
 ```
+
+> **Node version.** `package.json` requires Node **≥ 20** (`engines`), and
+> the test runner (vitest/rolldown) specifically needs **≥ 20.12** —
+> on older Node it aborts at startup with
+> `SyntaxError: ... does not provide an export named 'styleText'`. If
+> your default `node` is 18, run the suite under a 20+ toolchain (e.g.
+> Homebrew `node@23`: `PATH="$(brew --prefix node@23)/bin:$PATH" npm run test:run`).
+> `npm run check` (typecheck) and `npm run dev` (the CLI, via `tsx`)
+> work on Node 18. The full suite's current green/known-failing status
+> lives in [`ROADMAP.md`](ROADMAP.md).
 
 You will run the CLI as `npm run dev -- <command>`. When Ontology is published, `onto <command>` will be the equivalent.
 
