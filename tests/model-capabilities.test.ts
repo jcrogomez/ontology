@@ -99,7 +99,14 @@ describe("model-capabilities — modelsPreferredForTask", () => {
   });
 
   it("returns empty array for tasks no model is preferred for (yet)", () => {
-    expect(modelsPreferredForTask("critique")).toEqual([]);
+    // `reasoning` is the only LlmTaskKind no profile claims via
+    // preferredFor. (`critique` used to be empty too, but Opus is now
+    // calibrated for it — see the next test.)
+    expect(modelsPreferredForTask("reasoning")).toEqual([]);
+  });
+
+  it("returns the calibrated critic for critique (claude-opus-4-7)", () => {
+    expect(modelsPreferredForTask("critique")).toContain("claude-opus-4-7");
   });
 });
 

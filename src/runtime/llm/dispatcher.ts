@@ -42,7 +42,11 @@ export function buildDispatchCandidates(
   request: LlmRequest,
   options: Pick<DispatchOptions, 'provider' | 'defaultModel'> | undefined,
 ): readonly (string | undefined)[] {
-  const userOverride = options?.defaultModel ?? request.model;
+  // Precedence per the docstring above: request.model (most specific)
+  // wins over options.defaultModel. (The previous order had these
+  // flipped, contradicting the documented contract — see
+  // tests/llm-dispatcher.test.ts "request.model takes precedence".)
+  const userOverride = request.model ?? options?.defaultModel;
   if (userOverride) return [userOverride];
 
   const provider = options?.provider ?? 'mock';
@@ -61,7 +65,11 @@ export function buildDispatchCandidates(
 // fall back than block on an ambiguous string.
 export function isModelUnavailableError(err: unknown): boolean {
   const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
-  if (message.includes('model not found')) return true;
+  // Ollama interpolates the model id between "model" and "not found"
+  // (e.g. `model 'qwen2.5-coder:14b' not found`), so a literal
+  // "model not found" substring misses the real shape. Match the two
+  // tokens jointly — same idiom as the 404 check below.
+  if (message.includes('model') && message.includes('not found')) return true;
   if (message.includes('model_not_found')) return true;
   if (message.includes('not pulled')) return true;
   if (message.includes('does not exist') && message.includes('model')) return true;
