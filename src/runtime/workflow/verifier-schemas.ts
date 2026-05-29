@@ -30,10 +30,17 @@ export const SimplePassFailSchema = z.object({
 });
 export type SimplePassFailVerdict = z.infer<typeof SimplePassFailSchema>;
 
+// `severity` and `issues` are intentionally lenient: a correct `pass`
+// verdict has no severity to report and an empty issues list, and
+// models routinely emit `{"verdict":"pass"}` alone. Requiring those
+// fields made such a valid pass fail schema-parse, trip the retry, and
+// then fall back to `fail/major` — silently flipping a pass to a fail
+// (§4.2). `severity` is therefore optional (meaningful only on a fail)
+// and `issues` defaults to `[]`.
 export const WithSeveritySchema = z.object({
   verdict: z.enum(["pass", "fail"]),
-  severity: z.enum(["minor", "major"]),
-  issues: z.array(z.string()),
+  severity: z.enum(["minor", "major"]).optional(),
+  issues: z.array(z.string()).default([]),
 });
 export type WithSeverityVerdict = z.infer<typeof WithSeveritySchema>;
 

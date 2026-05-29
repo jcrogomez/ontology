@@ -362,6 +362,22 @@ describe("verifier schemas / parseVerdict", () => {
       parseVerdict("simple-pass-fail", { reason: "no verdict" }),
     ).toThrow();
   });
+
+  it("accepts a bare with-severity pass (severity optional, issues defaulted)", () => {
+    // §4.2: a clean pass has no severity and no issues — requiring them
+    // made this fail-parse → retry → silent fall back to fail/major.
+    const v = parseVerdict("with-severity", { verdict: "pass" });
+    expect(v).toEqual({ verdict: "pass", issues: [] });
+  });
+
+  it("still accepts a fail with severity + issues", () => {
+    const v = parseVerdict("with-severity", {
+      verdict: "fail",
+      severity: "minor",
+      issues: ["typo on line 3"],
+    });
+    expect(v).toEqual({ verdict: "fail", severity: "minor", issues: ["typo on line 3"] });
+  });
 });
 
 // ── Graph loader ────────────────────────────────────────────────────────────

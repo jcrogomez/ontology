@@ -146,7 +146,7 @@ Each verifier declares its output schema via a new node field
 `coordinates.verifierSchema`, one of:
 
 - `"simple-pass-fail"` — `{verdict: "pass" | "fail", reason?: string}`
-- `"with-severity"` — `{verdict: "pass" | "fail", severity: "minor" | "major", issues: string[]}`
+- `"with-severity"` — `{verdict: "pass" | "fail", severity?: "minor" | "major", issues?: string[]}`. `severity` is optional (meaningful only on a `fail`) and `issues` defaults to `[]`, so a bare `{"verdict":"pass"}` is valid — a strict schema here silently flipped clean passes to `fail/major` via the parse-retry fallback (§4.2).
 - A user-defined Zod schema named in a registry (deferred to v1)
 
 The schema is *load-bearing* for the predicate expression — a
