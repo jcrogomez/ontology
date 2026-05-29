@@ -4,6 +4,7 @@ import {
   parsePredicate,
   evaluatePredicate,
   predicateFields,
+  predicateCanMatchPoint,
   validatePredicateAgainstSchema,
 } from "../src/runtime/workflow/predicate-parser.js";
 import {
@@ -216,6 +217,95 @@ describe("predicate field-set introspection", () => {
   it("validatePredicateAgainstSchema accepts with-severity for severity references", () => {
     const ast = parsePredicate(`severity == "major" && verdict == "fail"`);
     expect(validatePredicateAgainstSchema(ast, "with-severity")).toEqual([]);
+  });
+});
+
+// ── Static coverage analysis (branch-coverage lint) ─────────────────────────
+
+describe("predicate static coverage / predicateCanMatchPoint", () => {
+  it("verdictEq matches only its verdict point", () => {
+    const ast = parsePredicate(`verdict == "pass"`);
+    expect(predicateCanMatchPoint(ast, { verdict: "pass" })).toBe(true);
+    expect(predicateCanMatchPoint(ast, { verdict: "fail" })).toBe(false);
+  });
+
+  it("consecutive() requires the current point to satisfy its inner", () => {
+    const ast = parsePredicate(`consecutive(verdict == "pass", 5)`);
+    expect(predicateCanMatchPoint(ast, { verdict: "pass" })).toBe(true);
+    expect(predicateCanMatchPoint(ast, { verdict: "fail" })).toBe(false);
+  });
+
+  it("since_last() can fire only where the current point does NOT satisfy inner", () => {
+    const ast = parsePredicate(`since_last(verdict == "pass") >= 10`);
+    // A pass now resets the counter to 0, so the predicate cannot fire.
+    expect(predicateCanMatchPoint(ast, { verdict: "pass" })).toBe(false);
+    // A fail now keeps the counter running, so it can fire with history.
+    expect(predicateCanMatchPoint(ast, { verdict: "fail" })).toBe(true);
+  });
+
+  it("since_last(pass || minor) >= 10 can fire only on major fails", () => {
+    const ast = parsePredicate(`since_last(verdict == "pass" || severity == "minor") >= 10`);
+    expect(predicateCanMatchPoint(ast, { verdict: "fail", severity: "major" })).toBe(true);
+    expect(predicateCanMatchPoint(ast, { verdict: "fail", severity: "minor" })).toBe(false);
+    expect(predicateCanMatchPoint(ast, { verdict: "pass", severity: "minor" })).toBe(false);
+  });
+});
+
+describe("graph loader / branch-coverage lint (spec §3.2)", () => {
+  it("a fully-covered simple-pass-fail verifier emits no warnings", () => {
+    const loaded = loadWorkflowGraph(MINIMAL_GRAPH);
+    expect(loaded.warnings).toEqual([]);
+  });
+
+  it("the IMO example is fully covered (verdict × severity)", () => {
+    const p = path.resolve(
+      __dirname,
+      "..",
+      "examples",
+      "workflow-imo-verify-refine",
+      "graph.json",
+    );
+    const loaded = loadWorkflowGraphFromFile(p);
+    expect(loaded.warnings).toEqual([]);
+  });
+
+  it("warns when a verdict point no predicate can match (missing fail branch)", () => {
+    const graph = {
+      entry: "v1",
+      nodes: [
+        { id: "v1", kind: "verifier", prompt: "p", verifierSchema: "simple-pass-fail" },
+        { id: "t", kind: "terminal", terminalVerdict: "accept" },
+      ],
+      edges: [
+        { from: "v1", to: "t", type: "branches_on", predicate: `verdict == "pass"` },
+      ],
+    };
+    const loaded = loadWorkflowGraph(graph);
+    expect(loaded.warnings).toHaveLength(1);
+    expect(loaded.warnings[0]).toMatch(/incomplete branch coverage/);
+    expect(loaded.warnings[0]).toMatch(/\bfail\b/);
+    expect(loaded.warnings[0]).not.toMatch(/\bpass\b.*not declared/); // pass IS covered
+  });
+
+  it("warns about the specific uncovered with-severity points", () => {
+    // Covers pass (both severities via verdict==pass) and fail/major,
+    // but leaves fail/minor uncovered.
+    const graph = {
+      entry: "v1",
+      nodes: [
+        { id: "v1", kind: "verifier", prompt: "p", verifierSchema: "with-severity" },
+        { id: "t_accept", kind: "terminal", terminalVerdict: "accept" },
+        { id: "t_reject", kind: "terminal", terminalVerdict: "reject" },
+      ],
+      edges: [
+        { from: "v1", to: "t_accept", type: "branches_on", predicate: `verdict == "pass"` },
+        { from: "v1", to: "t_reject", type: "branches_on", predicate: `verdict == "fail" && severity == "major"` },
+      ],
+    };
+    const loaded = loadWorkflowGraph(graph);
+    expect(loaded.warnings).toHaveLength(1);
+    expect(loaded.warnings[0]).toMatch(/fail\/minor/);
+    expect(loaded.warnings[0]).not.toMatch(/fail\/major/);
   });
 });
 

@@ -61,6 +61,28 @@ export function verifierSchemaFields(name: VerifierSchemaName): Set<string> {
 }
 
 /**
+ * The full set of verdict "points" a schema can emit — the cartesian
+ * product of its enumerable fields. Used by the graph loader's
+ * branch-coverage lint to check that every point a verifier could
+ * produce is matched by at least one outgoing predicate.
+ */
+export function verifierSchemaPoints(
+  name: VerifierSchemaName,
+): { verdict: string; severity?: string }[] {
+  switch (name) {
+    case "simple-pass-fail":
+      return [{ verdict: "pass" }, { verdict: "fail" }];
+    case "with-severity":
+      return [
+        { verdict: "pass", severity: "minor" },
+        { verdict: "pass", severity: "major" },
+        { verdict: "fail", severity: "minor" },
+        { verdict: "fail", severity: "major" },
+      ];
+  }
+}
+
+/**
  * Parse a string (a Zod-validated LLM response payload) into a
  * verdict matching the named schema. Returns the parsed verdict on
  * success; throws Zod's error on shape mismatch.

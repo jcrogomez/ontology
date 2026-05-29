@@ -48,7 +48,7 @@
       "kind": "terminal",
       "terminalVerdict": "reject",
       "metadata": {
-        "reason": "10 consecutive major-issue verifications with no intervening pass"
+        "reason": "10 consecutive major-issue verifications with no intervening pass or minor"
       }
     }
   ],
@@ -73,7 +73,7 @@
       "from": "step3_verification",
       "to": "step6_prime_reject",
       "type": "branches_on",
-      "predicate": "since_last(verdict == \"pass\") >= 10 && severity == \"major\""
+      "predicate": "since_last(verdict == \"pass\" || severity == \"minor\") >= 10"
     },
     {
       "from": "step3_verification",

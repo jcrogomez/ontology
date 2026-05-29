@@ -310,6 +310,56 @@ export function validatePredicateAgainstSchema(
   return unknown;
 }
 
+// ── Static coverage analysis ──────────────────────────────────────────────────
+
+/**
+ * Optimistic static check: COULD this predicate ever fire on a visit
+ * whose CURRENT verdict/severity equals `point`? Used by the graph
+ * loader's branch-coverage lint (spec §3.2).
+ *
+ * History- and step-gated operators are treated optimistically — we
+ * assume the surrounding trace can be arranged to satisfy their
+ * counting constraint — EXCEPT where the current point alone makes the
+ * predicate impossible:
+ *   - `consecutive(inner, n)`: the current visit is inside the window,
+ *     so it must satisfy `inner`.
+ *   - `since_last(inner) >= n` (n ≥ 1): fires only when the current
+ *     visit does NOT satisfy `inner` (otherwise the distance is 0 < n).
+ *   - `step_count >= n`: independent of the current point.
+ *
+ * Because a fully-specified point fixes every field the v0 grammar can
+ * read, `inner` is deterministic at a point, so the negation used for
+ * `since_last` is exact. A point that NO predicate can match is a
+ * guaranteed runtime `no_matching_branch`; the loader warns about it.
+ */
+export function predicateCanMatchPoint(
+  ast: PredicateAst,
+  point: { verdict: string; severity?: string },
+): boolean {
+  switch (ast.kind) {
+    case "verdictEq":
+      return point.verdict === ast.value;
+    case "severityEq":
+      return point.severity === ast.value;
+    case "stepCountGte":
+      return true;
+    case "consecutive":
+      return predicateCanMatchPoint(ast.inner, point);
+    case "sinceLastGte":
+      return ast.n <= 0 ? true : !predicateCanMatchPoint(ast.inner, point);
+    case "and":
+      return (
+        predicateCanMatchPoint(ast.left, point) &&
+        predicateCanMatchPoint(ast.right, point)
+      );
+    case "or":
+      return (
+        predicateCanMatchPoint(ast.left, point) ||
+        predicateCanMatchPoint(ast.right, point)
+      );
+  }
+}
+
 // ── Evaluator ───────────────────────────────────────────────────────────────
 
 /**

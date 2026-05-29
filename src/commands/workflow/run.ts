@@ -58,6 +58,15 @@ export async function workflowRunCommand(
     return;
   }
 
+  // Surface non-fatal load-time warnings (branch-coverage gaps, spec
+  // §3.2). In human mode print them before running; in --json mode
+  // they ride along in the result envelope below.
+  if (!options.json && loaded.warnings.length > 0) {
+    for (const w of loaded.warnings) {
+      console.error(`⚠ ${w}`);
+    }
+  }
+
   const initialInput = fs.readFileSync(inputPath, "utf-8");
 
   const provider = options.provider as LlmProvider | undefined;
@@ -85,7 +94,7 @@ export async function workflowRunCommand(
   }
 
   if (options.json) {
-    console.log(JSON.stringify({ ok: true, result }, null, 2));
+    console.log(JSON.stringify({ ok: true, warnings: loaded.warnings, result }, null, 2));
     return;
   }
 

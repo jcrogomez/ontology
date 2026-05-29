@@ -29,10 +29,10 @@ match, the workflow rejects with `no_matching_branch`. The order in
 1. `consecutive(verdict == "pass", 5)` → `step6_accept` — once 5
    straight passes accumulate, accept terminates immediately, even
    if the recent history mixed in failures elsewhere.
-2. `since_last(verdict == "pass") >= 10 && severity == "major"` →
-   `step6_prime_reject` — only fires when 10 visits have happened
-   without any intervening pass AND the most-recent visit's severity
-   is major.
+2. `since_last(verdict == "pass" || severity == "minor") >= 10` →
+   `step6_prime_reject` — fires on 10 consecutive major-issue
+   verifications: a pass OR a minor-severity verdict resets the
+   counter, so this only trips after 10 straight major fails.
 3. `verdict == "pass"` → `step3b_revisit` — a pass that does not yet
    satisfy the 5-consecutive criterion; loop back through the
    pass-through node to re-verify.

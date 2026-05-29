@@ -7,9 +7,11 @@ import {
 } from "../../schemas/workflow.js";
 import {
   parsePredicate,
+  predicateCanMatchPoint,
   validatePredicateAgainstSchema,
   type PredicateAst,
 } from "./predicate-parser.js";
+import { verifierSchemaPoints } from "./verifier-schemas.js";
 
 // Workflow graph loader (Phase ζ v0).
 //
@@ -46,6 +48,15 @@ export interface LoadedGraph {
    * same target with different predicates) stay distinguishable.
    */
   predicateAstByEdge: Map<string, PredicateAst>;
+  /**
+   * Non-fatal load-time warnings (spec §3.2). Currently: verifier
+   * branch-coverage gaps — verdict points the schema can emit that no
+   * outgoing predicate can match, which would stall the runtime with
+   * `no_matching_branch`. Empty when the graph is fully covered.
+   * Surfaced by the CLI; does not block execution (a graph may
+   * legitimately never emit some points in practice).
+   */
+  warnings: string[];
 }
 
 export function edgePredicateKey(from: string, to: string, index: number): string {
@@ -190,10 +201,39 @@ export function loadWorkflowGraph(raw: unknown): LoadedGraph {
     });
   }
 
+  // Branch-coverage lint (spec §3.2). For each verifier, enumerate the
+  // verdict points its schema can emit and check that at least one
+  // outgoing predicate could match each. A point matched by no
+  // predicate is a guaranteed runtime `no_matching_branch`; surface it
+  // as a non-fatal load-time warning so the gap is loud, not silent.
+  const warnings: string[] = [];
+  for (const node of graph.nodes) {
+    if (node.kind !== "verifier" || !node.verifierSchema) continue;
+    const outgoing = outgoingByNodeId.get(node.id) ?? [];
+    const asts: PredicateAst[] = [];
+    outgoing.forEach((edge, idx) => {
+      if (edge.type !== "branches_on") return;
+      const ast = predicateAstByEdge.get(edgePredicateKey(node.id, edge.to, idx));
+      if (ast) asts.push(ast);
+    });
+    const uncovered = verifierSchemaPoints(node.verifierSchema).filter(
+      (pt) => !asts.some((ast) => predicateCanMatchPoint(ast, pt)),
+    );
+    if (uncovered.length > 0) {
+      const desc = uncovered
+        .map((p) => (p.severity ? `${p.verdict}/${p.severity}` : p.verdict))
+        .join(", ");
+      warnings.push(
+        `verifier "${node.id}" has incomplete branch coverage: no branches_on predicate can match verdict point(s) [${desc}] allowed by schema "${node.verifierSchema}". The runtime will reject with no_matching_branch if the verifier emits one of these.`,
+      );
+    }
+  }
+
   return {
     graph,
     nodesById,
     outgoingByNodeId,
     predicateAstByEdge,
+    warnings,
   };
 }

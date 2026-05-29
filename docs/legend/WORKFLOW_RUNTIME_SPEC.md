@@ -130,9 +130,15 @@ is small and stable).
 evaluates outgoing `branches_on` predicates in **edge-declaration
 order** (the order edges appear in the graph file). The first match
 fires. If none match, the workflow rejects with reason
-`no_matching_branch` — surface a CLI warning at graph-load time when
-a verifier has incomplete branch coverage so this is a hard error,
-not a silent stall.
+`no_matching_branch`. To keep that from being a silent stall, the
+graph loader runs a **static branch-coverage lint**: for each verifier
+it enumerates the verdict points its schema can emit
+(`verifierSchemaPoints`) and checks each is matched by at least one
+outgoing predicate (`predicateCanMatchPoint`, which treats
+history/step operators optimistically). Uncovered points surface as
+non-fatal `LoadedGraph.warnings` (printed by `onto workflow run`,
+included in `--json`) — loud, but not blocking, since a graph may
+legitimately never emit some points in practice.
 
 ### 3.3 Verifier output schema
 
