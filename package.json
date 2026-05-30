@@ -7,7 +7,8 @@
     "onto": "./dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "templates"
   ],
   "engines": {
     "node": ">=20.0.0"
@@ -24,6 +25,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.2",
+    "@google/genai": "^2.7.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "commander": "^13.1.0",
     "fast-json-stable-stringify": "^2.1.0",
     "ink": "^5.2.1",
