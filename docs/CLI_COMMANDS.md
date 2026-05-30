@@ -209,6 +209,15 @@ Bootstrap 0.9 (post-validator-port).
 - **Flags:** `--depth <n>` (default `2`), `--type <a,b,c>` (filter edges), `--json`.
 - **Output:** the focal node (marked `*`) plus all nodes reachable within `depth` hops, and only the edges where both endpoints fall inside the slice. Boundary edges are excluded.
 
+### `mcp` *(read-only MCP server)*
+
+- **Purpose:** Start a Model Context Protocol server over the intent graph on **stdio**, so a third party — a human reviewer, or another model — can READ the declared intent and the audit chain to judge whether it is benign and competent, **without mutating the graph** and without needing the implementation source. The trust-transparency primitive behind Open-Prompt, made tangible.
+- **Example:** `npm run dev -- mcp --cwd examples/hello-world`. Configure it in an MCP client (e.g. Claude Desktop) as a command: `onto mcp --cwd /path/to/project`.
+- **Flags:** `--cwd <path>` (project to serve; default current directory).
+- **Tools (all read-only, zero mutation tools):** `list_nodes`, `get_node`, `inspect_node` (cached Inspector summary, never dispatches an LLM), `query_nodes` (Yoneda Hom-profile search), `assemble_context`, `graph_neighbors`, `graph_path`, `graph_subgraph`, `list_runs`, `get_run`, `verify_run`, `audit_log`.
+- **Resources:** `ontology://canon` (the canon node), `ontology://overview` (project state summary).
+- **Design:** stdout carries the MCP protocol stream; all human-facing logging goes to stderr. Each tool wraps an existing pure read function (no new domain logic). Coherent with the canon: *models may speak; only explicit graph commands may mutate* — there is intentionally no tool that creates, proposes, applies, or compiles.
+
 ### `compile plan <nodeId>` *(post-Bootstrap 0.5, PR #101)*
 
 - **Purpose:** Print the topological compile plan rooted at the focal node, in dependency order. Read-only preview — no artifact is written, no event is emitted.

@@ -50,6 +50,7 @@ import { registerQueryCommand } from "./commands/query/index.js";
 import { verifyHomeomorphismCommand } from "./commands/verify/homeomorphism.js";
 import { workflowRunCommand } from "./commands/workflow/run.js";
 import { openCommand } from "./commands/open.js";
+import { ontoMcpCommand } from "./commands/mcp/index.js";
 import { projectsListCommand } from "./commands/projects/list.js";
 import { projectsForgetCommand } from "./commands/projects/forget.js";
 import { errorMessage } from "./core/errors.js";
@@ -924,6 +925,19 @@ program
   });
 
 registerQueryCommand(program);
+
+program
+  .command("mcp")
+  .description("Start a read-only MCP server over the intent graph (stdio transport). Exposes query / graph-traversal / runs / audit-log tools and canon + overview resources so a third party (a human reviewer, or another model) can READ the declared intent and the audit chain to judge whether it is benign and competent — without mutating the graph and without needing the implementation source. No mutation tools are exposed (canon rule: models may speak; only explicit graph commands may mutate).")
+  .option("--cwd <path>", "Path to the Ontology project to serve (default: current directory).")
+  .action(async (options) => {
+    try {
+      await ontoMcpCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error starting MCP server: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
 
 program
   .command("verify-homeomorphism [focal]")
