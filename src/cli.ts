@@ -64,11 +64,13 @@ program
 
 program
   .command("init")
-  .description("Initializes a new Ontology Network Kernel.")
+  .description("Initializes a new Ontology Network Kernel. With --template <name>, seeds a starter intent-graph on top of the canon (replayed through the same kernel primitives as hand-authoring). Use --list-templates to see what's available.")
   .option("--name <name>", "Friendly name for the global project registry (defaults to the cwd basename)")
+  .option("--template <name>", "#3: seed a starter intent-graph from templates/<name>.json (e.g. hello-world, rest-api, python-cli). Validated up front; a bad name fails before anything is written.")
+  .option("--list-templates", "#3: print the available seed-graph templates and exit without initialising.")
   .action(async (options) => {
     try {
-      await initCommand({ name: options.name });
+      await initCommand({ name: options.name, template: options.template, listTemplates: options.listTemplates });
     } catch (err: unknown) {
       console.error(`✖ Error during init: ${errorMessage(err)}`);
       process.exit(1);

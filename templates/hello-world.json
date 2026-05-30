@@ -1,0 +1,56 @@
+{
+  "name": "hello-world",
+  "description": "Canonical 5-node refinement chain that compiles to a one-line program (mirrors examples/hello-world).",
+  "nodes": [
+    {
+      "key": "project",
+      "level": "project",
+      "kind": "decision",
+      "prompt": "A minimal project whose sole purpose is to print a greeting.",
+      "label": "Hello World project",
+      "parent": "canon"
+    },
+    {
+      "key": "target",
+      "level": "target",
+      "kind": "definition",
+      "prompt": "Deliver a runnable script that emits a greeting to stdout.",
+      "label": "Greeting script target",
+      "parent": "project"
+    },
+    {
+      "key": "domain",
+      "level": "domain",
+      "kind": "definition",
+      "prompt": "The greeting domain: the message to emit is the text \"hello world\".",
+      "label": "Greeting domain",
+      "parent": "target"
+    },
+    {
+      "key": "workflow",
+      "level": "workflow",
+      "kind": "action",
+      "prompt": "Write the greeting to standard output exactly once and exit.",
+      "label": "Print greeting workflow",
+      "parent": "domain"
+    },
+    {
+      "key": "artifact",
+      "level": "artifact",
+      "kind": "artifact",
+      "prompt": "Emit a program that prints the greeting.",
+      "label": "hello.py",
+      "parent": "workflow",
+      "manifestation": "code",
+      "language": "python",
+      "literal": "print(\"hello world\")"
+    }
+  ],
+  "edges": [
+    { "from": "project", "to": "canon", "type": "refines" },
+    { "from": "target", "to": "project", "type": "refines" },
+    { "from": "domain", "to": "target", "type": "refines" },
+    { "from": "workflow", "to": "domain", "type": "refines" },
+    { "from": "artifact", "to": "workflow", "type": "refines" }
+  ]
+}

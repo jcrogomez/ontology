@@ -14,6 +14,9 @@ import {
 } from "../schemas/ontology.js";
 import { hashObject } from "../core/integrity/hash.js";
 import { registerProject } from "../core/projects/registry.js";
+import { loadTemplate, listTemplates } from "../runtime/templates/load.js";
+import { applyTemplate } from "../runtime/templates/apply.js";
+import type { Template } from "../runtime/templates/schema.js";
 
 export interface InitOptions {
   // Friendly name for the global project registry. Defaults to the basename
@@ -21,6 +24,12 @@ export interface InitOptions {
   // `.ontology/` itself — the project's internal `state.json.projectName`
   // is left at its default.
   name?: string;
+  // #3: seed a starter intent-graph on top of the canon. Value is a template
+  // name resolved from templates/<name>.json. Validated up front so a bad
+  // name never half-creates a project.
+  template?: string;
+  // #3: print the available templates and exit without initialising.
+  listTemplates?: boolean;
 }
 
 // Bootstrap 0.1 creates the smallest trustworthy Ontology universe.
@@ -34,6 +43,26 @@ export interface InitOptions {
 // This is enough for Ontology to verify its own memory before learning to edit it.
 
 export async function initCommand(options: InitOptions = {}): Promise<void> {
+  // #3: list templates and exit (no initialisation).
+  if (options.listTemplates) {
+    const list = listTemplates();
+    if (list.length === 0) {
+      console.log("No templates found.");
+      return;
+    }
+    console.log("Available templates (onto init --template <name>):\n");
+    const pad = Math.max(...list.map((t) => t.name.length));
+    for (const t of list) console.log(`  ${t.name.padEnd(pad)}  ${t.description}`);
+    return;
+  }
+
+  // Validate the template up front so a bad --template never leaves a
+  // half-created project behind (loadTemplate throws on missing/invalid).
+  let template: Template | undefined;
+  if (options.template !== undefined) {
+    template = loadTemplate(options.template);
+  }
+
   const paths = getOntologyPaths();
 
   if (fs.existsSync(paths.ontologyDir)) {
@@ -322,4 +351,11 @@ Project "${friendlyName}" registered. Open later with:
 Next:
   onto validate
   onto inspect`);
+
+  // #3: seed the starter intent-graph (validated above) on top of the canon,
+  // replaying it through the same kernel primitives as hand-authoring.
+  if (template !== undefined) {
+    const res = applyTemplate(template);
+    console.log(`\n✓ Seeded template "${template.name}": ${res.nodesCreated} node(s), ${res.edgesCreated} edge(s).`);
+  }
 }

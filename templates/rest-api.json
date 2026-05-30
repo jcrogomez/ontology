@@ -1,0 +1,62 @@
+{
+  "name": "rest-api",
+  "description": "Starter intent-graph for a small HTTP REST API: target, resource model, request workflow, and one handler unit.",
+  "nodes": [
+    {
+      "key": "project",
+      "level": "project",
+      "kind": "decision",
+      "prompt": "A backend service exposing a small REST API over HTTP.",
+      "label": "REST API project",
+      "parent": "canon"
+    },
+    {
+      "key": "target",
+      "level": "target",
+      "kind": "definition",
+      "prompt": "Serve a JSON HTTP API with CRUD endpoints over a single resource collection. Stateless request handling; errors returned as JSON with appropriate status codes.",
+      "label": "HTTP JSON API target",
+      "parent": "project",
+      "provides": ["HttpApi"]
+    },
+    {
+      "key": "resource",
+      "level": "domain",
+      "kind": "entity",
+      "prompt": "The primary resource the API manages: a typed record with a stable id and a small set of fields. Define its shape, identity, and validation rules.",
+      "label": "Resource model",
+      "parent": "target",
+      "provides": ["ResourceModel"],
+      "rules": ["REQUIRE: every resource has a stable unique id", "FORBID: mutating the id after creation"]
+    },
+    {
+      "key": "request-flow",
+      "level": "workflow",
+      "kind": "action",
+      "prompt": "Handle one HTTP request: parse and validate input, dispatch by method (GET/POST/PUT/DELETE), apply the operation to the resource store, and serialise the response.",
+      "label": "Request handling workflow",
+      "parent": "resource",
+      "requires": ["ResourceModel"],
+      "provides": ["RequestHandler"]
+    },
+    {
+      "key": "list-handler",
+      "level": "unit",
+      "kind": "function",
+      "prompt": "Implement the GET /resources handler: return the full collection as a JSON array with a 200 status.",
+      "label": "List resources handler",
+      "parent": "request-flow",
+      "requires": ["RequestHandler", "ResourceModel"],
+      "provides": ["listResources"]
+    }
+  ],
+  "edges": [
+    { "from": "project", "to": "canon", "type": "refines" },
+    { "from": "target", "to": "project", "type": "refines" },
+    { "from": "resource", "to": "target", "type": "refines" },
+    { "from": "request-flow", "to": "resource", "type": "refines" },
+    { "from": "list-handler", "to": "request-flow", "type": "refines" },
+    { "from": "request-flow", "to": "resource", "type": "depends_on" },
+    { "from": "list-handler", "to": "request-flow", "type": "depends_on" }
+  ]
+}

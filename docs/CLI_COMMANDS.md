@@ -32,6 +32,25 @@ Bootstrap 0.9 (post-validator-port).
   - `.ontology/edges.jsonl` (Creates, empty)
   - `.ontology/nodes/node_0000_canon.json` (Creates)
 - **What it does not do:** It does not overwrite an existing valid `.ontology` network.
+- **Flags:**
+  - `--name <name>` — friendly name for the global project registry (defaults to the cwd basename).
+  - **`--template <name>`** *(#3)* — seed a starter intent-graph on top of the canon from `templates/<name>.json`. The template is replayed through the same kernel primitives as hand-authoring (`createNode`/`createEdge`), so hashes, events, and state are correct — nothing pre-hashed is committed. Validated up front: a missing/invalid/inconsistent template (unknown key, duplicate key, parent-before-child, or an edge that violates the abstraction poset) fails **before anything is written**.
+  - **`--list-templates`** *(#3)* — print the available templates and exit without initialising.
+
+#### Seed-graph templates *(#3)*
+
+Templates are declarative JSON data under `templates/*.json` (shipped in the package). Each is `{ name, description, nodes[], edges[] }`; nodes carry a template-local `key`, and `parent` / edge `from` / edge `to` reference another node's `key` or the reserved literal `"canon"` (the root node). Shipped set:
+
+| Template | What it seeds |
+|---|---|
+| `hello-world` | The canonical 5-node refinement chain (project→target→domain→workflow→artifact) compiling to a one-line program — mirrors `examples/hello-world`, artifact node pinned with a `literal`. |
+| `rest-api` | A small HTTP JSON API: target, resource model, request workflow, one handler unit, with example `requires`/`provides` contracts. |
+| `python-cli` | A Python command-line tool: target, argument parsing, command dispatch workflow, `__main__` entrypoint artifact. |
+
+- **Add a template:** drop a new `templates/<name>.json` (no rebuild needed in dev). The loader Zod-validates it and checks referential + poset integrity on use.
+- **Examples:**
+  - `npm run dev -- init --list-templates`
+  - `npm run dev -- init --template hello-world` then `onto compile run <artifactNodeId>` → reproduces the program.
 
 ### `validate`
 

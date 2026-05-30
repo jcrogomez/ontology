@@ -1,0 +1,63 @@
+{
+  "name": "python-cli",
+  "description": "Starter intent-graph for a Python command-line tool: target, argument parsing, command workflow, and an entrypoint artifact.",
+  "nodes": [
+    {
+      "key": "project",
+      "level": "project",
+      "kind": "decision",
+      "prompt": "A command-line tool written in Python, installed as a console script.",
+      "label": "Python CLI project",
+      "parent": "canon"
+    },
+    {
+      "key": "target",
+      "level": "target",
+      "kind": "definition",
+      "prompt": "A CLI that accepts subcommands and flags, prints results to stdout, and uses exit codes to signal success or failure.",
+      "label": "CLI tool target",
+      "parent": "project",
+      "provides": ["Cli"]
+    },
+    {
+      "key": "argparse",
+      "level": "domain",
+      "kind": "definition",
+      "prompt": "Define the argument surface: the subcommands, their positional arguments and options, defaults, and help text. Invalid input exits non-zero with a clear message.",
+      "label": "Argument parsing",
+      "parent": "target",
+      "provides": ["ArgSpec"],
+      "rules": ["REQUIRE: --help lists every subcommand", "REQUIRE: invalid input exits with a non-zero status"]
+    },
+    {
+      "key": "run-command",
+      "level": "workflow",
+      "kind": "action",
+      "prompt": "Dispatch the parsed arguments to the matching subcommand handler, run it, and map its result to stdout plus an exit code.",
+      "label": "Command dispatch workflow",
+      "parent": "argparse",
+      "requires": ["ArgSpec"],
+      "provides": ["Dispatch"]
+    },
+    {
+      "key": "entrypoint",
+      "level": "artifact",
+      "kind": "artifact",
+      "prompt": "Emit the __main__ entrypoint that builds the parser, parses sys.argv, dispatches, and exits with the returned status code.",
+      "label": "__main__.py",
+      "parent": "run-command",
+      "manifestation": "code",
+      "language": "python",
+      "requires": ["Dispatch", "ArgSpec"]
+    }
+  ],
+  "edges": [
+    { "from": "project", "to": "canon", "type": "refines" },
+    { "from": "target", "to": "project", "type": "refines" },
+    { "from": "argparse", "to": "target", "type": "refines" },
+    { "from": "run-command", "to": "argparse", "type": "refines" },
+    { "from": "entrypoint", "to": "run-command", "type": "refines" },
+    { "from": "run-command", "to": "argparse", "type": "depends_on" },
+    { "from": "entrypoint", "to": "run-command", "type": "depends_on" }
+  ]
+}
