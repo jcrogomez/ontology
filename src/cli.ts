@@ -51,6 +51,7 @@ import { verifyHomeomorphismCommand } from "./commands/verify/homeomorphism.js";
 import { workflowRunCommand } from "./commands/workflow/run.js";
 import { openCommand } from "./commands/open.js";
 import { ontoMcpCommand } from "./commands/mcp/index.js";
+import { runBakeoffCommand } from "./commands/bakeoff/index.js";
 import { projectsListCommand } from "./commands/projects/list.js";
 import { projectsForgetCommand } from "./commands/projects/forget.js";
 import { errorMessage } from "./core/errors.js";
@@ -943,6 +944,18 @@ program
       console.error(`✖ Error starting MCP server: ${errorMessage(err)}`);
       process.exit(1);
     }
+  });
+
+program
+  .command("bakeoff <reports...>")
+  .description("#4 fidelity release-gate: fold N verify-homeomorphism --json reports (recorded arm outputs) into one cross-arm synthesis via synthesizeBakeoff, and apply an H1 floor gate. Each positional is a report path or `label=path` (e.g. A=arm-a.json); the first arm is the baseline. HONESTY: this consumes ALREADY-RECORDED reports — it does NOT re-run the LLM (a live verify needs a real model, infeasible in CI). The gate is regression protection over the scoring + recorded corpus, not a fresh measurement. Exits non-zero if any arm's mean structural Jaccard is below --min-jaccard.")
+  .option("--min-jaccard <n>", "H1 gate floor: mean structural Jaccard must be >= this (default 0.1, the pre-registered ε floor).", parseFloat)
+  .option("--gate-all", "Require EVERY arm to clear the floor (default: gate the baseline arm only — comparison arms can legitimately score low).")
+  .option("--baseline <label>", "Arm label to treat as the synthesis baseline and gate target (default: the first positional).")
+  .option("--report <path>", "Write the full cross-arm synthesis as a markdown document to this path.")
+  .option("--json", "Emit { gate, synthesis } as JSON instead of the human table.")
+  .action(async (reports: string[], options) => {
+    await runBakeoffCommand(reports, options);
   });
 
 program

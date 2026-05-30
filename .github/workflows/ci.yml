@@ -17,5 +17,19 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - run: npm run check:nul
       - run: npm run build
+      # Fidelity release-gate (#4). Reads the ALREADY-RECORDED ε arm reports
+      # (committed) and fails the build if the canonical arm's mean structural
+      # Jaccard regresses below the pre-registered 0.1 floor. This is regression
+      # protection over the scoring + recorded corpus — NOT a live measurement
+      # (a live verify-homeomorphism needs a real LLM, infeasible in CI).
+      - name: Fidelity gate (recorded ε corpus)
+        run: >-
+          node dist/cli.js bakeoff
+          A=.ontology.self-ingest-epsilon-3a-arm-a.json
+          A0-control=.ontology.self-ingest-epsilon-3a-arm-a0.json
+          B=.ontology.self-ingest-epsilon-3a-arm-b.json
+          C-local=.ontology.self-ingest-epsilon-3a-arm-c-local.json
+          --min-jaccard 0.1
       - run: npm run test:run

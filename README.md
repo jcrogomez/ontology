@@ -56,7 +56,7 @@ Read [`examples/hello-world/README.md`](examples/hello-world/README.md) for the 
 
 | Verb | What it means |
 | --- | --- |
-| `onto init` | Create a fresh `.ontology/` kernel (state, events log, edges log, canon node). |
+| `onto init` | Create a fresh `.ontology/` kernel (state, events log, edges log, canon node). **#3: `--template <name>` seeds a starter intent-graph (hello-world / rest-api / python-cli) on top of the canon, replayed through the kernel primitives; `--list-templates` to discover.** |
 | `onto node create` | Add a typed semantic node. Supports `--manifestation`, `--language`, `--requires`/`--provides`/`--forbids`, `--rules`, `--literal` for compile-ready leaves. |
 | `onto node update / remove` | Edit a node in place or delete it (refuses if any edge references the node). The plasticity primitives. |
 | `onto node link` | Connect two nodes with a typed edge. Refinement-family edges enforce the abstraction poset. |
@@ -68,13 +68,15 @@ Read [`examples/hello-world/README.md`](examples/hello-world/README.md) for the 
 | `onto graph neighbors / path / subgraph` | Read-only traversal queries over the typed graph. |
 | **`onto graph infer-edges <dir>`** | **Project Legend γ-4: parse TypeScript imports/exports and report the static `depends_on` / `uses_token` edge graph. With `--create-proposals` (γ-6), emits one `edge_create` proposal per inferred edge by matching `outputs.files[0]` on each endpoint. Pure static analysis — no LLM.** |
 | **`onto link <nodeId> --candidate <text>`** | Run the semantic linker: gluing matrix + intent validation + edge proposal suggestions for missing requirements. Read-only. |
-| **`onto ingest <path>`** | **Project Legend γ-1/γ-5: lift existing source into the intent layer. Accepts a single file (one node\_create proposal) or a directory (one per source file, plus a γ-4 static-edge inference report). Provider defaults to Anthropic; falls back to Ollama or mock. `--include py,ts,tsx` for non-TS codebases. `--dry-run` previews extraction without committing.** |
+| **`onto ingest <path>`** | **Project Legend γ-1/γ-5: lift existing source into the intent layer. Accepts a single file (one node\_create proposal) or a directory (one per source file, plus a γ-4 static-edge inference report). Provider defaults to Anthropic; falls back to Ollama or mock. `--include py,ts,tsx` for non-TS codebases. `--dry-run` previews extraction without committing. **#2: `--from-pr <n>` / `--from-issue <n>` lift intent from a GitHub PR/issue (via `gh`) through a prose-tuned extractor (`manifestation=intent`); for PRs, `--resolve-edges <appliedNodeId>` links the change to existing code nodes after apply.**** |
 | `onto propose node / link` | Stage a typed candidate mutation without touching the graph. |
 | `onto proposal list / show / apply / reject` | Lifecycle the candidate. `apply` re-validates `parentHash`/endpoint hashes and stales on divergence. |
 | **`onto compile plan <id>`** | Preview the topological compile order rooted at a node. Read-only. |
 | **`onto compile run <id>`** | Compile the focal and its dependency closure. `--target <path>` writes to a user-pinned source path (gated behind `--force`); `--branch <name>` restricts to one Grothendieck fiber. |
 | **`onto compile run-batch [--all-artifacts \| --nodes <ids>]`** | Compile many focals in one invocation. Shared upstream walks reuse the per-run cache. The prerequisite for Legend's verify-homeomorphism. |
+| **`onto bakeoff <reports...>`** | **#4 fidelity release-gate: fold N `verify-homeomorphism --json` reports into one cross-arm synthesis and apply an H1 floor gate (`--min-jaccard`, exits non-zero on regression). Consumes *recorded* reports — regression protection over the scoring + corpus, not a live measurement. Wired into CI alongside the NUL guard.** |
 | **`onto query`** | Yoneda search by Hom-profile. Find every node whose edges + context-contract + coordinates match a query shape. |
+| **`onto mcp`** | **Start a read-only MCP server over the intent graph (stdio). Exposes `query` / graph-traversal / `runs` / `audit_log` tools and `canon` + `overview` resources so a third party — a human reviewer or another model — can READ the declared intent and audit chain and judge whether it is benign and competent, without mutating the graph and without the implementation source. The Open-Prompt trust-transparency layer, made tangible. `--cwd <path>` selects the project. No mutation tools are exposed.** |
 | `onto walk <id>` | The Walker: an interactive focal-cell terminal interface. Edit drafts, propose, run models, preview plans, compile — all from the TUI. **Shows which AI service is active (Anthropic / Ollama local / Ollama cloud / none → mock fallback) at the top of the focal cell.** |
 | `onto branch list / fiber` | Grothendieck-fiber views of the typed graph (read-only). |
 | `onto validate`, `onto inspect`, `onto events tail`, `onto model doctor`, `onto doctor` | Observability. `model doctor` reports per-provider availability and surfaces whether `ANTHROPIC_API_KEY` / `OLLAMA_HOST` are set. |

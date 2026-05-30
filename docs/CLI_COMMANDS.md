@@ -469,6 +469,15 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **Output (JSON):** `{ ok, report: { rootDir, thresholds, total, byVerdict: {epsilon_equivalent, divergent_loc, divergent_structural, divergent_both, unrecoverable}, totalUsage?: {promptTokens, completionTokens, totalTokens, costUSD}, results: [{nodeId, sourceFile, regenPath, ok, failure?, metrics?: {locDistance, structuralJaccard, originalLineCount, regenLineCount, originalDeclarations, regenDeclarations}, verdict, thresholds, usage?: {promptTokens, completionTokens, totalTokens, costUSD, cached}}] } }`.
 - **Cost:** roughly the same as ingest per file (one LLM dispatch per node). Pre-flight with `--cost-estimate` (no API call). For a 22-node sweep at Opus 4.7, expect ~$0.50–$1.00. The `--json` output now carries per-node `usage` (Anthropic input/output tokens + approximate cost from published rates) and an aggregate `totalUsage`, so the bill is in the report.
 
+### `bakeoff <reports...>` *(#4 — fidelity release-gate)*
+
+- **Purpose:** fold N `verify-homeomorphism --json` reports (recorded arm outputs) into one cross-arm synthesis via the pure `synthesizeBakeoff` reducer, and apply an **H1 floor gate** that exits non-zero when fidelity regresses. Migrates the hand-rolled `scripts/run-3a-bakeoff-synthesis.ts` to a first-class CLI surface.
+- **HONESTY:** this consumes **already-recorded** reports — it does **NOT** re-run the LLM. A live `verify-homeomorphism` needs a real model (cost + non-determinism), which CI can't do. So the gate is **regression protection** over the scoring machinery + the recorded corpus, **not a fresh fidelity measurement**. That's precisely its CI role.
+- **Args:** each positional is a report path or `label=path` (e.g. `A=arm-a.json`). The first arm is the baseline (or `--baseline <label>`).
+- **Gate:** `--min-jaccard <n>` (default `0.1`, the pre-registered ε floor). By default the gate targets the **baseline arm only** — comparison arms can legitimately score low (the ε run's Arm B / Arm C-local collapsed to ~0, a real recorded finding), so failing the build on them would be wrong. Pass `--gate-all` to require every arm to clear the floor.
+- **Flags:** `--min-jaccard`, `--gate-all`, `--baseline <label>`, `--report <path.md>` (write the full markdown synthesis), `--json` (`{ gate, synthesis }`).
+- **Example (the CI gate):** `node dist/cli.js bakeoff A=.ontology.self-ingest-epsilon-3a-arm-a.json A0-control=.ontology.self-ingest-epsilon-3a-arm-a0.json B=.ontology.self-ingest-epsilon-3a-arm-b.json C-local=.ontology.self-ingest-epsilon-3a-arm-c-local.json --min-jaccard 0.1` — exits 0 (baseline A=0.58 clears 0.1), printing the per-arm table. CI runs this after `build`; `tests/fidelity-gate.test.ts` additionally pins Arm A ≥ 0.5 and the grounding lift A − A0 ≥ 0.30.
+
 ### Model Observability
 - `onto model doctor` — health probe per provider. With `ANTHROPIC_API_KEY` set, runs a `/v1/models` list as the auth check; without the key, surfaces `not configured` rather than failing. Reports `OLLAMA_HOST` and `ANTHROPIC_API_KEY` env-var status.
 - `onto model doctor --json`
