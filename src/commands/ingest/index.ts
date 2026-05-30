@@ -5,9 +5,15 @@ import {
   AbstractionLevelSchema,
   ManifestationSchema,
   NodeKindSchema,
+  type OntologyNode,
 } from "../../schemas/ontology.js";
-import { loadNodeById, loadState } from "../../core/project/load.js";
+import { loadNodeById, loadNodes, loadEdges, loadState } from "../../core/project/load.js";
 import { createProposal } from "../../core/proposals/persist.js";
+import {
+  fetchPullRequest,
+  fetchIssue,
+  type IntentSource,
+} from "../../runtime/ingest/github.js";
 import { dispatchLlmRequest } from "../../runtime/llm/dispatcher.js";
 import type { LlmProvider, LlmResponse } from "../../runtime/llm/types.js";
 import { collectSourceFiles } from "../../runtime/static/typescript.js";
@@ -215,6 +221,22 @@ export interface IngestCommandOptions {
   //     is surfaced in the INGEST report's "Classifier routing"
   //     section.
   staticClassifier?: "report-only" | "enabled";
+  // #2 (create-context-graph follow-up): ingest intent from a GitHub
+  // pull request or issue instead of source files. Exactly one of
+  // {paths, fromPr, fromIssue} must be provided. These route through
+  // the prose extractor (manifestation=intent), not the code extractor.
+  fromPr?: string;
+  fromIssue?: string;
+  // Optional owner/repo override for the gh fetch (defaults to the
+  // repo of the current directory, per gh's own resolution).
+  repo?: string;
+  // Post-apply edge mode: given the APPLIED node id of a previously
+  // ingested PR intent, resolve the PR's changed files to existing
+  // code nodes and create `documents` edge_create proposals. Requires
+  // --from-pr. (Edges can't be created at capture time — the PR intent
+  // node id is only assigned when its node_create proposal is applied;
+  // this mirrors the γ-5 → γ-6 two-phase shape.)
+  resolveEdges?: string;
 }
 
 // The extraction system prompt. The Anthropic adapter tags this block
@@ -461,6 +483,43 @@ If any check fails, rewrite your answer before emitting JSON.
 Return JSON only.
 `;
 
+// Prose-tuned system prompt for PR / issue ingestion. Unlike the code
+// extractor above, the input here is NATURAL-LANGUAGE intent (a pull
+// request description, an issue body) — a statement of *why* a change
+// should happen, not a symbol contract. So this prompt asks for a
+// design-time intent node (manifestation=intent) and deliberately does
+// NOT ask for provides/requires symbol contracts (prose has none).
+export const EXTRACTION_SYSTEM_PROMPT_PROSE = `
+You are the Ontology intent extractor for natural-language change requests.
+
+Given ONE pull request or issue (its title, body, and optionally the list of files it touches), produce a JSON object that captures the DECLARED INTENT — what the author wants to be true, and why.
+
+Your job is NOT to summarize the text verbatim. Distill the durable intent: the goal, the motivation, and the acceptance criteria a future implementer must satisfy.
+
+Return ONLY valid JSON matching the expected schema. No markdown fence, no preamble, no explanation outside the JSON.
+
+Required fields: label, level, kind, prompt.
+Optional fields you SHOULD set: manifestation, rules.
+Optional fields you SHOULD usually OMIT: language, requires, provides, forbids — prose has no symbol contract, so leave these empty unless the text literally names concrete project symbols.
+
+JSON FIELD TYPES (critical — type mismatches fail validation):
+- label, level, kind, manifestation, prompt: STRINGS
+- rules, requires, provides, forbids: ARRAYS OF STRINGS
+
+FIELD GUIDANCE:
+- "manifestation": ALWAYS "intent". This is a design-time intention, not code.
+- "level": choose ONE of: project, target, domain, workflow. A feature/change request is usually "target"; a cross-cutting concern is "domain"; a process step is "workflow".
+- "kind": choose ONE of: decision, constraint, definition, action. A pull request (a chosen change) is usually "decision" or "action"; an issue stating a problem/requirement is usually "constraint" or "definition".
+- "label": a short noun phrase naming the intent (e.g. "Rate-limit the public API").
+- "prompt": a single JSON STRING synthesising the intent — the goal and the motivation, in 2–6 sentences. Use \\n for line breaks; never emit an array or object.
+- "rules": the acceptance criteria / definition-of-done, one short imperative per array item, when the text implies them.
+
+CRITICAL SCHEMA RULE:
+You MUST use only the enum values listed above. Invented values fail validation.
+
+Return JSON only.
+`;
+
 // ── Pure library: extract intent from a single source file ──────────────────
 
 interface ExtractInputs {
@@ -600,13 +659,6 @@ async function extractIntentFromFile(
     telemetry.wallClockMs = performance.now() - t0;
     return { ...telemetry };
   };
-  // DispatchFn wrapper that increments the dispatch counter on every
-  // LLM call (including H3 backoff internal retries). Passed to
-  // dispatchWithRetry so the counter sees real network attempts.
-  const countingDispatcher: DispatchFn = async (req, cfg) => {
-    telemetry.dispatchAttempts += 1;
-    return dispatchLlmRequest(req, cfg);
-  };
 
   // 1. Read + binary guard. NUL is the high-precision signal of
   // binary content; let the user know up front rather than paying
@@ -657,16 +709,76 @@ async function extractIntentFromFile(
     `Extract the structured intent for this file. Output JSON only.`,
   ].join("\n");
 
+  return extractIntentFromText({
+    label: filePath,
+    cwdRelative,
+    userPrompt,
+    systemPrompt: EXTRACTION_SYSTEM_PROMPT,
+    contentChars: fileContent.length,
+    provider,
+    model,
+    ollamaHost,
+  });
+}
+
+// Generic text → intent extractor. Owns telemetry + dispatch + H1
+// schema-retry; both the file flow (above) and the PR/issue prose flow
+// compose over it. Pure with respect to graph state — never writes
+// proposals or events.
+interface ExtractTextInputs {
+  /** Identifier for provenance/reporting: a file path, or "<PR #123>". */
+  label: string;
+  /** cwd-relative label echoed back on the ok result. */
+  cwdRelative: string;
+  /** Fully-built user turn (the caller bakes in the content + framing). */
+  userPrompt: string;
+  /** System prompt (code-contract vs prose-intent) — also sizes the budget. */
+  systemPrompt: string;
+  /** Char count of the embedded content, for the adaptive budget. */
+  contentChars: number;
+  provider: LlmProvider;
+  model?: string;
+  ollamaHost?: string;
+}
+
+async function extractIntentFromText(
+  inputs: ExtractTextInputs,
+): Promise<ExtractResult> {
+  const { cwdRelative, userPrompt, systemPrompt, contentChars, provider, model, ollamaHost } =
+    inputs;
+  // Alias so the dispatch/parse/retry body below reads `filePath`
+  // exactly as the original single function did.
+  const filePath = inputs.label;
+
+  // Phase ε E1: telemetry accumulator. Mutable, threaded through every
+  // return path via finalize(); finalize() snaps wallClockMs at exit.
+  const t0 = performance.now();
+  const telemetry: ExtractTelemetry = {
+    dispatchAttempts: 0,
+    schemaRetried: false,
+    astProvidesPatched: false,
+    astProvidesRescuedCount: 0,
+    contextWindowRequested: undefined,
+    maxTokensRequested: undefined,
+    firstFailureKind: undefined,
+    wallClockMs: 0,
+  };
+  const finalize = (): ExtractTelemetry => {
+    telemetry.wallClockMs = performance.now() - t0;
+    return { ...telemetry };
+  };
+  const countingDispatcher: DispatchFn = async (req, cfg) => {
+    telemetry.dispatchAttempts += 1;
+    return dispatchLlmRequest(req, cfg);
+  };
+
   // Phase ε H2: adaptive input/output budget. Ollama defaults to
   // num_ctx=2048 (input) — Pilot data showed source files >~6 KB
   // silently truncating; the model returns garbled or empty JSON.
-  // The budget below covers system prompt + file body + retry
-  // feedback + output JSON with a small safety buffer. Anthropic
-  // ignores `contextWindow` (auto-managed).
-  const budget = computeAdaptiveBudget(
-    EXTRACTION_SYSTEM_PROMPT.length,
-    fileContent.length,
-  );
+  // The budget below covers system prompt + content + retry feedback +
+  // output JSON with a small safety buffer. Anthropic ignores
+  // `contextWindow` (auto-managed).
+  const budget = computeAdaptiveBudget(systemPrompt.length, contentChars);
   telemetry.contextWindowRequested = budget.contextWindow;
   telemetry.maxTokensRequested = budget.maxTokens;
 
@@ -677,7 +789,7 @@ async function extractIntentFromFile(
       {
         task: "semantic_parse",
         prompt: userPrompt,
-        system: EXTRACTION_SYSTEM_PROMPT,
+        system: systemPrompt,
         json: true,
         contextWindow: budget.contextWindow,
         maxTokens: budget.maxTokens,
@@ -746,7 +858,7 @@ async function extractIntentFromFile(
       {
         task: "semantic_parse",
         prompt: retryPrompt,
-        system: EXTRACTION_SYSTEM_PROMPT,
+        system: systemPrompt,
         json: true,
         contextWindow: budget.contextWindow,
         maxTokens: budget.maxTokens,
@@ -1251,8 +1363,28 @@ export async function ingestCommand(
   pathArgs: string[],
   options: IngestCommandOptions,
 ): Promise<void> {
-  if (!Array.isArray(pathArgs) || pathArgs.length === 0) {
-    failWith("No paths provided to ingest.", options.json);
+  // ── Source routing: exactly one of {paths, --from-pr, --from-issue}. ──
+  const hasPaths = Array.isArray(pathArgs) && pathArgs.length > 0;
+  const sourceFlags = [options.fromPr, options.fromIssue].filter((v) => v !== undefined);
+  if (sourceFlags.length > 1) {
+    failWith("Pass only one of --from-pr / --from-issue.", options.json);
+    return;
+  }
+  if (sourceFlags.length === 1 && hasPaths) {
+    failWith("Pass either positional paths OR --from-pr/--from-issue, not both.", options.json);
+    return;
+  }
+  if (options.resolveEdges !== undefined && options.fromPr === undefined) {
+    failWith("--resolve-edges requires --from-pr <number>.", options.json);
+    return;
+  }
+  if (options.fromPr !== undefined || options.fromIssue !== undefined) {
+    await runIntentSourceIngest(options);
+    return;
+  }
+
+  if (!hasPaths) {
+    failWith("No paths provided to ingest. Pass a file/dir, or --from-pr/--from-issue <number>.", options.json);
     return;
   }
 
@@ -2210,12 +2342,275 @@ interface ProposalCreateErr {
   message: string;
 }
 
+// ── #2: ingest intent from a GitHub PR / issue (prose flow) ──────────────────
+
+// Build the prose user turn from a fetched IntentSource. The body is the
+// load-bearing content; title + metadata frame it.
+function buildIntentSourceUserPrompt(source: IntentSource): string {
+  const lines: string[] = [];
+  lines.push(`${source.kind === "pr" ? "Pull request" : "Issue"} #${source.number}: ${source.title}`);
+  if (source.state) lines.push(`State: ${source.state}`);
+  if (source.author) lines.push(`Author: ${source.author}`);
+  if (source.kind === "pr" && source.files && source.files.length > 0) {
+    lines.push(`Changed files (${source.files.length}): ${source.files.map((f) => f.path).join(", ")}`);
+  }
+  lines.push("");
+  lines.push("--- BEGIN DESCRIPTION ---");
+  lines.push(source.body.trim().length > 0 ? source.body : "(no description provided)");
+  lines.push("--- END DESCRIPTION ---");
+  lines.push("");
+  lines.push("Extract the structured intent. Output JSON only.");
+  return lines.join("\n");
+}
+
+// Read-only index of nodes keyed by their source file (outputs.files[0]),
+// the same key γ-6 uses. Hand-authored nodes (empty outputs.files) don't
+// appear and can't anchor a match.
+function buildNodeByFileIndex(cwd?: string): Map<string, OntologyNode> {
+  const idx = new Map<string, OntologyNode>();
+  for (const n of loadNodes(cwd)) {
+    const first = n.outputs?.files?.[0];
+    if (typeof first === "string" && first.length > 0 && !idx.has(first)) idx.set(first, n);
+  }
+  return idx;
+}
+
+export interface ChangedFileMatch {
+  file: string;
+  nodeId: string;
+}
+
+// Best-effort: map a PR's changed files to existing code nodes. Pure /
+// read-only — used both to report at capture time and to drive the
+// post-apply edge resolver. Exported for tests.
+export function matchChangedFilesToNodes(
+  files: Array<{ path: string }>,
+  cwd?: string,
+): ChangedFileMatch[] {
+  if (files.length === 0) return [];
+  const idx = buildNodeByFileIndex(cwd);
+  const out: ChangedFileMatch[] = [];
+  for (const f of files) {
+    const node = idx.get(f.path) ?? idx.get(computeCwdRelative(f.path));
+    if (node) out.push({ file: f.path, nodeId: node.id });
+  }
+  return out;
+}
+
+// Ingest one already-fetched IntentSource (PR / issue). Network I/O lives
+// in the caller (the CLI does the gh fetch); this stays testable with the
+// mock provider + a canned source. Exported for tests.
+export async function ingestFromIntentSource(args: {
+  source: IntentSource;
+  provider: LlmProvider;
+  model?: string;
+  ollamaHost?: string;
+  parentNodeId: string;
+  parentHash: string;
+  dryRun: boolean;
+  json: boolean;
+  cwd?: string;
+}): Promise<{ ok: boolean; proposalId?: string; extracted?: ExtractionResult; matchedFiles?: ChangedFileMatch[] }> {
+  const { source } = args;
+  const label = `<${source.kind === "pr" ? "PR" : "issue"} #${source.number}: ${source.title}>`;
+  const userPrompt = buildIntentSourceUserPrompt(source);
+
+  const result = await extractIntentFromText({
+    label,
+    cwdRelative: label,
+    userPrompt,
+    systemPrompt: EXTRACTION_SYSTEM_PROMPT_PROSE,
+    contentChars: (source.title + source.body).length,
+    provider: args.provider,
+    model: args.model,
+    ollamaHost: args.ollamaHost,
+  });
+  if (!result.ok) {
+    failWith(result.message, args.json);
+    return { ok: false };
+  }
+
+  // Best-effort changed-files → code-node matching (PRs only). Read-only;
+  // reported now, materialised as edges later via --resolve-edges.
+  const matched =
+    source.kind === "pr" ? matchChangedFilesToNodes(source.files ?? [], args.cwd) : [];
+
+  if (args.dryRun) {
+    if (args.json) {
+      console.log(JSON.stringify({ ok: true, dryRun: true, source: { kind: source.kind, number: source.number, url: source.url }, extracted: result.extracted, matchedFiles: matched }, null, 2));
+    } else {
+      printExtraction(result.extracted, { filePath: label, model: result.response.model, provider: result.response.provider, usage: result.response.usage, committed: false });
+      if (matched.length) console.log(`\n  ${matched.length} changed file(s) match existing nodes (apply, then --resolve-edges to link).`);
+    }
+    return { ok: true, extracted: result.extracted, matchedFiles: matched };
+  }
+
+  const proposalResult = createNodeProposalForExtraction(
+    label,
+    result.extracted,
+    result.response,
+    args.parentNodeId,
+    args.parentHash,
+    args.cwd,
+  );
+  if (!proposalResult.ok) {
+    failWith(proposalResult.message, args.json);
+    return { ok: false };
+  }
+
+  if (args.json) {
+    console.log(JSON.stringify({ ok: true, dryRun: false, proposal: { id: proposalResult.proposalId, status: "pending", mutationKind: "node_create", hash: proposalResult.proposalHash }, extracted: result.extracted, matchedFiles: matched, source: { kind: source.kind, number: source.number, url: source.url } }, null, 2));
+  } else {
+    printExtraction(result.extracted, { filePath: label, model: result.response.model, provider: result.response.provider, usage: result.response.usage, committed: true, proposalId: proposalResult.proposalId });
+    if (matched.length) {
+      console.log(`\n  ${matched.length} changed file(s) match existing code nodes:`);
+      for (const m of matched) console.log(`    ${m.file} → ${m.nodeId}`);
+      console.log(`  Apply proposal ${proposalResult.proposalId}, then run:`);
+      console.log(`    onto ingest --from-pr ${source.number} --resolve-edges <appliedNodeId>`);
+    }
+  }
+  return { ok: true, proposalId: proposalResult.proposalId, extracted: result.extracted, matchedFiles: matched };
+}
+
+// Post-apply edge resolver: from an APPLIED PR intent node, create
+// `documents` edge_create proposals to each existing code node the PR
+// touched. `documents` is outside the refinement family, so it never
+// trips the abstraction-poset validator. Mirrors γ-6's resolver.
+function resolvePrEdges(
+  prNodeId: string,
+  files: Array<{ path: string }>,
+  json: boolean,
+  cwd?: string,
+): void {
+  const prNode = loadNodeById(prNodeId, cwd);
+  if (!prNode) {
+    failWith(`Node not found: ${prNodeId} (apply the PR intent proposal first).`, json);
+    return;
+  }
+  const state = loadState(cwd);
+  const idx = buildNodeByFileIndex(cwd);
+  const existing = new Set<string>();
+  for (const e of loadEdges(cwd)) existing.add(`${e.from}|${e.to}|${e.type}`);
+
+  const created: Array<{ proposalId: string; to: string }> = [];
+  const skipped: Array<{ file: string; reason: string }> = [];
+  for (const f of files) {
+    const target = idx.get(f.path) ?? idx.get(computeCwdRelative(f.path));
+    if (!target) { skipped.push({ file: f.path, reason: "to_node_missing" }); continue; }
+    if (target.coordinates.branch !== prNode.coordinates.branch) { skipped.push({ file: f.path, reason: "cross_branch" }); continue; }
+    const key = `${prNode.id}|${target.id}|documents`;
+    if (existing.has(key)) { skipped.push({ file: f.path, reason: "edge_already_exists" }); continue; }
+    try {
+      const { proposal } = createProposal({
+        mutation: {
+          kind: "edge_create",
+          payload: { from: prNode.id, to: target.id, type: "documents", branch: state.activeBranch },
+          fromHash: prNode.integrity.hash,
+          toHash: target.integrity.hash,
+        },
+        source: null,
+        validation: null,
+        provenance: {
+          derivedFrom: [prNode.id, target.id],
+          rationale: JSON.stringify({ inferredBy: "pr-changed-files", file: f.path }, null, 2),
+        },
+        cwd,
+      });
+      created.push({ proposalId: proposal.id, to: target.id });
+      existing.add(key);
+    } catch (err: unknown) {
+      skipped.push({ file: f.path, reason: `proposal_failed: ${errorMessage(err)}` });
+    }
+  }
+
+  if (json) {
+    console.log(JSON.stringify({ ok: true, prNodeId, created, skipped }, null, 2));
+    return;
+  }
+  console.log(`✓ ${created.length} edge proposal(s) from ${prNodeId} (documents → code nodes).`);
+  for (const c of created) console.log(`    ${c.proposalId}: ${prNodeId} →(documents)→ ${c.to}`);
+  if (skipped.length) {
+    console.log(`  ${skipped.length} skipped:`);
+    for (const s of skipped) console.log(`    ${s.file}: ${s.reason}`);
+  }
+}
+
+// Parse a positive-integer flag value (PR / issue number). Fails loud.
+function parsePositiveIntFlag(raw: string, flag: string, json?: boolean): number | undefined {
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n <= 0) {
+    failWith(`${flag} must be a positive integer (got "${raw}").`, json);
+    return undefined;
+  }
+  return n;
+}
+
+// CLI-facing: fetch the PR/issue via gh, then dispatch to the prose flow
+// (or the post-apply edge resolver). The gh I/O is isolated here so
+// ingestFromIntentSource stays network-free and testable.
+async function runIntentSourceIngest(options: IngestCommandOptions): Promise<void> {
+  const provider = resolveProvider(options);
+  if (provider === undefined) return; // resolveProvider already failed.
+
+  // Post-apply edge mode (PR only): re-fetch changed files, link to nodes.
+  if (options.resolveEdges !== undefined) {
+    const prNum = parsePositiveIntFlag(options.fromPr!, "--from-pr", options.json);
+    if (prNum === undefined) return;
+    let source: IntentSource;
+    try {
+      source = fetchPullRequest(prNum, options.repo);
+    } catch (err: unknown) {
+      failWith(errorMessage(err), options.json);
+      return;
+    }
+    resolvePrEdges(options.resolveEdges, source.files ?? [], !!options.json);
+    return;
+  }
+
+  // Fetch the source.
+  let source: IntentSource;
+  try {
+    if (options.fromPr !== undefined) {
+      const n = parsePositiveIntFlag(options.fromPr, "--from-pr", options.json);
+      if (n === undefined) return;
+      source = fetchPullRequest(n, options.repo);
+    } else {
+      const n = parsePositiveIntFlag(options.fromIssue!, "--from-issue", options.json);
+      if (n === undefined) return;
+      source = fetchIssue(n, options.repo);
+    }
+  } catch (err: unknown) {
+    failWith(errorMessage(err), options.json);
+    return;
+  }
+
+  const state = loadState();
+  const parentNodeId = options.parent ?? state.rootNodeId;
+  const parentNode = loadNodeById(parentNodeId);
+  if (!parentNode) {
+    failWith(`Parent node not found: ${parentNodeId}`, options.json);
+    return;
+  }
+
+  await ingestFromIntentSource({
+    source,
+    provider,
+    model: options.model,
+    ollamaHost: options.ollamaHost,
+    parentNodeId,
+    parentHash: parentNode.integrity.hash,
+    dryRun: !!options.dryRun,
+    json: !!options.json,
+  });
+}
+
 function createNodeProposalForExtraction(
   filePathRelative: string,
   extracted: ExtractionResult,
   response: LlmResponse,
   parentNodeId: string,
   parentHash: string,
+  cwd?: string,
 ): ProposalCreateOk | ProposalCreateErr {
   // provenance.rationale carries the extractor metadata only; the
   // rich extracted fields live on the payload directly (γ-3).
@@ -2275,6 +2670,7 @@ function createNodeProposalForExtraction(
         derivedFrom: [parentNodeId],
         rationale: JSON.stringify(rationalePayload, null, 2),
       },
+      cwd,
     });
     return {
       ok: true,

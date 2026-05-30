@@ -413,6 +413,16 @@ Bootstrap 0.9 (post-validator-port).
 - **Failure modes:** binary-byte guard (NUL in a `--literal-file` or in the source file refuses upfront with a clear error); JSON-validation failure (the LLM returned something Zod's `ExtractionResultSchema` rejects); empty files; missing parent node. In directory mode, per-file failures don't abort the batch — they land in `results[]` with a `reason` and the walk continues.
 - **Provenance:** each proposal's `provenance.rationale` is a JSON blob with `{extractedFrom, extractorModel, extractorProvider}` so the audit chain records WHO produced the proposal off WHICH file. The rich extracted fields (manifestation / language / requires / provides / forbids / rules) ride on `payload.*` directly (γ-3); the source file path lands on `payload.sourceFiles[0]` (γ-5) so γ-6 can resolve file-path edges back to node IDs after apply.
 
+#### `ingest --from-pr / --from-issue` *(#2 — connectors as intent sources)*
+
+- **Purpose:** the intent of a codebase lives in its PRs and issues (the *why*), not only its code (the *what*). These flags lift a GitHub pull request or issue into the graph via the **`gh` CLI**, running a **prose-tuned extractor** (distinct from the code extractor) that emits a `node_create` proposal with `manifestation=intent`, an appropriate `level`/`kind`, the synthesised intent as `prompt`, and acceptance criteria as `rules`. No symbol contract (`provides`/`requires`) is extracted — prose has none.
+- **Surface:** provide exactly one of `{paths, --from-pr <n>, --from-issue <n>}`. `--repo <owner/repo>` overrides the gh-resolved repo. `--provider`/`--model`/`--parent`/`--dry-run`/`--json` apply as usual. Requires `gh` installed + `gh auth login`; a missing/unauthenticated `gh` fails loud.
+- **Best-effort edges (PRs):** at capture time the PR's changed files are matched (read-only) against existing code nodes (by `outputs.files[0]`, the γ-6 key) and reported. Edges are NOT created yet — the PR intent node's id is only assigned when its `node_create` proposal is applied. After applying, run `onto ingest --from-pr <n> --resolve-edges <appliedNodeId>` to create `documents` edge_create proposals from the PR node to each matched code node. This mirrors the γ-5 → γ-6 two-phase shape. (`documents` is outside the refinement family, so it never trips the abstraction-poset validator.) If the repo's code hasn't been ingested as nodes, this produces zero edges without error.
+- **Examples:**
+  - `npm run dev -- ingest --from-issue 42 --provider anthropic --dry-run`
+  - `npm run dev -- ingest --from-pr 17 --provider anthropic`
+  - `npm run dev -- ingest --from-pr 17 --resolve-edges node_0058   # after applying the PR intent node`
+
 ### `verify-homeomorphism [focal]` *(δ-2)*
 
 - **Purpose:** the **publishable measurement** for §3.10 (`F ∘ G ≈ id_Code modulo ε`). For each selected node, compile-back via the same provider chain, diff vs the original source on disk, classify with **two distances** (LoC delta + structural Jaccard over top-level declaration names). The γ-2 and Vibe-Reasoning calibrations both surfaced that LoC and behavior disagree — δ-2 reports both and folds them into a 2D verdict.

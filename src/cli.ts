@@ -888,8 +888,8 @@ compile
   });
 
 program
-  .command("ingest <paths...>")
-  .description("Project Legend γ-1 + γ-5 + Phase ε prework A: extract structured intent from source code. Accepts one or more positional paths; each may be a file or a directory. A single file path produces one node_create proposal; a single directory walks every matching file. Multiple paths are unioned and deduped by realpath, then ingested as one batch — load-bearing for Phase ε perimeters that span subtrees (e.g. src/runtime src/core src/commands src/schemas). Defaults to provider=anthropic (requires ANTHROPIC_API_KEY); use --provider ollama or --provider mock for $0 runs. --dry-run previews without committing.")
+  .command("ingest [paths...]")
+  .description("Project Legend γ-1 + γ-5 + Phase ε prework A + #2 connectors: extract structured intent from source code OR from a GitHub PR/issue. Positional paths (file or directory) run the code extractor; --from-pr/--from-issue run the prose extractor (manifestation=intent) over the PR/issue via the `gh` CLI. A single file produces one node_create proposal; a directory walks every matching file. Multiple paths are unioned and deduped by realpath. Provide exactly one of {paths, --from-pr, --from-issue}. Defaults to provider=anthropic (requires ANTHROPIC_API_KEY); use --provider ollama or --provider mock for $0 runs. --dry-run previews without committing.")
   .option("--provider <provider>", "LLM provider override: anthropic (default), ollama, or mock.")
   .option("--model <model>", "Model override. For anthropic, defaults to claude-opus-4-7.")
   .option("--ollama-host <host>", "Host for Ollama provider.")
@@ -900,9 +900,13 @@ program
   .option("--ensemble <mode>", "Phase ε E6 step 4: structured-extraction ensemble strategy. \"none\" (default) — single-run via the resolved model. \"high-confidence\" — run llama3.2:3b three times and select the most complete valid extraction. Use when 100% coverage on the perimeter matters more than per-file wall-clock. Currently honoured for semantic_parse (ingest extraction) only; other LlmTasks ignore the flag. Calibration: BAKEOFF_3B_FAMILY_2026-05-15.md §2.2.")
   .option("--static-classifier <mode>", "Structural Semantic Classifier integration. Two modes: \"report-only\" — classify every file with the deterministic AST-based classifier (src/runtime/legend/structural-classifier.ts) and surface aggregates in the INGEST report; does NOT change LLM routing. \"enabled\" — additionally consume those facts as ingest policy: files classified as `barrel` or `declaration_only` bypass the LLM entirely and receive a deterministic static summary (src/runtime/legend/static-summary.ts); every other shape — including `schema_module` — still dispatches via semantic_parse. Conservative on purpose: the v0 deflection set is intentionally small (smoke-test data showed ~5% of a typical perimeter deflects). The INGEST report's \"Classifier routing\" section surfaces the actual savings.")
   .option("--json", "Output results in JSON format.")
+  .option("--from-pr <number>", "#2: ingest intent from a GitHub pull request (via `gh`) instead of source paths. Runs the prose extractor → one node_create proposal with manifestation=intent. Mutually exclusive with positional paths and --from-issue.")
+  .option("--from-issue <number>", "#2: ingest intent from a GitHub issue (via `gh`) instead of source paths. Runs the prose extractor → one node_create proposal with manifestation=intent. Mutually exclusive with positional paths and --from-pr.")
+  .option("--repo <owner/repo>", "Optional repository override for --from-pr/--from-issue (defaults to the gh-resolved repo of the current directory).")
+  .option("--resolve-edges <nodeId>", "Post-apply edge mode (requires --from-pr): given the APPLIED node id of a previously ingested PR intent, re-fetch the PR's changed files and create `documents` edge_create proposals from that node to each matching existing code node. Edges can't be created at capture time because the PR node id is only assigned on apply (mirrors the γ-5 → γ-6 two-phase shape).")
   .action(async (paths: string[], options) => {
     try {
-      await ingestCommand(paths, options);
+      await ingestCommand(paths ?? [], options);
     } catch (err: unknown) {
       console.error(`✖ Error during ingest: ${errorMessage(err)}`);
       process.exit(1);
