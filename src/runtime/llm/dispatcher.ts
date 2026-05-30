@@ -2,6 +2,7 @@ import type { LlmProvider, LlmRequest, LlmResponse } from './types.js';
 import { createMockLlmAdapter } from './mock.js';
 import { createOllamaAdapter } from './ollama/adapter.js';
 import { createAnthropicAdapter } from './anthropic/adapter.js';
+import { createGeminiAdapter } from './gemini/adapter.js';
 import {
   getDefaultModelForTask,
   getPreferredModelsForTask,
@@ -18,6 +19,9 @@ export interface DispatchOptions {
   // Anthropic-specific override. When omitted the adapter reads
   // ANTHROPIC_API_KEY from the environment (SDK default).
   anthropicApiKey?: string;
+  // Gemini-specific override. When omitted the adapter reads
+  // GEMINI_API_KEY from the environment.
+  geminiApiKey?: string;
 }
 
 // Build the ordered list of model candidates the dispatcher will try
@@ -95,6 +99,14 @@ async function dispatchToAdapter(
   if (provider === 'anthropic') {
     const adapter = createAnthropicAdapter({
       apiKey: options?.anthropicApiKey,
+      defaultModel: model,
+    });
+    return adapter.generate(request);
+  }
+
+  if (provider === 'gemini') {
+    const adapter = createGeminiAdapter({
+      apiKey: options?.geminiApiKey,
       defaultModel: model,
     });
     return adapter.generate(request);

@@ -5,6 +5,7 @@ import type {
   LlmRequest,
   LlmResponse,
 } from "../types.js";
+import { runAgenticLoop } from "./agentic.js";
 
 export function createOllamaAdapter(options?: {
   host?: string;
@@ -54,6 +55,29 @@ export function createOllamaAdapter(options?: {
 
     async generate(request: LlmRequest): Promise<LlmResponse> {
       const model = request.model || defaultModel;
+
+      // Agentic web path: when the node declared the WEB_SEARCH capability,
+      // run the local tool-loop (web_search + fetch_page via DuckDuckGo)
+      // instead of a one-shot generation. This is how a LOCAL Ollama model
+      // gets real internet access — no Anthropic/Gemini.
+      if (request.webSearch) {
+        const t0 = performance.now();
+        const result = await runAgenticLoop({
+          host,
+          model,
+          system: request.system,
+          prompt: request.prompt,
+          maxSteps: request.webSearchMaxUses ?? 6,
+          numCtx: request.contextWindow,
+        });
+        return {
+          text: result.text,
+          model,
+          provider: "ollama",
+          usage: { evalDurationMs: performance.now() - t0 },
+          raw: result,
+        };
+      }
 
       const messages = [];
       if (request.system) {

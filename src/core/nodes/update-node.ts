@@ -41,6 +41,10 @@ export interface UpdateNodeOptions {
   // explicitly remove the literal so the node returns to model-driven
   // compile. Undefined preserves the existing value.
   literal?: string | typeof CLEAR_LITERAL;
+  // New model reference (handle into the models registry, e.g.
+  // "ollama-qwen-tools"). Undefined preserves the existing model. Used by
+  // the walker's `m` shortcut to permute a node's model in place.
+  model?: { ref: string };
   cwd?: string;
   // Free-form metadata appended to the event payload — useful for
   // proposal-driven updates that want to record the source proposalId.
@@ -110,6 +114,7 @@ export function updateNode(
     inputs: updatedInputs,
     rules: options.rules !== undefined ? options.rules : existing.rules,
     context: updatedContext,
+    model: options.model !== undefined ? options.model : existing.model,
     integrity: integrityWithoutHash,
   };
   if (options.literal === CLEAR_LITERAL) {

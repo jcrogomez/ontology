@@ -38,6 +38,9 @@ export function IdentityBar({ node, hasDraft }: IdentityBarProps): React.ReactEl
         <Text color={showColors ? color : undefined}>
           {node.coordinates.abstraction} · {node.coordinates.plane} · {node.coordinates.manifestation}
         </Text>
+        {node.model?.ref && (
+          <Text color="gray">  ⚙ {node.model.ref}</Text>
+        )}
       </Box>
     </Box>
   );

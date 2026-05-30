@@ -45,6 +45,8 @@ These close the largest distance between what's *built* and what's
 
 ### Phase ζ — workflow runtime
 
+- 🟡 **Branch-coverage lint is unsound under the lenient `with-severity` schema** (regression from the §4.2 fix `a03208d`). After §4.2 made `severity` optional, `{"verdict":"pass"}` (no severity) is a valid verifier emission — but `verifierSchemaPoints("with-severity")` (`verifier-schemas.ts:82`) still enumerates only the 4 severity-*ful* points. So a graph that branches only on severity-ful predicates passes the §3.2 lint with no warning, then dies at runtime with `no_matching_branch` when the model emits a bare pass. The lone IMO example dodges it (its branches are `verdict == "pass"`/`"fail"`, severity-agnostic) so nothing triggers it yet, but the lint's guarantee is broken. Cheap fix: add `{verdict:"pass"}` and `{verdict:"fail"}` to the `with-severity` point set; pin with a test (severity-only branches ⇒ coverage warning). Found by the 2026-05-29 review, confirmed against source.
+- 🔵 **Minor ζ ergonomics** (same review, low priority): `step_count` counts *global* visits, not per-node verifier visits — in a generator↔verifier loop `step_count >= 10` means ~5 verifications, not 10; document in spec §3.2 or expose a per-node `visit_count`. And `no_matching_branch` rejects return the verdict JSON as `output` while accept/reject terminals return `currentArtifact` — inconsistent; consider returning `currentArtifact` on branch rejects too.
 - 🟡 **Verdict-map determinism thread** (`MATHEMATICAL_CLAIMS.md` §3.10 T2 → T1). The full T1 gate (real-LLM determinism at temp 0) is empirically unachievable; T2 evidence tests pin the deterministic *fold*. Staying T2.
 - 🔵 **Behaviour checker module eviction** (`behavior-checker.ts`): the per-call `?ts=` cache-bust leaks module instances, but it is **load-bearing** — `behavior-checker.test.ts` pins that re-imports get fresh module state (isolation between reps). Content-addressing the cache key trades that isolation away, so a real fix needs worker/process isolation (deferred to v1). Fine at ~20 nodes until then.
 
@@ -53,6 +55,7 @@ These close the largest distance between what's *built* and what's
 - 🔵 **Arm C-cloud — `devstral-small-2:24b`** on rented GPU (~$5–10). ε closed without it; this is a reinforcement of H3, not a blocker. Local 8 GB Mac is infeasible.
 - 🟡 **Contract / intent columns** — the matrix fills 2 of 5; these two remain explicit no-data.
 - 🟡 **`onto legend bakeoff-synthesis` CLI.** Cross-arm synthesis still runs through a hand-rolled driver (`scripts/run-3a-bakeoff-synthesis.ts`); the verb removes the last manual surface.
+- 🟡 **Next fidelity lever = extraction/prompt completeness on large modules.** The 2026-05-29 loss-breakdown (`scripts/loss-report.ts`) showed Arm A's residual loss is **recall-bound, not precision-bound** — 22 large multi-export modules collapse into recoverable-but-truncated stubs (0/125 unrecoverable). Curbing over-emission is the *smaller* cost; the win is making regen emit the modules it currently drops. See `MATHEMATICAL_CLAIMS.md` §3.10.
 
 ### Plasticity follow-ups
 

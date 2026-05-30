@@ -512,11 +512,21 @@ function dispatchAndPersistE(
   prelude: PreludeShape,
 ): AsyncEffectWithLog<DispatchResult, CompileFailure> {
   const start = Date.now();
+  // Web-search opt-in is declared on the node: any rule matching
+  // WEB_SEARCH (e.g. "WEB_SEARCH" or "USE: web search") turns on the
+  // adapter's server-side search tool for this node's dispatch. Keeping
+  // the trigger in node.rules means it's a versioned property of the
+  // intention — a "research" node carries its own browse capability — and
+  // needs no schema change. Adapters without web search (mock, ollama)
+  // ignore the flag, so it is a no-op off anthropic.
+  const wantsWebSearch = (options.node.rules ?? []).some((r) =>
+    /web[_ ]?search/i.test(r),
+  );
   // Dispatch is the only genuinely async step. liftPromiseWithLog catches
   // any thrown error and translates it to a typed CompileFailure; nothing
   // else in this module ever needs try/catch.
   const dispatched = liftPromiseWithLog(
-    `dispatch (${handle.provider}${handle.resolvedModel ? `/${handle.resolvedModel}` : ""})`,
+    `dispatch (${handle.provider}${handle.resolvedModel ? `/${handle.resolvedModel}` : ""}${wantsWebSearch ? ", web_search" : ""})`,
     () =>
       dispatchLlmRequest(
         {
@@ -526,6 +536,7 @@ function dispatchAndPersistE(
           ...(prelude.systemPrompt ? { system: prelude.systemPrompt } : {}),
           ...(options.maxTokens !== undefined ? { maxTokens: options.maxTokens } : {}),
           ...(options.thinking !== undefined ? { thinking: options.thinking } : {}),
+          ...(wantsWebSearch ? { webSearch: true } : {}),
         },
         { provider: handle.provider, defaultModel: handle.resolvedModel, ollamaHost: options.ollamaHost },
       ),

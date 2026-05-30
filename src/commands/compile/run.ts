@@ -78,9 +78,10 @@ export async function compileRunCommand(focalId: string, options: CompileRunOpti
     if (
       options.provider !== "mock" &&
       options.provider !== "ollama" &&
-      options.provider !== "anthropic"
+      options.provider !== "anthropic" &&
+      options.provider !== "gemini"
     ) {
-      failWith(`Unsupported provider: ${options.provider} (try mock, ollama, or anthropic)`, options.json);
+      failWith(`Unsupported provider: ${options.provider} (try mock, ollama, anthropic, or gemini)`, options.json);
       return;
     }
     provider = options.provider as LlmProvider;

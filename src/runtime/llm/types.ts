@@ -1,4 +1,4 @@
-export type LlmProvider = "mock" | "ollama" | "openai" | "anthropic" | "local" | "literal";
+export type LlmProvider = "mock" | "ollama" | "openai" | "anthropic" | "gemini" | "local" | "literal";
 
 export type LlmTask =
   | "semantic_parse"
@@ -64,6 +64,18 @@ export interface LlmRequest {
   // this on visualize_adaptive_strategy.py. Adapters that do not
   // support thinking (mock, ollama) ignore the field.
   thinking?: "adaptive" | "disabled";
+  // Optional web-search capability. When true, adapters that support a
+  // server-side web-search tool (anthropic via the `web_search_20250305`
+  // tool) enable it for this dispatch — the model issues real searches
+  // and returns an answer grounded in fetched sources, with citations
+  // appended to the response text. Adapters without web search (mock,
+  // ollama — no native browsing) ignore the field. This is the hook that
+  // lets a "research" node actually browse instead of hallucinating.
+  webSearch?: boolean;
+  // Maximum number of server-side searches the model may run in one
+  // dispatch when `webSearch` is true. Bounds cost (each search bills
+  // separately). Defaults to 5 in the anthropic adapter when omitted.
+  webSearchMaxUses?: number;
 }
 
 export interface LlmUsage {

@@ -196,6 +196,22 @@ export function createAnthropicAdapter(
           ]
         : undefined;
 
+      // Web-search tool. When the caller sets `request.webSearch`, attach
+      // Anthropic's server-side `web_search_20250305` tool. The model runs
+      // the searches itself during the turn (server tool — no client-side
+      // tool loop needed) and returns an answer grounded in fetched pages,
+      // with per-claim citations carried on the text blocks. This is how a
+      // "research" node browses for real instead of hallucinating.
+      const webSearchTools = request.webSearch
+        ? [
+            {
+              type: "web_search_20250305" as const,
+              name: "web_search" as const,
+              max_uses: request.webSearchMaxUses ?? 5,
+            },
+          ]
+        : undefined;
+
       const t0 = performance.now();
       const response = await dispatchWithRetry(() =>
         client.messages.create({
@@ -203,6 +219,7 @@ export function createAnthropicAdapter(
           max_tokens: request.maxTokens ?? DEFAULT_MAX_TOKENS,
           ...(systemBlocks ? { system: systemBlocks } : {}),
           messages: [{ role: "user", content: request.prompt }],
+          ...(webSearchTools ? { tools: webSearchTools } : {}),
           // Adaptive thinking by default. Pass `request.thinking =
           // "disabled"` from the caller to suppress — useful for large
           // prompts where adaptive thinking exhausts the output budget
@@ -218,10 +235,39 @@ export function createAnthropicAdapter(
       // text block (skip thinking blocks — they're internal reasoning,
       // not the artifact body). For ingest the model returns one text
       // block; for other tasks we still flatten conservatively.
-      const text = response.content
-        .filter((b): b is Anthropic.TextBlock => b.type === "text")
-        .map((b) => b.text)
-        .join("");
+      const textBlocks = response.content.filter(
+        (b): b is Anthropic.TextBlock => b.type === "text",
+      );
+      let text = textBlocks.map((b) => b.text).join("");
+
+      // When web search ran, harvest the cited sources off the text
+      // blocks' citations and append a deduplicated FUENTES list so the
+      // research artifact is verifiable (the ep21-briefing pattern: real
+      // URLs the model consulted). Citations on web-grounded answers are
+      // `web_search_result_location` entries carrying url + title.
+      if (request.webSearch) {
+        const seen = new Set<string>();
+        const sources: string[] = [];
+        for (const b of textBlocks) {
+          const citations = (b as { citations?: unknown }).citations;
+          if (!Array.isArray(citations)) continue;
+          for (const c of citations) {
+            const url = (c as { url?: unknown }).url;
+            const title = (c as { title?: unknown }).title;
+            if (typeof url === "string" && !seen.has(url)) {
+              seen.add(url);
+              sources.push(
+                typeof title === "string" && title.length > 0
+                  ? `- ${title} (${url})`
+                  : `- ${url}`,
+              );
+            }
+          }
+        }
+        if (sources.length > 0) {
+          text += `\n\nFUENTES:\n${sources.join("\n")}`;
+        }
+      }
 
       let jsonParsed: unknown;
       if (request.json) {

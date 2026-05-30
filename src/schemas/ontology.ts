@@ -325,6 +325,7 @@ export const OntologyModelSchema = z.object({
     "mock",
     "openai",
     "anthropic",
+    "gemini",
     "ollama",
     "local",
   ]),
@@ -357,6 +358,7 @@ export const LlmProviderSchema = z.enum([
   "ollama",
   "openai",
   "anthropic",
+  "gemini",
   "local",
   "literal",
 ]);

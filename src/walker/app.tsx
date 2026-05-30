@@ -51,6 +51,9 @@ import { parseProviderArgs } from "./state/parse-provider-args.js";
 import { parseQueryArgs } from "./state/parse-query-args.js";
 import { parseLinkArgs } from "./state/parse-link-args.js";
 import type { LlmProvider } from "../runtime/llm/types.js";
+import { loadModelsRegistry } from "../core/project/load.js";
+import { updateNode } from "../core/nodes/update-node.js";
+import { modelTags } from "../runtime/llm/model-tags.js";
 
 export interface AppProps {
   initialNodeId: string;
@@ -81,6 +84,9 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
   // after saveDraft / clearDraft mutations land. Cheaper than re-loading the
   // whole neighborhood on every draft change.
   const [draftTick, setDraftTick] = useState(0);
+  // Bumped after an in-place node mutation (e.g. the `m` model-permute) to
+  // force the neighborhood useMemo to re-read the node from disk.
+  const [reloadTick, setReloadTick] = useState(0);
 
   // Run-result state machine. The walker stays interactive while a dispatch
   // is in flight: kicked off via useEffect on a "running" sentinel.
@@ -121,7 +127,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
     } catch (err) {
       return { error: err instanceof Error ? err.message : String(err) };
     }
-  }, [focalId, cwd]);
+  }, [focalId, cwd, reloadTick]);
 
   // Whether the focal node currently has a saved draft. Recomputed on every
   // focalId change and whenever draftTick advances (i.e., after save/clear).
@@ -474,6 +480,32 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
     }
     if (input === "E") {
       setMessage("edge walk arrives in walker v2");
+      return;
+    }
+    if (input === "m") {
+      // Permuta el modelo del nodo focal entre los del registry (locales + APIs).
+      // Cada toque avanza al siguiente y muestra para que es bueno ese modelo.
+      if ("error" in neighborhood) {
+        setMessage("sin focal");
+        return;
+      }
+      try {
+        const models = loadModelsRegistry(cwd).models;
+        if (models.length === 0) {
+          setMessage("sin modelos en el registry");
+          return;
+        }
+        const currentRef = neighborhood.focal.model?.ref;
+        const idx = models.findIndex((mm) => mm.id === currentRef);
+        const next = models[(idx + 1) % models.length];
+        updateNode({ id: focalId, model: { ref: next.id }, cwd });
+        setReloadTick((t) => t + 1);
+        setMessage(
+          `modelo → ${next.id}  [${next.name}]  · bueno para: ${modelTags(next).join(", ")}`,
+        );
+      } catch (err) {
+        setMessage(`m: ${err instanceof Error ? err.message : String(err)}`);
+      }
       return;
     }
     if (input === ":") {
