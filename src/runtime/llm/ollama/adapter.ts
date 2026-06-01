@@ -6,13 +6,17 @@ import type {
   LlmResponse,
 } from "../types.js";
 import { runAgenticLoop } from "./agentic.js";
+import { noTimeoutFetch } from "./fetch-shim.js";
 
 export function createOllamaAdapter(options?: {
   host?: string;
   defaultModel?: string;
 }): LlmAdapter {
   const host = options?.host || process.env.OLLAMA_HOST || "http://127.0.0.1:11434";
-  const ollama = new Ollama({ host });
+  // Route through a node:http fetch with no headers timeout: a slow
+  // prefill on a large local model can exceed undici's 300 s default
+  // and abort the dispatch (see fetch-shim.ts). Non-streaming only.
+  const ollama = new Ollama({ host, fetch: noTimeoutFetch });
   const defaultModel = options?.defaultModel || "llama3.1:8b";
 
   return {
