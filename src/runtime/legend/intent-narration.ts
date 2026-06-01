@@ -35,55 +35,65 @@
 
 // ── Output shape ────────────────────────────────────────────────────────────
 
+import { z } from "zod";
+
 /**
  * Allowed abstraction levels for a narrated intent. A single concrete file is
  * usually `unit` / `artifact`; the composed intent of a multi-file
  * neighbourhood rises to `architecture` / `domain` / `workflow`. Mirrors the
  * kernel's abstraction poset (src/schemas/ontology.ts AbstractionLevelSchema).
  */
-export type IntentLevel =
-  | "canon"
-  | "project"
-  | "target"
-  | "stack"
-  | "architecture"
-  | "domain"
-  | "workflow"
-  | "interface"
-  | "unit"
-  | "token"
-  | "artifact";
+export const IntentLevelSchema = z.enum([
+  "canon",
+  "project",
+  "target",
+  "stack",
+  "architecture",
+  "domain",
+  "workflow",
+  "interface",
+  "unit",
+  "token",
+  "artifact",
+]);
+export type IntentLevel = z.infer<typeof IntentLevelSchema>;
 
-export interface IntentNarration {
+/**
+ * Validated shape of a narrated intent. Validation lives with the type so the
+ * ingest wiring can `IntentNarrationSchema.safeParse` the model's JSON without
+ * re-declaring the contract.
+ */
+export const IntentNarrationSchema = z.object({
   /** Short noun phrase naming the intent (e.g. "Cooperative multi-process lock"). */
-  label: string;
+  label: z.string().min(1).max(256),
   /** Abstraction level — higher for composed/subsystem intent. */
-  level: IntentLevel;
+  level: IntentLevelSchema,
   /** (1) The need or question this code answers. */
-  problem: string;
+  problem: z.string().min(1),
   /** (2) The design decision taken, the alternative rejected, and why. */
-  decision: string;
+  decision: z.string().min(1),
   /** (3) Invariants / constraints / non-goals that govern it. */
-  constraints: string[];
+  constraints: z.array(z.string()),
   /** (4) The larger goal this is part of (often the neighbourhood's intent). */
-  parentGoal: string;
+  parentGoal: z.string().min(1),
   /**
    * The narration proper, written as a generative prompt: the instruction you
    * would give a competent engineer to rebuild *something that serves the same
    * purpose* — not the same symbols. Implementation detail that is one valid
    * choice among many is deliberately omitted.
    */
-  intentPrompt: string;
+  intentPrompt: z.string().min(1),
   /**
    * The behaviour oracle. Observable behaviours a faithful regeneration MUST
    * satisfy. A regeneration is faithful iff it satisfies these — judged by
    * behaviour, never by symbol parity. This is what makes the intent checkable
    * without rewarding the contract-tautology.
    */
-  acceptanceCriteria: string[];
+  acceptanceCriteria: z.array(z.string()),
   /** Source file paths this narration was lifted from (≥ 1; > 1 ⇒ composed intent). */
-  sourceFiles: string[];
-}
+  sourceFiles: z.array(z.string()),
+});
+export type IntentNarration = z.infer<typeof IntentNarrationSchema>;
 
 // ── System prompt ────────────────────────────────────────────────────────────
 

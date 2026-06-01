@@ -1,10 +1,11 @@
 # Intent Narration — the WHY-as-prompt lift
 
-> Status (2026-06-01): prompt + neighbourhood builder shipped and tested
-> (`src/runtime/legend/intent-narration.ts`, `tests/intent-narration.test.ts`).
-> LLM wiring (`onto ingest --intent`) and a real-model run are the next steps.
-> This is the designed path toward filling the **intent** column of the fidelity
-> cartography matrix, which is currently explicit no-data (see `ROADMAP.md`).
+> Status (2026-06-01): prompt + neighbourhood builder + **CLI wiring shipped and
+> tested** — `onto ingest --intent [<files...>]` (`src/runtime/legend/intent-narration.ts`,
+> wired in `src/commands/ingest/index.ts`, `tests/intent-narration.test.ts` +
+> `tests/ingest-intent-cli.test.ts`). A real-model run (frontier) is the last
+> step. This is the designed path toward filling the **intent** column of the
+> fidelity cartography matrix, currently explicit no-data (see `ROADMAP.md`).
 
 ## Why this exists
 
@@ -131,13 +132,29 @@ deliberate lossiness of intent a feature rather than measured loss. It is the
 same axis as the existing behaviour-checker, pointed at intent rather than
 structure.
 
+## CLI
+
+```
+onto ingest --intent [--dry-run] [--json] [--provider <p>] [--parent <id>] <files...>
+```
+
+- One or several **file paths** are read as one neighbourhood; a directory is
+  expanded by `--include` (default `ts,tsx`). Mutually exclusive with
+  `--from-pr` / `--from-issue`.
+- Dispatches `INTENT_NARRATION_PROMPT` through the cross-provider dispatcher,
+  validates the `IntentNarration` shape (Zod), and re-anchors `sourceFiles` to
+  the files actually fed.
+- Unless `--dry-run`, creates one **`manifestation=intent`** `node_create`
+  proposal whose `rules` carry the behaviour oracle as `REQUIRE:` lines and
+  whose `prompt` is the `intentPrompt`. No code-path manifestation override (an
+  intent node stays intent even when lifted from a `.ts` file).
+
 ## Next steps (not yet done)
 
-1. Wire `onto ingest --intent [<files...>]` to dispatch `INTENT_NARRATION_PROMPT`
-   through the cross-provider dispatcher and validate the `IntentNarration`
-   shape (Zod).
-2. Neighbourhood selection: group related files (by directory, by edge, by
-   import cluster) before narrating composed intent.
-3. Run against a frontier model on a small fixed slice and judge each narration
+1. Neighbourhood selection: group related files (by directory, by edge, by
+   import cluster) before narrating composed intent — today the caller supplies
+   the neighbourhood explicitly.
+2. Run against a frontier model on a small fixed slice and judge each narration
    by the behaviour oracle — the first real datum for the cartography matrix's
-   intent column.
+   intent column. (Local 8 GB is insufficient for the quality bar; this is
+   budget/frontier-gated, like the §3.10 variance run.)
