@@ -16,12 +16,14 @@ must appear here, classified honestly. If a doc *suggests* the analogy
 without claiming the formal correspondence, it should still appear
 here under tier T2 or T3.
 
-The audit was last refreshed on **2026-06-01**: three claims promoted to
-T1 — Axiom 5 restriction-law pin (+ sheaf characterisation) and
-Axiom 6 / §3.2 compiler functoriality (artifact category named, functor
-laws test-pinned); see §Axiom 5, §Axiom 6 and §5. The prior full
-refresh was **2026-05-26** against `main` after
-Phase ε's publishable substate. Phase β + Phase γ + Phase γ-7 + Phase δ
+The audit was last refreshed on **2026-06-01** in two passes (T1 count
+8 → 13). Pass 1 (categorical laws): Axiom 5 restriction-law pin
+(+ sheaf characterisation) and Axiom 6 / §3.2 compiler functoriality.
+Pass 2 (load-bearing hardening): Axiom 2 (crash-atomic durable log +
+advisory lock — the entry was stale; code already shipped) and §3.9
+validator port (closed-world parity exhaustively pinned). See §Axiom 2,
+§Axiom 5, §Axiom 6, §3.9 and §5. The prior full refresh was
+**2026-05-26** against `main` after Phase ε's publishable substate. Phase β + Phase γ + Phase γ-7 + Phase δ
 shipped earlier; Phase ε self-ingest landed a 4-arm bake-off on the
 ~125-file Ontology core perimeter (Arms A grounded, A0 ablation
 control, B granite hardware-vetoed, C-local starcoder contract-
@@ -68,11 +70,11 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 
 > *"Every mutation of the network is represented as an append-only event."*
 
-- **Tier:** T2 (operationally implemented).
-- **Code:** `.ontology/events.jsonl`; `src/core/state/state-store.ts`; `src/schemas/ontology.ts` `OntologyEventSchema`; every mutation command (`init`, `node create`, `node link`, `proposal apply`, `compile run`, `run --persist`) appends.
-- **Tests:** `tests/cli-observability.test.ts`, `tests/run-persistence.test.ts`.
-- **Why T2 not T1:** the file is *operationally* append-only — no command rewinds or rewrites — but `writeJson` (`src/core/fs/json.ts:15`) is a direct `fs.writeFileSync`, so a SIGKILL or out-of-disk mid-write can leave a truncated file. The "append-only" contract holds in the happy path, not under crashes. The single-writer assumption (CLI single-shot) is also unverified — concurrent processes are not lock-protected.
-- **Rigor improvement:** atomic write-to-temp + rename + `fsync`, plus an advisory lock under `.ontology/.lock`. This moves the claim from operational to strict.
+- **Tier:** T1 (strictly implemented). Promoted from T2 on **2026-06-01** — the two rigor improvements the prior audit named (crash-atomic writes + advisory lock) had in fact already shipped and are test-pinned; this entry was stale.
+- **Code:** `.ontology/events.jsonl`; `src/core/state/state-store.ts`; `src/schemas/ontology.ts` `OntologyEventSchema`; every mutation command (`init`, `node create`, `node link`, `proposal apply`, `compile run`, `run --persist`) appends. Durability primitives: `src/core/fs/json.ts` — `writeJson` is **crash-atomic** (serialise to `${file}.tmp.${pid}` → `fsync` the fd → `rename(2)` → `fsync` the parent dir; temp unlinked on failure so the original is never truncated), and `appendJsonl` is **durable** (`O_APPEND` single-buffer write + `fsync` before close). Advisory single-writer lock: `src/core/fs/lock.ts` (`acquireLock` / `withLock`, `O_CREAT|O_EXCL` atomic create, PID+hostname body, same-host stale-PID recovery, cross-host refusal, `--no-lock` opt-out).
+- **Tests:** `tests/fs-json.test.ts` (round-trip, no `.tmp` leftover after success, **original intact + temp cleaned when rename fails**, fd hygiene over 512 appends, exactly-one-terminator JSONL); `tests/advisory-lock.test.ts` (acquire/held/idempotent-release, stale-PID recovery, cross-host refusal, corrupt-body recovery, `withLock` release-on-throw, no-steal-on-takeover, `skipLock`); plus `tests/cli-observability.test.ts`, `tests/run-persistence.test.ts`.
+- **Why T1:** the characterising invariant — *the log is append-only and a crash cannot truncate or corrupt it* — is pinned: `writeJson`'s catch-path test proves the original target survives a mid-write failure with no temp residue, and `appendJsonl` always yields valid JSONL. The advisory-lock primitive is fully pinned, closing the multi-process single-writer hole the prior audit flagged.
+- **Honest scope of the lock (not a gap, a precise statement):** `withLock` is wired into the long-running, multi-write commands where concurrent runs are genuinely dangerous — `compile run`, `compile run-batch`, `verify-homeomorphism`. The quick single-shot mutations (`node create` / `link`, `proposal apply`, `init`) are **not** lock-wrapped; they rely on per-write atomicity, so the worst case under a (rare, single-user) concurrent invocation is a *last-writer-wins lost update* on `state.json`, never a corrupt file. Universalising the lock across the quick mutations is a deliberate future hardening, not a correctness bug — recorded in ROADMAP.
 
 ### Axiom 3 — Abstraction poset
 
@@ -190,13 +192,13 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 
 ### 3.9 Topos / subobject classifier
 
-- **Tier:** T1 (strictly implemented) for the three-valued algebra; T2 (operationally implemented) for the validator port.
+- **Tier:** T1 (strictly implemented) for the three-valued algebra **and** the validator port — closed-world parity pinned 2026-06-01.
 - **Code:** `src/runtime/topos/omega.ts`, `src/runtime/topos/predicate.ts`, `src/runtime/topos/rule-compiler.ts`. Validator port at `src/runtime/context/intent-validator.ts` (uses `compileValidationPredicate`, `buildEvaluationContext`, `evaluatePredicate`).
-- **Tests:** `tests/runtime/topos/omega.test.ts` (truth tables, commutativity, monotonicity wrt information refinement); `tests/runtime/topos/predicate.test.ts` (smart-constructor identities, compound evaluation); `tests/runtime/topos/rule-compiler.test.ts` (closed-world parity with `glueFragments`); `tests/intent-validator.test.ts` (verdict ∈ {true, false, unknown}, six-test compatibility surface preserved).
+- **Tests:** `tests/runtime/topos/omega.test.ts` (truth tables, commutativity, monotonicity wrt information refinement); `tests/runtime/topos/predicate.test.ts` (smart-constructor identities, compound evaluation); `tests/runtime/topos/closed-world-parity.test.ts` (**exhaustive** parity: `evaluatePredicate` == a hand-rolled Boolean oracle over every predicate-tree × every closed world, never `unknown`; open world genuinely yields `unknown` — 3000+ checks); `tests/runtime/topos/rule-compiler.test.ts` (closed-world parity with `glueFragments`); `tests/intent-validator.test.ts` (verdict ∈ {true, false, unknown}, six-test compatibility surface preserved).
 - **Why T1 for the algebra:** truth tables exhausted, monotonicity tested, parity-with-gluing pinned by an exhaustive sweep over a small token universe.
-- **Why T2 for the validator port:** the validator is now compositional and three-valued internally, but the externally-observable behaviour is closed-world (every synthetic token is classified by `buildEvaluationContext`). The Ω verdict is exposed via `result.verdict`, but the high-level `result.ok` collapses to Boolean. We *can* see "unknown" via the lower-level helpers; we don't yet *use* it from any caller.
+- **Why T1 for the validator port (2026-06-01):** the last gate — the parity contract — is now pinned. `tests/runtime/topos/closed-world-parity.test.ts` proves *exhaustively* (every raw predicate tree over a 3-token universe × all 2³ closed worlds, 3000+ checks) that under the closed-world reduction `evaluatePredicate` is byte-for-byte the same function as ordinary Boolean logic and **never** returns `unknown`. That is exactly what licenses the validator to surface a Boolean `result.ok` honestly: when the world is closed, the Ω machinery provably *is* a Boolean evaluator. The converse is pinned too — an open world genuinely yields `unknown` — so the three-valuedness is real, not a relabelled Bool. Combined with `openWorld` (shipped `c835509`, three-valued verdict exposed end-to-end through `semanticLink` / `validateIntent`), the validator port is strict.
 - **Why we are **not** a topos:** `omegaImplies` is the Kleene material implication `¬a ∨ b`, not the Heyting implication of a frame Ω. We don't compute inside any presheaf topos; Ω is just a three-element set with operations. `RULES_TOPOS.md` §1 and §7 admit this directly — keep that disclaimer.
-- **Rigor improvement:** add a property test that `evaluatePredicate(p, ctx)` over the closed-world reduction agrees with a hand-rolled Boolean evaluator for the same `p` (parity contract for the validator's domain, not just for `compileNodeRules`). And, when a real caller materialises that wants three-valued verdicts, expose an `openWorld?: boolean` flag on `validateIntent` rather than only via the lower-level helpers — that uplifts the validator port to T1. **Update 2026-05-11:** `openWorld` shipped at commit `c835509`; the validator now exposes the three-valued verdict end-to-end through `semanticLink` and `validateIntent`. The validator port is on a T1 path; only the closed-world parity property test remains.
+- **Rigor improvement:** ~~add a property test that `evaluatePredicate(p, ctx)` over the closed-world reduction agrees with a hand-rolled Boolean evaluator~~ **(done 2026-06-01, `closed-world-parity.test.ts`)**; ~~expose `openWorld?` on `validateIntent`~~ **(done `c835509`)**. Both gates closed → validator port T1. No further rigor work outstanding here; the only standing caveat is the honest "we are not a topos" disclaimer below (Kleene, not Heyting, implication), which is a *scope* statement, not a gap.
 
 ### 3.10 Compile adjoint (Project Legend)
 
@@ -319,9 +321,10 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 
 ## 5. Index — claims by tier
 
-### T1 — Strictly implemented (11)
+### T1 — Strictly implemented (13)
 
 - Axiom 1: typed directed multigraph.
+- Axiom 2: crash-atomic + durable append-only event log + advisory single-writer lock (`tests/fs-json.test.ts`, `tests/advisory-lock.test.ts`; promoted 2026-06-01 — code already shipped, entry was stale).
 - Axiom 3 (refinement-family edges only): poset enforcement.
 - Axiom 5 (restriction law only): presheaf restriction *F(S') ⊑ F(S)* on `assembleContext` (`tests/presheaf-sheaf-laws.test.ts`, pinned 2026-06-01).
 - Axiom 6: compiler functor — identity / morphism / composition laws pinned via the named artifact category (`tests/compiler-functoriality.test.ts`, `src/runtime/graph/artifact-category.ts`, 2026-06-01).
@@ -329,17 +332,16 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 - §3.1: category & typed multigraph (= axiom 1).
 - §3.2: compiler functor (= axiom 6).
 - §3.6: monad library + `compileNode` integration (laws + integration both tested).
-- §3.9 (algebra only): three-valued Ω predicate algebra (truth tables, monotonicity, parity sweep).
+- §3.9 (algebra): three-valued Ω predicate algebra (truth tables, monotonicity, parity sweep).
+- §3.9 (validator port): closed-world parity == Boolean oracle, exhaustive over predicate-tree × closed-world (`tests/runtime/topos/closed-world-parity.test.ts`, pinned 2026-06-01).
 - §4.1: content-addressed run records.
 
-### T2 — Operationally implemented (8)
+### T2 — Operationally implemented (6)
 
-- Axiom 2: append-only log (operational; not crash-atomic).
 - Axiom 4 (AST): marker-based prompt parser (no actual rewriting).
 - Axiom 5 (gluing only): separated presheaf with provider-uniqueness — **not** a sheaf (gluing axiom fails for agreeing sections; negative law pinned 2026-06-01). Restriction half promoted to T1 above.
 - §3.7: representable functor / Yoneda query (sound subset; no faithfulness test).
 - §3.8 (fibers): branch fibration partition + induced subgraph (no morphism-level fibration test).
-- §3.9 (validator port): three-valued internally, two-valued externally; lower-level helpers expose unknown.
 - §3.10: compile adjoint — Phase ε self-ingest, 2-column cartography matrix, pre-registered falsifiers met. Reframed 2026-06-01 as a *probabilistic/enriched* adjoint; verdict-*fold* determinism + variance-measurement core both test-pinned (`verdict-variance.ts`); only budget-gated real-LLM N-run generation remains open. Stays T2.
 - §4.2: proposal system lifecycle + provenance (categorical reading is generous).
 
@@ -365,13 +367,13 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 
 | Tier | Count |
 | --- | --- |
-| T1 | 11 |
-| T2 | 8 |
+| T1 | 13 |
+| T2 | 6 |
 | T3 | 7 |
 | T4 | 4 |
-| **Total** | **29** |
+| **Total** | **30** |
 
-Note: the **2026-06-01** refresh promotes three claims to T1 — Axiom 5's restriction law (and characterises its gluing as a separated presheaf, which stays T2) and Axiom 6 / §3.2 compiler functoriality (artifact category named + functor laws pinned). Net: T1 8 → 11, T2 10 → 8. The §3.10 promotion note from the prior refresh follows. — the 2026-05-26 refresh adds §3.10 to the T2 index — the 2026-05-13 audit had §3.10 in the body marked T4 but did not index it under T4 below, so re-counting after the promotion lands a +1 net on T2 with no T4 decrement. The original T2 label "(8)" undercounted the body by one; canonical recount is "(10)".
+Note: the **2026-06-01** refresh ran in two passes (starting from 29: T1 8 / T2 10 / T3 7 / T4 4). Pass 1 (categorical laws): Axiom 5's single T2 entry **split** into a restriction half (→ T1) and a gluing half (separated presheaf, stays T2) — that split is the lone +1 to the grand total (29 → 30); Axiom 6 / §3.2 compiler functoriality moved T2 → T1 (no total change). End of pass 1: T1 11, T2 8. Pass 2 (load-bearing hardening, no new line items): Axiom 2 (crash-atomic durable log + advisory lock — code already shipped, the ledger entry was stale) and §3.9 validator port (closed-world parity pinned) both moved T2 → T1. End of pass 2: **T1 13, T2 6, total 30.** The §3.10 promotion note from the prior refresh follows. — the 2026-05-26 refresh adds §3.10 to the T2 index — the 2026-05-13 audit had §3.10 in the body marked T4 but did not index it under T4 below, so re-counting after the promotion lands a +1 net on T2 with no T4 decrement. The original T2 label "(8)" undercounted the body by one; canonical recount is "(10)".
 
 ---
 
