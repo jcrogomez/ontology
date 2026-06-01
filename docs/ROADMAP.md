@@ -75,7 +75,7 @@ These close the largest distance between what's *built* and what's
 ### Cartography / ε tail (optional reinforcement)
 
 - 🔵 **Arm C-cloud — `devstral-small-2:24b`** on rented GPU (~$5–10). ε closed without it; this is a reinforcement of H3, not a blocker. Local 8 GB Mac is infeasible.
-- 🟡 **Contract / intent columns** — the matrix fills 2 of 5; these two remain explicit no-data.
+- 🟡 **Contract / intent columns** — the matrix fills 2 of 5; these two remain explicit no-data. **Intent column now has a designed extractor (2026-06-01):** `src/runtime/legend/intent-narration.ts` lifts the *why* (problem / decision / rejected-alternative / parent-goal) as a generative prompt with a behaviour-oracle (`acceptanceCriteria`), over file *neighbourhoods*, deliberately lossy — the opposite stance to the contract extractor. Spec + golden examples in [`legend/INTENT_NARRATION_SPEC.md`](legend/INTENT_NARRATION_SPEC.md). Remaining to fill the column: wire `onto ingest --intent`, then a frontier run judged by the behaviour oracle.
 - 🟡 **`onto legend bakeoff-synthesis` CLI.** Cross-arm synthesis still runs through a hand-rolled driver (`scripts/run-3a-bakeoff-synthesis.ts`); the verb removes the last manual surface.
 - 🟡 **Next fidelity lever = extraction/prompt completeness on large modules.** The 2026-05-29 loss-breakdown (`scripts/loss-report.ts`) showed Arm A's residual loss is **recall-bound, not precision-bound** — 22 large multi-export modules collapse into recoverable-but-truncated stubs (0/125 unrecoverable). Curbing over-emission is the *smaller* cost; the win is making regen emit the modules it currently drops. See `MATHEMATICAL_CLAIMS.md` §3.10.
 
