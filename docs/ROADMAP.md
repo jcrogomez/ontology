@@ -15,6 +15,25 @@ underneath (network kernel, proposal system, semantic linker, compiler
 with intent gate + `--runtime-check`, four categorical extensions,
 plasticity layer, atomic writes, hardening sweep §3.1–§3.15) is closed.
 
+**Rigor sprint (2026-06-01).** Three load-bearing categorical claims
+moved up the tier ladder: Axiom 5 presheaf-restriction and Axiom 6 /
+§3.2 compiler-functoriality promoted **T2 → T1** (laws test-pinned via
+`tests/presheaf-sheaf-laws.test.ts` + `tests/compiler-functoriality.test.ts`
+and the new `src/runtime/graph/artifact-category.ts`), and §3.10's adjoint
+reframed as a *probabilistic / enriched* functor with a shipped, tested
+variance-measurement core (`src/runtime/legend/verdict-variance.ts`) — it
+stays T2 (only the budget-gated real-LLM N-run remains). A pinned
+**negative** result: context gluing is a *separated presheaf*, not a
+sheaf / colimit (the gluing axiom fails for agreeing sections). A second
+pass closed the two cheap *load-bearing* claims: **Axiom 2** (crash-atomic
+durable event log + advisory lock — the code had already shipped, the
+ledger entry was stale; pinned by `fs-json.test.ts` + `advisory-lock.test.ts`)
+and **§3.9 validator port** (closed-world parity == Boolean oracle,
+exhaustively pinned by `tests/runtime/topos/closed-world-parity.test.ts`)
+→ both T1. **T1 count 8 → 13.** Detail in
+[`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §Axiom 2, §Axiom 5,
+§Axiom 6, §3.9, §3.10.
+
 **Where to look:**
 - This file is the single source of truth for what is open. Daily review findings roll in here, not into dated snapshots.
 - ε run history + hypothesis triplets: [`legend/calibrations/CALIBRATION_LOG.md`](legend/calibrations/CALIBRATION_LOG.md).
@@ -49,13 +68,14 @@ These close the largest distance between what's *built* and what's
 
 - 🟡 **Branch-coverage lint is unsound under the lenient `with-severity` schema** (regression from the §4.2 fix `a03208d`). After §4.2 made `severity` optional, `{"verdict":"pass"}` (no severity) is a valid verifier emission — but `verifierSchemaPoints("with-severity")` (`verifier-schemas.ts:82`) still enumerates only the 4 severity-*ful* points. So a graph that branches only on severity-ful predicates passes the §3.2 lint with no warning, then dies at runtime with `no_matching_branch` when the model emits a bare pass. The lone IMO example dodges it (its branches are `verdict == "pass"`/`"fail"`, severity-agnostic) so nothing triggers it yet, but the lint's guarantee is broken. Cheap fix: add `{verdict:"pass"}` and `{verdict:"fail"}` to the `with-severity` point set; pin with a test (severity-only branches ⇒ coverage warning). Found by the 2026-05-29 review, confirmed against source.
 - 🔵 **Minor ζ ergonomics** (same review, low priority): `step_count` counts *global* visits, not per-node verifier visits — in a generator↔verifier loop `step_count >= 10` means ~5 verifications, not 10; document in spec §3.2 or expose a per-node `visit_count`. And `no_matching_branch` rejects return the verdict JSON as `output` while accept/reject terminals return `currentArtifact` — inconsistent; consider returning `currentArtifact` on branch rejects too.
-- 🟡 **Verdict-map determinism thread** (`MATHEMATICAL_CLAIMS.md` §3.10 T2 → T1). The full T1 gate (real-LLM determinism at temp 0) is empirically unachievable; T2 evidence tests pin the deterministic *fold*. Staying T2.
+- 🟡 **Verdict-map variance thread** (`MATHEMATICAL_CLAIMS.md` §3.10, stays T2). The binary-determinism T1 gate is empirically unachievable (real LLMs are not bit-deterministic at temp 0), so §3.10 was reframed (2026-06-01) as a *probabilistic / enriched* adjoint and the measurement core shipped (`verdict-variance.ts` + test: N samples → verdict-distribution agreement / entropy / metric-stdev). Only the budget-gated **real-LLM N-run generation** remains — run it on a frontier provider against a small fixed repo and report the spread (the quantitative ε).
+- 🔵 **Advisory lock not universal across mutations** (kernel; surfaced by the 2026-06-01 Axiom 2 → T1 pass). `withLock` wraps the long-running multi-write commands (`compile run`, `compile run-batch`, `verify-homeomorphism`) but the quick single-shot mutations (`node create` / `link`, `proposal apply`, `init`) are not lock-wrapped. They rely on per-write crash-atomicity, so the worst case under a (rare, single-user) concurrent invocation is a *last-writer-wins lost update* on `state.json`, never a corrupt file. Universalising the lock (a shared `--no-lock` option + `withLock` wrap on the quick mutations) is deliberate future hardening, not a correctness bug.
 - 🔵 **Behaviour checker module eviction** (`behavior-checker.ts`): the per-call `?ts=` cache-bust leaks module instances, but it is **load-bearing** — `behavior-checker.test.ts` pins that re-imports get fresh module state (isolation between reps). Content-addressing the cache key trades that isolation away, so a real fix needs worker/process isolation (deferred to v1). Fine at ~20 nodes until then.
 
 ### Cartography / ε tail (optional reinforcement)
 
 - 🔵 **Arm C-cloud — `devstral-small-2:24b`** on rented GPU (~$5–10). ε closed without it; this is a reinforcement of H3, not a blocker. Local 8 GB Mac is infeasible.
-- 🟡 **Contract / intent columns** — the matrix fills 2 of 5; these two remain explicit no-data.
+- 🟡 **Contract / intent columns** — the matrix fills 2 of 5; these two remain explicit no-data. **Intent column now has a designed extractor (2026-06-01):** `src/runtime/legend/intent-narration.ts` lifts the *why* (problem / decision / rejected-alternative / parent-goal) as a generative prompt with a behaviour-oracle (`acceptanceCriteria`), over file *neighbourhoods*, deliberately lossy — the opposite stance to the contract extractor. Spec + golden examples in [`legend/INTENT_NARRATION_SPEC.md`](legend/INTENT_NARRATION_SPEC.md). **Wired (2026-06-01):** `onto ingest --intent [<files...>]` narrates one-or-many files → one `manifestation=intent` proposal (oracle persisted as `REQUIRE:` rules); `tests/ingest-intent-cli.test.ts` pins the mock dry-run flow. Remaining to fill the column: a frontier run judged by the behaviour oracle (local 8 GB insufficient — budget-gated, like the §3.10 variance run).
 - 🟡 **`onto legend bakeoff-synthesis` CLI.** Cross-arm synthesis still runs through a hand-rolled driver (`scripts/run-3a-bakeoff-synthesis.ts`); the verb removes the last manual surface.
 - 🟡 **Next fidelity lever = extraction/prompt completeness on large modules.** The 2026-05-29 loss-breakdown (`scripts/loss-report.ts`) showed Arm A's residual loss is **recall-bound, not precision-bound** — 22 large multi-export modules collapse into recoverable-but-truncated stubs (0/125 unrecoverable). Curbing over-emission is the *smaller* cost; the win is making regen emit the modules it currently drops. See `MATHEMATICAL_CLAIMS.md` §3.10.
 

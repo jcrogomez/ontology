@@ -907,6 +907,7 @@ program
   .option("--from-issue <number>", "#2: ingest intent from a GitHub issue (via `gh`) instead of source paths. Runs the prose extractor → one node_create proposal with manifestation=intent. Mutually exclusive with positional paths and --from-pr.")
   .option("--repo <owner/repo>", "Optional repository override for --from-pr/--from-issue (defaults to the gh-resolved repo of the current directory).")
   .option("--resolve-edges <nodeId>", "Post-apply edge mode (requires --from-pr): given the APPLIED node id of a previously ingested PR intent, re-fetch the PR's changed files and create `documents` edge_create proposals from that node to each matching existing code node. Edges can't be created at capture time because the PR node id is only assigned on apply (mirrors the γ-5 → γ-6 two-phase shape).")
+  .option("--intent", "Intent-narration mode (the WHY-as-prompt lift). Reads the positional file paths as ONE neighbourhood and narrates the code's PURPOSE as a generative prompt + a behaviour oracle (acceptance criteria) — deliberately lossy, distinct from the default contract extractor. Produces one manifestation=intent node_create proposal (unless --dry-run). Pass several files to narrate their composed subsystem intent. See docs/legend/INTENT_NARRATION_SPEC.md.")
   .action(async (paths: string[], options) => {
     try {
       await ingestCommand(paths ?? [], options);

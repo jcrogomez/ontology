@@ -44,6 +44,13 @@ import {
 } from "../../runtime/legend/structural-classifier.js";
 import { buildStaticSummary } from "../../runtime/legend/static-summary.js";
 import {
+  INTENT_NARRATION_PROMPT,
+  IntentNarrationSchema,
+  buildIntentNeighborhoodPrompt,
+  type IntentNarration,
+  type NeighborhoodFile,
+} from "../../runtime/legend/intent-narration.js";
+import {
   scanFileSymbols,
   patchProvidesWithAST,
 } from "../../runtime/legend/ast-symbol-scanner.js";
@@ -180,6 +187,15 @@ export interface IngestCommandOptions {
   // against the mock provider with zero LLM cost.
   dryRun?: boolean;
   json?: boolean;
+  // Intent-narration mode (the WHY-as-prompt lift). When set, the
+  // positional file paths are read as ONE neighbourhood and narrated
+  // via INTENT_NARRATION_PROMPT into a single IntentNarration — the
+  // code's purpose as a generative prompt + a behaviour oracle
+  // (acceptanceCriteria), deliberately lossy. Distinct from the
+  // default contract extractor. Produces one manifestation=intent
+  // node_create proposal (unless --dry-run). See
+  // docs/legend/INTENT_NARRATION_SPEC.md.
+  intent?: boolean;
   // Comma-separated file extensions to ingest in directory mode.
   // Default: "ts,tsx". For a Python project pass "--include py";
   // for a mixed Python/TS repo pass "--include py,ts,tsx". Has no
@@ -1378,6 +1394,21 @@ export async function ingestCommand(
     failWith("--resolve-edges requires --from-pr <number>.", options.json);
     return;
   }
+  // Intent-narration mode (the WHY-as-prompt lift). Operates on the
+  // positional file paths as one neighbourhood; mutually exclusive with
+  // the PR/issue prose source.
+  if (options.intent) {
+    if (sourceFlags.length > 0) {
+      failWith("--intent works on positional file paths, not --from-pr/--from-issue.", options.json);
+      return;
+    }
+    if (!hasPaths) {
+      failWith("--intent needs at least one file path to narrate.", options.json);
+      return;
+    }
+    await runIntentNarrationIngest(pathArgs, options);
+    return;
+  }
   if (options.fromPr !== undefined || options.fromIssue !== undefined) {
     await runIntentSourceIngest(options);
     return;
@@ -2548,6 +2579,234 @@ function parsePositiveIntFlag(raw: string, flag: string, json?: boolean): number
 // CLI-facing: fetch the PR/issue via gh, then dispatch to the prose flow
 // (or the post-apply edge resolver). The gh I/O is isolated here so
 // ingestFromIntentSource stays network-free and testable.
+// ── Intent-narration flow (the WHY-as-prompt lift) ──────────────────────────
+//
+// Reads the positional file paths as ONE neighbourhood, narrates the composed
+// intent via INTENT_NARRATION_PROMPT, validates the IntentNarration shape, and
+// (unless --dry-run) creates a single manifestation=intent node_create
+// proposal whose `rules` carry the behaviour oracle (acceptanceCriteria).
+// Deliberately distinct from the contract extractor: lossy, why-not-what.
+
+async function runIntentNarrationIngest(
+  pathArgs: string[],
+  options: IngestCommandOptions,
+): Promise<void> {
+  const provider = resolveProvider(options);
+  if (provider === undefined) return; // resolveProvider already failed.
+
+  // Stat + expand inputs into a flat file list (a dir is walked by --include).
+  const inputs: Array<{ path: string; stat: fs.Stats }> = [];
+  for (const p of pathArgs) {
+    try {
+      inputs.push({ path: p, stat: fs.statSync(p) });
+    } catch (err: unknown) {
+      failWith(`Could not stat "${p}": ${errorMessage(err)}`, options.json);
+      return;
+    }
+  }
+  const filePaths = collectAllInputFiles(inputs, parseIncludeFlag(options.include));
+  if (filePaths.length === 0) {
+    failWith("No files matched for intent narration.", options.json);
+    return;
+  }
+
+  // Read each file into the neighbourhood; skip binary/empty with a note.
+  const files: NeighborhoodFile[] = [];
+  const skipped: string[] = [];
+  for (const fp of filePaths) {
+    let content: string;
+    try {
+      content = fs.readFileSync(fp, "utf-8");
+    } catch (err: unknown) {
+      failWith(`Could not read "${fp}": ${errorMessage(err)}`, options.json);
+      return;
+    }
+    if (content.includes("\u0000") || content.trim().length === 0) {
+      skipped.push(computeCwdRelative(fp) || fp);
+      continue;
+    }
+    files.push({ path: computeCwdRelative(fp) || fp, content });
+  }
+  if (files.length === 0) {
+    failWith("All candidate files were empty or binary; nothing to narrate.", options.json);
+    return;
+  }
+
+  // Dispatch the narration. semantic_parse task reuses the existing budget +
+  // transient-retry machinery; only the system prompt and schema differ.
+  const userPrompt = buildIntentNeighborhoodPrompt(files);
+  const contentChars = files.reduce((n, f) => n + f.content.length, 0);
+  const budget = computeAdaptiveBudget(INTENT_NARRATION_PROMPT.length, contentChars);
+
+  let response: LlmResponse;
+  try {
+    response = await dispatchWithRetry(
+      {
+        task: "semantic_parse",
+        prompt: userPrompt,
+        system: INTENT_NARRATION_PROMPT,
+        json: true,
+        contextWindow: budget.contextWindow,
+        maxTokens: budget.maxTokens,
+      },
+      { provider, defaultModel: options.model, ollamaHost: options.ollamaHost },
+      dispatchLlmRequest,
+    );
+  } catch (err: unknown) {
+    failWith(`Intent narration dispatch failed: ${errorMessage(err)}`, options.json);
+    return;
+  }
+
+  const candidate =
+    response.json !== undefined ? response.json : tryParseJsonFromText(response.text);
+  if (candidate === undefined) {
+    failWith(
+      `The narrator did not return valid JSON. Raw response:\n${response.text.slice(0, 500)}`,
+      options.json,
+    );
+    return;
+  }
+  const parsed = IntentNarrationSchema.safeParse(candidate);
+  if (!parsed.success) {
+    failWith(
+      `Intent narration failed schema validation: ${formatZodIssues(parsed.error.issues)}`,
+      options.json,
+    );
+    return;
+  }
+  const narration = parsed.data;
+  // Anchor sourceFiles to what we actually fed — the model may omit or guess.
+  narration.sourceFiles = files.map((f) => f.path);
+
+  if (options.dryRun) {
+    if (options.json) {
+      console.log(JSON.stringify({ ok: true, dryRun: true, narration, model: response.model, provider: response.provider }, null, 2));
+    } else {
+      printIntentNarration(narration, { provider: response.provider, model: response.model, committed: false, skipped });
+    }
+    return;
+  }
+
+  const state = loadState();
+  const parentNodeId = options.parent ?? state.rootNodeId;
+  const parentNode = loadNodeById(parentNodeId);
+  if (!parentNode) {
+    failWith(`Parent node not found: ${parentNodeId}`, options.json);
+    return;
+  }
+  const proposalResult = createIntentNodeProposal(narration, parentNodeId, parentNode.integrity.hash, response);
+  if (!proposalResult.ok) {
+    failWith(proposalResult.message, options.json);
+    return;
+  }
+
+  if (options.json) {
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          dryRun: false,
+          proposal: { id: proposalResult.proposalId, status: "pending", mutationKind: "node_create", hash: proposalResult.proposalHash },
+          event: { eventId: proposalResult.eventId, eventType: "proposal_created" },
+          narration,
+          model: response.model,
+          provider: response.provider,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+  printIntentNarration(narration, {
+    provider: response.provider,
+    model: response.model,
+    committed: true,
+    proposalId: proposalResult.proposalId,
+    skipped,
+  });
+}
+
+function printIntentNarration(
+  narration: IntentNarration,
+  meta: { provider: string; model: string; committed: boolean; proposalId?: string; skipped?: string[] },
+): void {
+  console.log(`\nINTENT NARRATION  (${meta.provider}/${meta.model})`);
+  console.log(`  source: ${narration.sourceFiles.join(", ")}`);
+  if (meta.skipped && meta.skipped.length > 0) {
+    console.log(`  skipped (empty/binary): ${meta.skipped.join(", ")}`);
+  }
+  console.log(`\n  ${narration.label}  [${narration.level}]`);
+  console.log(`\n  Problem:    ${narration.problem}`);
+  console.log(`  Decision:   ${narration.decision}`);
+  console.log(`  Parent goal:${narration.parentGoal}`);
+  if (narration.constraints.length > 0) {
+    console.log(`\n  Constraints:`);
+    for (const c of narration.constraints) console.log(`    - ${c}`);
+  }
+  console.log(`\n  Intent prompt (the WHY-as-prompt):`);
+  console.log(indent(narration.intentPrompt, "    "));
+  console.log(`\n  Acceptance criteria (behaviour oracle):`);
+  for (const a of narration.acceptanceCriteria) console.log(`    - ${a}`);
+  if (meta.committed) {
+    console.log(`\n  ✔ intent node proposal created: ${meta.proposalId} (manifestation=intent, pending)`);
+  } else {
+    console.log(`\n  (dry-run — no proposal created)`);
+  }
+}
+
+// Map a validated IntentNarration into a manifestation=intent node_create
+// proposal. Unlike createNodeProposalForExtraction, there is NO code-path
+// manifestation override — an intent node stays intent even when lifted from
+// a `.ts` file. The behaviour oracle (acceptanceCriteria) is persisted as the
+// node's REQUIRE: rules.
+function createIntentNodeProposal(
+  narration: IntentNarration,
+  parentNodeId: string,
+  parentHash: string,
+  response: LlmResponse,
+  cwd?: string,
+): ProposalCreateOk | ProposalCreateErr {
+  const rules = narration.acceptanceCriteria.map((c) => `REQUIRE: ${c}`);
+  const rationalePayload = {
+    extractedFrom: narration.sourceFiles,
+    extractorModel: response.model,
+    extractorProvider: response.provider,
+    mode: "intent-narration",
+    problem: narration.problem,
+    decision: narration.decision,
+    parentGoal: narration.parentGoal,
+  };
+  try {
+    const { proposal, event } = createProposal({
+      mutation: {
+        kind: "node_create",
+        payload: {
+          level: narration.level,
+          kind: "definition",
+          prompt: narration.intentPrompt,
+          label: narration.label,
+          parentNodeId,
+          manifestation: "intent",
+          ...(rules.length > 0 ? { rules } : {}),
+          sourceFiles: narration.sourceFiles,
+        },
+        parentHash,
+      },
+      source: null,
+      validation: null,
+      provenance: {
+        derivedFrom: [parentNodeId],
+        rationale: JSON.stringify(rationalePayload, null, 2),
+      },
+      cwd,
+    });
+    return { ok: true, proposalId: proposal.id, proposalHash: proposal.hash, eventId: event.eventId };
+  } catch (err: unknown) {
+    return { ok: false, message: `Failed to create intent proposal: ${errorMessage(err)}` };
+  }
+}
+
 async function runIntentSourceIngest(options: IngestCommandOptions): Promise<void> {
   const provider = resolveProvider(options);
   if (provider === undefined) return; // resolveProvider already failed.

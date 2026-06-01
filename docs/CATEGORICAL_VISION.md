@@ -111,22 +111,25 @@ In Ontology, the most natural place this concept will land is the **branch-merge
 
 A second concrete natural transformation is the **Inspector triangle** (Project Legend §3): $\tau\colon \mathrm{intent} \Rightarrow \mathrm{prose}$ produces a per-node `translator` paragraph; combined with $F$ and the LLM-described-code map $\sigma$, it gives a (probabilistically) commuting square.
 
-### 2.4 Limits / colimits — *via topological closure*
+### 2.4 Limits / colimits — *analogy only (T3); not a universal construction*
 
-Limits and colimits are universal cones into / out of a diagram. Today Ontology realises them in two places:
+> **Honesty note (`MATHEMATICAL_CLAIMS.md` §3.4, T3).** Nothing here is a
+> categorical limit or colimit in the strict sense: no universal property is
+> constructed or tested. Kahn's algorithm computes *a* topological order, not
+> the universal cocone of a diagram; the gluing is a merge-with-conflict-checks,
+> not a colimit. The two readings below are useful intuitions for the shape of
+> the code, not claims about the codebase. Read them as analogy.
 
-- **Compile plan as a colimit.** `computeCompilePlan(focal)` returns
+- **Compile plan — read as a colimit-shaped closure.** `computeCompilePlan(focal)` returns the topological closure of $n$ under hard-dependency edges,
   
-  $$\mathrm{Plan}(n) \;=\; \mathrm{colim}\Bigl(\,\{m \in \mathcal{I} : m \to^{\,*}\, n \text{ along hard-deps}\}\,\Bigr),$$
+  $$\mathrm{Plan}(n) \;\approx\; \mathrm{colim}\Bigl(\,\{m \in \mathcal{I} : m \to^{\,*}\, n \text{ along hard-deps}\}\,\Bigr).$$
   
-  the topological closure of $n$ under hard-dependency edges.
-- **Context assembly as a limit / colimit.** `assembleContext(focal)` walks parents and edge neighbours and glues their context fragments. The gluing in [`src/runtime/context/gluing.ts`](../src/runtime/context/gluing.ts) is the colimit
+  What is *actually* pinned (and stronger than this analogy) is **functoriality**: the plan is a linear extension of the dependency poset that `F` preserves — identity, morphisms, and composition are test-pinned (`MATHEMATICAL_CLAIMS.md` §Axiom 6 / §3.2, T1). That is the real structural claim; "colimit" is just the diagram shape.
+- **Context assembly — a *separated-presheaf merge*, NOT a colimit.** `assembleContext(focal)` walks parents and edge neighbours and glues their fragments via [`src/runtime/context/gluing.ts`](../src/runtime/context/gluing.ts). It is tempting to write this as a quotient
   
-  $$\mathrm{Glue}(n) \;=\; \bigsqcup_{m \in \mathrm{Nbhd}(n)} \mathcal{P}(m) \;\big/\; {\sim}$$
+  $$\mathrm{Glue}(n) \;\overset{?}{=}\; \bigsqcup_{m \in \mathrm{Nbhd}(n)} \mathcal{P}(m) \;\big/\; {\sim},$$
   
-  in the presheaf category, where $\sim$ is the equaliser of overlapping requires / provides / forbids tokens.
-
-These are not labelled "limit" or "colimit" in the source today; the correspondence is a matter of how you read the existing functions.
+  but **that quotient is exactly what `glueFragments` does *not* compute** (negative result pinned 2026-06-01, `tests/presheaf-sheaf-laws.test.ts`; see `MATHEMATICAL_CLAIMS.md` §Axiom 5). Two fragments that *agree* on a shared provider are **rejected** (`duplicate_provider`), not identified under $\sim$. So the gluing is a **separated presheaf with provider-uniqueness** — it detects obstructions (missing requirement / forbidden match / branch mismatch / duplicate provider) but does not quotient agreeing sections into a colimit. The *restriction* law $F(S') \sqsubseteq F(S)$ that a presheaf must satisfy **is** pinned (T1); the gluing/colimit axiom is not (and, by design, should not be — provider-uniqueness is a feature).
 
 ### 2.5 Adjunction — *propose ⊣ apply (informal)*
 
@@ -290,10 +293,10 @@ Full design in [`docs/RULES_TOPOS.md`](docs/RULES_TOPOS.md).
 | Concept                       | Status                                            | Lives in                                  |
 | ----------------------------- | ------------------------------------------------- | ----------------------------------------- |
 | Category / typed multigraph   | ✅ shipped (axiom 1)                              | `src/schemas/`, `src/core/edges/`         |
-| Compiler functor              | ✅ shipped (axiom 6, Bootstrap 0.8)               | `src/runtime/compile/`                    |
+| Compiler functor              | ✅ shipped + functor laws pinned (axiom 6, T1 2026-06-01) | `src/runtime/compile/`, `src/runtime/graph/artifact-category.ts` |
 | Natural transformation        | 🟡 implicit (proposal coherence) — formal pending | `src/core/proposals/`                     |
-| Limit / colimit (compile plan)| ✅ shipped, not yet labelled as such              | `src/runtime/graph/compile-plan.ts`       |
-| Limit (context as presheaf)   | ✅ shipped (axiom 5)                              | `src/runtime/context/gluing.ts`           |
+| Limit / colimit (compile plan)| 🟡 analogy only (T3) — no universal property; functoriality is the real pin | `src/runtime/graph/compile-plan.ts`       |
+| Presheaf (context assembly)   | ✅ restriction law T1; gluing is a separated presheaf, **not** a colimit (T3) | `src/runtime/context/gluing.ts`           |
 | Adjunction (propose ⊣ apply)  | 🟡 candidate, not formal                          | `src/core/proposals/persist.ts`           |
 | Monad (Result / Effect)       | ✅ library shipped, ✅ `compileNode` on `EffectWithLog` (PR #115) | `src/runtime/effects/`                    |
 | Representable / Yoneda query  | ✅ shipped (CLI + walker `:query`)                | `src/runtime/query/`, `src/commands/query/` |

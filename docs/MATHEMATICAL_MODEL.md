@@ -73,7 +73,7 @@ $$\mathcal{P}\;\colon\; \mathbf{Graph}^{\mathrm{op}} \longrightarrow \mathbf{Set
 \qquad
 \mathcal{P}(n) \;=\; \bigl(\,\mathrm{requires}(n),\; \mathrm{provides}(n),\; \mathrm{forbids}(n),\; \mathrm{optional}(n)\,\bigr).$$
 
-The assembler collects sections over the neighborhood of the focal; `glueFragments` computes the colimit $\bigsqcup_n \mathcal{P}(n) / {\sim}$ (with conflict reporting at the equaliser); `validateIntent` evaluates a candidate response against the glued presheaf.
+The assembler collects sections over the neighborhood of the focal; `glueFragments` merges them with conflict reporting; `validateIntent` evaluates a candidate response against the glued presheaf. **Note:** this merge is *not* the colimit $\bigsqcup_n \mathcal{P}(n) / {\sim}$ — agreeing sections are rejected (`duplicate_provider`), not identified under $\sim$, so it is a *separated presheaf with provider-uniqueness*, not a sheaf/colimit (pinned 2026-06-01, `MATHEMATICAL_CLAIMS.md` §Axiom 5).
 
 - Each node declares requires, provides, forbids and optional context.
 - Context is local to graph neighborhoods.
@@ -85,7 +85,7 @@ The assembler collects sections over the neighborhood of the focal; `glueFragmen
   structured contract is surfaced in the LLM prompt under a `Contract`
   section so the model sees what the validator will judge it against
   (post-0.9; see `docs/CONTEXT_ASSEMBLER.md`).
-- **Not yet pinned:** the *presheaf restriction law* — $\mathcal{P}(n') \subseteq \mathcal{P}(n)$ for $n' \subseteq n$. The structure is presheaf-shaped operationally; the law has no test. `MATHEMATICAL_CLAIMS.md` §2.5 classifies this as T2.
+- **Pinned (2026-06-01):** the *presheaf restriction law* — $\mathcal{P}(n') \sqsubseteq \mathcal{P}(n)$ for $n' \subseteq n$ — is now test-pinned over `assembleContext` (`tests/presheaf-sheaf-laws.test.ts`), so this half is **T1**. `MATHEMATICAL_CLAIMS.md` §Axiom 5 carries the full entry; the gluing half stays T2 (separated presheaf, not a sheaf).
 - The `compare` and `propose` modes that earlier drafts of this axiom
   promised are not implemented; the assembler rejects any mode other
   than `strict`. They remain on the roadmap.

@@ -27,18 +27,6 @@ full pitch and `docs/PROJECT_LEGEND.md` for the design.
 | Onboarding / first run | [`README.md`](README.md), [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md) | |
 | CLI surface | [`docs/CLI_COMMANDS.md`](docs/CLI_COMMANDS.md) | |
 
-## Current phase state (2026-05-28)
-
-- **Phases α–ε are closed.** Phase ε (self-ingestion of the Ontology
-  repo) closed 2026-05-26 on a 4-arm bake-off + a 2-column fidelity
-  cartography matrix (structural + behaviour); AST grounding was shown
-  to contribute Δ = +0.355 mean Jaccard (real lift, not metric
-  circularity), and §3.10 (compile adjoint) was upgraded T4 → T2.
-- **Phase ζ (the workflow runtime) is active.** Note: "Phase ζ" in
-  older docs sometimes means "release + Open-Prompt seeds" — that was
-  the original plan; the *active* ζ stream is the workflow runtime.
-- For anything finer-grained, trust `docs/ROADMAP.md` over this list.
-
 ## Build / test / run
 
 ```bash
@@ -118,3 +106,16 @@ tests/             vitest suites (mirror src/ loosely)
 docs/              design docs; docs/legend/ = Project Legend; docs/legend/calibrations/ = ε records
 examples/          hello-world (compile demo), workflow-imo-verify-refine (Phase ζ demo)
 ```
+
+## Phase state (volatile — `docs/ROADMAP.md` is authoritative)
+
+Kept last on purpose: this is the only section that changes often, so
+editing it does not invalidate the prompt cache for the stable rules
+above. Do not move it up, and do not duplicate ROADMAP detail here.
+
+- **Phases α–ε are closed; Phase ζ (the workflow runtime) is active.**
+- **Naming gotcha:** "Phase ζ" in older docs sometimes meant "release +
+  Open-Prompt seeds" (the original plan). The *active* ζ stream is the
+  workflow runtime.
+- For phase specifics, metrics, dates, and open work, trust
+  `docs/ROADMAP.md` — that is the single source of truth.
