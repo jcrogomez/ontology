@@ -80,7 +80,19 @@ export function verifierSchemaPoints(
     case "simple-pass-fail":
       return [{ verdict: "pass" }, { verdict: "fail" }];
     case "with-severity":
+      // `severity` is OPTIONAL on `WithSeveritySchema` (see the note at
+      // its definition): a bare `{"verdict":"pass"}` / `{"verdict":"fail"}`
+      // is a valid, commonly-emitted point. Enumerate those severity-less
+      // points alongside the severity-bearing ones, or a graph that
+      // branches only on `severity == …` passes the coverage lint yet
+      // dies at runtime with `no_matching_branch` the moment the model
+      // returns a verdict with no severity. A bare point is matched by a
+      // `verdict == …` predicate but NOT by a `severity == …` one
+      // (`undefined !== "minor"`), so this enumeration is exactly the set
+      // a predicate set must cover.
       return [
+        { verdict: "pass" },
+        { verdict: "fail" },
         { verdict: "pass", severity: "minor" },
         { verdict: "pass", severity: "major" },
         { verdict: "fail", severity: "minor" },

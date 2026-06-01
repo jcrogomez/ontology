@@ -307,6 +307,36 @@ describe("graph loader / branch-coverage lint (spec §3.2)", () => {
     expect(loaded.warnings[0]).toMatch(/fail\/minor/);
     expect(loaded.warnings[0]).not.toMatch(/fail\/major/);
   });
+
+  it("warns when a with-severity graph branches ONLY on severity (bare verdict uncovered)", () => {
+    // Regression: `severity` is optional on with-severity, so a model
+    // can emit a bare `{"verdict":"pass"}` / `{"verdict":"fail"}`. A
+    // graph whose branches all carry a `severity == …` guard covers
+    // every severity-bearing point yet matches NEITHER bare verdict —
+    // a guaranteed runtime `no_matching_branch`. The coverage lint must
+    // flag it (previously it enumerated only the 4 severity points and
+    // stayed silent).
+    const graph = {
+      entry: "v1",
+      nodes: [
+        { id: "v1", kind: "verifier", prompt: "p", verifierSchema: "with-severity" },
+        { id: "t_minor", kind: "terminal", terminalVerdict: "accept" },
+        { id: "t_major", kind: "terminal", terminalVerdict: "reject" },
+      ],
+      edges: [
+        { from: "v1", to: "t_minor", type: "branches_on", predicate: `severity == "minor"` },
+        { from: "v1", to: "t_major", type: "branches_on", predicate: `severity == "major"` },
+      ],
+    };
+    const loaded = loadWorkflowGraph(graph);
+    expect(loaded.warnings).toHaveLength(1);
+    expect(loaded.warnings[0]).toMatch(/incomplete branch coverage/);
+    // Both bare verdicts are uncovered; no severity-bearing point is.
+    expect(loaded.warnings[0]).toMatch(/\bpass\b/);
+    expect(loaded.warnings[0]).toMatch(/\bfail\b/);
+    expect(loaded.warnings[0]).not.toMatch(/\/minor/);
+    expect(loaded.warnings[0]).not.toMatch(/\/major/);
+  });
 });
 
 // ── Verifier schemas + JSON extraction ──────────────────────────────────────
