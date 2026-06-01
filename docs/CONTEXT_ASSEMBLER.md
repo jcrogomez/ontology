@@ -108,7 +108,7 @@ Mathematically, the path's contract is a presheaf
 
 $$\mathcal{P}\colon \text{Path}^{\mathrm{op}} \longrightarrow \mathbf{Set}, \qquad \mathcal{P}(n) = \bigl(\,\mathrm{requires}(n),\;\mathrm{provides}(n),\;\mathrm{forbids}(n)\,\bigr),$$
 
-and `glueFragments` computes the colimit $\bigsqcup_n \mathcal{P}(n)$ that the linker then evaluates against the candidate response.
+and `glueFragments` merges the fragments — with conflict reporting — into a single contract the linker evaluates against the candidate response. **This merge is a *separated presheaf*, by design, not the colimit $\bigsqcup_n \mathcal{P}(n)/{\sim}$:** two neighbours that provide the *same* key are reported as a `duplicate_provider` conflict rather than identified, because provider-uniqueness is a feature here, not an accident. The *restriction* law a presheaf must satisfy is test-pinned (T1); the gluing/colimit axiom is deliberately not satisfied. See `MATHEMATICAL_CLAIMS.md` §Axiom 5 and `tests/presheaf-sheaf-laws.test.ts` (pinned 2026-06-01).
 
 ## CLI Surface
 

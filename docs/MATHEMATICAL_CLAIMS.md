@@ -16,7 +16,11 @@ must appear here, classified honestly. If a doc *suggests* the analogy
 without claiming the formal correspondence, it should still appear
 here under tier T2 or T3.
 
-The audit was last refreshed on **2026-05-26** against `main` after
+The audit was last refreshed on **2026-06-01**: three claims promoted to
+T1 — Axiom 5 restriction-law pin (+ sheaf characterisation) and
+Axiom 6 / §3.2 compiler functoriality (artifact category named, functor
+laws test-pinned); see §Axiom 5, §Axiom 6 and §5. The prior full
+refresh was **2026-05-26** against `main` after
 Phase ε's publishable substate. Phase β + Phase γ + Phase γ-7 + Phase δ
 shipped earlier; Phase ε self-ingest landed a 4-arm bake-off on the
 ~125-file Ontology core perimeter (Arms A grounded, A0 ablation
@@ -96,21 +100,22 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 
 > *"Each node declares requires, provides, forbids and optional context. Context is local to graph neighborhoods. Future validation will attempt to glue local contexts into a globally consistent state."*
 
-- **Tier:** T2 (operationally implemented).
+- **Tier:** T1 (strictly implemented) for the **presheaf-restriction law**; T2 (operationally implemented) characterised down to a **separated presheaf, explicitly *not* a sheaf**, for the gluing operation (negative law pinned 2026-06-01).
 - **Code:** `src/runtime/context/presheaf.ts` (`buildFragment`); `src/runtime/context/gluing.ts` (`glueFragments`); `src/runtime/context/assembler.ts`; `src/runtime/context/intent-validator.ts` (now ported onto Ω, see §3.9).
-- **Tests:** `tests/intent-validator.test.ts`, `tests/semantic-linker*.test.ts`.
-- **Why T2:** the fragments-and-gluing structure is real and used everywhere validation runs. What is *not* verified is the presheaf-restriction law: the doc says context is "local to graph neighborhoods" but we never assert *F(U) ↪ F(V) for V ⊂ U* — i.e., that restricting a node's context to a smaller neighborhood agrees with the same node's context computed against that smaller neighborhood directly. The gluing is a coproduct-with-coherence-checks rather than a colimit in any topos.
-- **Rigor improvement:** add a presheaf-restriction test: build a focal context against neighborhood `N`, then build it again against `N' ⊂ N`, and assert the second is a substructure of the first. That pins the *F(N') ⊂ F(N)* law and converts this to T1.
+- **Tests:** `tests/presheaf-sheaf-laws.test.ts` (restriction law + sheaf characterisation, 8 cases); `tests/intent-validator.test.ts`, `tests/semantic-linker*.test.ts`.
+- **Why T1 for restriction:** `tests/presheaf-sheaf-laws.test.ts` Part 1 models the "open set" as the edge-type set deciding which neighbours `assembleContext` pulls in, and pins *F(S') ⊑ F(S)* for *S' ⊆ S* on every component of the assembled section (nodes, constraints, edges), the invariance of the parent-chain base under restriction, and idempotence/determinism of recomputation. This is the *F(N') ⊂ F(N)* law the prior audit asked for, in test form.
+- **What we learned about gluing (negative result, T2):** `glueFragments` is **not a sheaf**. Part 2 of the test pins the precise shape: the **separation axiom holds** (two distinct sections providing the same key are rejected, not silently identified — provider uniqueness is enforced), **identity holds** (a self-contained fragment glues to itself), the **merge is order-independent** (a genuine presheaf-coherence law), and **incompatibility is an obstruction to gluing** (missing requirement / forbidden match / branch mismatch all block, which is what makes failure-to-glue a usable conflict-detection primitive) — but the **gluing axiom FAILS**: two local sections that *agree* on an overlap (both provide the same key) conflict rather than glue to the shared global section. So it is a **separated presheaf with provider-uniqueness**, not a sheaf / colimit. This makes §3.4's "not a colimit" disclaimer precise rather than hand-waved.
+- **Rigor improvement:** the restriction half is now T1. To make gluing a *bona fide* sheaf one would have to relax `duplicate_provider` into an *idempotent identification* (two sections providing the same key with compatible attributes glue to one) — a deliberate design change, not a bug, and likely undesirable here since provider-uniqueness is a feature. Recommended action is documentation, not code: state in `CONTEXT_ASSEMBLER.md` that gluing is a separated presheaf by design.
 
 ### Axiom 6 — Compiler functor
 
 > *"Compilation maps intention objects and semantic relations into executable artifact objects and relations. Compilation must preserve structure."*
 
-- **Tier:** T2 (operationally implemented).
-- **Code:** `src/runtime/compile/compile-plan-runner.ts`; `src/runtime/graph/compile-plan.ts` (Kahn's topological sort over hard-dependency edges); `src/runtime/compile/compile-node.ts`.
-- **Tests:** `tests/runtime/graph/compile-plan.test.ts`, `tests/cli-compile-*.test.ts`.
-- **Why T2:** the structure-preserving claim is true *operationally* — the compile order is derived from the graph and not hand-coded — but functoriality (F(g ∘ f) = F(g) ∘ F(f)) is not asserted in any test. We have one functor candidate (`F : intentions → artifacts`) but morphisms in the artifact category aren't even named: artifacts produced by `compileNode` don't carry typed edges between themselves, only filesystem paths. So we have an **object map**, not a functor in the strict categorical sense.
-- **Rigor improvement:** define an artifact category explicitly (artifacts as objects, "depends-on by virtue of compile order" as morphisms) and add a test that asserts `F` preserves at least one composition: compiling A → B → C produces artifacts `a`, `b`, `c` whose dependency edges in the artifact category mirror the hard-dependency edges in the intention category. That brings this to T1.
+- **Tier:** T1 (strictly implemented). Promoted from T2 on **2026-06-01**: the artifact category is now named and the functor laws are test-pinned.
+- **Code:** `src/runtime/compile/compile-plan-runner.ts`; `src/runtime/graph/compile-plan.ts` (Kahn's topological sort over hard-dependency edges); `src/runtime/graph/artifact-category.ts` (the codomain category C + `verifyFunctoriality`); `src/runtime/compile/compile-node.ts`.
+- **Tests:** `tests/compiler-functoriality.test.ts` (identity, morphism-preservation, composition-preservation, 5 cases); `tests/compile-plan.test.ts`, `tests/cli-compile-*.test.ts`.
+- **Why T1 now:** `src/runtime/graph/artifact-category.ts` names the artifact category C explicitly — objects are the emitted artifacts, morphisms are "depends-on by virtue of compile order" **read back from the plan output** (`step.dependsOn`), with composition as the transitive closure. `verifyFunctoriality` checks the three laws by comparing C against the intention poset I: identity (bijection on objects), morphism-preservation (every hard-dep edge's image is realised by the compile order), and composition-preservation (the transitive closures of I and C agree, i.e. *F(g∘f) = F(g)∘F(f)*). The composition law is checked on a chain with a **purely transitive** dependency (C↝A through B, no direct C→A edge), so it is not true-by-construction: C is built from the plan, and the composite must emerge. The check also reports `planFailed` (F undefined) for cyclic diagrams rather than claiming preservation.
+- **What stays out of scope:** F is here a functor on the *dependency poset* (objects + the partial order generated by hard-dep edges). Richer artifact-side morphisms (typed relations between emitted files beyond compile order) are not modelled; the claim is precisely "F preserves the dependency-poset structure", which is what the structure-preservation axiom asserts.
 
 ### Axiom 7 — Code as compiled shadow
 
@@ -134,7 +139,7 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 
 ### 3.2 Compiler functor
 
-- **Tier:** T2 (operationally implemented).
+- **Tier:** T1 (strictly implemented) as of 2026-06-01 — functor laws test-pinned.
 - **Same as axiom 6.** See above.
 
 ### 3.3 Natural transformation
@@ -219,7 +224,8 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 
 - **Why T2 (not T1) today.** The structural correspondence holds by construction and the per-axis distances are measured on the Ontology repo with pre-registered falsifiers (H1' floor: Arm-must-clear-control mean Jaccard 0.30, met by A at 0.581; H3' coding-spec floor unevaluated until cloud Arm C lands; H4 Arm A beats A0 by ≥ 0.20, met by Δ = 0.355). The deterministic *fold* of the verdict map is now pinned (evidence bullet above), but the end-to-end gate — that a **real** model at `temperature = 0` reproduces the verdict map across runs — is empirically unmet: production inference is not bit-deterministic at temp 0 (server batching, fp nondeterminism), so the end-to-end property cannot be honestly asserted by a test. That gap is what keeps this at T2.
 
-- **Path to T1.** Two honest routes, neither yet taken: (a) pin end-to-end determinism against a *deterministic* provider stand-in (the `mock` adapter) — but that pins our orchestration, not the adjoint, so it is weak T1 evidence; (b) *measure* real-LLM temp-0 verdict-map variance across N runs on a fixed small repo and report the spread, converting the determinism claim from binary to quantitative — this needs provider budget and is the more meaningful upgrade. Until one lands, the deterministic-fold evidence above is the honest extent of the pin. Note: the **workflow-runtime** is also labelled Phase ζ in the post-2026-05-26 roadmap (`WORKFLOW_RUNTIME_SPEC.md`); the two threads share a Phase number because they are scope-parallel, not sequenced.
+- **The right object is enriched, not Set-valued (framing clarified 2026-06-01).** Chasing a binary-determinism T1 is a category error: production LLM inference is not bit-deterministic at temperature 0 (server batching, fp nondeterminism), so $G$ is irreducibly a **probabilistic functor** and $\eta\colon \mathrm{id}_{\mathcal C} \Rightarrow F\circ G$ is a natural transformation valued in a category **enriched over probability distributions** (a Kleisli-style arrow into the Giry/distribution monad), not a function in $\mathbf{Set}$. The deterministic verdict *fold* is the $\mathbf{Set}$-level shadow that is genuinely T1 (pinned); the adjoint itself lives one level up and its rigor artefact is a *measured concentration*, not a determinism proof. Owning this is what distinguishes an honest probabilistic-categorical claim from a determinism claim that can never be met.
+- **Path to T1.** Two honest routes: (a) pin end-to-end determinism against a *deterministic* provider stand-in (the `mock` adapter) — but that pins our orchestration, not the adjoint, so it is weak T1 evidence; (b) *measure* real-LLM temp-0 verdict-map variance across N runs on a fixed small repo and report the spread, converting the claim from binary to quantitative — the more meaningful upgrade. **Route (b)'s measurement core now ships** (`src/runtime/legend/verdict-variance.ts` + `tests/verdict-variance.test.ts`, 2026-06-01): a pure, test-pinned fold from N regen samples → per-node verdict distribution → agreement rate / Shannon entropy / metric-stdev, with `agreement = 1 / entropy = 0` recovering the deterministic idealisation as a limiting case (verified against identical/mock samples). What remains budget/frontier-gated is only the **generation** of the N real-LLM samples (an 8 GB local box cannot host an adequate model — see ROADMAP); the measurement method is no longer a gap. Until that run lands, the deterministic-fold evidence plus the shipped variance core are the honest extent of the pin, and §3.10 stays T2. Note: the **workflow-runtime** is also labelled Phase ζ in the post-2026-05-26 roadmap (`WORKFLOW_RUNTIME_SPEC.md`); the two threads share a Phase number because they are scope-parallel, not sequenced.
 
 - **Deferred future work — 5th frontier arm.** A 5-arm extension adding `devstral-small-2:24b` on rented GPU (~$5–10, A10/L4 class) was originally scoped to test H3 ("coding-specialisation transfers to a coding-specialised frontier model"). Deferred 2026-05-26 for budget; the close substate does **not** depend on it because the T4 → T2 gate was *≥ 2 filled cartography columns*, which is met. When budget permits, the 5-arm synthesis is a one-line edit to `scripts/run-3a-bakeoff-synthesis.ts` (the 3 → 4 extension in `4697e4e` is the template) and a re-render of §3.10 with the additional column.
 
@@ -313,27 +319,28 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 
 ## 5. Index — claims by tier
 
-### T1 — Strictly implemented (8)
+### T1 — Strictly implemented (11)
 
 - Axiom 1: typed directed multigraph.
 - Axiom 3 (refinement-family edges only): poset enforcement.
+- Axiom 5 (restriction law only): presheaf restriction *F(S') ⊑ F(S)* on `assembleContext` (`tests/presheaf-sheaf-laws.test.ts`, pinned 2026-06-01).
+- Axiom 6: compiler functor — identity / morphism / composition laws pinned via the named artifact category (`tests/compiler-functoriality.test.ts`, `src/runtime/graph/artifact-category.ts`, 2026-06-01).
 - Axiom 7 (traceability): `artifact → compilation_run → runId → run record → prompt hash → node`.
 - §3.1: category & typed multigraph (= axiom 1).
+- §3.2: compiler functor (= axiom 6).
 - §3.6: monad library + `compileNode` integration (laws + integration both tested).
 - §3.9 (algebra only): three-valued Ω predicate algebra (truth tables, monotonicity, parity sweep).
 - §4.1: content-addressed run records.
 
-### T2 — Operationally implemented (10)
+### T2 — Operationally implemented (8)
 
 - Axiom 2: append-only log (operational; not crash-atomic).
 - Axiom 4 (AST): marker-based prompt parser (no actual rewriting).
-- Axiom 5: presheaf context + gluing (no restriction-law test).
-- Axiom 6: compiler functor (object map; no functoriality test).
-- §3.2: compiler functor (= axiom 6).
+- Axiom 5 (gluing only): separated presheaf with provider-uniqueness — **not** a sheaf (gluing axiom fails for agreeing sections; negative law pinned 2026-06-01). Restriction half promoted to T1 above.
 - §3.7: representable functor / Yoneda query (sound subset; no faithfulness test).
 - §3.8 (fibers): branch fibration partition + induced subgraph (no morphism-level fibration test).
 - §3.9 (validator port): three-valued internally, two-valued externally; lower-level helpers expose unknown.
-- §3.10: compile adjoint — Phase ε self-ingest, 2-column cartography matrix, pre-registered falsifiers met (verdict-*fold* determinism test-pinned; end-to-end real-LLM determinism still open).
+- §3.10: compile adjoint — Phase ε self-ingest, 2-column cartography matrix, pre-registered falsifiers met. Reframed 2026-06-01 as a *probabilistic/enriched* adjoint; verdict-*fold* determinism + variance-measurement core both test-pinned (`verdict-variance.ts`); only budget-gated real-LLM N-run generation remains open. Stays T2.
 - §4.2: proposal system lifecycle + provenance (categorical reading is generous).
 
 ### T3 — Useful analogy (7)
@@ -358,13 +365,13 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 
 | Tier | Count |
 | --- | --- |
-| T1 | 8 |
-| T2 | 10 |
+| T1 | 11 |
+| T2 | 8 |
 | T3 | 7 |
 | T4 | 4 |
 | **Total** | **29** |
 
-Note: the 2026-05-26 refresh adds §3.10 to the T2 index — the 2026-05-13 audit had §3.10 in the body marked T4 but did not index it under T4 below, so re-counting after the promotion lands a +1 net on T2 with no T4 decrement. The original T2 label "(8)" undercounted the body by one; canonical recount is "(10)".
+Note: the **2026-06-01** refresh promotes three claims to T1 — Axiom 5's restriction law (and characterises its gluing as a separated presheaf, which stays T2) and Axiom 6 / §3.2 compiler functoriality (artifact category named + functor laws pinned). Net: T1 8 → 11, T2 10 → 8. The §3.10 promotion note from the prior refresh follows. — the 2026-05-26 refresh adds §3.10 to the T2 index — the 2026-05-13 audit had §3.10 in the body marked T4 but did not index it under T4 below, so re-counting after the promotion lands a +1 net on T2 with no T4 decrement. The original T2 label "(8)" undercounted the body by one; canonical recount is "(10)".
 
 ---
 

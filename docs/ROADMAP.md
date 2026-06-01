@@ -15,6 +15,19 @@ underneath (network kernel, proposal system, semantic linker, compiler
 with intent gate + `--runtime-check`, four categorical extensions,
 plasticity layer, atomic writes, hardening sweep §3.1–§3.15) is closed.
 
+**Rigor sprint (2026-06-01).** Three load-bearing categorical claims
+moved up the tier ladder: Axiom 5 presheaf-restriction and Axiom 6 /
+§3.2 compiler-functoriality promoted **T2 → T1** (laws test-pinned via
+`tests/presheaf-sheaf-laws.test.ts` + `tests/compiler-functoriality.test.ts`
+and the new `src/runtime/graph/artifact-category.ts`), and §3.10's adjoint
+reframed as a *probabilistic / enriched* functor with a shipped, tested
+variance-measurement core (`src/runtime/legend/verdict-variance.ts`) — it
+stays T2 (only the budget-gated real-LLM N-run remains). A pinned
+**negative** result: context gluing is a *separated presheaf*, not a
+sheaf / colimit (the gluing axiom fails for agreeing sections). T1 count
+8 → 11. Detail in [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md)
+§Axiom 5, §Axiom 6, §3.10.
+
 **Where to look:**
 - This file is the single source of truth for what is open. Daily review findings roll in here, not into dated snapshots.
 - ε run history + hypothesis triplets: [`legend/calibrations/CALIBRATION_LOG.md`](legend/calibrations/CALIBRATION_LOG.md).
@@ -49,7 +62,7 @@ These close the largest distance between what's *built* and what's
 
 - 🟡 **Branch-coverage lint is unsound under the lenient `with-severity` schema** (regression from the §4.2 fix `a03208d`). After §4.2 made `severity` optional, `{"verdict":"pass"}` (no severity) is a valid verifier emission — but `verifierSchemaPoints("with-severity")` (`verifier-schemas.ts:82`) still enumerates only the 4 severity-*ful* points. So a graph that branches only on severity-ful predicates passes the §3.2 lint with no warning, then dies at runtime with `no_matching_branch` when the model emits a bare pass. The lone IMO example dodges it (its branches are `verdict == "pass"`/`"fail"`, severity-agnostic) so nothing triggers it yet, but the lint's guarantee is broken. Cheap fix: add `{verdict:"pass"}` and `{verdict:"fail"}` to the `with-severity` point set; pin with a test (severity-only branches ⇒ coverage warning). Found by the 2026-05-29 review, confirmed against source.
 - 🔵 **Minor ζ ergonomics** (same review, low priority): `step_count` counts *global* visits, not per-node verifier visits — in a generator↔verifier loop `step_count >= 10` means ~5 verifications, not 10; document in spec §3.2 or expose a per-node `visit_count`. And `no_matching_branch` rejects return the verdict JSON as `output` while accept/reject terminals return `currentArtifact` — inconsistent; consider returning `currentArtifact` on branch rejects too.
-- 🟡 **Verdict-map determinism thread** (`MATHEMATICAL_CLAIMS.md` §3.10 T2 → T1). The full T1 gate (real-LLM determinism at temp 0) is empirically unachievable; T2 evidence tests pin the deterministic *fold*. Staying T2.
+- 🟡 **Verdict-map variance thread** (`MATHEMATICAL_CLAIMS.md` §3.10, stays T2). The binary-determinism T1 gate is empirically unachievable (real LLMs are not bit-deterministic at temp 0), so §3.10 was reframed (2026-06-01) as a *probabilistic / enriched* adjoint and the measurement core shipped (`verdict-variance.ts` + test: N samples → verdict-distribution agreement / entropy / metric-stdev). Only the budget-gated **real-LLM N-run generation** remains — run it on a frontier provider against a small fixed repo and report the spread (the quantitative ε).
 - 🔵 **Behaviour checker module eviction** (`behavior-checker.ts`): the per-call `?ts=` cache-bust leaks module instances, but it is **load-bearing** — `behavior-checker.test.ts` pins that re-imports get fresh module state (isolation between reps). Content-addressing the cache key trades that isolation away, so a real fix needs worker/process isolation (deferred to v1). Fine at ~20 nodes until then.
 
 ### Cartography / ε tail (optional reinforcement)
