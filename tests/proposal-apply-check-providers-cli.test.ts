@@ -87,4 +87,48 @@ describe("onto proposal apply --check-providers (auto-gluing in apply)", () => {
     expect(apply.status).toBe(0);
     expect(JSON.parse(apply.stdout).providerCheck).toBeUndefined();
   });
+
+  // ── --strict: the sheaf governs the mutation ────────────────────────────────
+
+  it("--strict BLOCKS a drifting re-provision; the proposal stays PENDING (not staled)", () => {
+    const p1 = proposeContract("s1.json", "auth_login", "(creds: C): Session");
+    expect(runCli(tempDir, ["proposal", "apply", p1, "--json"]).status).toBe(0);
+
+    const p2 = proposeContract("s2.json", "auth_login", "(token: string): boolean");
+    const blocked = runCli(tempDir, ["proposal", "apply", p2, "--strict", "--json"]);
+    expect(blocked.status).not.toBe(0);
+    const parsed = JSON.parse(blocked.stdout);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.kind).toBe("provider_drift");
+    expect(parsed.providerCheck.drift.map((d: { key: string }) => d.key)).toContain("auth_login");
+
+    // Pending, not staled: the human can resolve and retry — and a retry
+    // WITHOUT --strict still applies (warn-only escape hatch).
+    const proposalFile = JSON.parse(
+      fs.readFileSync(path.join(tempDir, ".ontology/proposals", `${p2}.json`), "utf-8"),
+    );
+    expect(proposalFile.status).toBe("pending");
+    expect(runCli(tempDir, ["proposal", "apply", p2, "--check-providers", "--json"]).status).toBe(0);
+  });
+
+  it("--strict lets a compatible re-provision (equal signature) through", () => {
+    const p1 = proposeContract("s3.json", "auth_login", "(creds: C): Session");
+    expect(runCli(tempDir, ["proposal", "apply", p1, "--json"]).status).toBe(0);
+
+    const p2 = proposeContract("s4.json", "auth_login", "(creds: C): Session");
+    const apply = runCli(tempDir, ["proposal", "apply", p2, "--strict", "--json"]);
+    expect(apply.status).toBe(0);
+    const parsed = JSON.parse(apply.stdout);
+    expect(parsed.ok).toBe(true);
+    expect(parsed.providerCheck.identified.map((i: { key: string }) => i.key)).toContain("auth_login");
+  });
+
+  it("--strict implies the provider check (no --check-providers needed) and is inert without drift", () => {
+    // Fresh key, no existing provider: strict apply goes straight through,
+    // and the providerCheck rides on the success payload (proof it ran).
+    const p1 = proposeContract("s5.json", "fresh_key", "(x: number): string");
+    const apply = runCli(tempDir, ["proposal", "apply", p1, "--strict", "--json"]);
+    expect(apply.status).toBe(0);
+    expect(JSON.parse(apply.stdout).providerCheck).toBeDefined();
+  });
 });

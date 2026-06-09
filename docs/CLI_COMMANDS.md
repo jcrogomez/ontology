@@ -380,10 +380,12 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **Purpose:** Translate a pending proposal into a real graph mutation. Re-validates the dependency snapshot captured at proposal time:
   - For `node_create`: compares `parentHash` against the parent node's current integrity hash.
   - For `edge_create`: compares `fromHash` and `toHash` against both endpoint nodes' current integrity hashes.
+  - For `node_update` / `node_update_parent`: compares `nodeHash` (and `newParentHash`) against the target node(s).
 
-  If the snapshot has diverged, the proposal is transitioned to `staled` and refused (no graph mutation occurs). Otherwise the underlying mutation is dispatched (`node_created` or `edge_created`), the proposal is transitioned to `applied`, and both the mutation event and `proposal_applied` are appended to the temporal log.
+  If the snapshot has diverged, the proposal is transitioned to `staled` and refused (no graph mutation occurs). Otherwise the underlying mutation is dispatched (`node_created`, `edge_created`, `node_updated`, or `node_parent_updated`), the proposal is transitioned to `applied`, and both the mutation event and `proposal_applied` are appended to the temporal log.
 - **Example:** `npm run dev -- proposal apply proposal_0001` (or `... --json`).
 - **Dry run:** `npm run dev -- proposal apply proposal_0001 --dry-run` — validates without writing anything; reports whether the proposal would apply, would stale, or would fail.
+- **Provider check (auto-gluing):** `--check-providers` runs the O2 `identify-if-equal` sheaf check of a `node_create`/`node_update` proposal's declared `provides` against the existing providers of the same keys (same branch): equal signature → identification, different/missing → drift warning. Warn-only by default. `--strict` (implies the check) **blocks on drift** — the proposal stays *pending* (not staled), so you can resolve the drift or re-run without `--strict`; an errored check also blocks under `--strict` (cannot verify ⇒ do not apply). See `docs/legend/CONTEXT_GLUING_REGIMES.md`.
 - **Failure modes (each exits 1 and reports `kind` in JSON):**
   - `not_found` — the id is unknown
   - `not_pending` — the proposal is already applied / rejected / staled

@@ -8,14 +8,20 @@ import type { ContextFragment } from "../../runtime/context/presheaf.js";
 export interface ProposalApplyOptions {
   dryRun?: boolean;
   json?: boolean;
-  // O-gate (CONTEXT_GLUING_REGIMES.md): before applying a node_create proposal
-  // that declares `provides`, run the O2 `identify-if-equal` sheaf check of the
-  // candidate against the existing providers of the same keys (same branch). A
-  // compatible re-provision (identical signature) is reported as an
-  // identification; an incompatible one (drift / missing signature) is reported
-  // as a provider-drift warning. Opt-in; v0 warns, does NOT block (apply
-  // proceeds) — a `--strict` blocking mode is a future increment.
+  // O-gate (CONTEXT_GLUING_REGIMES.md): before applying a node_create or
+  // node_update proposal that declares `provides`, run the O2
+  // `identify-if-equal` sheaf check of the candidate against the existing
+  // providers of the same keys (same branch). A compatible re-provision
+  // (identical signature) is reported as an identification; an incompatible
+  // one (drift / missing signature) is reported as a provider-drift warning.
+  // Opt-in; warns only unless `strict` is set.
   checkProviders?: boolean;
+  // Blocking mode over the provider check (implies checkProviders): drift
+  // BLOCKS the apply and the proposal stays pending (not staled — staling is
+  // for snapshot divergence; drift is a contract conflict the human can
+  // resolve and retry). A check that ERRORS also blocks under strict:
+  // cannot verify ⇒ do not apply (unknown ⇒ conflict, never a false pass).
+  strict?: boolean;
 }
 
 interface ProviderCheck {
@@ -109,14 +115,24 @@ function checkProviderConsistency(id: string, cwd: string): ProviderCheck | null
 export async function proposalApplyCommand(id: string, options: ProposalApplyOptions): Promise<void> {
   const dryRun = !!options.dryRun;
 
-  // O2 provider check (opt-in, read-only, before the mutation). v0 warns; it
-  // never blocks the apply.
+  // O2 provider check (opt-in, read-only, before the mutation). Warn-only by
+  // default; --strict turns drift (or an errored check) into a block.
+  const strict = !!options.strict;
+  const runCheck = !!options.checkProviders || strict; // --strict implies the check
   let providerCheck: ProviderCheck | null = null;
-  if (options.checkProviders) {
+  if (runCheck) {
     try {
       providerCheck = checkProviderConsistency(id, process.cwd());
     } catch (err: unknown) {
-      // A check failure must never block a legitimate apply.
+      if (strict) {
+        // Cannot verify ⇒ do not apply. The proposal stays pending.
+        failWith(
+          `provider check failed and --strict is set — refusing to apply (${errorMessage(err)})`,
+          options.json,
+        );
+        return;
+      }
+      // Warn-only mode: a check failure must never block a legitimate apply.
       if (!options.json) console.error(`⚠ provider check skipped: ${errorMessage(err)}`);
     }
   }
@@ -127,6 +143,24 @@ export async function proposalApplyCommand(id: string, options: ProposalApplyOpt
     for (const d of providerCheck.drift) {
       console.error(`⚠ provider drift: "${d.key}" already provided by ${d.existingNodeIds.join(", ")} with a different/missing signature — re-provision is NOT a compatible glue`);
     }
+  }
+  if (strict && providerCheck && providerCheck.drift.length > 0) {
+    // The sheaf governs the mutation: a drifting re-provision does not glue,
+    // so under --strict it does not apply. Pending, not staled — the human
+    // can resolve the drift (or re-run without --strict) and retry.
+    if (options.json) {
+      console.log(JSON.stringify({
+        ok: false,
+        kind: "provider_drift",
+        error: `provider drift on ${providerCheck.drift.length} key(s) — blocked by --strict; proposal stays pending`,
+        providerCheck,
+      }, null, 2));
+    } else {
+      console.error(
+        `✖ blocked by --strict: ${providerCheck.drift.length} drifting key(s) above — proposal stays pending (resolve the drift or re-run without --strict)`,
+      );
+    }
+    process.exit(1);
   }
 
   let result;

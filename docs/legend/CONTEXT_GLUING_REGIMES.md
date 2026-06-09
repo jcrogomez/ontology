@@ -277,9 +277,14 @@ fidelity refinement that broadens the T1 subcategory, default unchanged;
 (b) `apply` now runs the
 `identify-if-equal` check against the existing graph as opt-in
 `onto proposal apply --check-providers` — it reports compatible re-provisions
-(identification) and drift (warning) but, in v0, **warns rather than blocks**;
-a `--strict` blocking mode is the next step; (c) workflows propose new
-nodes only (not node-update / edges) and persist no run record. The full
-agentic-graph regime — executions routinely proposing and the graph growing
-and rewiring under sheaf consistency — is the remaining horizon. The sequence
-is deliberate.
+(identification) and drift (warning); **`--strict` (landed 2026-06-09) turns
+drift into a block** (the proposal stays pending; an errored check also
+blocks — cannot verify ⇒ do not apply); (c) workflows now propose
+node-updates and edges too (`--update-node` + graph-declared
+`proposesEdges`, WORKFLOW_RUNTIME_SPEC §3.6) and persist a self-certifying
+`wfrun_*` run record that every resulting proposal's `source` references.
+With (a)–(c) landed (all 2026-06-09), the O1→O4 + apply-gate sequence is
+complete; what remains of the full agentic-graph regime — executions
+*routinely* proposing and the graph growing and rewiring under sheaf
+consistency — is operational adoption, not missing mechanism (plus the
+create-mode edge deferral, the γ-6 analogue).
