@@ -266,11 +266,13 @@ O1, O2, O3 v0, and O4 have shipped (all opt-in / default-preserving /
 human-gated; no math claim downgraded). The loop now closes end-to-end:
 an execution declares a contract, the artefact is measured against it
 (round-trip, for code), and the proposed node is born with a signature O2 can
-reconcile. What remains: (a) the discriminator is still syntactic in the wired paths —
-the **resolved-type extractor is now built and feasibility-pinned**
-(`typescript-resolved.ts`, gate #1 of the Path to T1: captures inferred
-returns/consts the syntactic tier can't, tier-tagged so it never confuses with
-syntactic), but **not yet wired into ingest**; (b) apply still doesn't *automatically*
+reconcile. What remains: (a) the discriminator defaults to syntactic, but the
+**resolved-type extractor is now built AND wired** as opt-in
+`onto ingest --resolved-signatures` (`typescript-resolved.ts` + the ingest
+override; captures inferred returns/consts and follows re-export aliases the
+syntactic tier can't, tier-tagged so it never confuses with syntactic) — a
+fidelity refinement that broadens the T1 subcategory, default unchanged;
+(b) apply still doesn't *automatically*
 run `identify-if-equal` against the existing graph (it's reachable via the
 validation flag, but not yet a step of apply itself); (c) workflows propose new
 nodes only (not node-update / edges) and persist no run record. The full

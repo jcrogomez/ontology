@@ -17,6 +17,10 @@ import {
 import { dispatchLlmRequest } from "../../runtime/llm/dispatcher.js";
 import type { LlmProvider, LlmResponse } from "../../runtime/llm/types.js";
 import { collectSourceFiles } from "../../runtime/static/typescript.js";
+import {
+  extractResolvedSignatures,
+  type ResolvedExport,
+} from "../../runtime/static/typescript-resolved.js";
 import { inferEdgesAutoFromDirectory } from "../../runtime/static/edges.js";
 import { errorMessage } from "../../core/errors.js";
 import {
@@ -242,6 +246,11 @@ export interface IngestCommandOptions {
   //     is surfaced in the INGEST report's "Classifier routing"
   //     section.
   staticClassifier?: "report-only" | "enabled";
+  // O-gate #1: attach resolved-type signatures (a whole-program TypeChecker
+  // pass) to ingested `provides` instead of the syntactic tier. Opt-in;
+  // applies to directory / multi-input ingest (where a program is built over
+  // the swept files), not single-file ingest.
+  resolvedSignatures?: boolean;
   // #2 (create-context-graph follow-up): ingest intent from a GitHub
   // pull request or issue instead of source files. Exactly one of
   // {paths, fromPr, fromIssue} must be provided. These route through
@@ -1541,6 +1550,7 @@ export async function ingestCommand(
         ensemble: ensembleMode,
         staticClassifier: staticClassifierMode,
         extensions,
+        resolvedSignatures: !!options.resolvedSignatures,
       });
       return;
     }
@@ -1638,6 +1648,7 @@ export async function ingestCommand(
     ensemble: ensembleMode,
     staticClassifier: staticClassifierMode,
     extensions,
+    resolvedSignatures: !!options.resolvedSignatures,
   });
 }
 
@@ -1805,6 +1816,13 @@ interface DirectoryOptions {
   // (parsed by parseIncludeFlag). Always non-empty when this struct
   // is constructed.
   extensions: string[];
+  // O-gate #1 (CONTEXT_GLUING_REGIMES.md): when set, signatures attached to
+  // ingested `provides` come from the resolved-type extractor (a whole-program
+  // TypeChecker pass) instead of the syntactic tier — genuine interface
+  // identity (alias expansion, inferred types), tier-tagged so it never
+  // string-equals a syntactic signature. Opt-in; default keeps the syntactic
+  // tier (no test churn, no environment-sensitive type strings by default).
+  resolvedSignatures?: boolean;
 }
 
 interface PerFileSummary {
@@ -1868,6 +1886,15 @@ async function runDirectoryIngest(
   const results: PerFileSummary[] = [];
   let totalTokens = 0;
 
+  // O-gate #1: when --resolved-signatures is set, build ONE TypeChecker
+  // program over the TS/JS files and resolve each export's type, so the
+  // signatures attached to ingested `provides` are the resolved tier (genuine
+  // interface identity) rather than the syntactic proxy. One program for the
+  // whole sweep (createProgram is heavy; amortise it once).
+  const resolvedSigMap = opts.resolvedSignatures
+    ? extractResolvedSignatures(files.filter((f) => /\.(ts|tsx|js|jsx)$/i.test(f)))
+    : undefined;
+
   // Walk sequentially rather than in parallel: cache hits on the
   // shared system prompt accumulate (Anthropic prompt cache writes
   // are visible only after the first response begins streaming, so
@@ -1906,6 +1933,8 @@ async function runDirectoryIngest(
 
     const tokensUsed = extract.response.usage?.totalTokens ?? 0;
     totalTokens += tokensUsed;
+
+    applyResolvedSignatures(extract.extracted, filePath, resolvedSigMap);
 
     if (opts.dryRun) {
       results.push({
@@ -2083,6 +2112,27 @@ async function runDirectoryIngest(
 // fs.realpathSync canonicalisation so a file passed both directly and
 // via its parent directory only appears once, and macOS /tmp ↔
 // /private/tmp symlink doublings collapse.
+// O-gate #1: replace a file's syntactic provideSignatures with resolved-tier
+// ones (replace, not merge, so a node's signatures are one uniform tier; keys
+// with no resolved signature carry none — conservative). Tier-tagged values
+// mean a resolved node never glues with a syntactic node across tiers.
+function applyResolvedSignatures(
+  extracted: ExtractionResult,
+  filePath: string,
+  resolvedSigMap: Map<string, ResolvedExport[]> | undefined,
+): void {
+  if (!resolvedSigMap || !extracted.provides?.length) return;
+  const resolved = resolvedSigMap.get(path.resolve(filePath));
+  if (!resolved || resolved.length === 0) return;
+  const byName = new Map(resolved.map((r) => [r.name, r.signature]));
+  const sigs: Record<string, string> = {};
+  for (const key of extracted.provides) {
+    const s = byName.get(key);
+    if (s !== undefined) sigs[key] = s;
+  }
+  extracted.provideSignatures = Object.keys(sigs).length > 0 ? sigs : undefined;
+}
+
 function collectAllInputFiles(
   inputs: Array<{ path: string; stat: fs.Stats }>,
   extensions: string[],
@@ -2153,6 +2203,12 @@ async function runMultiInputIngest(
   const results: PerFileSummary[] = [];
   let totalTokens = 0;
 
+  // O-gate #1: one resolved-type program over the TS/JS inputs (see
+  // runDirectoryIngest for the rationale).
+  const resolvedSigMap = opts.resolvedSignatures
+    ? extractResolvedSignatures(files.filter((f) => /\.(ts|tsx|js|jsx)$/i.test(f)))
+    : undefined;
+
   for (const filePath of files) {
     const cwdRelative = computeCwdRelative(filePath);
     const classification = classifyIfEnabled(filePath, opts.staticClassifier);
@@ -2186,6 +2242,8 @@ async function runMultiInputIngest(
 
     const tokensUsed = extract.response.usage?.totalTokens ?? 0;
     totalTokens += tokensUsed;
+
+    applyResolvedSignatures(extract.extracted, filePath, resolvedSigMap);
 
     if (opts.dryRun) {
       results.push({
