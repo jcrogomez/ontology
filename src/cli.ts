@@ -410,6 +410,7 @@ run
   .option("--time <time>", "Time to use for context")
   .option("--mode <mode>", "Mode for context assembly")
   .option("--validate", "Run deterministic intent validation")
+  .option("--identify-equal-providers", "With --validate: treat two providers of the same key as compatible (glued) when they carry an identical syntactic signature, instead of a duplicate-provider conflict (O2 sheaf policy). Opt-in; default enforces provider-uniqueness.")
   .option("--model <model>", "Model to use for the selected LLM provider")
   .option("--ollama-host <host>", "Host for Ollama provider")
   .option("--include-edges", "Include edge-aware context in the assembled prompt")

@@ -184,8 +184,18 @@ false identification).
   stated **Path to T1** (resolved-type discriminator + sheaf axiom as a stated
   law over an explicit cover + a real consumer). Default stays the T1
   restriction / T2 separated-presheaf; nothing existing changed (T2 6→7).
-- **Not yet wired into any caller** — compile/validate still use the default.
-  The mode is latent capability until O3 gives it a consumer.
+- **First consumer landed (2026-06-09):** `onto run context --validate
+  --identify-equal-providers` threads the policy into the validation gluing
+  step (opt-in; default still enforces uniqueness). Demonstrated end-to-end
+  over the *real* assembly path by `tests/context-glue-policy-integration.test.ts`:
+  two edge-neighbour nodes that provide the same key with an identical
+  signature glue under the policy and conflict by default; a divergent
+  signature still conflicts. **Honest scope:** the consumer lives in the
+  *settled / validation* path and is exercised by nodes that carry
+  `provides` + signatures (i.e. **static-ingest** output, O1) — **not** the
+  O3 workflow path, whose proposed nodes currently carry no `provides`
+  contract (see O3 below). So O2 is no longer latent, but its first consumer
+  is the static regime, not yet the workflow loop.
 
 ### O3 — ✅ first dynamic-mutation consumer, v0 (landed 2026-06-09)
 The execution→intent loop now closes over the existing proposal substrate:
@@ -202,11 +212,16 @@ instance of "variable intent: grow, improve, learn patterns."
   (not node-update or edges); `source: null` (workflows don't persist a run
   record yet — a future enrichment for a tighter audit link); opt-in and
   human-gated (nothing auto-mutates).
-- **This is where O2's sheaf earns its consumer:** once executions routinely
-  propose nodes that re-provide capabilities, `identify-if-equal` is the
-  consistency law that lets the graph grow without conflicting on every
-  legitimate re-provision. Wiring the workflow proposal path to *request*
-  `identify-if-equal` gluing on apply is the natural next increment.
+- **Snag found wiring O3→O2 (2026-06-09):** a workflow-proposed node carries a
+  `prompt` but **no `provides` contract**, so `identify-if-equal` has nothing
+  to act on from the workflow path — wiring it "on apply" today would be a
+  no-op dressed as a consumer. O2's real first consumer therefore lives in the
+  *validation* path over static-ingest contracts (see O2 above), not the
+  workflow loop. **To truly close O3→O2, a further increment must make the
+  workflow proposal carry a contract** (extract `provides` + signatures from
+  the artefact when it is code, or let the graph declare what the workflow
+  produces) — only then does an execution-proposed re-provision exist for the
+  sheaf to reconcile.
 
 ## 5. Pre-registered open decisions
 

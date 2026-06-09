@@ -30,6 +30,12 @@ export interface RunContextOptions {
   persist?: boolean;
   includeEdges?: boolean;
   edgeTypes?: string;
+  // O2 (CONTEXT_GLUING_REGIMES.md): when set, the validation gluing step treats
+  // two distinct providers of the same key as compatible (glued) iff they carry
+  // an identical syntactic signature (from O1), instead of always conflicting.
+  // Opt-in; default keeps provider-uniqueness. This is O2's first real consumer
+  // — exercised by static-ingest nodes, which carry `provides` + signatures.
+  identifyEqualProviders?: boolean;
   // --as-proposal turns the model's response into a typed candidate node mutation.
   // Auto-implies --persist. Default proposal parent is the focal node id (the one
   // the context was assembled against), since a child of the focal node is the
@@ -210,7 +216,11 @@ export async function runContextCommand(id: string, options: RunContextOptions) 
   let validationResult: IntentValidationResult | undefined;
   if (isValidate) {
     const fragments = contextOutput.nodes.map(buildFragment);
-    const glued = glueFragments(fragments);
+    const glued = glueFragments(fragments, {
+      onDuplicateProvider: options.identifyEqualProviders
+        ? "identify-if-equal"
+        : "conflict",
+    });
     validationResult = validateIntent({
       assembled: contextOutput,
       glued,
