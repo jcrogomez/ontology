@@ -40,6 +40,14 @@ export async function proposalShowCommand(id: string, options: ProposalShowOptio
     console.log(`  Branch:       ${p.branch ?? "(active)"}`);
     console.log(`  From hash:    ${proposal.mutation.fromHash}`);
     console.log(`  To hash:      ${proposal.mutation.toHash}`);
+  } else if (proposal.mutation.kind === "node_update") {
+    const p = proposal.mutation.payload;
+    console.log(`Mutation (node_update):`);
+    console.log(`  Node:         ${p.nodeId}`);
+    if (p.prompt !== undefined) console.log(`  New prompt:   ${p.prompt}`);
+    if (p.label !== undefined) console.log(`  New label:    ${p.label}`);
+    if (p.provides !== undefined) console.log(`  New provides: ${p.provides.join(", ")}`);
+    console.log(`  Node hash:    ${proposal.mutation.nodeHash}`);
   } else if (proposal.mutation.kind === "node_update_parent") {
     const p = proposal.mutation.payload;
     console.log(`Mutation (node_update_parent):`);

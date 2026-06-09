@@ -270,6 +270,76 @@ Output (human mode): a short summary of `{verdict, stepCount,
 durationMs}` plus the trace path. Output (`--json`): the full Result
 record above.
 
+### 3.6 Closing the loop — proposing back into the intent graph (v0.1)
+
+> *Added 2026-06-09 (post-v0; O3/O4 of `CONTEXT_GLUING_REGIMES.md`
+> shipped the create half on 2026-06-09, this section adds the
+> update/reconnect half). The workflow runtime is otherwise standalone;
+> everything in this section requires an initialised `.ontology/`
+> project and is opt-in via `--as-proposal`.*
+
+An ACCEPTED workflow run can propose mutations of the intention graph.
+Nothing here mutates directly: every path goes through the existing
+proposal substrate (`pending` → human-gated `onto proposal apply`).
+`--as-proposal` is incompatible with `--dry-run` (a dry run produces
+placeholder output, which must never enter the proposal sequence).
+
+**Mode 1 — grow (`node_create`, O3/O4, shipped).** The final artefact
+becomes a pending `node_create` proposal under `--proposal-parent`
+(default: root), with `--proposal-level/--proposal-kind` required. When
+the graph declares an output contract (top-level `provides:
+[{key, signature?}]`) and `artefactLanguage` is code, the artefact is
+measured (G) against the declaration and the proposed node is born with
+the measured `provides` + `provideSignatures` (declared ≠ produced is
+surfaced as a defect note, not a block).
+
+**Mode 2 — refine (`node_update`, this section).** With
+`--update-node <nodeId>` instead of level/kind/parent, the artefact
+becomes a pending **`node_update`** proposal against the EXISTING node:
+the artefact replaces `prompt`, and the resolved output contract
+(measured-or-declared, same rule as mode 1) replaces
+`provides`/`provideSignatures`. The proposal pins the target node's
+hash at creation time (`nodeHash`) and apply stales it on divergence —
+the same dual-snapshot discipline as `edge_create`/`node_update_parent`.
+This is the verify-refine loop pointed at its natural target: a node's
+prompt refined by a workflow and proposed back onto the same node.
+
+**Edges — reconnect (`proposesEdges`).** A workflow graph may declare,
+top-level:
+
+```json
+"proposesEdges": [
+  { "type": "depends_on", "target": "node_0042", "direction": "out" }
+]
+```
+
+Each entry proposes one typed edge between the **focal node** (the node
+being updated, or the created node in mode 1) and `target`.
+`direction: "out"` (default) reads focal → target; `"in"` reads
+target → focal. Semantics by mode:
+
+- **Update mode:** both endpoints exist, so one `edge_create` proposal
+  per entry is created alongside the `node_update` proposal.
+  **Apply-order matters:** apply the edge proposals FIRST, then the
+  `node_update` — the update rewrites the focal node's hash, which
+  stales any still-pending edge proposal pinned to the old hash (the
+  conservative direction: a stale edge proposal is re-proposable, a
+  silently mis-pinned one is not). The CLI prints the proposals in the
+  recommended apply order.
+- **Create mode:** the focal id does not exist until apply, so
+  declared edges are NOT proposed in-run; the CLI surfaces them as a
+  deferred note. Closing this (a post-apply `--resolve-edges`
+  analogue of ingest γ-6) is future work, recorded in ROADMAP.
+
+CLI additions to §3.5:
+
+- `--update-node <nodeId>` — switch `--as-proposal` to mode 2.
+  Mutually exclusive with `--proposal-level/--proposal-kind/
+  --proposal-parent`.
+- Edge declarations ride on the graph file, not flags — the workflow
+  *author* states what the output relates to; the runner only decides
+  whether to propose.
+
 ## 4. Pre-registered v0 predictions (when shipped)
 
 The v0 runtime is a small piece of code; v0 success is mostly

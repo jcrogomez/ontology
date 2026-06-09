@@ -535,8 +535,9 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
   - `--trace <path>` — write the full JSON trace to this path.
   - `--provider <provider>` / `--model <model>` / `--ollama-host <host>` — dispatch overrides for every step; when omitted, per-node `model` fields and task-default routing decide.
   - `--dry-run` — validate the graph + input and emit a canned trace without any LLM dispatch.
-  - `--as-proposal` — on an ACCEPTED run, turn the final artefact into a pending `node_create` proposal (review with `onto proposal apply`). Requires an initialised `.ontology/` project.
-  - `--proposal-level <level>` / `--proposal-kind <kind>` *(required with `--as-proposal`)*, `--proposal-parent <nodeId>`, `--proposal-label <label>`, `--proposal-rationale <text>` — proposal metadata, same semantics as `run context --as-proposal`.
+  - `--as-proposal` — on an ACCEPTED run, turn the final artefact into a pending `node_create` proposal (review with `onto proposal apply`). Incompatible with `--dry-run`. Requires an initialised `.ontology/` project.
+  - `--proposal-level <level>` / `--proposal-kind <kind>` *(required with `--as-proposal` in create mode)*, `--proposal-parent <nodeId>`, `--proposal-label <label>`, `--proposal-rationale <text>` — proposal metadata, same semantics as `run context --as-proposal`.
+  - `--update-node <nodeId>` — with `--as-proposal`: propose a **`node_update`** of this existing node instead of creating one (the artefact replaces its prompt; the resolved output contract replaces its provides). Mutually exclusive with the create-mode level/kind/parent flags. Graph-declared `proposesEdges` become `edge_create` proposals alongside — apply the edges **before** the update (the update rewrites the focal hash and stales pending edge proposals). Spec §3.6.
   - `--json` — output the result as JSON.
 
 ### Additional commands (compact reference)

@@ -537,6 +537,26 @@ export const ProposalNodeUpdateParentPayloadSchema = z.object({
   newParentNodeId: z.string().startsWith("node_"),
 });
 
+// node_update: propose rewriting fields of an EXISTING node in place —
+// the proposal-gated face of the `updateNode` plasticity primitive. Born
+// for the workflow runtime's refine mode (`onto workflow run --as-proposal
+// --update-node`, WORKFLOW_RUNTIME_SPEC §3.6): an accepted artefact
+// replaces the node's prompt and the measured output contract replaces
+// provides/provideSignatures. Every field is opt-in (undefined = preserve),
+// mirroring UpdateNodeOptions.
+export const ProposalNodeUpdatePayloadSchema = z.object({
+  nodeId: z.string().startsWith("node_"),
+  prompt: z.string().optional(),
+  label: z.string().optional(),
+  rules: z.array(z.string()).optional(),
+  requires: z.array(z.string()).optional(),
+  provides: z.array(z.string()).optional(),
+  forbids: z.array(z.string()).optional(),
+  // Same O1 side channel as node_create: key → signature, merged onto the
+  // provision objects by the kernel.
+  provideSignatures: z.record(z.string(), z.string()).optional(),
+});
+
 export const ProposalMutationSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("node_create"),
@@ -553,6 +573,14 @@ export const ProposalMutationSchema = z.discriminatedUnion("kind", [
     // both nodes and stales the proposal if either has diverged.
     fromHash: z.string(),
     toHash: z.string(),
+  }),
+  z.object({
+    kind: z.literal("node_update"),
+    payload: ProposalNodeUpdatePayloadSchema,
+    // The node being updated: its hash at proposal-creation time. Apply
+    // re-loads the node and stales the proposal on divergence — same
+    // snapshot discipline as the other mutation kinds.
+    nodeHash: z.string(),
   }),
   z.object({
     kind: z.literal("node_update_parent"),
@@ -602,6 +630,7 @@ export type Proposal = z.infer<typeof ProposalSchema>;
 export type ProposalSource = z.infer<typeof ProposalSourceSchema>;
 export type ProposalMutation = z.infer<typeof ProposalMutationSchema>;
 export type ProposalNodeCreatePayload = z.infer<typeof ProposalNodeCreatePayloadSchema>;
+export type ProposalNodeUpdatePayload = z.infer<typeof ProposalNodeUpdatePayloadSchema>;
 export type ProposalEdgeCreatePayload = z.infer<typeof ProposalEdgeCreatePayloadSchema>;
 export type ProposalNodeUpdateParentPayload = z.infer<typeof ProposalNodeUpdateParentPayloadSchema>;
 export type ProposalValidationSnapshot = z.infer<typeof ProposalValidationSnapshotSchema>;

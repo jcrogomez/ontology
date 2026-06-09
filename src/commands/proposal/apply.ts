@@ -36,11 +36,21 @@ interface ProviderCheck {
 // existing nodes' requires/forbids).
 function checkProviderConsistency(id: string, cwd: string): ProviderCheck | null {
   const proposal = loadProposal(id, cwd);
-  if (!proposal || proposal.mutation.kind !== "node_create") return null;
+  if (
+    !proposal ||
+    (proposal.mutation.kind !== "node_create" && proposal.mutation.kind !== "node_update")
+  ) {
+    return null;
+  }
   const payload = proposal.mutation.payload;
   const provides = payload.provides ?? [];
   if (provides.length === 0) return null;
   const sigs = payload.provideSignatures ?? {};
+  // For a node_update, the node being updated must not count as an "existing
+  // provider" of its own keys — re-providing your own capability is the
+  // update itself, not a duplication.
+  const selfNodeId =
+    proposal.mutation.kind === "node_update" ? proposal.mutation.payload.nodeId : null;
   const branch = readState(cwd).activeBranch;
   const keySet = new Set(provides);
 
@@ -58,6 +68,7 @@ function checkProviderConsistency(id: string, cwd: string): ProviderCheck | null
   const existing: ContextFragment[] = [];
   for (const node of loadNodes(cwd)) {
     if (node.coordinates.branch !== branch) continue;
+    if (selfNodeId !== null && node.id === selfNodeId) continue;
     const inter = (node.context.provides as Array<{ key: string; signature?: string }>)
       .filter((p) => keySet.has(p.key));
     if (inter.length === 0) continue;
@@ -187,6 +198,7 @@ export async function proposalApplyCommand(id: string, options: ProposalApplyOpt
   // claim "Created node: edge_xxxx" and confuse the human reader.
   const createdLabel =
     result.proposal.mutation.kind === "edge_create" ? "Created edge:"
+    : result.proposal.mutation.kind === "node_update" ? "Updated node:"
     : result.proposal.mutation.kind === "node_update_parent" ? "Reparented node:"
     : "Created node:";
   console.log(`${createdLabel}  ${result.createdEntityId}`);

@@ -200,6 +200,24 @@ export const WorkflowProvisionSchema = z.object({
 });
 export type WorkflowProvision = z.infer<typeof WorkflowProvisionSchema>;
 
+/**
+ * One typed edge the workflow's output node should carry in the intention
+ * graph (WORKFLOW_RUNTIME_SPEC §3.6 — the *reconnect* half of closing the
+ * loop). `target` is an existing ontology node id; `direction: "out"`
+ * (default) reads focal → target, `"in"` reads target → focal, where the
+ * focal node is the node being updated (`--update-node`) or created. The
+ * edge `type` vocabulary is validated against the ontology schema at
+ * proposal-creation time (the workflow schema stays standalone — it does
+ * not import the ontology's EdgeTypeSchema, mirroring how node ids are
+ * only resolvable against a project at run time).
+ */
+export const WorkflowProposedEdgeSchema = z.object({
+  type: z.string().min(1),
+  target: z.string().startsWith("node_"),
+  direction: z.enum(["out", "in"]).default("out"),
+});
+export type WorkflowProposedEdge = z.infer<typeof WorkflowProposedEdgeSchema>;
+
 // ── Graph ───────────────────────────────────────────────────────────────────
 
 /**
@@ -237,6 +255,14 @@ export const WorkflowGraphSchema = z
      * non-code → declaration stands alone (no measurement).
      */
     artefactLanguage: z.string().optional(),
+    /**
+     * Optional edge declarations for the output node (§3.6). In
+     * `--update-node` mode each entry becomes an `edge_create` proposal
+     * alongside the `node_update` (both endpoints exist); in create mode
+     * they are surfaced as a deferred note (the focal id is not known
+     * until the node_create proposal is applied).
+     */
+    proposesEdges: z.array(WorkflowProposedEdgeSchema).optional(),
   })
   .refine(
     (g) => g.nodes.some((n) => n.id === g.entry),
