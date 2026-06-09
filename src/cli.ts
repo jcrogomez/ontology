@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createRequire } from "node:module";
 import { Command } from "commander";
 import { initCommand } from "./commands/init.js";
 import { doctorCommand } from "./commands/doctor.js";
@@ -56,12 +57,18 @@ import { projectsListCommand } from "./commands/projects/list.js";
 import { projectsForgetCommand } from "./commands/projects/forget.js";
 import { errorMessage } from "./core/errors.js";
 
+// Single source of truth for the version: package.json. Resolved relative to
+// this module so it works both from src/ (tsx dev) and dist/ (built binary) —
+// both live one level below the package root.
+const require = createRequire(import.meta.url);
+const { version: PACKAGE_VERSION } = require("../package.json") as { version: string };
+
 const program = new Command();
 
 program
   .name("onto")
   .description("Ontology CLI: terminal-first multidimensional intention network editor.")
-  .version("0.3.0-alpha.0");
+  .version(PACKAGE_VERSION);
 
 program
   .command("init")

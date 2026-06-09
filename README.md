@@ -6,28 +6,9 @@
 
 ## What this is
 
-Ontology is a terminal-first system for **versioning intent**, not just code. You connect intentions as typed nodes and edges in `.ontology/` — a kernel-verified intention network — and a compiler walks that network in topological order to produce executable artifacts.
+Ontology is a terminal-first system for **versioning intent, not just code**. You write down *what you mean* as typed nodes and edges in a kernel-verified graph (`.ontology/`); a compiler walks that graph and emits the code. The reverse also works: `onto ingest` lifts an existing codebase back into the intent layer, and `onto verify-homeomorphism` measures how faithfully the round-trip survives.
 
-In one line of math, the system implements a structure-preserving functor
-
-$$F\colon \text{Intent} \longrightarrow \text{Code}$$
-
-with a semantic gate ($\text{validateIntent} \to \Omega$) that refuses to emit an artifact whose declared contract is violated. The inverse direction — **lifting existing code back into intent** — is the central work of [Project Legend](docs/PROJECT_LEGEND.md): the operational adjoint $G$ of $F$, with the round-trip $F \circ G \approx \mathrm{id}$ measured empirically.
-
-**A note on mathematical claims in this README.** Every load-bearing term below — "functor", "presheaf", "Yoneda", "topos", "fibration" — is graded T1 (strictly implemented and tested against a law), T2 (operational mapping without a property test), T3 (useful analogy, not a formal claim), or T4 (aspirational) in [`MATHEMATICAL_CLAIMS.md`](docs/MATHEMATICAL_CLAIMS.md). Read that document alongside this README to know how literally each claim holds. The README uses the unqualified noun for readability; the audit lives in the linked document. The intent is to neither hide the mathematical content nor oversell it.
-
-The point: an Ontology session generates code you can re-derive from a network you can read. The intent is the durable artifact; the code is the compiled shadow. Every artifact is traceable to the proposal that birthed it, the model run that drafted it, the assembled context the model saw, and the hashes of the nodes and edges that authorised the compilation.
-
-## Why this matters
-
-Two pains every team using LLM-assisted development feels today:
-
-1. **Bandwidth gap.** A session produces more code than a human can review with care.
-2. **Adoption wall.** The intent-first workflow works on greenfield projects; brownfield projects have no path in.
-
-Ontology addresses both. The forward direction (`onto compile run`) makes the intent the source of truth, so a session's diff is a small intent change, not a sprawl of generated files. Project Legend addresses the second: `onto ingest <path>` lifts existing source into the intent layer so the workflow applies to any codebase, not only new ones.
-
-Longer term, the **Open-Prompt protocol** turns the signed intent + audit chain into a trust-transparency layer between fully open-source and proprietary self-attestation: an organisation publishes its intent and lets third parties verify that the running code respects that intent, without exposing the implementation.
+The payoff: an Ontology session generates code you can **re-derive from a network you can read**. The intent is the durable artifact; the code is its compiled shadow. Every artifact traces back to the proposal that birthed it, the model run that drafted it, the context the model saw, and the hashes of the nodes and edges that authorised the compilation — an audit chain you can walk in either direction.
 
 ## See it in 60 seconds
 
@@ -54,38 +35,45 @@ Step 8: run the artifact
 ✓ Ontology compiled an intention into a working program.
 ```
 
-Read [`examples/hello-world/README.md`](examples/hello-world/README.md) for the walkthrough.
+The demo runs **offline** (the mock provider). Read [`examples/hello-world/README.md`](examples/hello-world/README.md) for the walkthrough, then [Getting Started](docs/GETTING_STARTED.md) for the hands-on tour.
+
+## Install
+
+- **Inside the repo (development):** `npm install`, then `npm run dev -- <command>` (or `npm run build && node dist/cli.js <command>`).
+- **As a global `onto` binary, straight from git:** `npm install -g github:jcrogomez/ontology` — the `prepare` script builds on install and exposes `onto` on your PATH.
+- **From npm:** the package is staged as `@jcrogomez/ontology` (the bare `ontology` name on npm belongs to an unrelated, abandoned package); publication is pending the first non-rc release.
+
+## Why this matters
+
+Two pains every team using LLM-assisted development feels today:
+
+1. **Bandwidth gap.** A session produces more code than a human can review with care. With the intent as the source of truth (`onto compile run`), a session's diff is a small intent change, not a sprawl of generated files.
+2. **Adoption wall.** Intent-first workflows usually only work on greenfield projects. `onto ingest <path>` lifts existing source into the intent layer, so the workflow applies to any codebase.
+
+Longer term, the **Open-Prompt protocol** turns the signed intent + audit chain into a trust-transparency layer between fully open-source and proprietary self-attestation: an organisation publishes its *intent* and lets third parties verify the running code respects it, without exposing the implementation. The read-only half (`onto mcp`) already ships; signing/replay are roadmap.
 
 ## What you actually get
 
-| Verb | What it means |
+| Verb | What it does |
 | --- | --- |
-| `onto init` | Create a fresh `.ontology/` kernel (state, events log, edges log, canon node). **#3: `--template <name>` seeds a starter intent-graph (hello-world / rest-api / python-cli) on top of the canon, replayed through the kernel primitives; `--list-templates` to discover.** |
-| `onto node create` | Add a typed semantic node. Supports `--manifestation`, `--language`, `--requires`/`--provides`/`--forbids`, `--rules`, `--literal` for compile-ready leaves. |
-| `onto node update / remove` | Edit a node in place or delete it (refuses if any edge references the node). The plasticity primitives. |
-| `onto node link` | Connect two nodes with a typed edge. Refinement-family edges enforce the abstraction poset. |
-| `onto edge remove / update` | Symmetric primitives for edge mutation. |
-| `onto node list / show` | Inspect the network. |
-| `onto context assemble` | Compute a node's local context (parent path + edge neighbors). |
-| `onto run prompt / run context` | Dispatch a prompt to a model. Persist with `--persist`. Wrap the run as a proposal with `--as-proposal`. |
-| `onto runs list / show / verify` | Audit persisted run records. Every byte is content-addressed. |
-| `onto graph neighbors / path / subgraph` | Read-only traversal queries over the typed graph. |
-| **`onto graph infer-edges <dir>`** | **Project Legend γ-4: parse TypeScript imports/exports and report the static `depends_on` / `uses_token` edge graph. With `--create-proposals` (γ-6), emits one `edge_create` proposal per inferred edge by matching `outputs.files[0]` on each endpoint. Pure static analysis — no LLM.** |
-| **`onto link <nodeId> --candidate <text>`** | Run the semantic linker: gluing matrix + intent validation + edge proposal suggestions for missing requirements. Read-only. |
-| **`onto ingest <path>`** | **Project Legend γ-1/γ-5: lift existing source into the intent layer. Accepts a single file (one node\_create proposal) or a directory (one per source file, plus a γ-4 static-edge inference report). Provider defaults to Anthropic; falls back to Ollama or mock. `--include py,ts,tsx` for non-TS codebases. `--dry-run` previews extraction without committing. `--intent` narrates the *why* of one-or-many files into a single intent node; `--resolved-signatures` attaches resolved-type signatures via a whole-program TypeChecker pass (opt-in). **#2: `--from-pr <n>` / `--from-issue <n>` lift intent from a GitHub PR/issue (via `gh`) through a prose-tuned extractor (`manifestation=intent`); for PRs, `--resolve-edges <appliedNodeId>` links the change to existing code nodes after apply.**** |
-| `onto propose node / link` | Stage a typed candidate mutation without touching the graph. |
-| `onto proposal list / show / apply / reject` | Lifecycle the candidate. `apply` re-validates `parentHash`/endpoint hashes and stales on divergence. |
-| **`onto compile plan <id>`** | Preview the topological compile order rooted at a node. Read-only. |
-| **`onto compile run <id>`** | Compile the focal and its dependency closure. `--target <path>` writes to a user-pinned source path (gated behind `--force`); `--branch <name>` restricts to one Grothendieck fiber. |
-| **`onto compile run-batch [--all-artifacts \| --nodes <ids>]`** | Compile many focals in one invocation. Shared upstream walks reuse the per-run cache. The prerequisite for Legend's verify-homeomorphism. |
-| **`onto bakeoff <reports...>`** | **#4 fidelity release-gate: fold N `verify-homeomorphism --json` reports into one cross-arm synthesis and apply an H1 floor gate (`--min-jaccard`, exits non-zero on regression). Consumes *recorded* reports — regression protection over the scoring + corpus, not a live measurement. Wired into CI alongside the NUL guard.** |
-| **`onto query`** | Yoneda search by Hom-profile. Find every node whose edges + context-contract + coordinates match a query shape. |
-| **`onto mcp`** | **Start a read-only MCP server over the intent graph (stdio). Exposes `query` / graph-traversal / `runs` / `audit_log` tools and `canon` + `overview` resources so a third party — a human reviewer or another model — can READ the declared intent and audit chain and judge whether it is benign and competent, without mutating the graph and without the implementation source. A first read-only slice of the Open-Prompt idea (signing/replay remain roadmap). `--cwd <path>` selects the project. No mutation tools are exposed.** |
-| `onto walk <id>` | The Walker: an interactive focal-cell terminal interface. Edit drafts, propose, run models, preview plans, compile — all from the TUI. **Shows which AI service is active (Anthropic / Ollama local / Ollama cloud / none → mock fallback) at the top of the focal cell.** |
-| `onto branch list / fiber` | Grothendieck-fiber views of the typed graph (read-only). |
-| `onto validate`, `onto inspect`, `onto events tail`, `onto model doctor`, `onto doctor` | Observability. `model doctor` reports per-provider availability and surfaces whether `ANTHROPIC_API_KEY` / `OLLAMA_HOST` are set. |
+| `onto init` | Create a fresh `.ontology/` kernel; `--template <name>` seeds a starter graph. |
+| `onto node create / update / remove / link` | Author typed nodes and edges; refinement edges enforce the abstraction poset. |
+| `onto context assemble` | Compute a node's local context (parent path + edge neighbours). |
+| `onto run prompt / context` | Dispatch to a model; `--persist` records the run; `--as-proposal` stages the output. |
+| `onto runs list / show / verify` | Audit content-addressed run records. |
+| `onto propose node / link`, `onto proposal …` | Stage and lifecycle typed candidate mutations; `apply` re-validates hashes and can gate on the provider sheaf check (`--check-providers`, `--strict`). |
+| `onto compile plan / run / run-batch` | The forward direction: walk the topological plan and emit artifacts (multi-provider routing, `--branch` fiber scoping, `--target` pinned paths). |
+| `onto ingest <paths…>` | The inverse direction: lift source files, a directory, a GitHub PR/issue, or the *why* of files (`--intent`) into intent proposals. |
+| `onto graph infer-edges / neighbors / path / subgraph / metrics` | Static edge inference (no LLM) and read-only graph queries. |
+| `onto verify-homeomorphism` | Measure the round-trip: dual distances, five-label verdict, fidelity-cartography matrix, behaviour checker. |
+| `onto workflow run` | Verify-refine state machine over a typed workflow graph; `--as-proposal` feeds accepted results back into the intent graph (create or `--update-node`). |
+| `onto bakeoff <reports…>` | Fidelity regression gate over recorded verify reports (wired into CI). |
+| `onto query` | Search nodes by Hom-profile (edges + contract + coordinates). |
+| `onto mcp` | Read-only MCP server over the intent graph + audit chain — a third party can judge the declared intent without mutation access. |
+| `onto walk <id>` | The Walker: interactive TUI — navigate, draft, propose, review proposals, run models, compile. |
+| `onto validate / inspect / doctor / events tail / model doctor` | Observability and health checks. |
 
-The full surface is in [docs/CLI_COMMANDS.md](docs/CLI_COMMANDS.md).
+Every command and flag is documented in [docs/CLI_COMMANDS.md](docs/CLI_COMMANDS.md) (with a task-oriented index at the top).
 
 ## The canonical loop, end-to-end
 
@@ -102,14 +90,14 @@ proposal (typed candidate mutation, parentHash-pinned)
    ↓
 explicit apply (user approval, fail-loud on stale dependencies)
    ↓
-mutation (node_created / edge_created event)
+mutation (node_created / edge_created / node_updated event)
    ↓
 compilation (topological plan run, model dispatch, artifact written)
    ↓
 file on disk (auditable: artifact → event → run → prompt hash → node)
 ```
 
-Every step is recorded in the append-only `events.jsonl`. Every artifact ties back to a `compilation_run` event. The chain is auditable in either direction (`onto runs verify`, `onto events tail`, `onto runs show`). Replay-as-rebuild — reconstructing `state.json` from the events log — is roadmap, not shipped; today state is loaded from `state.json` directly. See [`MATHEMATICAL_CLAIMS.md`](docs/MATHEMATICAL_CLAIMS.md) §4.4 for the rigor classification.
+Every step is recorded in the append-only `events.jsonl`; every artifact ties back to a `compilation_run` event; the chain is auditable in either direction (`onto runs verify`, `onto events tail`). Replay-as-rebuild — reconstructing `state.json` from the events log — is roadmap, not shipped.
 
 ## Why this exists
 
@@ -135,89 +123,54 @@ That separation buys four things:
 3. **Composition.** When a project grows, the topology of the graph determines what gets compiled, in what order, with what dependencies.
 4. **Provenance.** Every byte of every artifact traces back through the events log to the canon. Nothing slips through.
 
+## The math, honestly
+
+In one line, the compiler implements a structure-preserving functor
+
+$$F\colon \text{Intent} \longrightarrow \text{Code}$$
+
+with a semantic gate ($\text{validateIntent} \to \Omega$, a three-valued predicate algebra) that refuses to emit an artifact whose declared contract is violated. The inverse lift is [Project Legend](docs/PROJECT_LEGEND.md): an operational adjunction $G \dashv F$ ($G$ the ingest lift, left adjoint), with the round-trip $F \circ G \approx \mathrm{id}$ **measured empirically** — per-axis distances and tolerances on a fidelity matrix, against pre-registered falsifiers, not asserted.
+
+**Every load-bearing term in this README** — "functor", "presheaf", "Yoneda", "topos", "fibration", "adjoint" — is graded in [`MATHEMATICAL_CLAIMS.md`](docs/MATHEMATICAL_CLAIMS.md): **T1** (a law pinned by tests), **T2** (operational, no law test), **T3** (useful analogy), or **T4** (aspirational). Some of the most useful entries are *negative* results stated plainly: the default context gluing is a separated presheaf, **not** a sheaf (the opt-in `identify-if-equal` mode is a sheaf on the equal-signature subcategory, T1); the Ω algebra is Kleene, **not** a Heyting/topos implication; and $G$ is irreducibly probabilistic, so the adjunction is graded T2 with a measurement program, not claimed as a theorem. The intent is to neither hide the mathematical content nor oversell it.
+
 ## Where to go next
 
-If you're a **first-time visitor**, start with the guided tour:
+**First-time visitors:**
 
-- [**Getting Started**](docs/GETTING_STARTED.md) — a hands-on walk from `init` to `compile` in 5 minutes.
+- [**Getting Started**](docs/GETTING_STARTED.md) — `init` to `compile` in 5 minutes.
 - [**Hello World example**](examples/hello-world/README.md) — the canonical demonstration.
 
-If you want to understand **the design**:
+**The design:**
 
 - [**The Canon**](docs/ONTOLOGY_CANON.md) — the foundational definition.
 - [**The Mathematical Model**](docs/MATHEMATICAL_MODEL.md) — the seven axioms.
-- [**The Categorical Vision**](docs/CATEGORICAL_VISION.md) — the nine-concept map (categories, functors, Yoneda, monads, fibrations, topos, …) onto concrete modules.
-- [**Mathematical Claims — Audit & Map**](docs/MATHEMATICAL_CLAIMS.md) — every math claim classified into strict / operational / analogy / aspirational, with file citations. Read this alongside the two above to know how literally each claim holds.
-- [**The Architecture**](docs/ARCHITECTURE.md) — how Kernel, Observability, LLM Runtime, Context Assembler, Proposal System, and Compiler relate.
-- [**The Compiler**](docs/COMPILER.md) — how `onto compile` walks the plan and produces artifacts.
-- [**The Walker**](docs/WALKER_INTERFACE.md) — the interactive TUI design.
+- [**The Categorical Vision**](docs/CATEGORICAL_VISION.md) — the nine-concept map onto concrete modules.
+- [**Mathematical Claims — Audit & Map**](docs/MATHEMATICAL_CLAIMS.md) — the rigor ledger (read alongside the two above).
+- [**The Architecture**](docs/ARCHITECTURE.md) — how Kernel, LLM Runtime, Context Assembler, Proposal System, and Compiler relate.
+- [**The Compiler**](docs/COMPILER.md) and [**The Walker**](docs/WALKER_INTERFACE.md).
 
-For the four post-axiom categorical extensions:
+**The four categorical extensions:** [Yoneda Query](docs/QUERY_REPRESENTABLE.md) · [Effect Monad](docs/EFFECT_MONAD.md) · [Branch Fibration](docs/BRANCH_FIBRATION.md) · [Rules as Topos](docs/RULES_TOPOS.md).
 
-- [**Yoneda Query**](docs/QUERY_REPRESENTABLE.md) — `onto query` search by Hom-profile.
-- [**Effect Monad**](docs/EFFECT_MONAD.md) — `Result` / `Effect` / `EffectWithLog` with proven monad laws.
-- [**Branch Fibration**](docs/BRANCH_FIBRATION.md) — branches as Grothendieck fibers over the event log.
-- [**Rules as Topos**](docs/RULES_TOPOS.md) — three-valued Ω predicate algebra over `requires` / `provides` / `forbids`.
+**Project Legend** (the inverse direction):
 
-For **Project Legend** — the inverse direction of the compile functor, now partially operational:
+- [**Project Legend**](docs/PROJECT_LEGEND.md) — design doc + phase plan. Phases α–ε closed (self-ingestion of this repo, 4-arm bake-off, fidelity matrix); **Phase ζ (the workflow runtime) is active** — see the [workflow runtime spec](docs/legend/WORKFLOW_RUNTIME_SPEC.md).
+- [**Calibration log**](docs/legend/calibrations/CALIBRATION_LOG.md) — the dated, pre-registered experiment record (hypotheses committed *before* runs).
+- [**Open-Prompt protocol spec**](docs/OPEN_PROMPT.md) — signed intent + audit-chain replay as a third trust posture. Spec-only; the `onto mcp` read surface is its first tangible slice.
+- [**Branch Model**](docs/BRANCH_MODEL.md) — the Option-C design decision gating cross-branch propagation.
 
-- [**Project Legend**](docs/PROJECT_LEGEND.md) — design doc + phase plan. `onto ingest <path>` lifts existing source into the intent layer; γ-6 closes the multi-file cycle by translating static imports into `edge_create` proposals; δ-1 `onto node inspect` produces a cached human-readable summary per node; δ-2 `onto verify-homeomorphism` measures the round-trip with dual distances (LoC + structural Jaccard) and a five-label verdict. **Phase ε (self-ingestion of the Ontology repo) closed 2026-05-26** on a 4-arm bake-off + 2-column cartography matrix; **Phase ζ (the workflow runtime) is active** — see [`legend/WORKFLOW_RUNTIME_SPEC.md`](docs/legend/WORKFLOW_RUNTIME_SPEC.md) and [`ROADMAP.md`](docs/ROADMAP.md). Also includes the Open-Prompt protocol (signed intent + audit-chain replay as a trust-transparency layer between open-source and proprietary self-attestation).
-- [**γ-2 hash.ts calibration**](docs/legend/calibrations/HASH_TS_2026-05-12.md) — first empirical data point. 5 / 5 functions ε-equivalent under F ∘ G with Claude Opus 4.7.
-- [**γ-7 Vibe-Reasoning calibration**](docs/legend/calibrations/VIBE_REASONING_GAMMA_7_2026-05-12.md) — second empirical data point on an external 24-file Python corpus. The γ-7 prompt invariants (MANDATORY EXPORTS block + comprehensive `provides` capture) moved ε-equivalent 36% → 65% and fully eliminated `divergent_both` (4 → 0) across an apples-to-apples re-ingest.
-- [**Vibe-Reasoning calibration procedure**](docs/legend/calibrations/VIBE_REASONING_PROCEDURE.md) — runbook for testing the full ingest cycle on an external Python codebase. Useful template for ingesting any non-TS codebase.
-- [**Branch Model**](docs/BRANCH_MODEL.md) — design decision (Option C: lazy materialisation on touch) that gates Bootstrap 0.10 / cross-branch `node_update`.
+**Contributing / current state:**
 
-If you want to **contribute or extend**:
-
-- [**Roadmap**](docs/ROADMAP.md) — what is implemented, what is planned, in which bootstrap; refreshed after every commit that ships a new surface.
-- [**RFCs**](docs) — `RUN_PERSISTENCE.md`, `PROPOSAL_SYSTEM.md`, `WALKER_INTERFACE.md`, `COMPILER.md`.
-- [**Release Notes**](docs/RELEASE_NOTES.md) — the running changelog.
-- [**LEGEND (0.4.0 release note)**](docs/LEGEND.md) — the public-facing release write-up for the inverse-functor cycle: what shipped γ-0 through δ-2, the two empirical data points, what to read next.
-- [**Workflow runtime spec**](docs/legend/WORKFLOW_RUNTIME_SPEC.md) — Phase ζ: the typed-node verify-refine state machine (`onto workflow run`) with the predicate DSL and artefact-slot dataflow.
-- [**Open-Prompt protocol spec**](docs/OPEN_PROMPT.md) — also Phase ζ: signed intent + audit-chain replay as a third trust posture between open-source and self-attestation. Spec-only so far. (Both streams historically carry the ζ label; the workflow runtime is the active one — see [docs/ROADMAP.md](docs/ROADMAP.md).)
-- Open work + daily-review findings live in [**ROADMAP.md**](docs/ROADMAP.md) (single source of truth). The old dated `docs/reviews/` milestone snapshots were retired 2026-05-28 — they remain in git history.
+- [**Roadmap**](docs/ROADMAP.md) — **the single source of truth** for phase state and open work.
+- [**Release Notes**](docs/RELEASE_NOTES.md) — the running changelog; [**LEGEND**](docs/LEGEND.md) — the 0.4.0 release write-up (historical snapshot).
+- RFCs under [docs/](docs): `RUN_PERSISTENCE.md`, `PROPOSAL_SYSTEM.md`, `WALKER_INTERFACE.md`, `COMPILER.md`.
 
 ## Status
 
-**Project Legend Phases β + γ + γ-7 + δ + ε shipped — auto-digest cycle + Inspector + verification + self-ingestion all operational; Phase ζ (workflow runtime) in progress.** (ε closed 2026-05-26; see [`ROADMAP.md`](docs/ROADMAP.md) for the live phase state and version.) The seven axioms of the canon run concrete code, the plasticity layer is in place, the forward + inverse functors of the compile adjunction are both implemented, the round-trip is measured on two external corpora, and dispatch routing is cross-provider per-task (LlmTask → tier → model resolved automatically):
+**Alpha.** Project Legend phases α–ε are closed; Phase ζ (workflow runtime) is active. In one breath:
 
-- **Forward (F)** — `onto compile run` walks the topological plan and dispatches every node. `--target <path>` writes to user-pinned source paths (β-1, gated behind `--force` with a two-phase commit so a failed validator never clobbers the user's file); `node.literal` pins irreducible-specificity content verbatim (β-2); `computeFiberBy(input, projection)` generalises the branch fibration to arbitrary projections, with `pathProjection` as the spatial analogue Legend needs (β-3).
-- **Inverse (G)** — `onto ingest <file|dir>` extracts structured intent via a frontier LLM (γ-0 Anthropic provider + prompt caching; γ-1 single-file; γ-5 multi-file with `--include` for non-TS codebases; γ-3 rich proposal payload so apply produces complete nodes in one step).
-- **Cross-file edges** — `onto graph infer-edges <dir>` parses TypeScript imports and reports `depends_on` / `uses_token` edges without an LLM (γ-4); `--create-proposals` resolves them to `edge_create` proposals after apply (γ-6), closing the multi-file cycle.
-- **Inspector / Lupa (δ-1)** — `onto node inspect <id>` produces a 3–5 sentence developer-facing summary per node, cached on the node as `translator: { text, model, provider, generatedAt, sourceHash }`. One LLM call per node lifetime; automatic invalidation when prompt / rules / contract / literal change.
-- **Verification framework (δ-2)** — `onto verify-homeomorphism --all-artifacts` compiles back every code-manifestation node and classifies each with **two distances** (LoC delta + structural Jaccard over top-level declarations) folded into a five-label verdict. `--report <path.md>` writes a markdown summary; `--json` exposes the same data programmatically with per-node usage/cost.
-- **Two empirical data points** — γ-2 (`hash.ts` single-file, 5/5 ε-equivalent at $0.08) and γ-7 (Vibe-Reasoning external corpus, +29pp ε-equivalent and `divergent_both` eliminated after the MANDATORY EXPORTS prompt invariant). Reports: [`HASH_TS_2026-05-12.md`](docs/legend/calibrations/HASH_TS_2026-05-12.md), [`VIBE_REASONING_GAMMA_7_2026-05-12.md`](docs/legend/calibrations/VIBE_REASONING_GAMMA_7_2026-05-12.md).
-- **Cross-provider per-task routing** — `LlmTask × provider → preferred model` resolved automatically via `DefaultAnthropicRouting` + `DefaultOllamaRouting`. `--provider anthropic` (no `--model`) routes `inspect` → Haiku 4.5, `semantic_parse` → Sonnet 4.6, `code_sketch` → Opus 4.7. Mixed plans (some nodes on Ollama, some on Anthropic, some pinned via `node.literal`) work in the same compile run.
-- **Walker AI indicator** — the focal-cell TUI shows which AI service is configured (`anthropic` / `ollama (local)` / `ollama (cloud)` / `none — mock fallback`) at the top of the panel, so a user knows at a glance which provider `:run` and `:compile` will route through.
+- **Both directions are operational** — F (compile) and G (ingest) — and the round-trip is *measured*: AST grounding contributes Δ = +0.355 mean structural Jaccard over an ablation control on this repo's 125-file core; the fidelity matrix fills 2 of 5 columns (structural + behaviour), the rest are explicit no-data.
+- **The kernel's mathematical claims are test-pinned where it matters** — 13 T1 laws (crash-atomic durable event log, presheaf restriction, sheaf-on-subcategory gluing, compiler functoriality, monad laws, Ω closed-world parity, content-addressed runs, …).
+- **Durability:** `state.json` writes are atomic + durable, `events.jsonl` appends are durable; the advisory lock covers the long-running mutators only (quick mutations rely on per-write atomicity — worst case last-writer-wins, never corruption).
+- **Not yet:** a clean real-LLM pass of the ζ verify-refine loop (frontier-gated; first attempt 2026-05-29 surfaced fixes), replay-as-rebuild, and the signing half of Open-Prompt.
 
-**Phase ε (self-ingestion of the Ontology repo) closed 2026-05-26** — a 4-arm bake-off established AST grounding contributes Δ = +0.355 mean Jaccard (a real lift, not metric circularity), and the §3.10 compile-adjoint claim was upgraded T4 → T2. **Phase ζ is now active: the workflow runtime** (`onto workflow run` — a typed-node verify-refine state machine with a predicate DSL and artefact-slot dataflow; see [`WORKFLOW_RUNTIME_SPEC.md`](docs/legend/WORKFLOW_RUNTIME_SPEC.md)), alongside the originally-planned Open-Prompt seeds. **Phase ε's publishable target was a fidelity-cartography matrix, not a single percentage** (this was the pre-registered framing, preserved here) — orthogonal axes (contract / structural / behavior / intent / literal × Ollama / Anthropic cost) with the *intent-faithful vs intent-resistant* boundary pre-registered as a falsifiable hypothesis before the run, not described post-hoc. Expected intent-resistant zones were IO adapters, CLI parsing, prompt strings, literal config; expected intent-faithful: pure transformations, schema-driven code. Tools promising 100 % intent-fidelity always lie — admitting the resistant zones (with kept traceability) makes the faithful zones credible. Branch-aware compile (`onto compile run --branch <name>`) and the branch fibration CLI (`onto branch list / fiber`) cover the temporal-fiber surface; the spatial path fibration helper is ready for ingest's per-directory token vocabulary normalisation.
-
-| Axiom | Implementation |
-| --- | --- |
-| 1. Typed directed multigraph | `node link` with 18 edge types, multigraph allowed |
-| 2. Temporal log | append-only `events.jsonl` with hash chain |
-| 3. Abstraction poset | enforced at `node link` and `validate` for the refinement family |
-| 4. Prompts as rewrite rules | `parsePromptAST` lifts `@requires:` / `@provides:` / `@expand:` markers into a structured `PromptAST`; `compileNode` consumes the parsed body |
-| 5. Presheaf context | `assembleContext`, `glueFragments`, `validateIntent` (built on the topos predicate algebra), edge-aware `semanticLink` (CLI: `onto link <nodeId>`) |
-| 6. Compiler functor | `onto compile run` walks the topological plan; refinement-parent context threading, per-node `model.ref` routing through the registry, language parse-check on every artifact, optional `--runtime-check` execution, and a top-level `EffectWithLog` retire the legacy try/catch tower |
-| 7. Code as compiled shadow | every artifact under `.ontology/artifacts/generated/` ties back through events to nodes; code-fence stripping + parse validation enforce structural fidelity |
-
-Compiler-plan hardening (Bootstrap 0.9): `computeCompilePlan` now rejects `contradicts` edges as plan errors and halts BFS on `supersedes` with a `superseded` warning, so contradictions surface as failures instead of silent compiles.
-
-The four additive categorical extensions (`CATEGORICAL_VISION.md`) ship as runtime libraries with first-line surfaces. T-tiers per [`MATHEMATICAL_CLAIMS.md`](docs/MATHEMATICAL_CLAIMS.md):
-
-| Extension | Library | Surface | Tier |
-| --- | --- | --- | --- |
-| Yoneda query | `src/runtime/query/representable.ts` | `onto query` CLI, walker `:query` | T2 (operational Hom-profile matcher; not proven to recover all isomorphic objects) |
-| Effect monad | `src/runtime/effects/io.ts` | concrete use inside `compileNode` and `runFromWalker` (both post-0.9) | **T1** (monad laws — left identity, right identity, associativity — pinned as property tests) |
-| Branch fibration | `src/runtime/fibration/branch-fiber.ts` | `onto branch list` / `onto branch fiber <name>` CLI, walker `:branch list`, and `onto compile run --branch <name>` for fiber-scoped compiles | T2 (partition + projection shipped; cartesian-lift universal property not yet formalised) |
-| Topos predicate algebra | `src/runtime/topos/predicate.ts` | `intent-validator.ts` ported onto the algebra; `validateIntent({openWorld: true})` exposes the three-valued verdict end-to-end through `semanticLink` | T2-T3 (three-valued algebra implemented; "topos" is analogy-grade — no proven Ω-classifier ↔ subobjects iso) |
-
-Ontology is alpha-quality. Durability + atomicity status as of `5d70f3b` (2026-05-23):
-
-- ✅ `state.json` writes are **atomic** (write-to-tmp + `rename(2)`) and **durable** (`fsync` on the file fd before rename, `fsync` on the parent directory after — POSIX rename + dir-fsync gives both atomicity and rename-durability).
-- ✅ `events.jsonl` appends are **durable** — single-buffer `write(2)` via `O_APPEND` (kernel-atomic for typical event payloads ≪ 4 KB) followed by `fsync` on the fd before close, so a power loss between append and the next OS flush can no longer vanish a recorded event.
-- ⚠ Concurrent writers from multiple processes are protected by `.ontology/.lock` only on the paths that opt in (`onto compile run`, `onto compile run-batch`, `onto verify-homeomorphism`); raw-kernel calls and a few legacy paths still trust single-writer invariants.
-- ⚠ Replay-as-rebuild — reconstructing `state.json` from `events.jsonl` alone — is roadmap, not shipped. `state.json` remains authoritative for the in-memory snapshot; if it diverges from the event log there is no recovery primitive yet.
-
-Everything else is meant to fail loudly and exit `1` rather than silently corrupt.
+Live phase state, metrics, dates and open work: [**ROADMAP.md**](docs/ROADMAP.md). Everything is meant to fail loudly and exit `1` rather than silently corrupt.
