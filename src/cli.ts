@@ -798,6 +798,7 @@ proposal
   .command("apply <id>")
   .description("Translate a pending proposal into a real graph mutation, after re-validating its parentHash. Stale proposals (parent changed since creation) are transitioned to staled and refused.")
   .option("--dry-run", "Validate the proposal without writing anything")
+  .option("--check-providers", "For a node_create proposal that declares `provides`: run the O2 identify-if-equal sheaf check against existing providers of the same keys (same branch). Compatible re-provisions (equal signature) are reported as identifications; drift (different/missing signature) as a warning. Opt-in, read-only, never blocks the apply (v0). See docs/legend/CONTEXT_GLUING_REGIMES.md.")
   .option("--json", "Output results in JSON format")
   .action(async (id, options) => {
     try {
