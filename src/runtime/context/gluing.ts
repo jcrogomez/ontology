@@ -155,6 +155,23 @@ export function glueFragments(
     }
   }
 
+  // The glued section carries the identified signature per provided key, so
+  // it is a COMPLETE section (the sheaf gluing axiom's "global section"): a
+  // restriction of it can recover each piece. Under identify-if-equal the
+  // contributors agree, so the first defined signature is canonical; under
+  // the default policy a duplicate already fails (ok=false), so this is only
+  // load-bearing on a successful glue.
+  const mergedSignatures: Record<string, string> = {};
+  for (const key of allProvides) {
+    for (const f of fragments) {
+      const sig = f.provideSignatures?.[key];
+      if (sig !== undefined) {
+        mergedSignatures[key] = sig;
+        break;
+      }
+    }
+  }
+
   return {
     ok: conflicts.length === 0,
     merged: {
@@ -165,8 +182,46 @@ export function glueFragments(
       forbids: Array.from(allForbids).sort(),
       optional: Array.from(allOptional).sort(),
       rules: Array.from(allRules).sort(),
+      ...(Object.keys(mergedSignatures).length > 0
+        ? { provideSignatures: mergedSignatures }
+        : {}),
     },
     conflicts,
     warnings,
+  };
+}
+
+// ── Restriction map (sheaf structure, Path-to-T1 gate #2) ─────────────────────
+//
+// The presheaf restriction map for the gluing object: F(U) → F(U_i). Given a
+// (typically glued) section and a `piece` of the cover, return the part of the
+// section that lies over the piece's domain — the provides/requires/forbids/
+// optional/rules the piece deals with. This is the map that was *implicit*
+// (and kept the gluing claim at T2): naming it lets the sheaf gluing axiom be
+// stated as a law — a compatible family glues to a section that *restricts
+// back* to each piece. See `tests/presheaf-sheaf-laws.test.ts` Part 3.
+export function restrictSection(
+  section: ContextFragment,
+  piece: ContextFragment,
+): ContextFragment {
+  const keep = (from: string[], domain: string[]): string[] => {
+    const set = new Set(domain);
+    return from.filter((x) => set.has(x));
+  };
+  const provides = keep(section.provides, piece.provides);
+  const provideSignatures: Record<string, string> = {};
+  for (const k of provides) {
+    const sig = section.provideSignatures?.[k];
+    if (sig !== undefined) provideSignatures[k] = sig;
+  }
+  return {
+    nodeId: piece.nodeId,
+    branch: piece.branch,
+    provides,
+    requires: keep(section.requires, piece.requires),
+    forbids: keep(section.forbids, piece.forbids),
+    optional: keep(section.optional, piece.optional),
+    rules: keep(section.rules, piece.rules),
+    ...(Object.keys(provideSignatures).length > 0 ? { provideSignatures } : {}),
   };
 }
