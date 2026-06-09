@@ -120,6 +120,98 @@ describe("extractResolvedSignatures (TypeChecker)", () => {
     expect(map.get(path.resolve(fileB))).toEqual([]);
   });
 
+  function writeTwo(srcA: string, srcB: string): [string, string] {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "ts-resolved-"));
+    const fileA = path.join(dir, "a.ts");
+    const fileB = path.join(dir, "b.ts");
+    fs.writeFileSync(fileA, srcA);
+    fs.writeFileSync(fileB, srcB);
+    return [fileA, fileB];
+  }
+
+  function sigOf(map: Map<string, { name: string; signature: string }[]>, file: string, name: string): string {
+    return map.get(path.resolve(file))!.find((e) => e.name === name)!.signature;
+  }
+
+  // ── Nominal-type content hashing (the structural-faithfulness law) ────────
+
+  it("VALUE exports over same-named but structurally different nominals get DIFFERENT signatures", () => {
+    // The residual false-merge: `(c: Config) => string` rendered identically
+    // from both files even though the two Configs are disjoint. The nominal
+    // hash suffix breaks the tie → conflict (conservative), never a merge.
+    const [fileA, fileB] = writeTwo(
+      `export interface Config { host: string; port: number }
+       export function fn(c: Config): string { return c.host; }`,
+      `export interface Config { totallyDifferent: boolean[] }
+       export function fn(c: Config): string { return String(c.totallyDifferent.length); }`,
+    );
+    const map = extractResolvedSignatures([fileA, fileB]);
+    const a = sigOf(map, fileA, "fn");
+    const b = sigOf(map, fileB, "fn");
+    expect(a).toMatch(/\[Config#[0-9a-f]{8}\]/);
+    expect(b).toMatch(/\[Config#[0-9a-f]{8}\]/);
+    expect(a).not.toBe(b);
+  });
+
+  it("textually IDENTICAL nominals in different files keep string-equal signatures (the legitimate identification survives)", () => {
+    const decl = `export interface Config { host: string; port: number }`;
+    const fn = `export function fn(c: Config): string { return c.host; }`;
+    const [fileA, fileB] = writeTwo(`${decl}\n${fn}`, `${decl}\n${fn}`);
+    const map = extractResolvedSignatures([fileA, fileB]);
+    expect(sigOf(map, fileA, "fn")).toBe(sigOf(map, fileB, "fn"));
+  });
+
+  it("NESTED drift is caught: identical Config text over divergent Inner types differs (transitive closure)", () => {
+    const fn = `export function fn(c: Config): number { return 0; }`;
+    const config = `export interface Config { inner: Inner }`;
+    const [fileA, fileB] = writeTwo(
+      `interface Inner { a: string }\n${config}\n${fn}`,
+      `interface Inner { b: number[] }\n${config}\n${fn}`,
+    );
+    const map = extractResolvedSignatures([fileA, fileB]);
+    const a = sigOf(map, fileA, "fn");
+    const b = sigOf(map, fileB, "fn");
+    expect(a).toContain("Inner#"); // Inner dragged in by the closure
+    expect(a).not.toBe(b);
+  });
+
+  it("lib types (Date, Promise) are NOT hashed — globally identical by construction", () => {
+    const src = `export function stamp(d: Date): Promise<string> { return Promise.resolve(d.toISOString()); }`;
+    const [fileA, fileB] = writeTwo(src, src);
+    const map = extractResolvedSignatures([fileA, fileB]);
+    const a = sigOf(map, fileA, "stamp");
+    expect(a).toBe(sigOf(map, fileB, "stamp"));
+    expect(a).not.toContain("Date#");
+    expect(a).not.toContain("["); // no project-local nominals → no suffix
+  });
+
+  it("self-referential nominals terminate (cycle-safe) and still discriminate", () => {
+    const [fileA, fileB] = writeTwo(
+      `export interface Node2 { value: string; next: Node2 | null }
+       export function head(n: Node2): string { return n.value; }`,
+      `export interface Node2 { value: number; next: Node2 | null }
+       export function head(n: Node2): string { return String(n.value); }`,
+    );
+    const map = extractResolvedSignatures([fileA, fileB]);
+    const a = sigOf(map, fileA, "head");
+    const b = sigOf(map, fileB, "head");
+    expect(a).toContain("Node2#");
+    expect(a).not.toBe(b);
+  });
+
+  it("type ALIASES used in value positions are hashed too", () => {
+    const fn = `export function pick(m: Mode): Mode { return m; }`;
+    const [fileA, fileB] = writeTwo(
+      `export type Mode = "fast" | "safe";\n${fn}`,
+      `export type Mode = "slow" | "unsafe";\n${fn}`,
+    );
+    const map = extractResolvedSignatures([fileA, fileB]);
+    const a = sigOf(map, fileA, "pick");
+    const b = sigOf(map, fileB, "pick");
+    expect(a).toContain("Mode#");
+    expect(a).not.toBe(b);
+  });
+
   it("excludes default exports and is deterministic by name", () => {
     const source = `
       export function zeta() { return 1; }
