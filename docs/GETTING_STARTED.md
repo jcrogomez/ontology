@@ -22,7 +22,7 @@ npm run test:run  # test suite — see the Node note below
 > work on Node 18. The full suite's current green/known-failing status
 > lives in [`ROADMAP.md`](ROADMAP.md).
 
-You will run the CLI as `npm run dev -- <command>`. When Ontology is published, `onto <command>` will be the equivalent.
+You will run the CLI as `npm run dev -- <command>`. When Ontology is published, `onto <command>` will be the equivalent. Examples below write `onto X`; substitute `npm run dev -- X` if you haven't linked the binary.
 
 Optional: if you have [Ollama](https://ollama.com/) running locally, the model commands can dispatch to a real model. Without Ollama, the `mock` provider works for everything in this tour.
 
