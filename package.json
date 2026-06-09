@@ -1,7 +1,7 @@
 {
-  "name": "ontology",
+  "name": "@jcrogomez/ontology",
   "version": "0.4.0-rc.1",
-  "description": "Ontology semantic compiler for operational interfaces.",
+  "description": "Version intent, not just code: a typed intention graph with a compiler (intent → code), an ingest lift (code → intent), and a full audit chain.",
   "type": "module",
   "bin": {
     "onto": "./dist/cli.js"
@@ -10,12 +10,20 @@
     "dist",
     "templates"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jcrogomez/ontology.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=20.0.0"
   },
   "scripts": {
     "dev": "tsx src/cli.ts",
     "build": "tsc -p tsconfig.build.json",
+    "prepare": "npm run build",
     "check": "tsc --noEmit",
     "check:nul": "bash scripts/check-nul-bytes.sh --all",
     "start": "node dist/cli.js",

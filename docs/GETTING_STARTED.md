@@ -22,7 +22,14 @@ npm run test:run  # test suite — see the Node note below
 > work on Node 18. The full suite's current green/known-failing status
 > lives in [`ROADMAP.md`](ROADMAP.md).
 
-You will run the CLI as `npm run dev -- <command>`. When Ontology is published, `onto <command>` will be the equivalent. Examples below write `onto X`; substitute `npm run dev -- X` if you haven't linked the binary.
+You will run the CLI as `npm run dev -- <command>`. To get a real `onto` binary on your PATH instead, install globally straight from git — the `prepare` script builds on install:
+
+```bash
+npm install -g github:jcrogomez/ontology
+onto --version
+```
+
+(Publication to npm as `@jcrogomez/ontology` is pending the first non-rc release; the bare `ontology` name on npm is an unrelated, abandoned package.) Examples below write `onto X`; substitute `npm run dev -- X` if you haven't installed the binary.
 
 Optional: if you have [Ollama](https://ollama.com/) running locally, the model commands can dispatch to a real model. Without Ollama, the `mock` provider works for everything in this tour.
 
