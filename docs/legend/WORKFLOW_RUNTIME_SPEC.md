@@ -340,6 +340,22 @@ CLI additions to §3.5:
   *author* states what the output relates to; the runner only decides
   whether to propose.
 
+**Provenance — the workflow run record.** Every `--as-proposal` run
+persists a **workflow run record** (`.ontology/runs/wfrun_<8hex>.json`,
+`WorkflowRunRecordSchema`) BEFORE creating proposals, and every proposal
+born from the run (node and edges alike) carries a non-null `source` of
+the new `workflow_run` shape: `{kind, workflowRunId, graphHash,
+inputHash, provider, model}`. The record holds what a single-dispatch
+`(runId, promptHash)` source cannot — graph identity (hash of the graph
+file text), input identity, CLI-level model overrides (null = per-node
+routing), the accept verdict, and the per-step trace summary
+(node/kind/duration/verdict). Identity is deliberately NOT
+content-addressed: workflow executions are not deterministic functions
+of `(input, model)`, so ids are random and there is no same-id caching;
+the body hash still self-certifies the record
+(recompute-and-compare, `verifyWorkflowRunRecord`). The `run_` prefix
+filter in `onto runs list` keeps the two id spaces from colliding.
+
 ## 4. Pre-registered v0 predictions (when shipped)
 
 The v0 runtime is a small piece of code; v0 success is mostly

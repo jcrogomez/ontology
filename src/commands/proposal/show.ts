@@ -59,7 +59,15 @@ export async function proposalShowCommand(id: string, options: ProposalShowOptio
 
   console.log("");
   console.log(`Source:`);
-  if (proposal.source) {
+  if (proposal.source && "kind" in proposal.source) {
+    // §3.6 workflow-run source: multi-step provenance lives in the
+    // persisted wfrun_* record under .ontology/runs/.
+    console.log(`  Workflow run: ${proposal.source.workflowRunId}`);
+    console.log(`  Graph #:      ${proposal.source.graphHash}`);
+    console.log(`  Input #:      ${proposal.source.inputHash}`);
+    console.log(`  Provider:     ${proposal.source.provider ?? "(per-node routing)"}`);
+    console.log(`  Model:        ${proposal.source.model ?? "(per-node routing)"}`);
+  } else if (proposal.source) {
     console.log(`  Run:        ${proposal.source.runId}`);
     console.log(`  Provider:   ${proposal.source.provider}`);
     console.log(`  Model:      ${proposal.source.model}`);

@@ -29,7 +29,12 @@ export async function proposalListCommand(options: ProposalListOptions): Promise
       kind: p.mutation.kind,
       createdAt: p.createdAt,
       hash: p.hash,
-      runId: p.source?.runId ?? null,
+      // Either source shape's run record id (run_* / wfrun_*).
+      runId: p.source === null
+        ? null
+        : "kind" in p.source
+          ? p.source.workflowRunId
+          : p.source.runId,
     }));
     console.log(JSON.stringify({ proposals: summary }, null, 2));
     return;

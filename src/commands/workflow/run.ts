@@ -9,6 +9,7 @@ import {
 } from "../../runtime/workflow/executor.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
 import { createProposal } from "../../core/proposals/persist.js";
+import { createWorkflowRunRecord } from "../../core/runs/workflow-record.js";
 import { readState } from "../../core/state/state-store.js";
 import { loadNodeById } from "../../core/project/load.js";
 import {
@@ -17,6 +18,7 @@ import {
   NodeKindSchema,
   type OntologyNode,
   type Proposal,
+  type ProposalWorkflowSource,
 } from "../../schemas/ontology.js";
 import { validateEdgeDirection } from "../../runtime/graph/poset.js";
 import { parseTypeScriptFile } from "../../runtime/static/typescript.js";
@@ -137,6 +139,8 @@ export async function workflowRunCommand(
   // proposal substrate — nothing mutates the graph here; `onto proposal
   // apply` is the human-gated step.
   let proposalInfo: { id: string; status: string } | undefined;
+  // §3.6 provenance: id of the persisted workflow run record (wfrun_*).
+  let workflowRunId: string | undefined;
   // §3.6: edge proposals (update mode) in recommended apply order — edges
   // BEFORE the node_update, because the update rewrites the focal node's
   // hash and stales any still-pending edge proposal pinned to it.
@@ -184,6 +188,47 @@ export async function workflowRunCommand(
         ? `contract mismatch (declared≠produced): ${contractCheck.mismatches.join("; ")}`
         : undefined;
 
+    // §3.6 provenance: persist the workflow run record FIRST so every
+    // proposal born from this run carries a non-null source pointing at it.
+    let source: ProposalWorkflowSource;
+    try {
+      const { record } = createWorkflowRunRecord({
+        graphName: loaded.graph.name ?? null,
+        graphFile: path.basename(graphPath),
+        graphText: fs.readFileSync(graphPath, "utf-8"),
+        inputText: initialInput,
+        provider: options.provider ?? null,
+        model: options.model ?? null,
+        result: {
+          // The record persists only on the --as-proposal path, which has
+          // already required an ACCEPTED run — so reason is always null here.
+          verdict: result.verdict,
+          reason: null,
+          stepCount: result.stepCount,
+          durationMs: result.durationMs,
+        },
+        steps: result.trace.map((v) => ({
+          step: v.step,
+          nodeId: v.nodeId,
+          kind: v.kind,
+          durationMs: v.durationMs,
+          verdict: v.verdict?.verdict ?? null,
+        })),
+      });
+      workflowRunId = record.id;
+      source = {
+        kind: "workflow_run",
+        workflowRunId: record.id,
+        graphHash: record.graph.graphHash,
+        inputHash: record.inputHash,
+        provider: options.provider ?? null,
+        model: options.model ?? null,
+      };
+    } catch (err) {
+      fail(`workflow run-record persistence failed: ${errorMessage(err)}`, options.json);
+      return;
+    }
+
     if (options.updateNode !== undefined) {
       // §3.6 mode 2 — refine: node_update of the existing node, plus
       // edge_create proposals for the graph-declared edges (both
@@ -200,6 +245,7 @@ export async function workflowRunCommand(
           provideSignatures: contractCheck.provideSignatures,
           contractNote,
           proposesEdges: loaded.graph.proposesEdges,
+          source,
         });
         edgeProposalInfos = built.edgeProposals.map((p) => ({
           id: p.id,
@@ -244,6 +290,7 @@ export async function workflowRunCommand(
           provides: contractCheck.provides,
           provideSignatures: contractCheck.provideSignatures,
           contractNote,
+          source,
         });
         proposalInfo = { id: proposal.id, status: proposal.status };
       } catch (err) {
@@ -268,6 +315,7 @@ export async function workflowRunCommand(
           ok: true,
           warnings: loaded.warnings,
           result,
+          ...(workflowRunId ? { workflowRun: { id: workflowRunId } } : {}),
           ...(proposalInfo ? { proposal: proposalInfo } : {}),
           // Recommended apply order: edges first, then the node proposal.
           ...(edgeProposalInfos.length > 0 ? { edgeProposals: edgeProposalInfos } : {}),
@@ -283,6 +331,9 @@ export async function workflowRunCommand(
 
   printResultHuman(result, graphPath, options.trace);
   if (proposalInfo) {
+    if (workflowRunId) {
+      console.log(`run record: ${workflowRunId} (provenance for the proposals below)`);
+    }
     // Apply order matters in update mode: the node_update rewrites the focal
     // hash, staling any still-pending edge proposal — so edges print first.
     for (const e of edgeProposalInfos) {
@@ -390,9 +441,9 @@ export function resolveContract(
 
 // Map an accepted workflow's final artefact onto a pending `node_create`
 // proposal. Reuses the generic proposal substrate (`createProposal`) and the
-// human-gated apply/audit chain wholesale; the only workflow-specific part is
-// the provenance rationale. `source` is null — workflows do not persist a run
-// record yet (a future enrichment could thread one for a tighter audit link).
+// human-gated apply/audit chain wholesale; the workflow-specific parts are
+// the provenance rationale and the §3.6 workflow-run source (the persisted
+// `wfrun_*` record carrying the multi-step provenance).
 function buildProposalFromWorkflow(args: {
   output: string;
   level: ReturnType<typeof AbstractionLevelSchema.parse>;
@@ -407,6 +458,7 @@ function buildProposalFromWorkflow(args: {
   provideSignatures?: Record<string, string>;
   // Appended to the rationale when the round-trip found declared≠produced.
   contractNote?: string;
+  source: ProposalWorkflowSource;
 }): Proposal {
   const state = readState();
   const parentNodeId = args.parent ?? state.rootNodeId;
@@ -438,7 +490,7 @@ function buildProposalFromWorkflow(args: {
       },
       parentHash: parentNode.integrity.hash,
     },
-    source: null,
+    source: args.source,
     validation: null,
     provenance: {
       derivedFrom: [parentNodeId],
@@ -466,6 +518,9 @@ function buildUpdateProposalsFromWorkflow(args: {
   provideSignatures: Record<string, string>;
   contractNote?: string;
   proposesEdges: WorkflowProposedEdge[] | undefined;
+  // §3.6 provenance: the persisted workflow run record every proposal of
+  // this run references.
+  source: ProposalWorkflowSource;
 }): { edgeProposals: Proposal[]; nodeProposal: Proposal } {
   const target = loadNodeById(args.nodeId);
   if (!target) {
@@ -515,7 +570,7 @@ function buildUpdateProposalsFromWorkflow(args: {
         fromHash: e.fromNode.integrity.hash,
         toHash: e.toNode.integrity.hash,
       },
-      source: null,
+      source: args.source,
       validation: null,
       provenance: {
         derivedFrom: [e.fromNode.id, e.toNode.id],
@@ -545,7 +600,7 @@ function buildUpdateProposalsFromWorkflow(args: {
       },
       nodeHash: target.integrity.hash,
     },
-    source: null,
+    source: args.source,
     validation: null,
     provenance: {
       derivedFrom: [target.id],
