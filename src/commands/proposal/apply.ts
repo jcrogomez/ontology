@@ -1,16 +1,123 @@
-import { applyProposal } from "../../core/proposals/persist.js";
+import { applyProposal, loadProposal } from "../../core/proposals/persist.js";
 import { errorMessage } from "../../core/errors.js";
+import { loadNodes } from "../../core/project/load.js";
+import { readState } from "../../core/state/state-store.js";
+import { glueFragments } from "../../runtime/context/gluing.js";
+import type { ContextFragment } from "../../runtime/context/presheaf.js";
 
 export interface ProposalApplyOptions {
   dryRun?: boolean;
   json?: boolean;
+  // O-gate (CONTEXT_GLUING_REGIMES.md): before applying a node_create proposal
+  // that declares `provides`, run the O2 `identify-if-equal` sheaf check of the
+  // candidate against the existing providers of the same keys (same branch). A
+  // compatible re-provision (identical signature) is reported as an
+  // identification; an incompatible one (drift / missing signature) is reported
+  // as a provider-drift warning. Opt-in; v0 warns, does NOT block (apply
+  // proceeds) — a `--strict` blocking mode is a future increment.
+  checkProviders?: boolean;
+}
+
+interface ProviderCheck {
+  // Keys the candidate re-provides compatibly with an existing provider.
+  identified: Array<{ key: string; withNodeIds: string[] }>;
+  // Keys the candidate re-provides INcompatibly (signature drift or missing).
+  drift: Array<{ key: string; existingNodeIds: string[] }>;
 }
 
 // Lifecycle transition: pending → applied (happy path) or pending → staled
 // (parentHash diverged). The CLI surface mirrors the kernel result shape so
 // scripts can branch on `kind` in --json mode.
+// Run the O2 sheaf check of a pending node_create proposal's declared
+// `provides` against the existing providers of the same keys on the same
+// branch. Read-only. Returns null when the proposal is not a node_create or
+// declares no provides. Existing fragments are stripped to the intersecting
+// keys so the glue only exercises the provider-duplication axis (not the
+// existing nodes' requires/forbids).
+function checkProviderConsistency(id: string, cwd: string): ProviderCheck | null {
+  const proposal = loadProposal(id, cwd);
+  if (!proposal || proposal.mutation.kind !== "node_create") return null;
+  const payload = proposal.mutation.payload;
+  const provides = payload.provides ?? [];
+  if (provides.length === 0) return null;
+  const sigs = payload.provideSignatures ?? {};
+  const branch = readState(cwd).activeBranch;
+  const keySet = new Set(provides);
+
+  const candidate: ContextFragment = {
+    nodeId: "__candidate__",
+    branch,
+    provides,
+    requires: [],
+    forbids: [],
+    optional: [],
+    rules: [],
+    ...(Object.keys(sigs).length > 0 ? { provideSignatures: sigs } : {}),
+  };
+
+  const existing: ContextFragment[] = [];
+  for (const node of loadNodes(cwd)) {
+    if (node.coordinates.branch !== branch) continue;
+    const inter = (node.context.provides as Array<{ key: string; signature?: string }>)
+      .filter((p) => keySet.has(p.key));
+    if (inter.length === 0) continue;
+    const ps: Record<string, string> = {};
+    for (const p of inter) if (p.signature !== undefined) ps[p.key] = p.signature;
+    existing.push({
+      nodeId: node.id,
+      branch,
+      provides: inter.map((p) => p.key),
+      requires: [],
+      forbids: [],
+      optional: [],
+      rules: [],
+      ...(Object.keys(ps).length > 0 ? { provideSignatures: ps } : {}),
+    });
+  }
+  if (existing.length === 0) return { identified: [], drift: [] };
+
+  const glued = glueFragments([...existing, candidate], {
+    onDuplicateProvider: "identify-if-equal",
+  });
+  const drift = glued.conflicts
+    .filter((c) => c.type === "duplicate_provider" && c.nodeIds.includes("__candidate__"))
+    .map((c) => ({
+      key: c.message.replace(/^Duplicate provider for key: /, ""),
+      existingNodeIds: c.nodeIds.filter((n) => n !== "__candidate__"),
+    }));
+  const identified = glued.warnings
+    .map((w) => w.match(/Identified \d+ providers of key "(.+)" by equal signature/)?.[1])
+    .filter((k): k is string => k !== undefined)
+    .map((key) => ({
+      key,
+      withNodeIds: existing.filter((e) => e.provides.includes(key)).map((e) => e.nodeId),
+    }));
+  return { identified, drift };
+}
+
 export async function proposalApplyCommand(id: string, options: ProposalApplyOptions): Promise<void> {
   const dryRun = !!options.dryRun;
+
+  // O2 provider check (opt-in, read-only, before the mutation). v0 warns; it
+  // never blocks the apply.
+  let providerCheck: ProviderCheck | null = null;
+  if (options.checkProviders) {
+    try {
+      providerCheck = checkProviderConsistency(id, process.cwd());
+    } catch (err: unknown) {
+      // A check failure must never block a legitimate apply.
+      if (!options.json) console.error(`⚠ provider check skipped: ${errorMessage(err)}`);
+    }
+  }
+  if (providerCheck && !options.json) {
+    for (const i of providerCheck.identified) {
+      console.log(`✓ provider "${i.key}" identified with existing ${i.withNodeIds.join(", ")} (equal signature)`);
+    }
+    for (const d of providerCheck.drift) {
+      console.error(`⚠ provider drift: "${d.key}" already provided by ${d.existingNodeIds.join(", ")} with a different/missing signature — re-provision is NOT a compatible glue`);
+    }
+  }
+
   let result;
   try {
     result = applyProposal(id, { dryRun });
@@ -58,6 +165,7 @@ export async function proposalApplyCommand(id: string, options: ProposalApplyOpt
         eventId: result.mutationEvent?.eventId ?? null,
         eventType: result.mutationEvent?.eventType ?? null,
       },
+      ...(providerCheck ? { providerCheck } : {}),
     }, null, 2));
     return;
   }

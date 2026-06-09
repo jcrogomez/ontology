@@ -274,9 +274,11 @@ reconcile. What remains: (a) the discriminator defaults to syntactic, but the
 override; captures inferred returns/consts and follows re-export aliases the
 syntactic tier can't, tier-tagged so it never confuses with syntactic) — a
 fidelity refinement that broadens the T1 subcategory, default unchanged;
-(b) apply still doesn't *automatically*
-run `identify-if-equal` against the existing graph (it's reachable via the
-validation flag, but not yet a step of apply itself); (c) workflows propose new
+(b) `apply` now runs the
+`identify-if-equal` check against the existing graph as opt-in
+`onto proposal apply --check-providers` — it reports compatible re-provisions
+(identification) and drift (warning) but, in v0, **warns rather than blocks**;
+a `--strict` blocking mode is the next step; (c) workflows propose new
 nodes only (not node-update / edges) and persist no run record. The full
 agentic-graph regime — executions routinely proposing and the graph growing
 and rewiring under sheaf consistency — is the remaining horizon. The sequence
