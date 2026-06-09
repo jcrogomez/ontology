@@ -20,17 +20,27 @@ export function IdentityBar({ node, hasDraft }: IdentityBarProps): React.ReactEl
   const showColors = colorsEnabled();
   return (
     <Box justifyContent="space-between">
-      <Box>
-        <Text color={showColors ? color : undefined} bold>
-          {node.id}
-        </Text>
-        <Text>  </Text>
-        <Text>{node.label}</Text>
+      {/* Graceful degradation on a narrow terminal: the LABEL (long, variable,
+          low-priority) absorbs the overflow by truncating, so the high-priority
+          id, draft indicator, and coordinate tag stay intact on one line. The
+          id and indicator are flexShrink={0} so they are never broken
+          mid-token (Ink would otherwise wrap "node_0000_canon" → "node_0000_ca"
+          / "on" and "(draft pending)" → "(draft" / "pending)"). */}
+      <Box flexShrink={1} minWidth={0}>
+        <Box flexShrink={0}>
+          <Text color={showColors ? color : undefined} bold>
+            {node.id}
+          </Text>
+          <Text>  </Text>
+        </Box>
+        <Box flexShrink={1} minWidth={0}>
+          <Text wrap="truncate-end">{node.label}</Text>
+        </Box>
         {hasDraft && (
-          <>
+          <Box flexShrink={0}>
             <Text>  </Text>
             <Text color="yellow">(draft pending)</Text>
-          </>
+          </Box>
         )}
       </Box>
       <Box>
