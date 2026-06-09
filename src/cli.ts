@@ -5,6 +5,7 @@ import { Command } from "commander";
 import { initCommand } from "./commands/init.js";
 import { doctorCommand } from "./commands/doctor.js";
 import { validateCommand } from "./commands/validate.js";
+import { replayCommand } from "./commands/replay.js";
 import { inspectCommand } from "./commands/inspect.js";
 import { createNodeCommand } from "./commands/node/create.js";
 import { nodeListCommand } from "./commands/node/list.js";
@@ -148,6 +149,20 @@ program
       await validateCommand();
     } catch (err: unknown) {
       console.error(`✖ Error during validation: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("replay")
+  .description("Rebuild the state summary from events.jsonl alone and compare it to state.json (the replay law: every log-derived field must match). Verifies chain integrity (sequence + previousEventId) while folding. Read-only by default; exits 1 on divergence.")
+  .option("--write", "Repair state.json from the replayed fold (refused if the chain itself is broken).")
+  .option("--json", "Output the replay report as JSON.")
+  .action(async (options) => {
+    try {
+      await replayCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during replay: ${errorMessage(err)}`);
       process.exit(1);
     }
   });

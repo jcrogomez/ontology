@@ -281,10 +281,11 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 
 ### 4.4 Append-only log "supports replay"
 
-- **Tier:** T3 (useful analogy).
-- **Code:** events.jsonl is read by `onto events tail`, `onto runs show`, `onto inspect`; no command actually replays the log to reconstruct state.
-- **Why T3:** *Replay* in the strict sense means a function `replay(events) → state` such that `replay(history(state)) === state`. We have `history(state)` (the event log is appended on every mutation), but we do not have `replay`. State is loaded from `state.json`, not reconstructed from events.
-- **Rigor improvement:** either add `onto replay` (a one-shot rebuild of `state.json` from `events.jsonl`) and assert `replay(currentEvents) === currentState` in tests — that would lift this to T1 — or stop saying "replayable" in docs and say "auditable" / "traceable" instead.
+- **Tier:** T1 (strictly implemented). Promoted from T3 on **2026-06-09** — `onto replay` ships and the replay law is test-pinned.
+- **Code:** `src/core/state/replay.ts` (`replayEvents` — the pure fold `replay(events) → state`, plus chain-integrity verification of `sequence` and `previousEventId` in the same pass); `src/commands/replay.ts` (`onto replay`, read-only check by default, `--write` as the recovery primitive, refused when the chain itself is broken).
+- **Tests:** `tests/replay-cli.test.ts` — the law `replay(history(state)) === state` over a real mutation history (init + node creates + link + proposal apply + edge remove); tamper-detection (hand-mangled `state.json` → divergence reported, `--write` repairs, law holds again); broken-chain detection (tampered `previousEventId` → violation reported, `--write` refused).
+- **Honest scope of the law:** every **log-derived** field (initialized, schemaVersion, projectName, rootNodeId, activeBranch, nodeCount, edgeCount, eventCount, lastEventId) must match exactly. The two **wall-clock** fields (`createdAt`/`updatedAt`) are written from `new Date()` at write time, not from the log, and are excluded by design (replay reconstructs them from the genesis/last event timestamps on `--write`). `projectName`/`rootNodeId` ride on the genesis payload since 2026-06-09; legacy logs fall back to conventions with a warning. The canon node is counted at `system_init` (init writes it without a `node_created` event), and `nodeCount` is a sequential id counter (never decremented — matching `remove-node.ts`).
+- **Rigor improvement:** none outstanding for the summary-state law. A stronger, future law would replay the *full graph* (nodes/edges files) rather than the state summary — that requires events to carry complete node/edge bodies, which `node_created` currently does not (it carries id/level/kind/prompt). Recorded as future work, not claimed.
 
 ### 4.5 Validation modes (`compare`, `propose`)
 
@@ -332,7 +333,7 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 
 ## 5. Index — claims by tier
 
-### T1 — Strictly implemented (13)
+### T1 — Strictly implemented (14)
 
 - Axiom 1: typed directed multigraph.
 - Axiom 2: crash-atomic + durable append-only event log + advisory single-writer lock (`tests/fs-json.test.ts`, `tests/advisory-lock.test.ts`; promoted 2026-06-01 — code already shipped, entry was stale).
@@ -347,6 +348,7 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 - §3.9 (algebra): three-valued Ω predicate algebra (truth tables, monotonicity, parity sweep).
 - §3.9 (validator port): closed-world parity == Boolean oracle, exhaustive over predicate-tree × closed-world (`tests/runtime/topos/closed-world-parity.test.ts`, pinned 2026-06-01).
 - §4.1: content-addressed run records.
+- §4.4: replay law — `onto replay` rebuilds the state summary from the log and `replay(history(state)) === state` holds for every log-derived field, chain integrity verified in the same fold (`src/core/state/replay.ts`, `tests/replay-cli.test.ts`; promoted T3 → T1 2026-06-09).
 
 ### T2 — Operationally implemented (6)
 
@@ -357,7 +359,7 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 - §3.10: compile adjoint — Phase ε self-ingest, 2-column cartography matrix, pre-registered falsifiers met. Reframed 2026-06-01 as a *probabilistic/enriched* adjoint; verdict-*fold* determinism + variance-measurement core both test-pinned (`verdict-variance.ts`); only budget-gated real-LLM N-run generation remains open. Stays T2.
 - §4.2: proposal system lifecycle + provenance (categorical reading is generous).
 
-### T3 — Useful analogy (8)
+### T3 — Useful analogy (7)
 
 - Axiom 3 (broader "constrains"): not all edges encode poset constraints.
 - Axiom 4 (rewrite rule): no actual rewriting.
@@ -366,7 +368,6 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 - §3.5: propose ⊣ apply (admitted as informal in the doc itself).
 - §3.8 (cartesian lift): cartesian property is interpretation, not proof.
 - §4.3: mock provider as identity functor (true on one task only).
-- §4.4: append-only log "replayable" (auditable, not replayable).
 
 ### T4 — Aspirational (6)
 
@@ -381,13 +382,13 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 
 | Tier | Count |
 | --- | --- |
-| T1 | 13 |
+| T1 | 14 |
 | T2 | 6 |
-| T3 | 8 |
+| T3 | 7 |
 | T4 | 6 |
 | **Total** | **33** |
 
-Note: the **2026-06-01** refresh ran in two passes (starting from 29: T1 8 / T2 10 / T3 7 / T4 4). Pass 1 (categorical laws): Axiom 5's single T2 entry **split** into a restriction half (→ T1) and a gluing half (separated presheaf, stays T2) — that split is the lone +1 to the grand total (29 → 30); Axiom 6 / §3.2 compiler functoriality moved T2 → T1 (no total change). End of pass 1: T1 11, T2 8. Pass 2 (load-bearing hardening, no new line items): Axiom 2 (crash-atomic durable log + advisory lock — code already shipped, the ledger entry was stale) and §3.9 validator port (closed-world parity pinned) both moved T2 → T1. End of pass 2: **T1 13, T2 6, total 30.** The **2026-06-09** refresh (i) added one new line item — Axiom 5 gluing's opt-in `identify-if-equal` sheaf-on-subcategory mode (O2), a distinct claim about new code (`+1` to the grand total → 31), and (ii) **promoted that same item T2 → T1** once its gluing axiom was pinned as a characterising law over an explicit cover (Path-to-T1 gate #2). Net for the day: **T1 13 → 14, T2 stays 6, total 31**; no other tier changed. The §3.10 promotion note from the prior refresh follows. — the 2026-05-26 refresh adds §3.10 to the T2 index — the 2026-05-13 audit had §3.10 in the body marked T4 but did not index it under T4 below, so re-counting after the promotion lands a +1 net on T2 with no T4 decrement. The original T2 label "(8)" undercounted the body by one; canonical recount is "(10)". (Recount 2026-06-09: the running totals above carried a clerical off-by-one in the T1/T3 headers since the first audit and never indexed §4.8/§4.9 under T4; the honest totals are T1 13 / T2 6 / T3 8 / T4 6 = 33, with all recorded tier *movements* unaffected.)
+Note: the **2026-06-01** refresh ran in two passes (starting from 29: T1 8 / T2 10 / T3 7 / T4 4). Pass 1 (categorical laws): Axiom 5's single T2 entry **split** into a restriction half (→ T1) and a gluing half (separated presheaf, stays T2) — that split is the lone +1 to the grand total (29 → 30); Axiom 6 / §3.2 compiler functoriality moved T2 → T1 (no total change). End of pass 1: T1 11, T2 8. Pass 2 (load-bearing hardening, no new line items): Axiom 2 (crash-atomic durable log + advisory lock — code already shipped, the ledger entry was stale) and §3.9 validator port (closed-world parity pinned) both moved T2 → T1. End of pass 2: **T1 13, T2 6, total 30.** The **2026-06-09** refresh (i) added one new line item — Axiom 5 gluing's opt-in `identify-if-equal` sheaf-on-subcategory mode (O2), a distinct claim about new code (`+1` to the grand total → 31), and (ii) **promoted that same item T2 → T1** once its gluing axiom was pinned as a characterising law over an explicit cover (Path-to-T1 gate #2). Net for the day: **T1 13 → 14, T2 stays 6, total 31**; no other tier changed. The §3.10 promotion note from the prior refresh follows. — the 2026-05-26 refresh adds §3.10 to the T2 index — the 2026-05-13 audit had §3.10 in the body marked T4 but did not index it under T4 below, so re-counting after the promotion lands a +1 net on T2 with no T4 decrement. The original T2 label "(8)" undercounted the body by one; canonical recount is "(10)". (Recount 2026-06-09: the running totals above carried a clerical off-by-one in the T1/T3 headers since the first audit and never indexed §4.8/§4.9 under T4; the honest totals at recount time were T1 13 / T2 6 / T3 8 / T4 6 = 33, with all recorded tier *movements* unaffected.) Later the same day, §4.4 (replay) was promoted T3 → T1 once `onto replay` shipped with the law test-pinned: **T1 13 → 14, T3 8 → 7, total stays 33.**
 
 ---
 
@@ -398,11 +399,11 @@ Listed in priority order (cheapest-with-most-leverage first). Each item is a rou
 1. ✅ **Atomic writes + advisory lock on `events.jsonl` and `state.json`** — done 2026-06-01 (axiom 2 promoted T2 → T1).
 2. ✅ **Presheaf-restriction test on `assembleContext`** — done 2026-06-01 (axiom 5 restriction half promoted T2 → T1).
 3. **Drop rhetorical claims that overstate rigor** — edit `CATEGORICAL_VISION.md` §2.4 (limit/colimit), `PROPOSAL_SYSTEM.md` §1 (rewrite-rule), and `MATHEMATICAL_MODEL.md` axiom 4 to match what the code actually delivers. Pure prose work; closes the largest credibility risk.
-4. **Replace "replayable" with "auditable" / "traceable"** project-wide except where a real `onto replay` exists. Trivial sed-style edit; closes §4.4.
+4. ✅ **Replace "replayable" with "auditable" / "traceable"** — resolved 2026-06-09 the other way: a real `onto replay` now exists, so "replayable" is literal for the state summary (see §4.4).
 5. ✅ **Define an artifact category for the compiler functor** and add one composition-preservation test — done 2026-06-01 (axiom 6 promoted T2 → T1; `src/runtime/graph/artifact-category.ts`, `tests/compiler-functoriality.test.ts`).
 6. **Cartesian-lift universal-property test** — promotes §3.8 (cartesian lift portion) from T3 to T2.
 7. **`onto branch` CLI surface** (already in roadmap) — adds a real surface to the fibration library, makes T2 claims about fibration easier to defend.
-8. **`onto replay` command** — would promote §4.4 from T3 to T1 *and* give a useful tool. Higher cost than the others.
+8. ✅ **`onto replay` command** — done 2026-06-09 (§4.4 promoted T3 → T1; `src/core/state/replay.ts`, `tests/replay-cli.test.ts`; `--write` is the recovery primitive).
 
 ---
 

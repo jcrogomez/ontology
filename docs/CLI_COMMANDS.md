@@ -72,6 +72,13 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **Files Touched:** Reads `.ontology/state.json`, `.ontology/events.jsonl`, `.ontology/edges.jsonl`, and all `.ontology/nodes/*.json` files.
 - **What it does not do:** It does not mutate or fix any files. If validations fail, it exits loudly with a non-zero code.
 
+### `replay` *(2026-06-09 — the §4.4 replay law)*
+
+- **Purpose:** Rebuild the state summary from `events.jsonl` alone and compare it field-by-field to `state.json` — the replay law `replay(history(state)) === state` for every log-derived field. Verifies chain integrity (monotonic `sequence`, linked `previousEventId`) in the same fold.
+- **Example:** `npm run dev -- replay` (or `... --json`). Exits 1 on any divergence or chain violation.
+- **Repair:** `npm run dev -- replay --write` rewrites `state.json` from the replayed fold — the recovery primitive for a diverged or hand-mangled state file. Refused if the chain itself is broken (a replay of a corrupt log must not be trusted).
+- **Honest scope:** wall-clock fields (`createdAt`/`updatedAt`) are written at write time, not derived from the log, and are excluded from the comparison (on `--write` they are reconstructed from the genesis/last event timestamps). `projectName`/`rootNodeId` ride on the genesis payload for projects initialised from 2026-06-09 on; older logs fall back to conventions with a warning. See `MATHEMATICAL_CLAIMS.md` §4.4.
+
 ### `inspect`
 
 - **Purpose:** Summarizes the current topological state, detailing nodes, events, and edge counts.
