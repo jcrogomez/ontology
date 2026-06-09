@@ -71,6 +71,7 @@ Longer term, the **Open-Prompt protocol** turns the signed intent + audit chain 
 | `onto query` | Search nodes by Hom-profile (edges + contract + coordinates). |
 | `onto mcp` | Read-only MCP server over the intent graph + audit chain — a third party can judge the declared intent without mutation access. |
 | `onto walk <id>` | The Walker: interactive TUI — navigate, draft, propose, review proposals, run models, compile. |
+| `onto replay` | Rebuild the state summary from the event log alone, verify chain integrity, `--write` to repair. |
 | `onto validate / inspect / doctor / events tail / model doctor` | Observability and health checks. |
 
 Every command and flag is documented in [docs/CLI_COMMANDS.md](docs/CLI_COMMANDS.md) (with a task-oriented index at the top).
@@ -97,7 +98,7 @@ compilation (topological plan run, model dispatch, artifact written)
 file on disk (auditable: artifact → event → run → prompt hash → node)
 ```
 
-Every step is recorded in the append-only `events.jsonl`; every artifact ties back to a `compilation_run` event; the chain is auditable in either direction (`onto runs verify`, `onto events tail`). Replay-as-rebuild — reconstructing `state.json` from the events log — is roadmap, not shipped.
+Every step is recorded in the append-only `events.jsonl`; every artifact ties back to a `compilation_run` event; the chain is auditable in either direction (`onto runs verify`, `onto events tail`) and **replayable**: `onto replay` rebuilds the state summary from the log alone, verifies chain integrity, and `--write` repairs a diverged `state.json`.
 
 ## Why this exists
 
@@ -171,6 +172,6 @@ with a semantic gate ($\text{validateIntent} \to \Omega$, a three-valued predica
 - **Both directions are operational** — F (compile) and G (ingest) — and the round-trip is *measured*: AST grounding contributes Δ = +0.355 mean structural Jaccard over an ablation control on this repo's 125-file core; the fidelity matrix fills 2 of 5 columns (structural + behaviour), the rest are explicit no-data.
 - **The kernel's mathematical claims are test-pinned where it matters** — 13 T1 laws (crash-atomic durable event log, presheaf restriction, sheaf-on-subcategory gluing, compiler functoriality, monad laws, Ω closed-world parity, content-addressed runs, …).
 - **Durability:** `state.json` writes are atomic + durable, `events.jsonl` appends are durable; the advisory lock covers the long-running mutators only (quick mutations rely on per-write atomicity — worst case last-writer-wins, never corruption).
-- **Not yet:** a clean real-LLM pass of the ζ verify-refine loop (frontier-gated; first attempt 2026-05-29 surfaced fixes), replay-as-rebuild, and the signing half of Open-Prompt.
+- **Not yet:** a clean real-LLM pass of the ζ verify-refine loop (frontier-gated; first attempt 2026-05-29 surfaced fixes) and the signing half of Open-Prompt.
 
 Live phase state, metrics, dates and open work: [**ROADMAP.md**](docs/ROADMAP.md). Everything is meant to fail loudly and exit `1` rather than silently corrupt.

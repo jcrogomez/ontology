@@ -99,6 +99,10 @@ export async function initCommand(options: InitOptions = {}): Promise<void> {
     payload: {
       action: "bootstrap_network_kernel",
       schemaVersion: OntologySchemaVersion,
+      // Carried in the log (2026-06-09+) so `onto replay` can reconstruct
+      // state.json from events alone; legacy logs fall back to conventions.
+      projectName: "ontology-project",
+      rootNodeId: "node_0000_canon",
     },
   });
   appendJsonl(paths.eventsPath, genesisEvent);
