@@ -232,6 +232,225 @@ describe("onto workflow run --as-proposal (O3)", () => {
     });
   });
 
+  // ── §3.6 mode 2 — refine: --update-node (node_update + proposesEdges) ─────
+
+  const createNode = (prompt: string): string => {
+    const r = runCli(tempDir, [
+      "node", "create",
+      "--level", "domain",
+      "--kind", "entity",
+      "--prompt", prompt,
+    ]);
+    expect(r.status).toBe(0);
+    const m = (r.stdout + r.stderr).match(/node_\d{4}/);
+    expect(m).not.toBeNull();
+    return m![0];
+  };
+
+  it("--update-node turns the artefact into a pending node_update proposal that applies onto the existing node", () => {
+    const nodeId = createNode("old prompt to refine");
+    writeGraph("contract.json", ACCEPT_GRAPH_CONTRACT);
+    const r = runCli(tempDir, [
+      "workflow", "run", "contract.json",
+      "--input", "input.txt",
+      "--provider", "mock",
+      "--as-proposal",
+      "--update-node", nodeId,
+      "--json",
+    ]);
+    expect(r.status).toBe(0);
+    const parsed = JSON.parse(r.stdout);
+    expect(parsed.proposal).toBeDefined();
+
+    const proposalFile = JSON.parse(
+      fs.readFileSync(
+        path.join(tempDir, ".ontology/proposals", `${parsed.proposal.id}.json`),
+        "utf-8",
+      ),
+    );
+    expect(proposalFile.mutation.kind).toBe("node_update");
+    expect(proposalFile.mutation.payload.nodeId).toBe(nodeId);
+    expect(proposalFile.mutation.payload.prompt).toBe(parsed.result.output);
+    expect(proposalFile.mutation.payload.provides).toEqual(["podcast_pipeline"]);
+    // Pinned to the target node's hash at proposal-creation time.
+    const nodeBefore = JSON.parse(
+      fs.readFileSync(path.join(tempDir, ".ontology/nodes", `${nodeId}.json`), "utf-8"),
+    );
+    expect(proposalFile.mutation.nodeHash).toBe(nodeBefore.integrity.hash);
+
+    const apply = runCli(tempDir, ["proposal", "apply", parsed.proposal.id, "--json"]);
+    expect(apply.status).toBe(0);
+    expect(JSON.parse(apply.stdout).mutation.createdEntityId).toBe(nodeId);
+
+    // The node was refined in place: new prompt, contract with signature,
+    // level/kind untouched.
+    const node = JSON.parse(
+      fs.readFileSync(path.join(tempDir, ".ontology/nodes", `${nodeId}.json`), "utf-8"),
+    );
+    expect(node.prompt.raw).toBe(parsed.result.output);
+    expect(node.coordinates.abstraction).toBe("domain");
+    expect(node.context.provides).toContainEqual({
+      key: "podcast_pipeline",
+      nodeType: "declared",
+      signature: "(brief: string): Episode",
+    });
+  });
+
+  it("--update-node is mutually exclusive with the create-mode options", () => {
+    const nodeId = createNode("target");
+    writeGraph("accept.json", ACCEPT_GRAPH);
+    const r = runCli(tempDir, [
+      "workflow", "run", "accept.json",
+      "--input", "input.txt",
+      "--provider", "mock",
+      "--as-proposal",
+      "--update-node", nodeId,
+      "--proposal-level", "domain",
+      "--json",
+    ]);
+    const parsed = JSON.parse(r.stdout);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toMatch(/mutually exclusive/);
+    expect(r.status).not.toBe(0);
+  });
+
+  it("a node_update proposal STALES when the target node mutates out-of-band (snapshot discipline)", () => {
+    const nodeId = createNode("original");
+    writeGraph("accept.json", ACCEPT_GRAPH);
+    const run = runCli(tempDir, [
+      "workflow", "run", "accept.json",
+      "--input", "input.txt",
+      "--provider", "mock",
+      "--as-proposal",
+      "--update-node", nodeId,
+      "--json",
+    ]);
+    const proposalId = JSON.parse(run.stdout).proposal.id;
+    // Out-of-band mutation between propose and apply.
+    expect(runCli(tempDir, ["node", "update", nodeId, "--prompt", "drifted"]).status).toBe(0);
+    const apply = runCli(tempDir, ["proposal", "apply", proposalId, "--json"]);
+    expect(apply.status).not.toBe(0);
+    const parsed = JSON.parse(apply.stdout);
+    expect(parsed.kind).toBe("stale");
+    // The drifted prompt survives — the stale proposal never applied.
+    const node = JSON.parse(
+      fs.readFileSync(path.join(tempDir, ".ontology/nodes", `${nodeId}.json`), "utf-8"),
+    );
+    expect(node.prompt.raw).toBe("drifted");
+  });
+
+  it("graph-declared proposesEdges become edge_create proposals in update mode, ordered edges-first", () => {
+    const focalId = createNode("focal");
+    const depId = createNode("dependency target");
+    const graph = {
+      ...ACCEPT_GRAPH,
+      name: "with-edges",
+      proposesEdges: [{ type: "depends_on", target: depId }],
+    };
+    writeGraph("edges.json", graph);
+    const r = runCli(tempDir, [
+      "workflow", "run", "edges.json",
+      "--input", "input.txt",
+      "--provider", "mock",
+      "--as-proposal",
+      "--update-node", focalId,
+      "--json",
+    ]);
+    expect(r.status).toBe(0);
+    const parsed = JSON.parse(r.stdout);
+    expect(parsed.edgeProposals).toHaveLength(1);
+    const edgeFile = JSON.parse(
+      fs.readFileSync(
+        path.join(tempDir, ".ontology/proposals", `${parsed.edgeProposals[0].id}.json`),
+        "utf-8",
+      ),
+    );
+    expect(edgeFile.mutation.kind).toBe("edge_create");
+    expect(edgeFile.mutation.payload.from).toBe(focalId); // direction "out" default
+    expect(edgeFile.mutation.payload.to).toBe(depId);
+    expect(edgeFile.mutation.payload.type).toBe("depends_on");
+
+    // The documented apply order works: edge first, then the update.
+    expect(
+      runCli(tempDir, ["proposal", "apply", parsed.edgeProposals[0].id, "--json"]).status,
+    ).toBe(0);
+    expect(
+      runCli(tempDir, ["proposal", "apply", parsed.proposal.id, "--json"]).status,
+    ).toBe(0);
+  });
+
+  it("applying the node_update FIRST stales the edge proposal (the documented hazard, pinned)", () => {
+    const focalId = createNode("focal");
+    const depId = createNode("dep");
+    writeGraph("edges.json", {
+      ...ACCEPT_GRAPH,
+      proposesEdges: [{ type: "depends_on", target: depId }],
+    });
+    const r = runCli(tempDir, [
+      "workflow", "run", "edges.json",
+      "--input", "input.txt",
+      "--provider", "mock",
+      "--as-proposal",
+      "--update-node", focalId,
+      "--json",
+    ]);
+    const parsed = JSON.parse(r.stdout);
+    expect(runCli(tempDir, ["proposal", "apply", parsed.proposal.id, "--json"]).status).toBe(0);
+    const edgeApply = runCli(tempDir, ["proposal", "apply", parsed.edgeProposals[0].id, "--json"]);
+    expect(edgeApply.status).not.toBe(0);
+    expect(JSON.parse(edgeApply.stdout).kind).toBe("stale");
+  });
+
+  it("an invalid proposesEdges declaration creates NO proposals at all (validate-then-create)", () => {
+    const focalId = createNode("focal");
+    writeGraph("bad-edges.json", {
+      ...ACCEPT_GRAPH,
+      proposesEdges: [{ type: "not_a_real_edge_type", target: "node_9999" }],
+    });
+    const r = runCli(tempDir, [
+      "workflow", "run", "bad-edges.json",
+      "--input", "input.txt",
+      "--provider", "mock",
+      "--as-proposal",
+      "--update-node", focalId,
+      "--json",
+    ]);
+    const parsed = JSON.parse(r.stdout);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toMatch(/invalid edge type/);
+    expect(r.status).not.toBe(0);
+    const proposalsDir = path.join(tempDir, ".ontology/proposals");
+    const files = fs.existsSync(proposalsDir) ? fs.readdirSync(proposalsDir) : [];
+    expect(files.filter((f) => f.endsWith(".json"))).toHaveLength(0);
+  });
+
+  it("create mode defers declared edges (no edge proposals; surfaced as a note)", () => {
+    const depId = createNode("dep");
+    writeGraph("create-edges.json", {
+      ...ACCEPT_GRAPH,
+      proposesEdges: [{ type: "depends_on", target: depId }],
+    });
+    const r = runCli(tempDir, [
+      "workflow", "run", "create-edges.json",
+      "--input", "input.txt",
+      "--provider", "mock",
+      "--as-proposal",
+      "--proposal-level", "domain",
+      "--proposal-kind", "entity",
+      "--json",
+    ]);
+    expect(r.status).toBe(0);
+    const parsed = JSON.parse(r.stdout);
+    expect(parsed.edgeProposals).toBeUndefined();
+    expect(parsed.deferredProposedEdges).toHaveLength(1);
+    // Only the node_create proposal exists.
+    const proposalsDir = path.join(tempDir, ".ontology/proposals");
+    const kinds = fs.readdirSync(proposalsDir)
+      .filter((f) => f.endsWith(".json"))
+      .map((f) => JSON.parse(fs.readFileSync(path.join(proposalsDir, f), "utf-8")).mutation.kind);
+    expect(kinds).toEqual(["node_create"]);
+  });
+
   it("without --as-proposal, a run creates no proposal (default unchanged)", () => {
     writeGraph("accept.json", ACCEPT_GRAPH);
     const r = runCli(tempDir, [

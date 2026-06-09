@@ -35,6 +35,11 @@ export interface UpdateNodeOptions {
   rules?: string[];
   requires?: string[];
   provides?: string[];
+  // O1 side channel, mirroring CreateNodeOptions: per-key signature merged
+  // onto the provision objects when `provides` is replaced. Ignored when
+  // `provides` is undefined (the existing provisions — and their
+  // signatures — are preserved verbatim).
+  provideSignatures?: Record<string, string>;
   forbids?: string[];
   // Literal escape hatch toggle (Project Legend Phase β-2). Pass a
   // string to set / replace; pass the sentinel CLEAR_LITERAL to
@@ -89,7 +94,12 @@ export function updateNode(
       ? options.requires.map((source) => ({ source, nodeType: "declared" }))
       : existing.context.requires,
     provides: options.provides !== undefined
-      ? options.provides.map((key) => ({ key, nodeType: "declared" }))
+      ? options.provides.map((key) => {
+          const signature = options.provideSignatures?.[key];
+          return signature !== undefined
+            ? { key, nodeType: "declared", signature }
+            : { key, nodeType: "declared" };
+        })
       : existing.context.provides,
     forbids: options.forbids !== undefined
       ? options.forbids.map((source) => ({ source, nodeType: "declared" }))

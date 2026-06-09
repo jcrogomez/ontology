@@ -19,6 +19,7 @@ import { readState, writeState } from "../state/state-store.js";
 import { loadNodeById } from "../project/load.js";
 import { createNode } from "../nodes/create-node.js";
 import { createEdge } from "../edges/create-edge.js";
+import { updateNode } from "../nodes/update-node.js";
 import { updateNodeParent, wouldCreateCycle } from "../nodes/update-parent.js";
 
 // Proposal persistence module.
@@ -316,6 +317,9 @@ export function applyProposal(
   if (current.mutation.kind === "edge_create") {
     return applyEdgeCreate(id, current, dryRun, cwd);
   }
+  if (current.mutation.kind === "node_update") {
+    return applyNodeUpdate(id, current, dryRun, cwd);
+  }
   if (current.mutation.kind === "node_update_parent") {
     return applyNodeUpdateParent(id, current, dryRun, cwd);
   }
@@ -547,6 +551,101 @@ function applyEdgeCreate(
     proposalEvent: result.event,
     mutationEvent: edgeResult.event,
     createdEntityId: edgeResult.edge.edgeId,
+    dryRun: false,
+  };
+}
+
+// node_update: re-validate the target node's hash against the nodeHash
+// captured at proposal creation, then dispatch the updateNode plasticity
+// primitive. The proposal-gated face of in-place refinement — born for the
+// workflow runtime's `--update-node` mode (WORKFLOW_RUNTIME_SPEC §3.6).
+function applyNodeUpdate(
+  id: string,
+  current: Proposal,
+  dryRun: boolean,
+  cwd: string,
+): ApplyProposalResult {
+  if (current.mutation.kind !== "node_update") {
+    throw new Error("internal: applyNodeUpdate called with non-node_update mutation");
+  }
+  const nodeId = current.mutation.payload.nodeId;
+  const targetNode = loadNodeById(nodeId, cwd);
+  if (!targetNode) {
+    return {
+      ok: false,
+      kind: "missing_parent",
+      message: `Target node referenced by proposal no longer exists: ${nodeId}`,
+    };
+  }
+
+  if (targetNode.integrity.hash !== current.mutation.nodeHash) {
+    const detail =
+      `${nodeId} hash diverged (expected ${current.mutation.nodeHash}, ` +
+      `found ${targetNode.integrity.hash})`;
+    if (dryRun) {
+      return { ok: false, kind: "stale", message: `Proposal ${id} is stale: ${detail}.` };
+    }
+    const result = transitionProposal(id, current, "staled", {
+      reason: "node_hash_diverged",
+      nodeId,
+      expectedNodeHash: current.mutation.nodeHash,
+      actualNodeHash: targetNode.integrity.hash,
+    }, cwd, "proposal_staled");
+    return {
+      ok: false,
+      kind: "stale",
+      message: `Proposal ${id} marked staled: ${detail}.`,
+      proposal: result.proposal,
+      proposalEvent: result.event,
+    };
+  }
+
+  if (dryRun) {
+    return {
+      ok: true,
+      proposal: current,
+      proposalEvent: null as unknown as OntologyEvent,
+      mutationEvent: null,
+      createdEntityId: null,
+      dryRun: true,
+    };
+  }
+
+  let updateResult;
+  try {
+    // Thread only the defined fields — updateNode preserves everything
+    // omitted, which is exactly the payload's opt-in contract.
+    updateResult = updateNode({
+      id: nodeId,
+      prompt: current.mutation.payload.prompt,
+      label: current.mutation.payload.label,
+      rules: current.mutation.payload.rules,
+      requires: current.mutation.payload.requires,
+      provides: current.mutation.payload.provides,
+      provideSignatures: current.mutation.payload.provideSignatures,
+      forbids: current.mutation.payload.forbids,
+      cwd,
+      eventMetadata: { sourceProposalId: id },
+    });
+  } catch (err: unknown) {
+    return {
+      ok: false,
+      kind: "mutation_failed",
+      message: `Mutation failed during apply: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  const result = transitionProposal(id, current, "applied", {
+    resultingNodeId: updateResult.node.id,
+    resultingEventId: updateResult.event.eventId,
+  }, cwd, "proposal_applied");
+
+  return {
+    ok: true,
+    proposal: result.proposal,
+    proposalEvent: result.event,
+    mutationEvent: updateResult.event,
+    createdEntityId: updateResult.node.id,
     dryRun: false,
   };
 }

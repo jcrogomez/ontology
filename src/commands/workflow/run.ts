@@ -13,11 +13,14 @@ import { readState } from "../../core/state/state-store.js";
 import { loadNodeById } from "../../core/project/load.js";
 import {
   AbstractionLevelSchema,
+  EdgeTypeSchema,
   NodeKindSchema,
+  type OntologyNode,
   type Proposal,
 } from "../../schemas/ontology.js";
+import { validateEdgeDirection } from "../../runtime/graph/poset.js";
 import { parseTypeScriptFile } from "../../runtime/static/typescript.js";
-import type { WorkflowProvision } from "../../schemas/workflow.js";
+import type { WorkflowProposedEdge, WorkflowProvision } from "../../schemas/workflow.js";
 
 // `onto workflow run` — Phase ζ v0.
 //
@@ -44,6 +47,11 @@ export interface WorkflowRunOptions {
   // letting an execution propose growth of the intention graph rather than
   // just print a result. Requires an initialised `.ontology/` project.
   asProposal?: boolean;
+  // §3.6 mode 2 (refine): propose a node_update of this existing node
+  // instead of a node_create. Mutually exclusive with the create-mode
+  // level/kind/parent options. Graph-declared proposesEdges become
+  // edge_create proposals alongside (both endpoints exist in this mode).
+  updateNode?: string;
   proposalLevel?: string;
   proposalKind?: string;
   proposalParent?: string;
@@ -129,6 +137,11 @@ export async function workflowRunCommand(
   // proposal substrate — nothing mutates the graph here; `onto proposal
   // apply` is the human-gated step.
   let proposalInfo: { id: string; status: string } | undefined;
+  // §3.6: edge proposals (update mode) in recommended apply order — edges
+  // BEFORE the node_update, because the update rewrites the focal node's
+  // hash and stales any still-pending edge proposal pinned to it.
+  let edgeProposalInfos: Array<{ id: string; status: string; edge: string }> = [];
+  let deferredEdges: WorkflowProposedEdge[] = [];
   let contractCheck: ContractCheck | undefined;
   if (options.asProposal) {
     if (result.verdict !== "accept") {
@@ -138,18 +151,14 @@ export async function workflowRunCommand(
       );
       return;
     }
-    const lvl = AbstractionLevelSchema.safeParse(options.proposalLevel);
-    if (!lvl.success) {
+    if (
+      options.updateNode !== undefined &&
+      (options.proposalLevel !== undefined ||
+        options.proposalKind !== undefined ||
+        options.proposalParent !== undefined)
+    ) {
       fail(
-        `--as-proposal requires a valid --proposal-level (got: ${options.proposalLevel ?? "missing"})`,
-        options.json,
-      );
-      return;
-    }
-    const knd = NodeKindSchema.safeParse(options.proposalKind);
-    if (!knd.success) {
-      fail(
-        `--as-proposal requires a valid --proposal-kind (got: ${options.proposalKind ?? "missing"})`,
+        `--update-node is mutually exclusive with --proposal-level/--proposal-kind/--proposal-parent (the target node already has them)`,
         options.json,
       );
       return;
@@ -170,27 +179,85 @@ export async function workflowRunCommand(
       console.error(`⚠ contract check (declared ≠ produced):`);
       for (const m of contractCheck.mismatches) console.error(`  - ${m}`);
     }
-    try {
-      const proposal = buildProposalFromWorkflow({
-        output: result.output,
-        level: lvl.data,
-        kind: knd.data,
-        parent: options.proposalParent,
-        label: options.proposalLabel,
-        rationale: options.proposalRationale,
-        graphName: path.basename(graphPath),
-        stepCount: result.stepCount,
-        provides: contractCheck.provides,
-        provideSignatures: contractCheck.provideSignatures,
-        contractNote:
-          contractCheck.mismatches.length > 0
-            ? `contract mismatch (declared≠produced): ${contractCheck.mismatches.join("; ")}`
-            : undefined,
-      });
-      proposalInfo = { id: proposal.id, status: proposal.status };
-    } catch (err) {
-      fail(`proposal creation failed: ${errorMessage(err)}`, options.json);
-      return;
+    const contractNote =
+      contractCheck.mismatches.length > 0
+        ? `contract mismatch (declared≠produced): ${contractCheck.mismatches.join("; ")}`
+        : undefined;
+
+    if (options.updateNode !== undefined) {
+      // §3.6 mode 2 — refine: node_update of the existing node, plus
+      // edge_create proposals for the graph-declared edges (both
+      // endpoints exist in this mode).
+      try {
+        const built = buildUpdateProposalsFromWorkflow({
+          nodeId: options.updateNode,
+          output: result.output,
+          label: options.proposalLabel,
+          rationale: options.proposalRationale,
+          graphName: path.basename(graphPath),
+          stepCount: result.stepCount,
+          provides: contractCheck.provides,
+          provideSignatures: contractCheck.provideSignatures,
+          contractNote,
+          proposesEdges: loaded.graph.proposesEdges,
+        });
+        edgeProposalInfos = built.edgeProposals.map((p) => ({
+          id: p.id,
+          status: p.status,
+          edge:
+            p.mutation.kind === "edge_create"
+              ? `${p.mutation.payload.from} -${p.mutation.payload.type}-> ${p.mutation.payload.to}`
+              : "",
+        }));
+        proposalInfo = { id: built.nodeProposal.id, status: built.nodeProposal.status };
+      } catch (err) {
+        fail(`proposal creation failed: ${errorMessage(err)}`, options.json);
+        return;
+      }
+    } else {
+      const lvl = AbstractionLevelSchema.safeParse(options.proposalLevel);
+      if (!lvl.success) {
+        fail(
+          `--as-proposal requires a valid --proposal-level (got: ${options.proposalLevel ?? "missing"})`,
+          options.json,
+        );
+        return;
+      }
+      const knd = NodeKindSchema.safeParse(options.proposalKind);
+      if (!knd.success) {
+        fail(
+          `--as-proposal requires a valid --proposal-kind (got: ${options.proposalKind ?? "missing"})`,
+          options.json,
+        );
+        return;
+      }
+      try {
+        const proposal = buildProposalFromWorkflow({
+          output: result.output,
+          level: lvl.data,
+          kind: knd.data,
+          parent: options.proposalParent,
+          label: options.proposalLabel,
+          rationale: options.proposalRationale,
+          graphName: path.basename(graphPath),
+          stepCount: result.stepCount,
+          provides: contractCheck.provides,
+          provideSignatures: contractCheck.provideSignatures,
+          contractNote,
+        });
+        proposalInfo = { id: proposal.id, status: proposal.status };
+      } catch (err) {
+        fail(`proposal creation failed: ${errorMessage(err)}`, options.json);
+        return;
+      }
+      // Create mode cannot propose edges in-run (the focal id is born at
+      // apply time) — surface the declaration as a deferred note (§3.6).
+      deferredEdges = loaded.graph.proposesEdges ?? [];
+      if (!options.json && deferredEdges.length > 0) {
+        console.error(
+          `ℹ ${deferredEdges.length} declared edge(s) NOT proposed: create mode defers edges until the node exists (apply the proposal, then propose the edges against the created id)`,
+        );
+      }
     }
   }
 
@@ -202,6 +269,9 @@ export async function workflowRunCommand(
           warnings: loaded.warnings,
           result,
           ...(proposalInfo ? { proposal: proposalInfo } : {}),
+          // Recommended apply order: edges first, then the node proposal.
+          ...(edgeProposalInfos.length > 0 ? { edgeProposals: edgeProposalInfos } : {}),
+          ...(deferredEdges.length > 0 ? { deferredProposedEdges: deferredEdges } : {}),
           ...(contractCheck ? { contractCheck } : {}),
         },
         null,
@@ -213,6 +283,13 @@ export async function workflowRunCommand(
 
   printResultHuman(result, graphPath, options.trace);
   if (proposalInfo) {
+    // Apply order matters in update mode: the node_update rewrites the focal
+    // hash, staling any still-pending edge proposal — so edges print first.
+    for (const e of edgeProposalInfos) {
+      console.log(
+        `proposal:  ${e.id} (${e.status}) — edge ${e.edge} — apply BEFORE the node update`,
+      );
+    }
     console.log(
       `proposal:  ${proposalInfo.id} (${proposalInfo.status}) — review with \`onto proposal apply ${proposalInfo.id}\``,
     );
@@ -369,6 +446,113 @@ function buildProposalFromWorkflow(args: {
     },
   });
   return proposal;
+}
+
+// §3.6 mode 2 — refine: map the accepted artefact onto a pending
+// `node_update` proposal of an EXISTING node (artefact → prompt, resolved
+// contract → provides/provideSignatures), plus one `edge_create` proposal
+// per graph-declared edge. All edge declarations are validated (type
+// vocabulary, endpoint existence, self-loop, poset direction) BEFORE any
+// proposal is created, so a bad declaration never leaves a partial set in
+// the append-only sequence.
+function buildUpdateProposalsFromWorkflow(args: {
+  nodeId: string;
+  output: string;
+  label?: string;
+  rationale?: string;
+  graphName: string;
+  stepCount: number;
+  provides: string[];
+  provideSignatures: Record<string, string>;
+  contractNote?: string;
+  proposesEdges: WorkflowProposedEdge[] | undefined;
+}): { edgeProposals: Proposal[]; nodeProposal: Proposal } {
+  const target = loadNodeById(args.nodeId);
+  if (!target) {
+    throw new Error(`--update-node target not found: ${args.nodeId}`);
+  }
+
+  // Validation pass over every declared edge — no proposal is created yet.
+  const resolvedEdges: Array<{
+    fromNode: OntologyNode;
+    toNode: OntologyNode;
+    type: ReturnType<typeof EdgeTypeSchema.parse>;
+  }> = [];
+  for (const e of args.proposesEdges ?? []) {
+    const edgeType = EdgeTypeSchema.safeParse(e.type);
+    if (!edgeType.success) {
+      throw new Error(
+        `proposesEdges: invalid edge type "${e.type}" (expected one of: ${EdgeTypeSchema.options.join(", ")})`,
+      );
+    }
+    const other = loadNodeById(e.target);
+    if (!other) {
+      throw new Error(`proposesEdges: target node not found: ${e.target}`);
+    }
+    const [fromNode, toNode] = e.direction === "in" ? [other, target] : [target, other];
+    if (fromNode.id === toNode.id) {
+      throw new Error(`proposesEdges: self-loop refused (${fromNode.id} → ${toNode.id})`);
+    }
+    const direction = validateEdgeDirection({
+      sourceLevel: fromNode.coordinates.abstraction,
+      targetLevel: toNode.coordinates.abstraction,
+      edgeType: edgeType.data,
+    });
+    if (!direction.ok) {
+      throw new Error(`proposesEdges: ${direction.reason}`);
+    }
+    resolvedEdges.push({ fromNode, toNode, type: edgeType.data });
+  }
+
+  // Edge proposals first — they pin the focal node's CURRENT hash, which the
+  // node_update will rewrite; the printed apply order preserves validity.
+  const edgeProposals: Proposal[] = [];
+  for (const e of resolvedEdges) {
+    const { proposal } = createProposal({
+      mutation: {
+        kind: "edge_create",
+        payload: { from: e.fromNode.id, to: e.toNode.id, type: e.type, branch: null },
+        fromHash: e.fromNode.integrity.hash,
+        toHash: e.toNode.integrity.hash,
+      },
+      source: null,
+      validation: null,
+      provenance: {
+        derivedFrom: [e.fromNode.id, e.toNode.id],
+        rationale: `Edge declared by workflow "${args.graphName}" (proposesEdges, §3.6).`,
+      },
+    });
+    edgeProposals.push(proposal);
+  }
+
+  const baseRationale =
+    args.rationale ??
+    `Refined by workflow run "${args.graphName}" (${args.stepCount} steps).`;
+  const rationale = args.contractNote
+    ? `${baseRationale} ⚠ ${args.contractNote}`
+    : baseRationale;
+  const hasContract = args.provides.length > 0;
+  const hasSigs = Object.keys(args.provideSignatures).length > 0;
+  const { proposal } = createProposal({
+    mutation: {
+      kind: "node_update",
+      payload: {
+        nodeId: target.id,
+        prompt: args.output,
+        ...(args.label !== undefined ? { label: args.label } : {}),
+        ...(hasContract ? { provides: args.provides } : {}),
+        ...(hasContract && hasSigs ? { provideSignatures: args.provideSignatures } : {}),
+      },
+      nodeHash: target.integrity.hash,
+    },
+    source: null,
+    validation: null,
+    provenance: {
+      derivedFrom: [target.id],
+      rationale,
+    },
+  });
+  return { edgeProposals, nodeProposal: proposal };
 }
 
 function printResultHuman(

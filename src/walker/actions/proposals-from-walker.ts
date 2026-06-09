@@ -165,6 +165,15 @@ export function summarizeProposalRow(p: Proposal): string {
     const payload = p.mutation.payload;
     return `${p.id}  edge  ${payload.from} → ${payload.to}  (${payload.type})`;
   }
+  if (p.mutation.kind === "node_update") {
+    const payload = p.mutation.payload;
+    const what = [
+      payload.prompt !== undefined ? "prompt" : null,
+      payload.provides !== undefined ? "provides" : null,
+      payload.label !== undefined ? "label" : null,
+    ].filter(Boolean).join("+") || "fields";
+    return `${p.id}  update  ${payload.nodeId}  (${what})`;
+  }
   // node_update_parent — the hierarchizer's reparenting kind.
   const payload = p.mutation.payload;
   return `${p.id}  reparent  ${payload.nodeId} → ${payload.newParentNodeId}`;
