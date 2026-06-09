@@ -447,6 +447,56 @@ export type PersistedRunModel = z.infer<typeof PersistedRunModelSchema>;
 export type PersistedRunOutput = z.infer<typeof PersistedRunOutputSchema>;
 export type PersistedRunValidation = z.infer<typeof PersistedRunValidationSchema>;
 
+// Workflow run records live under `.ontology/runs/wfrun_<id>.json`, next to
+// the single-dispatch `run_*` records (whose lister filters on the `run_`
+// prefix, so the two id spaces coexist). One is written per
+// `onto workflow run --as-proposal` execution (spec §3.6) so the resulting
+// proposal's `source` stops being null: the record carries the multi-step
+// provenance — graph identity, input identity, per-step timing/verdicts —
+// that the single-dispatch (runId, promptHash) source shape cannot.
+//
+// Identity contract differs from PersistedRun ON PURPOSE: workflow
+// executions are NOT deterministic functions of (input, model) — verifier
+// loops take different paths — so the id is random, never content-derived,
+// and there is no cache-on-same-id semantics. The body hash still
+// self-certifies the record (verify = recompute-and-compare).
+export const WorkflowRunStepSchema = z.object({
+  step: z.number().int().min(0),
+  nodeId: z.string(),
+  kind: z.string(),
+  durationMs: z.number().min(0),
+  // Verifier verdict label when the step was a verifier; null otherwise.
+  verdict: z.string().nullable().default(null),
+});
+
+export const WorkflowRunRecordSchema = z.object({
+  id: z.string().startsWith("wfrun_"),
+  createdAt: z.number().int().min(0),
+  graph: z.object({
+    name: z.string().nullable().default(null),
+    // Basename only — no machine paths, so records are checkout-portable.
+    file: z.string(),
+    graphHash: z.string().startsWith("wfgraph:hash:"),
+  }),
+  inputHash: z.string().startsWith("wfinput:hash:"),
+  model: z.object({
+    // CLI-level overrides; null = per-node routing decided per step.
+    provider: z.string().nullable().default(null),
+    model: z.string().nullable().default(null),
+  }),
+  result: z.object({
+    verdict: z.enum(["accept", "reject"]),
+    reason: z.string().nullable().default(null),
+    stepCount: z.number().int().min(0),
+    durationMs: z.number().min(0),
+  }),
+  steps: z.array(WorkflowRunStepSchema),
+  hash: z.string().startsWith("wfrun:hash:"),
+});
+
+export type WorkflowRunRecord = z.infer<typeof WorkflowRunRecordSchema>;
+export type WorkflowRunStep = z.infer<typeof WorkflowRunStepSchema>;
+
 // Proposal records live under `.ontology/proposals/proposal_<id>.json`.
 // A proposal is a typed candidate mutation that has not yet been applied to
 // the graph. Models may produce proposals; only an explicit `proposal apply`
@@ -454,13 +504,39 @@ export type PersistedRunValidation = z.infer<typeof PersistedRunValidationSchema
 
 // Source pins a proposal to the model run that generated it. For manually
 // authored proposals (no LLM in the loop), source is null.
-export const ProposalSourceSchema = z.object({
+//
+// Two shapes (union, not discriminated — the run shape predates the `kind`
+// field and on-disk records must keep parsing):
+//   1. single-dispatch run source (the original shape) — a proposal born
+//      from ONE model call (`run prompt/context --as-proposal`, ingest).
+//   2. workflow run source — a proposal born from a MULTI-STEP workflow
+//      execution (`onto workflow run --as-proposal`, spec §3.6). It points
+//      at a persisted WorkflowRunRecord (`wfrun_*`), which carries the
+//      step-by-step provenance a single (runId, promptHash) cannot.
+// Narrow with `"kind" in source`.
+export const ProposalRunSourceSchema = z.object({
   runId: z.string().startsWith("run_"),
   contextHash: z.string().startsWith("ctx:hash:").nullable(),
   promptHash: z.string().startsWith("prompt:hash:"),
   provider: LlmProviderSchema,
   model: z.string(),
 });
+
+export const ProposalWorkflowSourceSchema = z.object({
+  kind: z.literal("workflow_run"),
+  workflowRunId: z.string().startsWith("wfrun_"),
+  graphHash: z.string().startsWith("wfgraph:hash:"),
+  inputHash: z.string().startsWith("wfinput:hash:"),
+  // CLI-level overrides when set; null means per-node `model` fields and
+  // task-default routing decided per step (the record's steps say more).
+  provider: z.string().nullable(),
+  model: z.string().nullable(),
+});
+
+export const ProposalSourceSchema = z.union([
+  ProposalRunSourceSchema,
+  ProposalWorkflowSourceSchema,
+]);
 
 // node_create: propose adding a new node as a child of an existing parent.
 // parentHash pins the proposal to the parent's state at creation time.
@@ -628,6 +704,8 @@ export const ProposalSchema = z.object({
 
 export type Proposal = z.infer<typeof ProposalSchema>;
 export type ProposalSource = z.infer<typeof ProposalSourceSchema>;
+export type ProposalRunSource = z.infer<typeof ProposalRunSourceSchema>;
+export type ProposalWorkflowSource = z.infer<typeof ProposalWorkflowSourceSchema>;
 export type ProposalMutation = z.infer<typeof ProposalMutationSchema>;
 export type ProposalNodeCreatePayload = z.infer<typeof ProposalNodeCreatePayloadSchema>;
 export type ProposalNodeUpdatePayload = z.infer<typeof ProposalNodeUpdatePayloadSchema>;

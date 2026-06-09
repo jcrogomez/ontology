@@ -152,7 +152,12 @@ export function createProposal(options: CreateProposalOptions): {
       proposalId: id,
       mutationKind: options.mutation.kind,
       hash: bodyHash,
-      runId: options.source?.runId ?? null,
+      // Either source shape resolves to its run record id (run_* / wfrun_*).
+      runId: options.source === null
+        ? null
+        : "kind" in options.source
+          ? options.source.workflowRunId
+          : options.source.runId,
     },
   });
   appendJsonl(paths.eventsPath, event);

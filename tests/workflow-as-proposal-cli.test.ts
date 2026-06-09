@@ -91,10 +91,94 @@ describe("onto workflow run --as-proposal (O3)", () => {
     expect(proposalFile.mutation.payload.prompt.length).toBeGreaterThan(0);
     expect(proposalFile.mutation.payload.level).toBe("domain");
     expect(proposalFile.mutation.payload.kind).toBe("entity");
-    // Workflows do not persist a run record yet → source is null; provenance
-    // carries a default workflow-run rationale.
-    expect(proposalFile.source).toBeNull();
+    // §3.6 provenance: the proposal's source points at the persisted
+    // workflow run record (source stopped being null on 2026-06-09).
+    expect(proposalFile.source).not.toBeNull();
+    expect(proposalFile.source.kind).toBe("workflow_run");
+    expect(proposalFile.source.workflowRunId).toBe(parsed.workflowRun.id);
     expect(proposalFile.provenance.rationale).toMatch(/workflow run "accept\.json"/);
+  });
+
+  it("persists a self-certifying workflow run record the proposal source references (§3.6 provenance)", async () => {
+    writeGraph("accept.json", ACCEPT_GRAPH);
+    const r = runCli(tempDir, [
+      "workflow", "run", "accept.json",
+      "--input", "input.txt",
+      "--provider", "mock",
+      "--as-proposal",
+      "--proposal-level", "domain",
+      "--proposal-kind", "entity",
+      "--json",
+    ]);
+    expect(r.status).toBe(0);
+    const parsed = JSON.parse(r.stdout);
+    expect(parsed.workflowRun.id).toMatch(/^wfrun_[0-9a-f]{8}$/);
+
+    const recordPath = path.join(tempDir, ".ontology/runs", `${parsed.workflowRun.id}.json`);
+    const record = JSON.parse(fs.readFileSync(recordPath, "utf-8"));
+    expect(record.result.verdict).toBe("accept");
+    expect(record.result.stepCount).toBe(parsed.result.stepCount);
+    expect(record.steps.length).toBe(parsed.result.trace.length);
+    expect(record.graph.file).toBe("accept.json");
+    expect(record.model.provider).toBe("mock");
+    // No machine paths anywhere in the record (checkout-portable).
+    expect(JSON.stringify(record)).not.toContain(tempDir);
+
+    // The record self-certifies: recompute-and-compare the body hash.
+    const { verifyWorkflowRunRecord, loadWorkflowRunRecord } = await import(
+      "../src/core/runs/workflow-record.js"
+    );
+    const loaded = loadWorkflowRunRecord(parsed.workflowRun.id, tempDir);
+    expect(loaded).not.toBeNull();
+    expect(verifyWorkflowRunRecord(loaded!)).toBe(true);
+
+    // The proposal's source carries the record's hashes verbatim.
+    const proposalFile = JSON.parse(
+      fs.readFileSync(
+        path.join(tempDir, ".ontology/proposals", `${parsed.proposal.id}.json`),
+        "utf-8",
+      ),
+    );
+    expect(proposalFile.source.graphHash).toBe(record.graph.graphHash);
+    expect(proposalFile.source.inputHash).toBe(record.inputHash);
+
+    // `onto runs list` still works with a wfrun record in the same dir
+    // (the run_ prefix filter keeps the two id spaces separate).
+    const runsList = runCli(tempDir, ["runs", "list", "--json"]);
+    expect(runsList.status).toBe(0);
+  });
+
+  it("edge proposals from update mode carry the same workflow-run source", () => {
+    const focalId = createNode("focal");
+    const depId = createNode("dep");
+    writeGraph("edges.json", {
+      ...ACCEPT_GRAPH,
+      proposesEdges: [{ type: "depends_on", target: depId }],
+    });
+    const r = runCli(tempDir, [
+      "workflow", "run", "edges.json",
+      "--input", "input.txt",
+      "--provider", "mock",
+      "--as-proposal",
+      "--update-node", focalId,
+      "--json",
+    ]);
+    const parsed = JSON.parse(r.stdout);
+    const edgeFile = JSON.parse(
+      fs.readFileSync(
+        path.join(tempDir, ".ontology/proposals", `${parsed.edgeProposals[0].id}.json`),
+        "utf-8",
+      ),
+    );
+    const nodeFile = JSON.parse(
+      fs.readFileSync(
+        path.join(tempDir, ".ontology/proposals", `${parsed.proposal.id}.json`),
+        "utf-8",
+      ),
+    );
+    expect(edgeFile.source.kind).toBe("workflow_run");
+    expect(edgeFile.source.workflowRunId).toBe(parsed.workflowRun.id);
+    expect(nodeFile.source.workflowRunId).toBe(parsed.workflowRun.id);
   });
 
   it("the proposal applies into a real node (end-to-end loop closes)", () => {
