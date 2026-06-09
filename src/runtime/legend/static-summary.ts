@@ -58,6 +58,11 @@ export interface StaticExtractionResult {
   provides?: string[];
   forbids?: string[];
   rules?: string[];
+  // O1: per-provides syntactic signature (key → signature), parallel to
+  // `provides`. Only the subset of provided symbols the TS parser could read
+  // a signature for appears here; the rest are simply absent. Carried to the
+  // proposal payload's `provideSignatures` side channel.
+  provideSignatures?: Record<string, string>;
 }
 
 // The conservative v0 shape set this builder supports. Routing must
@@ -149,6 +154,7 @@ function buildBarrelSummary(
   // source-file order preserved; no dedupe (a barrel that exports
   // the same name twice would be a bug we want to surface, not hide).
   const provides = namedReExports.map((e) => e.name);
+  const provideSignatures = collectSignatures(namedReExports);
 
   // requires — every imported SYMBOL NAME this barrel pulls in from
   // upstream modules. Phase ε β′ (2026-05-16) revealed that emitting
@@ -213,11 +219,25 @@ function buildBarrelSummary(
     prompt: promptLines.join("\n\n"),
     requires,
     provides,
+    ...(provideSignatures ? { provideSignatures } : {}),
     forbids: ["runtime side effects in the barrel itself"],
     rules: [
       "REQUIRE: every export is a re-export from a sibling file; no local declarations",
     ],
   };
+}
+
+// Build a key → signature map from a list of exports, keeping the first
+// signature seen per name and dropping names without a signature. Returns
+// undefined when nothing carries a signature, so callers can omit the field.
+function collectSignatures(
+  exps: ReadonlyArray<{ name: string; signature?: string }>,
+): Record<string, string> | undefined {
+  const out: Record<string, string> = {};
+  for (const e of exps) {
+    if (e.signature !== undefined && !(e.name in out)) out[e.name] = e.signature;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 function groupNamedReExportsByModule(
@@ -245,6 +265,7 @@ function buildDeclarationOnlySummary(
   // declarations and NO runtime declarations, so every exported
   // name here is type-only.
   const exportedNames = (vocabulary?.exports ?? []).map((e) => e.name);
+  const provideSignatures = collectSignatures(vocabulary?.exports ?? []);
 
   // requires — imported SYMBOL NAMES referenced by this file's
   // type declarations. Phase ε β′ (2026-05-16) Move 1b: same
@@ -292,6 +313,7 @@ function buildDeclarationOnlySummary(
     prompt: promptLines.join("\n\n"),
     requires,
     provides: exportedNames,
+    ...(provideSignatures ? { provideSignatures } : {}),
     forbids: ["runtime side effects", "value-level declarations"],
     rules: [
       "REQUIRE: file contains only type-level declarations (interface, type alias)",

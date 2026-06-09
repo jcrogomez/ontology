@@ -42,6 +42,11 @@ export interface CreateNodeOptions {
   // ignores; the linker only reads `key` / `source`.
   requires?: string[];
   provides?: string[];
+  // Optional per-provides syntactic signature (key → signature), O1. When a
+  // provided key has an entry, it is attached to that provision object as
+  // `signature`. Populated by static ingest; absent for manual / LLM
+  // provisions. Gluing ignores it today (future O2 discriminator material).
+  provideSignatures?: Record<string, string>;
   forbids?: string[];
   // Optional inline rules (FORBID:/REQUIRE: prose strings). Pass at create
   // time so the user does not have to hand-edit JSON to add constraints.
@@ -109,7 +114,14 @@ export function createNode(options: CreateNodeOptions): { node: OntologyNode; ev
     },
     context: {
       requires: (options.requires ?? []).map((source) => ({ source, nodeType: "declared" })),
-      provides: (options.provides ?? []).map((key) => ({ key, nodeType: "declared" })),
+      provides: (options.provides ?? []).map((key) => {
+        const signature = options.provideSignatures?.[key];
+        return {
+          key,
+          nodeType: "declared",
+          ...(signature !== undefined ? { signature } : {}),
+        };
+      }),
       forbids: (options.forbids ?? []).map((source) => ({ source, nodeType: "declared" })),
       optional: []
     },

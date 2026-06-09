@@ -146,6 +146,11 @@ export const ExtractionResultSchema = z.object({
   provides: z.array(SymbolNameSchema).optional(),
   forbids: z.array(z.string()).optional(),
   rules: z.array(z.string()).optional(),
+  // O1 side channel (key → syntactic signature), parallel to `provides`.
+  // Populated only by the static-summary extractor; the LLM extractor omits
+  // it (not in the system prompt). Threaded to the proposal payload's
+  // `provideSignatures`. See docs/legend/CONTEXT_GLUING_REGIMES.md O1(c).
+  provideSignatures: z.record(z.string(), z.string()).optional(),
 });
 
 export type ExtractionResult = z.infer<typeof ExtractionResultSchema>;
@@ -2917,6 +2922,7 @@ function createNodeProposalForExtraction(
           ...(extracted.language !== undefined ? { language: extracted.language } : {}),
           ...(extracted.requires !== undefined ? { requires: extracted.requires } : {}),
           ...(extracted.provides !== undefined ? { provides: extracted.provides } : {}),
+          ...(extracted.provideSignatures !== undefined ? { provideSignatures: extracted.provideSignatures } : {}),
           ...(extracted.forbids !== undefined ? { forbids: extracted.forbids } : {}),
           ...(extracted.rules !== undefined ? { rules: extracted.rules } : {}),
           sourceFiles: [filePathRelative],

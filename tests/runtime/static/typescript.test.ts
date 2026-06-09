@@ -100,7 +100,7 @@ describe("parseTypeScriptFile — exports", () => {
       `export function foo(): void {}`,
     );
     expect(result.exports).toEqual([
-      { name: "foo", kind: "value", isDefault: false },
+      { name: "foo", kind: "value", isDefault: false, signature: "(): void" },
     ]);
   });
 
@@ -124,6 +124,7 @@ describe("parseTypeScriptFile — exports", () => {
         localName: "compute",
         kind: "value",
         isDefault: true,
+        signature: "(): void",
       },
     ]);
   });
@@ -145,7 +146,12 @@ describe("parseTypeScriptFile — exports", () => {
       `export enum Color { Red, Green }`,
     );
     expect(result.exports).toEqual([
-      { name: "Color", kind: "value", isDefault: false },
+      {
+        name: "Color",
+        kind: "value",
+        isDefault: false,
+        signature: "{ Red, Green }",
+      },
     ]);
   });
 
@@ -160,6 +166,85 @@ describe("parseTypeScriptFile — exports", () => {
     // emit a depends_on edge from this file to upstream):
     expect(result.imports).toHaveLength(1);
     expect(result.imports[0].modulePath).toBe("./upstream.js");
+  });
+});
+
+describe("parseTypeScriptFile — syntactic signatures (O1)", () => {
+  const sigOf = (source: string, name: string): string | undefined =>
+    parseTypeScriptFile("/virtual/a.ts", source).exports.find(
+      (e) => e.name === name,
+    )?.signature;
+
+  it("captures a function's written param + return signature, normalising whitespace", () => {
+    expect(
+      sigOf(
+        `export function add(
+           a: number,
+           b: number,
+         ): number { return a + b; }`,
+        "add",
+      ),
+    ).toBe("(a: number, b: number): number");
+  });
+
+  it("captures type parameters and defaulted params", () => {
+    expect(
+      sigOf(`export function wrap<T>(x: T, opts = {}): T[] { return [x]; }`, "wrap"),
+    ).toBe("<T>(x: T, opts = {}): T[]");
+  });
+
+  it("captures a type alias RHS", () => {
+    expect(sigOf(`export type Id = string | number;`, "Id")).toBe(
+      "string | number",
+    );
+  });
+
+  it("captures an interface member shape including heritage", () => {
+    expect(
+      sigOf(
+        `export interface Box extends Base { x: number; label?: string }`,
+        "Box",
+      ),
+    ).toBe("extends Base { x: number; label?: string }");
+  });
+
+  it("captures a typed const's annotation; leaves an inferred const undefined", () => {
+    const src = `export const HOST: string = "localhost";
+                 export const PORT = 8080;`;
+    expect(sigOf(src, "HOST")).toBe("string");
+    expect(sigOf(src, "PORT")).toBeUndefined();
+  });
+
+  it("captures a class's public member shape, excluding bodies and private members", () => {
+    const sig = sigOf(
+      `export class Svc {
+         private secret = 1;
+         protected helper(): void {}
+         url: string = "";
+         start(port: number): boolean { return true; }
+       }`,
+      "Svc",
+    );
+    // sorted public members; no bodies; private/protected dropped
+    expect(sig).toBe("{ start(port: number): boolean; url: string }");
+  });
+
+  it("is identical across line-reflow reformatting (indentation / newlines / trailing comma)", () => {
+    // Whitespace RUNS are collapsed, so a formatter reflowing the same
+    // canonical tokens across lines yields an identical signature. (Token-
+    // internal spacing like `a:number` vs `a: number` is NOT canonicalised —
+    // that can yield a false non-match, which is safe: the conservative
+    // fallback treats it as a conflict, never a false identification.)
+    const a = sigOf(`export function f(a: number): void {}`, "f");
+    const b = sigOf(`export function f(\n  a: number,\n): void {}`, "f");
+    expect(a).toBe(b);
+    expect(a).toBe("(a: number): void");
+  });
+
+  it("leaves cross-file re-exports without a signature (no TypeChecker)", () => {
+    expect(
+      sigOf(`export { Foo } from "./upstream.js";`, "Foo"),
+    ).toBeUndefined();
   });
 });
 
