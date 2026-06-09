@@ -5,7 +5,8 @@ import {
   validateIntent,
 } from "../src/runtime/context/intent-validator.js";
 import type { ContextAssemblyOutput } from "../src/runtime/context/types.js";
-import type { GluingResult } from "../src/runtime/context/gluing.js";
+import { glueFragments, type GluingResult } from "../src/runtime/context/gluing.js";
+import type { ContextFragment } from "../src/runtime/context/presheaf.js";
 import {
   type EvaluationContext,
   evaluatePredicate,
@@ -230,6 +231,48 @@ describe("Intent Validator", () => {
         const v = evaluatePredicate(rule.predicate, ctx);
         expect(v === "true" || v === "false").toBe(true);
       }
+    });
+  });
+
+  describe("§3.9 parity guard — gluing_ok token tracks glued.ok under every gluing policy", () => {
+    const GLUING_OK = "__validator__:gluing_ok";
+    const frag = (nodeId: string, sig?: string): ContextFragment => ({
+      nodeId,
+      branch: "main",
+      provides: ["A"],
+      requires: [],
+      forbids: [],
+      optional: [],
+      rules: [],
+      ...(sig ? { provideSignatures: { A: sig } } : {}),
+    });
+
+    it("closed-world: gluing_ok is provided iff glued.ok — whether ok comes from conflict OR identify-if-equal (O2)", () => {
+      // Same fragments, two policies: under the default the duplicate provider
+      // conflicts (ok=false); under identify-if-equal the equal signatures
+      // glue (ok=true). The closed-world parity result (§3.9) rests on the
+      // validator's synthetic gluing_ok token mirroring glued.ok EXACTLY — so
+      // changing the gluing policy can never silently desync the ground truth
+      // the Boolean oracle is checked against. This guard pins that coupling.
+      const fragments = [frag("n1", "(): number"), frag("n2", "(): number")];
+      const conflictGlue = glueFragments(fragments);
+      const identifyGlue = glueFragments(fragments, {
+        onDuplicateProvider: "identify-if-equal",
+      });
+      expect(conflictGlue.ok).toBe(false);
+      expect(identifyGlue.ok).toBe(true);
+
+      const ctxOf = (glued: GluingResult) =>
+        buildEvaluationContext({
+          assembled: baseAssembled,
+          glued,
+          candidate: baseCandidate,
+        });
+
+      expect(ctxOf(conflictGlue).providedTokens.has(GLUING_OK)).toBe(false);
+      expect(ctxOf(conflictGlue).deniedTokens.has(GLUING_OK)).toBe(true);
+      expect(ctxOf(identifyGlue).providedTokens.has(GLUING_OK)).toBe(true);
+      expect(ctxOf(identifyGlue).deniedTokens.has(GLUING_OK)).toBe(false);
     });
   });
 

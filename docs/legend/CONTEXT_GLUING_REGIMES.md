@@ -149,16 +149,23 @@ drift detection).
 - **Unlocks:** O2 (a sound compatibility criterion now exists on the
   fragment); richer vocab-gap / drift detection today.
 
-### O2 — Add gluing policy as an opt-in parameter (sound only after O1)
+### O2 — ✅ gluing policy as an opt-in parameter (landed 2026-06-09)
 `glueFragments(frags, {onDuplicateProvider: "conflict" | "identify-if-equal"})`,
-**default `"conflict"`** so all current behaviour, tests and §3.9 stay intact.
-`identify-if-equal` glues two distinct providers iff their `signature`s match
-(from O1) and conflicts on drift.
-- **Mandatory guard:** a parity test pinning `glued.ok` ↔ `TOKEN_GLUING_OK`
-  so §3.9 can't regress silently (terrain §2.3).
-- **Unlocks:** a genuine **sheaf on the identical-overlap subcategory** — a
-  precise, honest T1-able claim (the "Target B" middle path), without losing
-  conflict detection. Re-audit `MATHEMATICAL_CLAIMS.md` §Axiom 5 / §3.9.
+**default `"conflict"`** — all current behaviour, callers, tests and §3.9 stay
+intact (default-preserving by construction). `identify-if-equal` glues two
+distinct providers iff their `signature`s (from O1) are both defined and equal;
+missing or differing ⇒ conflict (drift caught, unknown ⇒ conflict, never a
+false identification).
+- **Guard shipped:** `tests/intent-validator.test.ts` pins `glued.ok` ↔
+  `gluing_ok` token under *both* policies, so §3.9 closed-world parity cannot
+  regress silently. Policy behaviour pinned in `tests/context-gluing.test.ts`.
+- **Ledger:** `MATHEMATICAL_CLAIMS.md` §Axiom 5 records the mode as **T2** — a
+  **sheaf on the identical-syntactic-signature overlap subcategory** — with a
+  stated **Path to T1** (resolved-type discriminator + sheaf axiom as a stated
+  law over an explicit cover + a real consumer). Default stays the T1
+  restriction / T2 separated-presheaf; nothing existing changed (T2 6→7).
+- **Not yet wired into any caller** — compile/validate still use the default.
+  The mode is latent capability until O3 gives it a consumer.
 
 ### O3 — Build the first dynamic-mutation consumer (the train)
 Elevate the `run --as-proposal` path into a runtime capability: a workflow /

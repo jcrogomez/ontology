@@ -16,13 +16,17 @@ must appear here, classified honestly. If a doc *suggests* the analogy
 without claiming the formal correspondence, it should still appear
 here under tier T2 or T3.
 
-The audit was last refreshed on **2026-06-01** in two passes (T1 count
-8 → 13). Pass 1 (categorical laws): Axiom 5 restriction-law pin
-(+ sheaf characterisation) and Axiom 6 / §3.2 compiler functoriality.
-Pass 2 (load-bearing hardening): Axiom 2 (crash-atomic durable log +
-advisory lock — the entry was stale; code already shipped) and §3.9
-validator port (closed-world parity exhaustively pinned). See §Axiom 2,
-§Axiom 5, §Axiom 6, §3.9 and §5. The prior full refresh was
+The audit was last refreshed on **2026-06-09**: added one T2 line item —
+Axiom 5 gluing's opt-in `identify-if-equal` mode (a sheaf on the
+identical-syntactic-signature overlap subcategory; O2 of
+`docs/legend/CONTEXT_GLUING_REGIMES.md`), with a stated Path to T1 and no
+existing tier changed (T2 6 → 7, total 30 → 31). The prior refresh on
+**2026-06-01** ran in two passes (T1 count 8 → 13). Pass 1 (categorical
+laws): Axiom 5 restriction-law pin (+ sheaf characterisation) and Axiom 6
+/ §3.2 compiler functoriality. Pass 2 (load-bearing hardening): Axiom 2
+(crash-atomic durable log + advisory lock — the entry was stale; code
+already shipped) and §3.9 validator port (closed-world parity exhaustively
+pinned). See §Axiom 2, §Axiom 5, §Axiom 6, §3.9 and §5. The prior full refresh was
 **2026-05-26** against `main` after Phase ε's publishable substate. Phase β + Phase γ + Phase γ-7 + Phase δ
 shipped earlier; Phase ε self-ingest landed a 4-arm bake-off on the
 ~125-file Ontology core perimeter (Arms A grounded, A0 ablation
@@ -102,12 +106,14 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 
 > *"Each node declares requires, provides, forbids and optional context. Context is local to graph neighborhoods. Future validation will attempt to glue local contexts into a globally consistent state."*
 
-- **Tier:** T1 (strictly implemented) for the **presheaf-restriction law**; T2 (operationally implemented) characterised down to a **separated presheaf, explicitly *not* a sheaf**, for the gluing operation (negative law pinned 2026-06-01).
+- **Tier:** T1 (strictly implemented) for the **presheaf-restriction law**; T2 (operationally implemented) characterised down to a **separated presheaf, explicitly *not* a sheaf**, for the **default** gluing operation (negative law pinned 2026-06-01); T2 (operationally implemented) for the **opt-in `identify-if-equal` gluing as a sheaf on the identical-syntactic-signature overlap subcategory** (added 2026-06-09, O2 — see below).
 - **Code:** `src/runtime/context/presheaf.ts` (`buildFragment`); `src/runtime/context/gluing.ts` (`glueFragments`); `src/runtime/context/assembler.ts`; `src/runtime/context/intent-validator.ts` (now ported onto Ω, see §3.9).
-- **Tests:** `tests/presheaf-sheaf-laws.test.ts` (restriction law + sheaf characterisation, 8 cases); `tests/intent-validator.test.ts`, `tests/semantic-linker*.test.ts`.
+- **Tests:** `tests/presheaf-sheaf-laws.test.ts` (restriction law + sheaf characterisation, 8 cases); `tests/context-gluing.test.ts` (default conflict + `identify-if-equal` policy: glue on equal signature, conflict on drift/missing); `tests/intent-validator.test.ts` (incl. the §3.9 parity guard `gluing_ok` ↔ `glued.ok` under both policies); `tests/semantic-linker*.test.ts`.
 - **Why T1 for restriction:** `tests/presheaf-sheaf-laws.test.ts` Part 1 models the "open set" as the edge-type set deciding which neighbours `assembleContext` pulls in, and pins *F(S') ⊑ F(S)* for *S' ⊆ S* on every component of the assembled section (nodes, constraints, edges), the invariance of the parent-chain base under restriction, and idempotence/determinism of recomputation. This is the *F(N') ⊂ F(N)* law the prior audit asked for, in test form.
 - **What we learned about gluing (negative result, T2):** `glueFragments` is **not a sheaf**. Part 2 of the test pins the precise shape: the **separation axiom holds** (two distinct sections providing the same key are rejected, not silently identified — provider uniqueness is enforced), **identity holds** (a self-contained fragment glues to itself), the **merge is order-independent** (a genuine presheaf-coherence law), and **incompatibility is an obstruction to gluing** (missing requirement / forbidden match / branch mismatch all block, which is what makes failure-to-glue a usable conflict-detection primitive) — but the **gluing axiom FAILS**: two local sections that *agree* on an overlap (both provide the same key) conflict rather than glue to the shared global section. So it is a **separated presheaf with provider-uniqueness**, not a sheaf / colimit. This makes §3.4's "not a colimit" disclaimer precise rather than hand-waved.
-- **Rigor improvement:** the restriction half is now T1. To make gluing a *bona fide* sheaf one would have to relax `duplicate_provider` into an *idempotent identification* (two sections providing the same key with compatible attributes glue to one) — a deliberate design change, not a bug, and likely undesirable here since provider-uniqueness is a feature. Recommended action is documentation, not code: state in `CONTEXT_ASSEMBLER.md` that gluing is a separated presheaf by design.
+- **Gluing as a sheaf on a subcategory — `identify-if-equal` (T2, added 2026-06-09, O2).** The relaxation the prior audit called "likely undesirable" now ships as an **opt-in** policy, not the default. `glueFragments(frags, { onDuplicateProvider: "identify-if-equal" })` identifies (glues) two distinct providers of the same key **iff** both carry an identical, *defined* syntactic signature (`ContextFragment.provideSignatures`, populated by O1's static extractor). Differing signatures (drift) or a missing signature on either side still conflict — conservative by construction: *unknown ⇒ conflict, never a false identification*. On the subcategory of covers whose overlapping providers carry identical signatures, the **gluing axiom holds** (agreeing sections glue to the one shared global section) while separation/identity/order-independence are retained, so on that subcategory it is a genuine **sheaf**; off it, it remains the separated presheaf above. Pinned by `tests/context-gluing.test.ts`. **Why T2, not T1:** (a) the discriminator is a *syntactic* signature proxy, not resolved-type identity — two genuinely-equal capabilities with differently-*written* signatures are (safely) not identified; (b) the gluing axiom is pinned by behavioural cases, not yet stated as a law over an explicit site/cover; (c) no consumer exercises the mode yet (the dynamic regime, O3, is unbuilt).
+- **Path to T1.** Close all three: (1) replace the syntactic proxy with a **resolved-type signature** (a whole-program `TypeChecker` pass — the "resolved tier" deferred in `docs/legend/CONTEXT_GLUING_REGIMES.md` O1) so "identical signature" means genuine interface-identity, eliminating false non-matches; (2) pin the **sheaf gluing axiom as a stated law over an explicit cover** (existence + uniqueness of the glued section for a compatible family), the same lift the §3.8 universal-property test makes — not just identify/conflict behaviour cases; (3) ship a real consumer (O3) so the mode is load-bearing, not latent. (1)+(2) are the substantive gates; (3) is what makes the categorical name earn its keep.
+- **Default stays a separated presheaf.** The opt-in does not change the default `glueFragments` behaviour, so the T1 restriction law and the T2 separated-presheaf characterisation above are untouched; the §3.9 closed-world parity rests on `glued.ok` ↔ `gluing_ok`, which a parity guard now pins under *both* policies. Documentation note still applies: `CONTEXT_ASSEMBLER.md` should state that the default gluing is a separated presheaf by design and the sheaf is an opt-in subcategory mode.
 
 ### Axiom 6 — Compiler functor
 
@@ -336,10 +342,11 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 - §3.9 (validator port): closed-world parity == Boolean oracle, exhaustive over predicate-tree × closed-world (`tests/runtime/topos/closed-world-parity.test.ts`, pinned 2026-06-01).
 - §4.1: content-addressed run records.
 
-### T2 — Operationally implemented (6)
+### T2 — Operationally implemented (7)
 
 - Axiom 4 (AST): marker-based prompt parser (no actual rewriting).
-- Axiom 5 (gluing only): separated presheaf with provider-uniqueness — **not** a sheaf (gluing axiom fails for agreeing sections; negative law pinned 2026-06-01). Restriction half promoted to T1 above.
+- Axiom 5 (gluing, default): separated presheaf with provider-uniqueness — **not** a sheaf (gluing axiom fails for agreeing sections; negative law pinned 2026-06-01). Restriction half promoted to T1 above.
+- Axiom 5 (gluing, `identify-if-equal` opt-in): **sheaf on the identical-syntactic-signature overlap subcategory** (added 2026-06-09, O2; `tests/context-gluing.test.ts`). T2 because the discriminator is a syntactic proxy and no consumer exercises it yet — Path to T1 in the §Axiom 5 body.
 - §3.7: representable functor / Yoneda query (sound subset; no faithfulness test).
 - §3.8 (fibers): branch fibration partition + induced subgraph (no morphism-level fibration test).
 - §3.10: compile adjoint — Phase ε self-ingest, 2-column cartography matrix, pre-registered falsifiers met. Reframed 2026-06-01 as a *probabilistic/enriched* adjoint; verdict-*fold* determinism + variance-measurement core both test-pinned (`verdict-variance.ts`); only budget-gated real-LLM N-run generation remains open. Stays T2.
@@ -368,12 +375,12 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 | Tier | Count |
 | --- | --- |
 | T1 | 13 |
-| T2 | 6 |
+| T2 | 7 |
 | T3 | 7 |
 | T4 | 4 |
-| **Total** | **30** |
+| **Total** | **31** |
 
-Note: the **2026-06-01** refresh ran in two passes (starting from 29: T1 8 / T2 10 / T3 7 / T4 4). Pass 1 (categorical laws): Axiom 5's single T2 entry **split** into a restriction half (→ T1) and a gluing half (separated presheaf, stays T2) — that split is the lone +1 to the grand total (29 → 30); Axiom 6 / §3.2 compiler functoriality moved T2 → T1 (no total change). End of pass 1: T1 11, T2 8. Pass 2 (load-bearing hardening, no new line items): Axiom 2 (crash-atomic durable log + advisory lock — code already shipped, the ledger entry was stale) and §3.9 validator port (closed-world parity pinned) both moved T2 → T1. End of pass 2: **T1 13, T2 6, total 30.** The §3.10 promotion note from the prior refresh follows. — the 2026-05-26 refresh adds §3.10 to the T2 index — the 2026-05-13 audit had §3.10 in the body marked T4 but did not index it under T4 below, so re-counting after the promotion lands a +1 net on T2 with no T4 decrement. The original T2 label "(8)" undercounted the body by one; canonical recount is "(10)".
+Note: the **2026-06-01** refresh ran in two passes (starting from 29: T1 8 / T2 10 / T3 7 / T4 4). Pass 1 (categorical laws): Axiom 5's single T2 entry **split** into a restriction half (→ T1) and a gluing half (separated presheaf, stays T2) — that split is the lone +1 to the grand total (29 → 30); Axiom 6 / §3.2 compiler functoriality moved T2 → T1 (no total change). End of pass 1: T1 11, T2 8. Pass 2 (load-bearing hardening, no new line items): Axiom 2 (crash-atomic durable log + advisory lock — code already shipped, the ledger entry was stale) and §3.9 validator port (closed-world parity pinned) both moved T2 → T1. End of pass 2: **T1 13, T2 6, total 30.** The **2026-06-09** refresh adds one new T2 line item — Axiom 5 gluing's opt-in `identify-if-equal` sheaf-on-subcategory mode (O2), a distinct claim about new code (`+1` to T2 and to the grand total: **T2 7, total 31**), with no existing tier changed. The §3.10 promotion note from the prior refresh follows. — the 2026-05-26 refresh adds §3.10 to the T2 index — the 2026-05-13 audit had §3.10 in the body marked T4 but did not index it under T4 below, so re-counting after the promotion lands a +1 net on T2 with no T4 decrement. The original T2 label "(8)" undercounted the body by one; canonical recount is "(10)".
 
 ---
 

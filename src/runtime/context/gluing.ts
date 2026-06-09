@@ -19,7 +19,26 @@ export interface GluingResult {
   warnings: string[];
 }
 
-export function glueFragments(fragments: ContextFragment[]): GluingResult {
+export interface GluingOptions {
+  // How to treat two DISTINCT nodes providing the same key (O2,
+  // docs/legend/CONTEXT_GLUING_REGIMES.md).
+  //   "conflict" (default) — provider-uniqueness: always a
+  //     `duplicate_provider` conflict. This is the separated-presheaf
+  //     behaviour the Axiom 5 ledger pins; every existing caller uses it.
+  //   "identify-if-equal" — sheaf-on-identical-overlaps: two providers of
+  //     the same key are IDENTIFIED (glued, no conflict) iff they carry an
+  //     identical, defined syntactic signature (`fragment.provideSignatures`).
+  //     A missing signature on either side, or differing signatures (drift),
+  //     still conflicts — conservative by construction: unknown ⇒ conflict,
+  //     never a false identification.
+  onDuplicateProvider?: "conflict" | "identify-if-equal";
+}
+
+export function glueFragments(
+  fragments: ContextFragment[],
+  options: GluingOptions = {},
+): GluingResult {
+  const onDuplicateProvider = options.onDuplicateProvider ?? "conflict";
   if (fragments.length === 0) {
     return {
       ok: true,
@@ -62,13 +81,33 @@ export function glueFragments(fragments: ContextFragment[]): GluingResult {
   }
 
   for (const [key, nodeIds] of providesMap.entries()) {
-    if (nodeIds.size > 1) {
-      conflicts.push({
-        type: "duplicate_provider",
-        message: `Duplicate provider for key: ${key}`,
-        nodeIds: Array.from(nodeIds).sort(),
-      });
+    if (nodeIds.size <= 1) continue;
+
+    // Multiple distinct providers of `key`. Under "identify-if-equal", glue
+    // them iff every provider declares the SAME, defined signature for the
+    // key — that is the precise sense in which agreeing local sections glue
+    // to one global section (a sheaf on the identical-overlap subcategory).
+    if (onDuplicateProvider === "identify-if-equal") {
+      const sigs = fragments
+        .filter((f) => f.provides.includes(key))
+        .map((f) => f.provideSignatures?.[key]);
+      const allDefined = sigs.every((s) => s !== undefined);
+      const allEqual = sigs.every((s) => s === sigs[0]);
+      if (allDefined && allEqual) {
+        warnings.push(
+          `Identified ${nodeIds.size} providers of key "${key}" by equal signature.`,
+        );
+        continue; // identified — no conflict
+      }
+      // fall through: missing or differing signature ⇒ conflict (drift /
+      // unknown is never silently identified)
     }
+
+    conflicts.push({
+      type: "duplicate_provider",
+      message: `Duplicate provider for key: ${key}`,
+      nodeIds: Array.from(nodeIds).sort(),
+    });
   }
 
   const allProvides = new Set<string>();
