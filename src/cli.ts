@@ -1017,6 +1017,12 @@ workflowCmd
   .option("--ollama-host <host>", "Host for Ollama provider.")
   .option("--dry-run", "Validate the graph + input and emit a canned trace without any LLM dispatch. Useful for testing graph shapes before paying for tokens.")
   .option("--json", "Output the result as JSON to stdout.")
+  .option("--as-proposal", "On an ACCEPTED run, turn the final artefact into a pending `node_create` proposal (review with `onto proposal apply`). Closes the execution→intent loop. Requires an initialised `.ontology/` project.")
+  .option("--proposal-level <level>", "Required with --as-proposal: abstraction level for the proposed node.")
+  .option("--proposal-kind <kind>", "Required with --as-proposal: semantic kind for the proposed node.")
+  .option("--proposal-parent <nodeId>", "Optional with --as-proposal: parent node id (defaults to the root canon).")
+  .option("--proposal-label <label>", "Optional with --as-proposal: human label for the proposed node.")
+  .option("--proposal-rationale <text>", "Optional with --as-proposal: rationale recorded in the proposal's provenance (defaults to a workflow-run note).")
   .action(async (graph, rawOptions) => {
     try {
       await workflowRunCommand(graph, rawOptions);

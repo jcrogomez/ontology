@@ -8,6 +8,14 @@ import {
   type WorkflowResult,
 } from "../../runtime/workflow/executor.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
+import { createProposal } from "../../core/proposals/persist.js";
+import { readState } from "../../core/state/state-store.js";
+import { loadNodeById } from "../../core/project/load.js";
+import {
+  AbstractionLevelSchema,
+  NodeKindSchema,
+  type Proposal,
+} from "../../schemas/ontology.js";
 
 // `onto workflow run` — Phase ζ v0.
 //
@@ -28,6 +36,17 @@ export interface WorkflowRunOptions {
   /** Validate the graph + input and report; no LLM dispatch. */
   dryRun?: boolean;
   json?: boolean;
+  // O3 (CONTEXT_GLUING_REGIMES.md): close the execution→intent loop. When
+  // set, an ACCEPTED workflow's final artefact becomes a pending
+  // `node_create` proposal (for human review via `onto proposal apply`),
+  // letting an execution propose growth of the intention graph rather than
+  // just print a result. Requires an initialised `.ontology/` project.
+  asProposal?: boolean;
+  proposalLevel?: string;
+  proposalKind?: string;
+  proposalParent?: string;
+  proposalLabel?: string;
+  proposalRationale?: string;
 }
 
 export async function workflowRunCommand(
@@ -93,12 +112,121 @@ export async function workflowRunCommand(
     fs.writeFileSync(absTrace, JSON.stringify(result, null, 2), "utf-8");
   }
 
+  // O3: close the execution→intent loop. An accepted workflow's final
+  // artefact can become a pending node_create proposal over the existing
+  // proposal substrate — nothing mutates the graph here; `onto proposal
+  // apply` is the human-gated step.
+  let proposalInfo: { id: string; status: string } | undefined;
+  if (options.asProposal) {
+    if (result.verdict !== "accept") {
+      fail(
+        `--as-proposal needs an accepted workflow; this run rejected (${result.reason})`,
+        options.json,
+      );
+      return;
+    }
+    const lvl = AbstractionLevelSchema.safeParse(options.proposalLevel);
+    if (!lvl.success) {
+      fail(
+        `--as-proposal requires a valid --proposal-level (got: ${options.proposalLevel ?? "missing"})`,
+        options.json,
+      );
+      return;
+    }
+    const knd = NodeKindSchema.safeParse(options.proposalKind);
+    if (!knd.success) {
+      fail(
+        `--as-proposal requires a valid --proposal-kind (got: ${options.proposalKind ?? "missing"})`,
+        options.json,
+      );
+      return;
+    }
+    try {
+      const proposal = buildProposalFromWorkflow({
+        output: result.output,
+        level: lvl.data,
+        kind: knd.data,
+        parent: options.proposalParent,
+        label: options.proposalLabel,
+        rationale: options.proposalRationale,
+        graphName: path.basename(graphPath),
+        stepCount: result.stepCount,
+      });
+      proposalInfo = { id: proposal.id, status: proposal.status };
+    } catch (err) {
+      fail(`proposal creation failed: ${errorMessage(err)}`, options.json);
+      return;
+    }
+  }
+
   if (options.json) {
-    console.log(JSON.stringify({ ok: true, warnings: loaded.warnings, result }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          warnings: loaded.warnings,
+          result,
+          ...(proposalInfo ? { proposal: proposalInfo } : {}),
+        },
+        null,
+        2,
+      ),
+    );
     return;
   }
 
   printResultHuman(result, graphPath, options.trace);
+  if (proposalInfo) {
+    console.log(
+      `proposal:  ${proposalInfo.id} (${proposalInfo.status}) — review with \`onto proposal apply ${proposalInfo.id}\``,
+    );
+    console.log(``);
+  }
+}
+
+// Map an accepted workflow's final artefact onto a pending `node_create`
+// proposal. Reuses the generic proposal substrate (`createProposal`) and the
+// human-gated apply/audit chain wholesale; the only workflow-specific part is
+// the provenance rationale. `source` is null — workflows do not persist a run
+// record yet (a future enrichment could thread one for a tighter audit link).
+function buildProposalFromWorkflow(args: {
+  output: string;
+  level: ReturnType<typeof AbstractionLevelSchema.parse>;
+  kind: ReturnType<typeof NodeKindSchema.parse>;
+  parent?: string;
+  label?: string;
+  rationale?: string;
+  graphName: string;
+  stepCount: number;
+}): Proposal {
+  const state = readState();
+  const parentNodeId = args.parent ?? state.rootNodeId;
+  const parentNode = loadNodeById(parentNodeId);
+  if (!parentNode) {
+    throw new Error(`parent node not found: ${parentNodeId}`);
+  }
+  const { proposal } = createProposal({
+    mutation: {
+      kind: "node_create",
+      payload: {
+        level: args.level,
+        kind: args.kind,
+        prompt: args.output,
+        label: args.label ?? null,
+        parentNodeId,
+      },
+      parentHash: parentNode.integrity.hash,
+    },
+    source: null,
+    validation: null,
+    provenance: {
+      derivedFrom: [parentNodeId],
+      rationale:
+        args.rationale ??
+        `Produced by workflow run "${args.graphName}" (${args.stepCount} steps).`,
+    },
+  });
+  return proposal;
 }
 
 function printResultHuman(

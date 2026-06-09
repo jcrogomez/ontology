@@ -187,13 +187,26 @@ false identification).
 - **Not yet wired into any caller** — compile/validate still use the default.
   The mode is latent capability until O3 gives it a consumer.
 
-### O3 — Build the first dynamic-mutation consumer (the train)
-Elevate the `run --as-proposal` path into a runtime capability: a workflow /
-agentic node that emits a graph mutation (a proposal) from its execution.
-This is the missing rail for "mutable agentic graph". Only here does O2's
-sheaf have a reason to exist (mutation starts producing re-provisions).
-- **Unlocks:** the dynamic regime; gives O2 its consumer; first real
-  step toward the agentic-graph vision.
+### O3 — ✅ first dynamic-mutation consumer, v0 (landed 2026-06-09)
+The execution→intent loop now closes over the existing proposal substrate:
+`onto workflow run <graph> --as-proposal` turns an **accepted** workflow's
+final artefact into a pending `node_create` proposal (prompt = artefact),
+reviewed/applied via `onto proposal apply`. An execution can now *propose
+growth of the intention graph*, not just print a result — the smallest real
+instance of "variable intent: grow, improve, learn patterns."
+- **Reuses wholesale:** `createProposal` + the apply / stale-check / audit
+  chain. The only workflow-specific part is the provenance rationale. Pinned
+  by `tests/workflow-as-proposal-cli.test.ts` (accept→proposal→apply→node;
+  reject refuses; default unchanged).
+- **v0 scope / honest gaps:** proposes a *new node* from the artefact only
+  (not node-update or edges); `source: null` (workflows don't persist a run
+  record yet — a future enrichment for a tighter audit link); opt-in and
+  human-gated (nothing auto-mutates).
+- **This is where O2's sheaf earns its consumer:** once executions routinely
+  propose nodes that re-provide capabilities, `identify-if-equal` is the
+  consistency law that lets the graph grow without conflicting on every
+  legitimate re-provision. Wiring the workflow proposal path to *request*
+  `identify-if-equal` gluing on apply is the natural next increment.
 
 ## 5. Pre-registered open decisions
 
@@ -209,7 +222,9 @@ sheaf have a reason to exist (mutation starts producing re-provisions).
 
 ## 6. Honest scope
 
-O1 is real, low-risk, shippable now. O2 is a material categorical-claim
-change gated on O1 + a §3.9 guard. O3 and the agentic-graph regime are
-**design-ahead-of-code**: the rail is being laid before the train exists,
-recorded here so the sequence is deliberate, not accidental.
+O1, O2, and O3 v0 have shipped (all opt-in / default-preserving / human-gated;
+no math claim downgraded). What remains design-ahead-of-code: the **full
+agentic-graph regime** — executions routinely proposing and the graph growing
+under `identify-if-equal` consistency. O3 v0 is the first turn of that loop, not
+the whole loop: it proposes new nodes only, doesn't yet request signature-based
+gluing on apply, and doesn't persist a run record. The sequence is deliberate.
