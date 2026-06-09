@@ -179,11 +179,12 @@ false identification).
 - **Guard shipped:** `tests/intent-validator.test.ts` pins `glued.ok` ↔
   `gluing_ok` token under *both* policies, so §3.9 closed-world parity cannot
   regress silently. Policy behaviour pinned in `tests/context-gluing.test.ts`.
-- **Ledger:** `MATHEMATICAL_CLAIMS.md` §Axiom 5 records the mode as **T2** — a
-  **sheaf on the identical-syntactic-signature overlap subcategory** — with a
-  stated **Path to T1** (resolved-type discriminator + sheaf axiom as a stated
-  law over an explicit cover + a real consumer). Default stays the T1
-  restriction / T2 separated-presheaf; nothing existing changed (T2 6→7).
+- **Ledger:** `MATHEMATICAL_CLAIMS.md` §Axiom 5 records the mode — a **sheaf on
+  the equal-signature overlap subcategory** — initially at T2, then **promoted
+  to T1 (2026-06-09)** once Path-to-T1 gate #2 landed (the gluing axiom pinned
+  as a characterising law over an explicit cover; see O-gate below). Default
+  stays the T1 restriction / T2 separated-presheaf; no existing tier changed
+  (T1 13→14).
 - **First consumer landed (2026-06-09):** `onto run context --validate
   --identify-equal-providers` threads the policy into the validation gluing
   step (opt-in; default still enforces uniqueness). Demonstrated end-to-end
