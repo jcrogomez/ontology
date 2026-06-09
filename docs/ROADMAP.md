@@ -50,7 +50,7 @@ exhaustively pinned by `tests/runtime/topos/closed-world-parity.test.ts`)
 | γ | `onto ingest <file/dir>`, Anthropic provider, static-edge inference, rich proposal payload | ✅ shipped |
 | δ | Inspector / translator (`onto node inspect`) + verification (`onto verify-homeomorphism`) | ✅ shipped |
 | ε | β / β′ / γ / δ / δ′ self-ingest runs + Move 3α multi-arm bake-off (AST grounding Δ = +0.355 mean Jaccard, §3.1 circularity resolved); §3.10 adjoint T4 → T2 | ✅ closed 2026-05-26 (4-arm + 2-column substate) |
-| **ζ** | Workflow runtime — typed-node state machine, predicate DSL, artefact-slot dataflow, behaviour-axis checker | 🟡 active — runtime v0 + §4.1 dataflow fix landed; never run end-to-end against a real LLM |
+| **ζ** | Workflow runtime — typed-node state machine, predicate DSL, artefact-slot dataflow, behaviour-axis checker | 🟡 active — runtime v0 + §4.1 dataflow fix landed; no clean real-LLM pass yet |
 
 ## Open follow-ups
 
@@ -75,12 +75,11 @@ These close the largest distance between what's *built* and what's
 
 - 🔵 **Arm C-cloud — `devstral-small-2:24b`** on rented GPU (~$5–10). ε closed without it; this is a reinforcement of H3, not a blocker. Local 8 GB Mac is infeasible.
 - 🟡 **Contract / intent columns** — the matrix fills 2 of 5; these two remain explicit no-data. **Intent column now has a designed extractor (2026-06-01):** `src/runtime/legend/intent-narration.ts` lifts the *why* (problem / decision / rejected-alternative / parent-goal) as a generative prompt with a behaviour-oracle (`acceptanceCriteria`), over file *neighbourhoods*, deliberately lossy — the opposite stance to the contract extractor. Spec + golden examples in [`legend/INTENT_NARRATION_SPEC.md`](legend/INTENT_NARRATION_SPEC.md). **Wired (2026-06-01):** `onto ingest --intent [<files...>]` narrates one-or-many files → one `manifestation=intent` proposal (oracle persisted as `REQUIRE:` rules); `tests/ingest-intent-cli.test.ts` pins the mock dry-run flow. Remaining to fill the column: a frontier run judged by the behaviour oracle (local 8 GB insufficient — budget-gated, like the §3.10 variance run).
-- 🟡 **`onto legend bakeoff-synthesis` CLI.** Cross-arm synthesis still runs through a hand-rolled driver (`scripts/run-3a-bakeoff-synthesis.ts`); the verb removes the last manual surface.
+- ✅ **Cross-arm synthesis CLI** — superseded by the shipped `onto bakeoff` (see Interop #4 below); `scripts/run-3a-bakeoff-synthesis.ts` stays as the dated Move 3α driver.
 - 🟡 **Next fidelity lever = extraction/prompt completeness on large modules.** The 2026-05-29 loss-breakdown (`scripts/loss-report.ts`) showed Arm A's residual loss is **recall-bound, not precision-bound** — 22 large multi-export modules collapse into recoverable-but-truncated stubs (0/125 unrecoverable). Curbing over-emission is the *smaller* cost; the win is making regen emit the modules it currently drops. See `MATHEMATICAL_CLAIMS.md` §3.10.
 
 ### Plasticity follow-ups
 
-- 🟡 **Advisory lock under `.ontology/.lock`** — concurrent-writer protection (atomic writes are done).
 - 🟡 **`onto branch lift <nodeId> --to <branch>`** — turn `describeCartesianLift` into proposals; depends on the BRANCH_MODEL.md Option-C confirmation.
 - 🟡 **`onto query` extensions** — negation, exact edge profiles, multi-shape OR.
 - 🟡 **`run prompt --as-proposal` for `edge_create`** — schema supports it; the model-driven candidate edge is missing.
@@ -107,7 +106,7 @@ ordered by value. #1 shipped; #2–#4 are designed and queued.
 ## Known limitations
 
 - Semantic linker is read-only (`onto link <nodeId>`); proposal-mutation flow needs the two-step `onto propose link` → `onto proposal apply`.
-- Concurrent multi-process writes are not lock-protected (writes are crash-atomic, but cooperating CLI invocations are not).
+- Only the long-running mutators (`compile run` / `run-batch` / `verify-homeomorphism`) are lock-protected; quick single-shot mutations rely on per-write crash-atomicity (worst case last-writer-wins, never corruption).
 - BRANCH_MODEL.md Option-C (lazy materialisation) is recommended but not user-confirmed; gates cross-branch `node_update` propagation.
 - Walker v2 (proposal review pane, plane/time/branch/manifestation rotation) is unshipped.
 - Several doc claims are useful intuition but not pinned by tests; see [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) for the tiered ledger.
@@ -136,4 +135,4 @@ Detail per PR is in [`RELEASE_NOTES.md`](RELEASE_NOTES.md); the table below is a
 
 ---
 
-*Last refresh: **2026-06-09** (state as of last commit, 2026-06-01). Rigor sprint pinned five load-bearing claims → **T1 count 8 → 13** (Axioms 2/5/6, §3.2, §3.9; §3.10 reframed probabilistic, stays T2). Phase ζ active — runtime v0 shipped; first real-LLM verify-refine attempt (2026-05-29) surfaced the undici-timeout fix (`3db9aa4`) but not yet a clean pass (gated on a frontier provider). This file is the single source of truth for open work; when a follow-up ships, promote it out of the open list into the bootstrap-history table or `RELEASE_NOTES.md`.*
+*Last refresh: **2026-06-09** (state as of last commit, 2026-06-09 — O2/O4 gluing gates, `onto ingest --resolved-signatures`, Axiom 5 gluing promoted T2 → T1). The 06-09 promotion is narrated as T1 13 → 14, but a same-day recount fixed a clerical off-by-one in the running headers — honest current T1 count is **13** (see `MATHEMATICAL_CLAIMS.md` §5). Phase ζ active — runtime v0 shipped; first real-LLM verify-refine attempt (2026-05-29) surfaced the undici-timeout fix (`3db9aa4`) but not yet a clean pass (gated on a frontier provider). This file is the single source of truth for open work; when a follow-up ships, promote it out of the open list into the bootstrap-history table or `RELEASE_NOTES.md`.*

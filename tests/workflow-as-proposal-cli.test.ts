@@ -128,6 +128,28 @@ describe("onto workflow run --as-proposal (O3)", () => {
     const parsed = JSON.parse(r.stdout);
     expect(parsed.ok).toBe(false);
     expect(parsed.error).toMatch(/proposal-level/);
+    expect(r.status).not.toBe(0); // failures must be visible to scripts/CI
+  });
+
+  it("refuses --as-proposal combined with --dry-run (placeholder output must not become a proposal)", () => {
+    writeGraph("accept.json", ACCEPT_GRAPH);
+    const r = runCli(tempDir, [
+      "workflow", "run", "accept.json",
+      "--input", "input.txt",
+      "--dry-run",
+      "--as-proposal",
+      "--proposal-level", "domain",
+      "--proposal-kind", "entity",
+      "--json",
+    ]);
+    const parsed = JSON.parse(r.stdout);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toMatch(/dry-run/);
+    expect(r.status).not.toBe(0);
+    // No junk proposal in the append-only sequence, no state mutation.
+    const proposalsDir = path.join(tempDir, ".ontology/proposals");
+    const files = fs.existsSync(proposalsDir) ? fs.readdirSync(proposalsDir) : [];
+    expect(files.filter((f) => f.endsWith(".json"))).toHaveLength(0);
   });
 
   it("refuses to propose from a REJECTED workflow", () => {
@@ -144,6 +166,7 @@ describe("onto workflow run --as-proposal (O3)", () => {
     const parsed = JSON.parse(r.stdout);
     expect(parsed.ok).toBe(false);
     expect(parsed.error).toMatch(/accepted workflow/);
+    expect(r.status).not.toBe(0);
     // no proposal file written
     const proposalsDir = path.join(tempDir, ".ontology/proposals");
     const files = fs.existsSync(proposalsDir) ? fs.readdirSync(proposalsDir) : [];

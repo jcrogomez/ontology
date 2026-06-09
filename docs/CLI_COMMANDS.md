@@ -1,7 +1,7 @@
 # CLI Commands
 
-This document is the full reference for the `onto` CLI surface as of
-Bootstrap 0.9 (post-validator-port).
+This document is the full reference for the `onto` CLI surface,
+covering everything through Phase ζ (the workflow runtime).
 
 > **Note on Usage:**
 > For local development, execute commands via `npm run dev -- <command>`.
@@ -14,6 +14,19 @@ Bootstrap 0.9 (post-validator-port).
 > *currently shipped* — the Bootstrap tag tells you when it landed,
 > not whether it works today. The trailing §"Planned Commands"
 > section enumerates what is still unshipped.
+
+## I want to…
+
+| Task | Command |
+|---|---|
+| Create a graph node | `onto node create --level <l> --kind <k> --prompt "..."` |
+| Link two nodes | `onto node link --from <id> --to <id> --type <edgeType>` |
+| Compile intent → code | `onto compile run <nodeId>` (batch: `onto compile run-batch`) |
+| Ingest code into intent | `onto ingest <paths...>` |
+| Verify the round-trip (F∘G ≈ id) | `onto verify-homeomorphism [focal]` |
+| Run a workflow (verify-refine loop) | `onto workflow run <graph> --input <path>` |
+| Inspect a node (LLM summary) | `onto node inspect <id>` |
+| Serve the graph read-only over MCP | `onto mcp --cwd <path>` |
 
 ## Bootstrap 0.1 Commands
 
@@ -77,6 +90,11 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
   - `--provides "tok1,tok2"` — same for `context.provides` (the canonical key form).
   - `--forbids "tok1,tok2"` — same for `context.forbids`.
   - `--rules "FORBID: x|REQUIRE: y"` — pipe-separated prose rules that land in `node.rules` (pipe rather than comma because rule text often contains commas).
+- **Other flags:**
+  - `--label <text>` — optional human label.
+  - `--manifestation <m>` — intent / ast / osl / code / test / build (default intent).
+  - `--language <lang>` — language tag (e.g. python, typescript) the compiler uses to pick the artifact extension.
+  - `--literal <text>` / `--literal-file <path>` — pin the compiled artifact body verbatim (compile bypasses model dispatch; validator + runtime check still apply). Mutually exclusive.
 - **Files Touched:**
   - `.ontology/nodes/node_0001.json` (Creates the node file)
   - `.ontology/events.jsonl` (Appends a `node_created` event)
@@ -115,6 +133,8 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
   - `--label <text>` — replaces `node.label`.
   - `--rules "a|b|c"` — replaces `node.rules` wholesale; pass `--rules ""` to clear.
   - `--requires "t1,t2"` / `--provides "t1,t2"` / `--forbids "t1,t2"` — replaces the corresponding `context.*` array wholesale. Pass an empty string to clear.
+  - `--literal <text>` / `--literal-file <path>` — set (or replace) the literal escape hatch. Mutually exclusive.
+  - `--clear-literal` — remove the literal so the node returns to model-driven compile.
   - `--json` — machine-readable result.
 - **Files Touched:**
   - `.ontology/nodes/<id>.json` (Rewritten with the new hash)
@@ -122,6 +142,17 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
   - `.ontology/state.json` (Counter increment; `nodeCount` is NOT changed — it is the monotonic id seed)
 - **Errors:** `Node not found`, or refuses with "requires at least one mutating flag" if nothing was passed.
 - **What it does not do:** It does not change `id`, `coordinates`, or `graph.parentId` — the topology stays fixed. To re-parent a node, use `onto edge update`.
+
+### `node inspect <id>` *(Legend δ-1 — Inspector / Lupa)*
+
+- **Purpose:** Render a human-readable 3–5 sentence summary of what the node does and what invariants any implementation must preserve. Cached on the node as `node.translator` — one LLM call per node lifetime; the cache auto-invalidates when prompt / rules / contract change (sourceHash mismatch).
+- **Example:** `npm run dev -- node inspect node_0042 --provider anthropic`
+- **Flags:**
+  - `--provider <provider>` — LLM provider override (mock, ollama, or anthropic). When omitted, routes per-node via the model registry.
+  - `--model <model>` — model override (only meaningful with `--provider`).
+  - `--ollama-host <host>` — host for the Ollama provider.
+  - `--regenerate` — force a fresh inspect even when the cached translator is valid.
+  - `--json` — machine-readable result.
 
 ### `node remove <id>` *(post-Bootstrap 0.9)*
 
@@ -148,6 +179,7 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 
 - **Purpose:** Streams or lists the most recent events from the event log.
 - **Example:** `npm run dev -- events tail` (or `npm run dev -- events tail --json`)
+- **Flags:** `--limit <n>` — number of events to tail; `--json`.
 
 ### `context assemble`
 
@@ -155,6 +187,7 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **Example:** `npm run dev -- context assemble <nodeId>` (or `npm run dev -- context assemble <nodeId> --json`)
 - **Edge-aware Example:** `npm run dev -- context assemble <nodeId> --include-edges`
 - **Filtered Edge Example:** `npm run dev -- context assemble <nodeId> --include-edges --edge-types documents,validates_against`
+- **Other flags:** `--branch <branch>` (branch to assemble context for), `--time <time>` (assemble as of a point in time), `--mode <mode>` (assembly mode; only `strict` is supported).
 - **Notes:** Without `--include-edges`, the assembler returns the parent path only. With it, the assembler projects typed edges incident to the node into an `edgeContext` block. Edge type values are validated against `EdgeTypeSchema`; an invalid type fails loudly with `✖ Invalid edge type: <type>`. The command never mutates `.ontology`.
 
 ### `run prompt`
@@ -179,6 +212,7 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 
 - **Purpose:** Runs an LLM task against an assembled context and strictly validates the response via the intentional validation pipeline.
 - **Example:** `npm run dev -- run context <nodeId> --provider mock --validate`
+- **`--identify-equal-providers`** — with `--validate`: treat two providers of the same key as compatible (glued) when they carry an identical syntactic signature, instead of a duplicate-provider conflict (the opt-in O2 sheaf policy; default enforces provider-uniqueness). See `docs/legend/CONTEXT_GLUING_REGIMES.md`.
 
 ### `run prompt --persist` and `run context --persist`
 
@@ -250,7 +284,7 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 
 - **Purpose:** Walk the topological compile plan rooted at the focal and produce artifacts on disk. The structure-preserving functor of axiom 6 made concrete.
 - **Example:** `npm run dev -- compile run node_0005 --provider mock`
-- **Flags:** `--provider mock|ollama|anthropic` (default `mock`; γ-0 adds anthropic), `--model <name>`, `--ollama-host <host>`, `--runtime-check`, `--runtime-check-timeout-ms <ms>`, `--branch <name>` (post-0.9 — restrict the plan to a single fiber), `--target <path>` (β-1 — write the focal artifact to a user-pinned path; default still `.ontology/artifacts/generated/<nodeId>.<ext>`), `--force` (required to overwrite an existing `--target` file), `--max-tokens <n>`, `--no-thinking` (post-γ-7 — suppress adaptive thinking on providers that support it; useful for large prompts where thinking exhausts the output budget and the response comes back empty), `--json`.
+- **Flags:** `--provider mock|ollama|anthropic|gemini` (when omitted, each node compiles via its own `model.ref` resolved through the registry — see §Model Routing; mock is only a legacy per-node fallback), `--model <name>`, `--ollama-host <host>`, `--runtime-check`, `--runtime-check-timeout-ms <ms>`, `--branch <name>` (post-0.9 — restrict the plan to a single fiber), `--target <path>` (β-1 — write the focal artifact to a user-pinned path; default still `.ontology/artifacts/generated/<nodeId>.<ext>`), `--force` (required to overwrite an existing `--target` file), `--open-world` (unsatisfied `requires` tokens degrade to warnings instead of hard failures — for contracts referencing external deps, common on ingest-derived graphs), `--max-tokens <n>`, `--no-thinking` (post-γ-7 — suppress adaptive thinking on providers that support it; useful for large prompts where thinking exhausts the output budget and the response comes back empty), `--json`.
 - **Post-γ-7 dispatch knobs:** `--max-tokens` and `--no-thinking` now form part of the persisted-run identity. A retry with a different value (e.g. `--max-tokens 16384` after a default-budget failure) deterministically lands on a fresh run id and re-dispatches, instead of hitting the cached empty result. Anthropic adapter retries transient HTTP 429 / 5xx / network errors up to 3 times with exponential backoff (1.5s / 3s / 6s) before surfacing the failure.
 - **`--target <path>` (β-1):** redirects the focal step's artifact away from the default `.ontology/artifacts/generated/` tree to a user-pinned path. Relative paths resolve against cwd; missing parent directories are created. **Crash-atomic + clobber-gated:** writes go to a sibling `.tmp.<pid>` first; on every-validator-passed the file is renamed onto the final path. A failed validator (`validateLanguage` / `validateIntent` / `--runtime-check`) triggers a rollback — the staging file is unlinked and the user's pre-existing target survives untouched. Without `--force`, an existing target file fails the focal step with `reason: "target_exists"` before any bytes are written; with `--force`, the rename overwrites. Upstream steps continue to land under `generated/`.
 - **`--provider anthropic` (γ-0):** routes through the Anthropic adapter with system-prompt caching (`cache_control: ephemeral`). Reads `ANTHROPIC_API_KEY` from env. Default model is `claude-opus-4-7`; override with `--model`.
@@ -392,7 +426,7 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 
 - **Purpose:** Compile many focals in a single invocation. Plans are computed per-focal but share the per-run persisted cache, so shared upstream walks across focals reuse the same content-addressed run records (no second LLM call on the second-and-later focal whose plan touches the same upstream node).
 - **Required:** exactly one of `--all-artifacts` (compile every node whose `coordinates.manifestation === "code"`) or `--nodes <id1,id2,...>` (comma-separated explicit list). Mutex.
-- **Optional:** `--provider mock|ollama|anthropic`, `--model <name>`, `--ollama-host <host>`, `--runtime-check`, `--runtime-check-timeout-ms <ms>`, `--branch <name>` (filters BOTH the focal list AND the per-plan walk to the named fiber), `--json`.
+- **Optional:** `--provider mock|ollama|anthropic|gemini` (when omitted, each node routes via its own `model.ref`), `--model <name>`, `--ollama-host <host>`, `--runtime-check`, `--runtime-check-timeout-ms <ms>`, `--branch <name>` (filters BOTH the focal list AND the per-plan walk to the named fiber), `--open-world` (same semantics as `compile run --open-world`, applied uniformly to every step in every focal's plan), `--max-tokens <n>` (applies to every dispatch in the batch), `--no-thinking` (applied uniformly across the batch), `--json`.
 - **Resolve-time gates (--nodes path only):**
   - Non-code-manifestation focals are refused upfront with an actionable error rather than failing per-step inside the loop.
   - Off-branch focals (when `--branch` is set) are refused upfront with the same shape.
@@ -402,7 +436,7 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 
 - **Purpose (γ-4):** walk a source directory and report the import-derived edge graph — which file `depends_on` which (value imports) and which `uses_token` which (type-only `import type` statements). Pure static analysis; zero LLM cost; runs in milliseconds per file. Read-only. TypeScript files use the TS compiler API; Python files use a regex-based parser.
 - **Purpose (γ-6, with `--create-proposals`):** in addition to the report, resolve each inferred edge to applied node IDs by matching `outputs.files[0]` on each endpoint, then emit one `edge_create` proposal per resolved pair. Skips edges whose endpoints are not yet on the graph (the user hasn't applied that file's ingest proposal yet — surfaced as `from_node_missing` / `to_node_missing` in the JSON report) and edges that already exist with the same `(from, to, type)` tuple — so γ-6 is idempotent.
-- **Flags:** `--create-proposals` (γ-6 mode), `--include <exts>` (comma-separated; default `ts,tsx` — pass `py` for a Python project, `py,ts,tsx` for a mixed-language repo), `--json`.
+- **Flags:** `--create-proposals` (γ-6 mode), `--metrics-preview` (resolve edges the same way `--create-proposals` does but simulate the resulting edge fabric and report before/after metrics — especially `closedWorldContextReachableSatisfaction` — without writing anything), `--ontology-dir <path>` (score `--metrics-preview` against an arbitrary ontology directory; mutually exclusive with `--create-proposals`), `--include <exts>` (comma-separated; default `ts,tsx` — pass `py` for a Python project, `py,ts,tsx` for a mixed-language repo), `--json`.
 - **Example (preview, TS):** `npm run dev -- graph infer-edges src/runtime/fibration`
 - **Example (preview, Python):** `npm run dev -- graph infer-edges path/to/python/project --include py`
 - **Example (γ-6):** `npm run dev -- graph infer-edges src/runtime/fibration --create-proposals --json`
@@ -413,7 +447,7 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **Scope of γ-4 v0 (Python):** `import X`, `import X.Y[.Z]`, `import X as Y`, `import X, Y` (multi), `from X import Y[, Z]`, single-line parenthesized form `from X import (Y, Z)`, `from X import Y as W`, wildcard `from X import *`, relative `from . / .X / ..X import Y`. Out of scope: multi-line parenthesized form, `if TYPE_CHECKING:` blocks, conditional imports inside functions. Modules resolve as `X.py` or `X/__init__.py` under the project root.
 - **Exit codes:** preview always exits 0. `--create-proposals` exits 0 unless every inferred edge was skipped AND there was at least one edge to process (almost always a sign the user forgot to run `onto proposal apply` first) — in that case exits 1 so CI / scripts notice. An empty walk (no edges at all) is always exit 0.
 
-### `ingest <path>` *(γ-1 single-file, γ-5 multi-file)*
+### `ingest [paths...]` *(γ-1 single-file, γ-5 multi-file)*
 
 - **Purpose:** the **inverse** of the compile functor. Extract structured intent from existing source code and produce one `node_create` proposal per source file. With γ-3's rich proposal payload, `onto proposal apply` produces a complete node in a single step — no follow-up `onto node update --requires ... --provides ...` ceremony needed.
 - **Modes (auto-detected from `<path>`):**
@@ -422,6 +456,11 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **Provider:** defaults to `anthropic` (γ-0 — requires `ANTHROPIC_API_KEY` in env). `--provider ollama` for the local model; `--provider mock` for plumbing tests (identity-functor — only works on files that embed a valid JSON extraction fixture).
 - **Cost:** ~$0.08 per file at Opus 4.7 tier; ~$0 with Ollama. The shared system prompt is tagged `cache_control: ephemeral` so per-file calls in the same session reuse the cached prefix once the prompt grows past Opus 4.7's 4096-token cacheable minimum.
 - **Flags:** `--provider`, `--model`, `--ollama-host`, `--parent <nodeId>` (default: project root canon), `--include <exts>` (directory mode only — comma-separated extensions; default `ts,tsx`. Use `--include py` for a Python project, `--include py,ts,tsx` for a mixed repo. Static-edge inference (γ-4) stays TS-only — non-TS ingests skip the cross-file edge report), `--dry-run` (preview the extraction without writing proposals — the load-bearing flag for iterating the extraction template and for testing with the mock provider at zero LLM cost), `--cost-estimate` (pre-flight cost guard: walks the inputs, multiplies file sizes by published rates, prints breakdown, exits WITHOUT dispatching the LLM — unlike `--dry-run`, makes zero API calls and works without `ANTHROPIC_API_KEY`), `--json`.
+- **More flags:**
+  - `--intent` — intent-narration mode (the WHY-as-prompt lift): reads the positional file paths as ONE neighbourhood and narrates the code's purpose as a generative prompt + behaviour oracle (acceptance criteria), producing one `manifestation=intent` proposal. See `docs/legend/INTENT_NARRATION_SPEC.md`.
+  - `--resolved-signatures` — directory / multi-input mode only: attach RESOLVED-type signatures to ingested `provides` (whole-program TypeChecker pass) instead of the syntactic tier; tier-tagged so resolved never glues with syntactic. Heavier; opt-in. See `docs/legend/CONTEXT_GLUING_REGIMES.md`.
+  - `--ensemble <mode>` — structured-extraction ensemble strategy: `none` (default, single run) or `high-confidence` (run llama3.2:3b three times, select the most complete valid extraction). Honoured for `semantic_parse` only.
+  - `--static-classifier <mode>` — `report-only` (classify every file with the deterministic AST-based classifier, surface aggregates in the report) or `enabled` (additionally let `barrel` / `declaration_only` files bypass the LLM with a deterministic static summary).
 - **Examples:**
   - `npm run dev -- ingest src/runtime/fibration --cost-estimate --provider anthropic   # zero-cost pre-flight`
   - `npm run dev -- ingest src/core/integrity/hash.ts --dry-run`
@@ -457,6 +496,14 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
   - `unrecoverable` — compile-back failed (no artifact to diff).
 - **Default thresholds:** `--loc-threshold 0.3 --jaccard-threshold 0.5`. Both tunable on the CLI.
 - **Flags:** `--provider`, `--model`, `--ollama-host`, `--max-tokens`, `--no-thinking` (suppress adaptive thinking — γ-7 calibration finding for prompts where thinking exhausts the output budget), `--open-world` (default true for verify), `--no-open-world` (force closed-world), `--loc-threshold`, `--jaccard-threshold`, `--cost-estimate` (pre-flight, $0), `--dry-run` (skip compile-back, re-classify existing regen), `--report <path>` (also write a markdown summary to the given path), `--json`.
+- **Phase ε flags:**
+  - `--matrix` — emit the six-axis fidelity matrix (contract, structural, behavior, intent, literalRequired, cost) per node alongside the legacy verdict report; unmeasured axes report explicit not-measured states.
+  - `--reps <n>` — run N compile-back dispatches per node and aggregate the per-rep metrics (default 1); defangs single-draw Jaccard variance at N× LLM spend.
+  - `--aggregator <mode>` — `median` (default, variance-resistant) or `mean` over per-rep metrics when `--reps > 1`.
+  - `--ast-grounding` — append a deterministic MANDATORY EXPORTS section (from the source AST) to every compile-back system prompt; folded into the run-cache contextHash. Off by default.
+  - `--behavior-check` — behaviour-axis checker v0: run the registered fixture's call-sites against source and regen and override the matrix's `behavior` axis with the measured state. Requires `--matrix`. See `docs/legend/BEHAVIOUR_AXIS_CHECKER_SPEC.md`.
+  - `--behavior-fixtures-dir <path>` — override the fixtures directory (default `tests/behavior-fixtures/`).
+  - `--behavior-timeout-ms <n>` — per-case wall-clock cap, clamped to [100, 60000]; default 5000.
 - **Examples:**
   - `npm run dev -- verify-homeomorphism node_0001 --provider anthropic`
   - `npm run dev -- verify-homeomorphism --all-artifacts --cost-estimate`
@@ -477,6 +524,31 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **Gate:** `--min-jaccard <n>` (default `0.1`, the pre-registered ε floor). By default the gate targets the **baseline arm only** — comparison arms can legitimately score low (the ε run's Arm B / Arm C-local collapsed to ~0, a real recorded finding), so failing the build on them would be wrong. Pass `--gate-all` to require every arm to clear the floor.
 - **Flags:** `--min-jaccard`, `--gate-all`, `--baseline <label>`, `--report <path.md>` (write the full markdown synthesis), `--json` (`{ gate, synthesis }`).
 - **Example (the CI gate):** `node dist/cli.js bakeoff A=.ontology.self-ingest-epsilon-3a-arm-a.json A0-control=.ontology.self-ingest-epsilon-3a-arm-a0.json B=.ontology.self-ingest-epsilon-3a-arm-b.json C-local=.ontology.self-ingest-epsilon-3a-arm-c-local.json --min-jaccard 0.1` — exits 0 (baseline A=0.58 clears 0.1), printing the per-arm table. CI runs this after `build`; `tests/fidelity-gate.test.ts` additionally pins Arm A ≥ 0.5 and the grounding lift A − A0 ≥ 0.30.
+
+### `workflow run <graph>` *(Phase ζ — workflow runtime)*
+
+- **Purpose:** Run a workflow graph against an input file. Walks the graph node-by-node, dispatches each generator/verifier through the existing LLM dispatcher (model-agnostic), branches on verifier verdicts via the v0 predicate DSL, and emits a trace + accept/reject result. The verify-refine state machine of Phase ζ. See `docs/legend/WORKFLOW_RUNTIME_SPEC.md` and `examples/workflow-imo-verify-refine`.
+- **Example:** `npm run dev -- workflow run examples/workflow-imo-verify-refine/graph.json --input problem.md --trace trace.json`
+- **Flags:**
+  - `--input <path>` *(required)* — file whose contents seed the workflow's entry node.
+  - `--max-steps <n>` — maximum total node visits before rejecting with `step_budget_exhausted` (default 100).
+  - `--trace <path>` — write the full JSON trace to this path.
+  - `--provider <provider>` / `--model <model>` / `--ollama-host <host>` — dispatch overrides for every step; when omitted, per-node `model` fields and task-default routing decide.
+  - `--dry-run` — validate the graph + input and emit a canned trace without any LLM dispatch.
+  - `--as-proposal` — on an ACCEPTED run, turn the final artefact into a pending `node_create` proposal (review with `onto proposal apply`). Requires an initialised `.ontology/` project.
+  - `--proposal-level <level>` / `--proposal-kind <kind>` *(required with `--as-proposal`)*, `--proposal-parent <nodeId>`, `--proposal-label <label>`, `--proposal-rationale <text>` — proposal metadata, same semantics as `run context --as-proposal`.
+  - `--json` — output the result as JSON.
+
+### Additional commands (compact reference)
+
+- **`query`** — find nodes by Yoneda profile (a partial Hom-profile of properties and edges). Flags: `--shape <json>` / `--shape-file <path>` (mutually exclusive shape literals), plus per-property shorthands `--kind`, `--abstraction`, `--plane`, `--manifestation`, `--status`, `--branch`, `--provides`, `--requires`, `--forbids`, `--has-incoming`, `--has-outgoing`, `--json`.
+- **`graph metrics`** — read-only baseline metrics over the typed graph (topology, parent distribution, requires/provides satisfaction, flatness verdict). Flags: `--ontology-dir <path>` (score an arbitrary ontology directory), `--json`.
+- **`graph hierarchize`** — read-only preview of a deterministic hierarchization plan (promote `outputs.files[0]` directory structure into intermediate nodes). Always preview mode. Flags: `--ontology-dir <path>`, `--json`.
+- **`graph readiness`** — structural-readiness gate: three rules over the typed graph; exits non-zero when any fails. Flags: `--ontology-dir <path>`, `--json`.
+- **`graph materialize-edges <src> <dst>`** — Phase ε harness: clone an ontology dir and apply the statically-inferred edges into the copy. Flags: `--source-root <code-dir>` *(required)*, `--include <exts>`, `--json`.
+- **`frontier <paths...>`** — $0 pre-flight diagnostic: run the frontier tagger over every file in the paths and report the multi-label tag distribution. Flags: `--include <exts>` (default `ts,tsx`), `--totals-only` (aggregates only), `--json`.
+- **`open [path]`** — open an Ontology project: interactive picker over registered projects, or open `[path]` directly.
+- **`projects list`** / **`projects forget <pathOrName>`** — manage the global project registry (`~/.config/ontology/projects.json`); `forget` drops the entry without deleting the project. Both take `--json`.
 
 ### Model Observability
 - `onto model doctor` — health probe per provider. With `ANTHROPIC_API_KEY` set, runs a `/v1/models` list as the auth check; without the key, surfaces `not configured` rather than failing. Reports `OLLAMA_HOST` and `ANTHROPIC_API_KEY` env-var status.
@@ -530,8 +602,9 @@ order of decreasing priority:
    `LlmTask`. When only `--provider <X>` is passed (no `--model`,
    no per-node ref), the dispatcher looks up `task → preferred[0]`
    and uses it as the dispatch default. Today: `ollama` and `anthropic`
-   are wired; mock and literal fall through to adapter-internal
-   defaults.
+   are wired; `gemini` (a full adapter — reads `GEMINI_API_KEY`,
+   default model `gemini-2.5-flash`), mock, and literal fall through
+   to adapter-internal defaults.
 
 Anthropic table (per-task, picked from the published price/intelligence
 frontier on the claude-4.x family):
@@ -583,17 +656,14 @@ Remaining γ work:
   ingest <python-dir>` produce a connected cross-file graph the same
   way TS projects do today.
 
-**Project Legend Phase δ** — **not yet shipped.**
-- 🟡 **`onto node inspect <id>`** — Inspector / Lupa primitive; one
-  LLM call per node lifetime, cached as `node.translator`.
-- 🟡 **`onto verify-homeomorphism <id>`** + batch report — runs the
-  per-node round-trip diff automatically and aggregates the result
-  into a verdict map (`ε-equivalent` / `divergent` / `unrecoverable`).
-  Closes the manual compile-back-and-diff loop the
-  `VIBE_REASONING_PROCEDURE.md` runbook walks through by hand.
+**Project Legend Phase δ** — **✅ shipped.** Both planned commands
+landed: `onto node inspect <id>` (Inspector / Lupa) and
+`onto verify-homeomorphism` (dual-distance round-trip verdict) — see
+their sections above.
 
-**Project Legend Phase ε** — **not yet shipped.** Self-ingestion of
-the Ontology repo; the publishable adjunction-claim measurement.
+**Project Legend Phase ε** — **✅ closed 2026-05-26.** Self-ingestion
+of the Ontology repo; see `docs/ROADMAP.md` and
+`docs/legend/calibrations/CALIBRATION_LOG.md` for the record.
 
 **Other:**
 - **`onto branch lift <nodeId> --to <branch>`** — turn the read-only

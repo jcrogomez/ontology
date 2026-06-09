@@ -70,15 +70,15 @@ edges allowed between the same pair of objects.
 
 | Categorical idea           | Ontology home                                  |
 | -------------------------- | ---------------------------------------------- |
-| Object                     | `OntologyNode` ([src/schemas/ontology.ts](src/schemas/ontology.ts))      |
+| Object                     | `OntologyNode` ([src/schemas/ontology.ts](../src/schemas/ontology.ts))      |
 | Morphism                   | `OntologyEdge` (18 typed relations)            |
 | Composition                | implicit via `compile-plan` traversal          |
 | Identity                   | every node trivially has a self-existence edge |
 | Multiple morphisms A → B   | allowed (multigraph, not simple graph)         |
 
-Edges live in [`src/core/edges/create-edge.ts`](src/core/edges/create-edge.ts) and the
+Edges live in [`src/core/edges/create-edge.ts`](../src/core/edges/create-edge.ts) and the
 typed vocabulary is enforced by `EdgeTypeSchema` in
-[`src/schemas/ontology.ts`](src/schemas/ontology.ts). The *abstraction poset*
+[`src/schemas/ontology.ts`](../src/schemas/ontology.ts). The *abstraction poset*
 (axiom 3) restricts the direction of refinement-family edges
 (`refines`, `inherits_from`, `implements`, `belongs_to`) but does not restrict
 the rest of the multigraph structure.
@@ -87,27 +87,27 @@ the rest of the multigraph structure.
 
 Compilation is a **structure-preserving functor**
 
-$$F\;\colon\; \mathcal{I} \longrightarrow \mathcal{A}$$
+$$F\;\colon\; \mathcal{I} \longrightarrow \mathcal{C}$$
 
-from the category of *intentions* to the category of *artifacts*:
+from the category of *intentions* to the category $\mathcal{C}$ of *artifacts* (artifacts/source trees):
 
 - **Objects.** Each compilable node $n \in \mathrm{Ob}(\mathcal{I})$ maps to one artifact $F(n)$ under `.ontology/artifacts/generated/`.
-- **Morphisms.** Hard-dependency edges in $\mathcal{I}$ (`depends_on`, `inherits_from`, `refines`, `implements`, `validates_against`, `belongs_to`) determine the topological compile order in $\mathcal{A}$.
+- **Morphisms.** Hard-dependency edges in $\mathcal{I}$ (`depends_on`, `inherits_from`, `refines`, `implements`, `validates_against`, `belongs_to`) determine the topological compile order in $\mathcal{C}$.
 - **Identity / composition.** A leaf node compiled with the mock provider on `task: code_sketch` returns its `prompt.raw` verbatim — that is $F$ acting as the identity functor on a degenerate object.
 
 The implementation is [`src/runtime/compile/compile-plan-runner.ts`](../src/runtime/compile/compile-plan-runner.ts) plus the planner [`src/runtime/graph/compile-plan.ts`](../src/runtime/graph/compile-plan.ts) (Kahn's algorithm over the hard-dependency edge family).
 
-The **inverse direction** $G\colon \mathcal{A} \to \mathcal{I}$ is the central construction of [Project Legend](PROJECT_LEGEND.md) — an approximate left adjoint that lifts existing source into the intent layer. The operational adjunction $F \dashv G$ with measured $\varepsilon$ on the round-trip $F \circ G \approx \mathrm{id}_{\mathcal{A}}$ is `MATHEMATICAL_CLAIMS.md` §3.10.
+The **inverse direction** $G\colon \mathcal{C} \to \mathcal{I}$ is the central construction of [Project Legend](PROJECT_LEGEND.md) — an approximate left adjoint that lifts existing source into the intent layer. The operational adjunction $G \dashv F$ (with unit $\eta\colon \mathrm{id}_{\mathcal{C}} \Rightarrow F \circ G$) and the measured $\varepsilon$ on the round-trip $F \circ G \approx \mathrm{id}_{\mathcal{C}}$ is `MATHEMATICAL_CLAIMS.md` §3.10.
 
 ### 2.3 Natural transformation — *between equivalent functors*
 
 A natural transformation $\eta\colon F \Rightarrow G$ is a coherent family of morphisms $\{\eta_X\colon F(X) \to G(X)\}_{X \in \mathrm{Ob}(\mathcal{C})}$ that commutes with the morphisms of the source category — i.e. for every $f\colon X \to Y$, the square
 
-$$\begin{array}{ccc} F(X) & \xrightarrow{\eta_X} & G(X) \\ {\scriptsize F(f)}\downarrow & & \downarrow{\scriptsize G(f)} \\ F(Y) & \xrightarrow{\eta_Y} & G(Y) \end{array}$$
+$$\begin{array}{ccc} F(X) & \xrightarrow{\eta_X} & G(X) \\ F(f)\downarrow & & \downarrow G(f) \\ F(Y) & \xrightarrow{\eta_Y} & G(Y) \end{array}$$
 
 commutes.
 
-In Ontology, the most natural place this concept will land is the **branch-merge proposal** (future work): given two compile functors $F_b, F_{b'}\colon \mathcal{I} \to \mathcal{A}$ viewing the graph from two different branches $b, b'$, merging branches is a natural transformation $F_b \Rightarrow F_{b'}$ over the cartesian-lift functor. Today the structure is implicit in the proposal system ([`src/core/proposals/persist.ts`](../src/core/proposals/persist.ts)) which already pins `parentHash` re-validation and stale detection — these are the coherence conditions a natural transformation must satisfy.
+In Ontology, the most natural place this concept will land is the **branch-merge proposal** (future work): given two compile functors $F_b, F_{b'}\colon \mathcal{I} \to \mathcal{C}$ viewing the graph from two different branches $b, b'$, merging branches is a natural transformation $F_b \Rightarrow F_{b'}$ over the cartesian-lift functor. Today the structure is implicit in the proposal system ([`src/core/proposals/persist.ts`](../src/core/proposals/persist.ts)) which already pins `parentHash` re-validation and stale detection — these are the coherence conditions a natural transformation must satisfy.
 
 A second concrete natural transformation is the **Inspector triangle** (Project Legend §3): $\tau\colon \mathrm{intent} \Rightarrow \mathrm{prose}$ produces a per-node `translator` paragraph; combined with $F$ and the LLM-described-code map $\sigma$, it gives a (probabilistically) commuting square.
 
@@ -141,9 +141,9 @@ is not pinned formally yet, but the existing parentHash re-validation ([`src/cor
 
 A second candidate adjunction worth flagging is **refine ⊣ project**: refinement-family edges climb the abstraction poset (refine: $s \to t$ with $\mathrm{level}(s) \le_L \mathrm{level}(t)$), and the "forget the refinement" projection is its right adjoint.
 
-The **third and most important** candidate adjunction — and the only one with a concrete plan to make operational — is **Project Legend's $F \dashv G$**: the compile functor and its approximate inverse, with the round-trip homeomorphism $F \circ G \approx \mathrm{id}$ measured empirically. See [`PROJECT_LEGEND.md`](PROJECT_LEGEND.md) §2.1 and [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §3.10.
+The **third and most important** candidate adjunction — and the only one with a concrete plan to make operational — is **Project Legend's $G \dashv F$** (the ingest functor $G$ as left adjoint to the compile functor $F$), with the round-trip homeomorphism $F \circ G \approx \mathrm{id}$ measured empirically. See [`PROJECT_LEGEND.md`](PROJECT_LEGEND.md) §2.1 and [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §3.10.
 
-### 2.6 Monad — *Effect runtime, [src/runtime/effects/](src/runtime/effects/)*
+### 2.6 Monad — *Effect runtime, [src/runtime/effects/](../src/runtime/effects/)*
 
 A monad is an endofunctor T : 𝓒 → 𝓒 with unit η : 1 ⇒ T and multiplication
 μ : T² ⇒ T satisfying associativity and identity. The new effects module ships
@@ -157,8 +157,8 @@ the trio:
 
 All three obey the **three monad laws** (left identity, right identity,
 associativity), proven on hand-picked values in
-[`tests/runtime/effects/result.test.ts`](tests/runtime/effects/result.test.ts) and
-[`tests/runtime/effects/io.test.ts`](tests/runtime/effects/io.test.ts).
+[`tests/runtime/effects/result.test.ts`](../tests/runtime/effects/result.test.ts) and
+[`tests/runtime/effects/io.test.ts`](../tests/runtime/effects/io.test.ts).
 
 `bindWithLog` concatenates logs even when the inner effect fails — log entries
 are write-only and survive failure. This is exactly what the compiler needs
@@ -168,9 +168,9 @@ for principled diagnostic accumulation.
 monad laws; `compileNode` is now built on `EffectWithLog` (PR #115) — the
 dispatch / write / validate / runtime-check pipeline composes via
 `bindWithLog`, and the top-level `try/catch` is retired. Design rationale is
-in [`docs/EFFECT_MONAD.md`](docs/EFFECT_MONAD.md).
+in [`docs/EFFECT_MONAD.md`](EFFECT_MONAD.md).
 
-### 2.7 Representable functor & Yoneda — *`onto query`, [src/runtime/query/](src/runtime/query/)*
+### 2.7 Representable functor & Yoneda — *`onto query`, [src/runtime/query/](../src/runtime/query/)*
 
 The Yoneda Lemma states that an object X in a locally small category is
 fully determined, up to isomorphism, by its representable functor
@@ -188,16 +188,16 @@ onto query --kind rule --has-incoming refines --provides spec
 ```
 
 The pure matcher lives at
-[`src/runtime/query/representable.ts`](src/runtime/query/representable.ts);
+[`src/runtime/query/representable.ts`](../src/runtime/query/representable.ts);
 its Zod-validated shape grammar is in
-[`src/runtime/query/types.ts`](src/runtime/query/types.ts).
+[`src/runtime/query/types.ts`](../src/runtime/query/types.ts).
 
 The empty shape `{}` matches every node (the identity Hom-profile). That's
 the trivial Yoneda statement — every object represents itself.
 
-Full design in [`docs/QUERY_REPRESENTABLE.md`](docs/QUERY_REPRESENTABLE.md).
+Full design in [`docs/QUERY_REPRESENTABLE.md`](QUERY_REPRESENTABLE.md).
 
-### 2.8 Fibration — *branches as fibers, [src/runtime/fibration/](src/runtime/fibration/)*
+### 2.8 Fibration — *branches as fibers, [src/runtime/fibration/](../src/runtime/fibration/)*
 
 A **Grothendieck fibration** is a functor p : E → B such that for every
 morphism f : b → b' in the base and every object E over b', there is a
@@ -219,7 +219,7 @@ The library implements *fibers* and *cartesian lifts* explicitly. The
 the existing `coordinates.branch` projection).
 
 Public API in
-[`src/runtime/fibration/branch-fiber.ts`](src/runtime/fibration/branch-fiber.ts):
+[`src/runtime/fibration/branch-fiber.ts`](../src/runtime/fibration/branch-fiber.ts):
 
 ```ts
 listBranches(state)                 // unique branch names, sorted
@@ -234,9 +234,9 @@ branch-aware compile (`compile run --branch feature/x`), `onto branch lift`,
 and branch-merge proposals (a natural transformation between two functors
 into a fiber).
 
-Full design in [`docs/BRANCH_FIBRATION.md`](docs/BRANCH_FIBRATION.md).
+Full design in [`docs/BRANCH_FIBRATION.md`](BRANCH_FIBRATION.md).
 
-### 2.9 Topos / subobject classifier — *rule predicates, [src/runtime/topos/](src/runtime/topos/)*
+### 2.9 Topos / subobject classifier — *rule predicates, [src/runtime/topos/](../src/runtime/topos/)*
 
 In an elementary topos, the **subobject classifier** Ω classifies subobjects:
 subobjects of an object X correspond to morphisms X → Ω. In Set, Ω = {⊤, ⊥}.
@@ -284,7 +284,7 @@ We are *not* a topos in the strict sense: `omegaImplies` is the Kleene
 material implication, not the Heyting implication of a frame Ω.
 `MATHEMATICAL_CLAIMS.md` §3.9 calls this out explicitly.
 
-Full design in [`docs/RULES_TOPOS.md`](docs/RULES_TOPOS.md).
+Full design in [`docs/RULES_TOPOS.md`](RULES_TOPOS.md).
 
 ---
 
@@ -330,7 +330,7 @@ Full design in [`docs/RULES_TOPOS.md`](docs/RULES_TOPOS.md).
   (metadata marker) to T2 in that domain; node-level `@expand:`
   remains metadata until separate work picks it up.
 
-Each of these items has a one-line entry in [`docs/ROADMAP.md`](docs/ROADMAP.md).
+Each of these items has a one-line entry in [`docs/ROADMAP.md`](ROADMAP.md).
 
 ---
 
@@ -343,7 +343,7 @@ Each of these items has a one-line entry in [`docs/ROADMAP.md`](docs/ROADMAP.md)
 - Grothendieck, *SGA 1* — for fibered categories and descent.
 - Lawvere & Schanuel, *Conceptual Mathematics* — gentle entry point.
 - The corresponding Ontology design notes, one per categorical concept:
-  [`docs/QUERY_REPRESENTABLE.md`](docs/QUERY_REPRESENTABLE.md),
-  [`docs/EFFECT_MONAD.md`](docs/EFFECT_MONAD.md),
-  [`docs/BRANCH_FIBRATION.md`](docs/BRANCH_FIBRATION.md),
-  [`docs/RULES_TOPOS.md`](docs/RULES_TOPOS.md).
+  [`docs/QUERY_REPRESENTABLE.md`](QUERY_REPRESENTABLE.md),
+  [`docs/EFFECT_MONAD.md`](EFFECT_MONAD.md),
+  [`docs/BRANCH_FIBRATION.md`](BRANCH_FIBRATION.md),
+  [`docs/RULES_TOPOS.md`](RULES_TOPOS.md).

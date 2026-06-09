@@ -27,8 +27,10 @@ the round-trip after the Vibe-Reasoning Vertiente C surfaced
 rename / decomposition divergences. γ-2 calibration on
 `src/core/integrity/hash.ts` with `claude-opus-4-7` end-to-end reads
 **5/5 ε-equivalent** (see §7.1). Phase ε (self-ingestion on the
-Ontology codebase) is the next active stream — all infrastructure is
-in place; the remaining gate is API spend to measure $\varepsilon$.
+Ontology codebase) subsequently ran and closed 2026-05-26 with the
+round-trip tolerance $\varepsilon$ measured per axis
+(`MATHEMATICAL_CLAIMS.md` §3.10); Phase ζ (the workflow runtime) is
+the active stream.
 
 Companion reads:
 [`BRANCH_FIBRATION.md`](BRANCH_FIBRATION.md) · [`BRANCH_MODEL.md`](BRANCH_MODEL.md) ·
@@ -52,13 +54,13 @@ Two failure modes of LLM-assisted programming today, both load-bearing:
 
 Legend addresses both:
 
-- **For new code**, the forward direction `\text{Intent} \xrightarrow{F} \text{Code}`
+- **For new code**, the forward direction $\text{Intent} \xrightarrow{F} \text{Code}$
   is already operational in Ontology (`onto compile run` + the §1 validator
   gate). The user writes intent, the LLM produces code, the validator
   refuses code that violates the contract.
 - **For existing code**, Legend builds the inverse direction
-  `\text{Code} \xrightarrow{G} \text{Intent}`, file by file, then verifies
-  the round-trip `F \circ G \approx \mathrm{id}_{\text{Code}}` empirically.
+  $\text{Code} \xrightarrow{G} \text{Intent}$, file by file, then verifies
+  the round-trip $F \circ G \approx \mathrm{id}_{\text{Code}}$ empirically.
   Where the round-trip is faithful, the network is *homeomorphic* to the
   codebase: a compressed, navigable surface for the same artefact.
 
@@ -127,7 +129,7 @@ irreducible implementation detail (specific algorithms, magic constants,
 patterns that require literal preservation). Legend's empirical work is
 to *measure* both subcategories and to characterise them.
 
-> **Why this matters.** Until Legend, the existence of $G$ was retoric.
+> **Why this matters.** Until Legend, the existence of $G$ was rhetorical.
 > With Legend, $G$ is an executable function and $\varepsilon$ is a
 > reported number. The adjunction claim becomes falsifiable.
 
@@ -159,6 +161,12 @@ This is not metaphor: the sheaf detector is the existing `glueFragments`
 function, repurposed. A `LegensSheafReport` lists every file pair where
 local sections disagree, with a suggested normalisation (a colimit in
 the local fiber).
+
+> **Honest amendment (2026-06-09).** The default gluing is a *separated
+> presheaf* — it detects conflicts rather than computing a colimit; the
+> sheaf gluing axiom holds only in the opt-in `identify-if-equal` mode
+> on the equal-signature subcategory — see `MATHEMATICAL_CLAIMS.md`
+> §Axiom 5.
 
 ### 2.3 The Yoneda principle, made operational
 
@@ -251,6 +259,9 @@ $$
 $$
 
 with $\varepsilon \approx 0.3$ (30% LoC churn) and $\tau \approx 0.7$.
+(Design note: this three-label scheme is superseded by the shipped
+dual-distance **five-label** verdict in `onto verify-homeomorphism`;
+the original text is preserved here as design narrative.)
 The bounds are tunable and reported with every Legend run. A node
 that is $\varepsilon$-equivalent participates in the homeomorphism;
 a node that is divergent indicates intent that needs sharpening; a
@@ -349,7 +360,7 @@ $$
 \begin{array}{ccc}
 \mathrm{intent} & \xrightarrow{\tau} & \mathrm{prose} \\
 \;\downarrow F & & \;\downarrow \tau' \\
-\mathrm{code} & \xrightarrow{\sigma} & \mathrm{code commentary}
+\mathrm{code} & \xrightarrow{\sigma} & \text{code commentary}
 \end{array}
 $$
 

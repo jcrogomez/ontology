@@ -79,6 +79,47 @@ describe("extractResolvedSignatures (TypeChecker)", () => {
     expect(resolved.startsWith(RESOLVED_SIGNATURE_PREFIX)).toBe(true);
   });
 
+  it("emits NO signature for type-only exports (interface / type alias) — never `resolved:any`", () => {
+    // A type-only export has no value side; the checker's value-type query
+    // yields the error type, which stringifies as `any`. Emitting that would
+    // collapse structurally different interfaces to one constant signature —
+    // a false-merge hazard under identify-if-equal. The conservative law:
+    // no value declaration → no resolved signature (missing ⇒ conflict).
+    const source = `
+      export interface Config { host: string; port: number }
+      export type Mode = "fast" | "safe";
+      export const REAL = 42;
+    `;
+    const file = write(source);
+    const resolved = extractResolvedSignatures([file]).get(path.resolve(file))!;
+    const names = resolved.map((e) => e.name);
+    expect(names).toEqual(["REAL"]); // Config and Mode emit nothing
+    expect(resolved.every((e) => e.signature !== `${RESOLVED_SIGNATURE_PREFIX}any`)).toBe(
+      true,
+    );
+  });
+
+  it("emits NO signature for `any`-typed values (zero discriminating power)", () => {
+    const source = `export const loose: any = JSON.parse("{}");`;
+    const file = write(source);
+    const resolved = extractResolvedSignatures([file]).get(path.resolve(file))!;
+    expect(resolved.find((e) => e.name === "loose")).toBeUndefined();
+  });
+
+  it("two same-named but different interfaces never gain string-equal resolved signatures", () => {
+    // Regression for the 2026-06-09 false-merge finding: before the
+    // value-declaration guard, BOTH of these resolved to `resolved:any` and
+    // glueFragments would have identified incompatible providers.
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "ts-resolved-"));
+    const fileA = path.join(dir, "a.ts");
+    const fileB = path.join(dir, "b.ts");
+    fs.writeFileSync(fileA, `export interface Config { host: string; port: number }`);
+    fs.writeFileSync(fileB, `export interface Config { totallyDifferent: boolean[] }`);
+    const map = extractResolvedSignatures([fileA, fileB]);
+    expect(map.get(path.resolve(fileA))).toEqual([]); // no signature at all
+    expect(map.get(path.resolve(fileB))).toEqual([]);
+  });
+
   it("excludes default exports and is deterministic by name", () => {
     const source = `
       export function zeta() { return 1; }

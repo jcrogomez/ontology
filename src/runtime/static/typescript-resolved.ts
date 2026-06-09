@@ -12,8 +12,14 @@ import ts from "typescript";
 //
 // This module upgrades the discriminator to a RESOLVED view: it builds a real
 // `ts.Program` (so module resolution + lib are in scope) and asks the
-// TypeChecker for each export's type, which expands aliases and materialises
-// inferred types. That is the genuine interface-identity the sheaf wants.
+// TypeChecker for each export's type, which follows re-export aliases and
+// materialises inferred types. Honest scope: `typeToString` still prints
+// *nominal* types (interfaces, classes) by NAME, unqualified — so two
+// same-named but structurally different types in different files can produce
+// string-equal resolved signatures. The resolved tier is a finer proxy than
+// the syntactic one for inferred/re-exported values, not a full structural
+// identity; that residual false-merge hazard is why `--resolved-signatures`
+// stays opt-in (see MATHEMATICAL_CLAIMS.md §Axiom 5 honest-scope).
 //
 // Tier safety: a resolved signature and a syntactic one are NOT comparable by
 // string equality (different normal forms). Callers MUST keep the two tiers
@@ -48,6 +54,10 @@ const PROGRAM_OPTIONS: ts.CompilerOptions = {
   noEmit: true,
   skipLibCheck: true,
   declaration: false,
+  // Ingest accepts .js/.jsx inputs; without these the program silently
+  // drops them (zero exports) and the node keeps its syntactic tier.
+  allowJs: true,
+  jsx: ts.JsxEmit.Preserve,
 };
 
 const TYPE_FORMAT_FLAGS =
@@ -92,7 +102,17 @@ export function extractResolvedSignatures(
       const target =
         sym.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym) : sym;
       const targetDecl = target.valueDeclaration ?? target.declarations?.[0] ?? decl;
+      // Type-only exports (interface / type alias) have no value side, so
+      // asking the checker for a value type yields the error type, which
+      // stringifies as `any`. Emitting that would REPLACE a discriminating
+      // syntactic signature with a constant — a false-merge hazard under
+      // identify-if-equal. Emit nothing instead: a missing signature means
+      // conflict, never identification (conservative).
+      if (!target.valueDeclaration) continue;
       const type = checker.getTypeOfSymbolAtLocation(target, targetDecl);
+      // Same guard for values whose type resolves to `any` (error type, bare
+      // `any` annotations, degraded JSX): zero discriminating power.
+      if (type.flags & ts.TypeFlags.Any) continue;
       const resolved = checker.typeToString(type, targetDecl, TYPE_FORMAT_FLAGS);
       exports.push({
         name,

@@ -126,7 +126,7 @@ the next. **Do not do a later step before its prerequisite.**
 This doc + a note in `CONTEXT_ASSEMBLER.md`. Unblocks nothing technically;
 prevents the framing from outrunning the code. **Status: this doc.**
 
-### O1 — Populate a sound provider discriminator  ← **the prerequisite, do first**
+### O1 — ✅ a sound provider discriminator (shipped — was the prerequisite)
 Give `provides` an identity beyond `key`, sourced from the static inference
 that *already* computes exports (`static-summary.ts:108/214/294`). No gluing
 change, no §3.9 risk, independently useful (richer vocab-gap, dedup, ingest
@@ -142,7 +142,8 @@ drift detection).
   **written** signature (param + annotation + return text for functions;
   member shape for interfaces/types/classes), normalised + hashed. **Resolved
   types** (alias expansion, inferred returns) need a whole-program
-  TypeChecker pass and are **deferred** as a future enrichment.
+  TypeChecker pass — ~~deferred~~ since built AND wired as opt-in
+  `onto ingest --resolved-signatures` (see §6).
 - **Coverage honesty:** good for TS with annotations; degrades to
   `signature: undefined` for untyped JS, un-annotated inferred returns, and
   Python (no extractor). `undefined` means "unknown" — O2 gluing simply does
@@ -252,10 +253,11 @@ The execution→intent loop now carries a **verified contract**, closing O3→O2
 
 1. ~~**O1 discriminator semantics:** interface-signature vs definition-hash~~
    **Resolved 2026-06-09: interface-signature, syntactic tier** (see §4 O1).
-   Resolved-type extraction deferred.
-2. **O2 policy surface:** parameter on `glueFragments` vs a new
-   `assembleContext` gluing-mode (recommendation: parameter — `mode` is not
-   a seam).
+   Resolved-type extraction since built + wired as opt-in
+   `onto ingest --resolved-signatures` (see §6).
+2. ~~**O2 policy surface:** parameter on `glueFragments` vs a new
+   `assembleContext` gluing-mode~~ **Resolved: landed as a `glueFragments`
+   parameter** (`onDuplicateProvider`, see §4 O2).
 3. **Strategic emphasis:** consolidate the static regime (O1 serves SSoT +
    Legend) vs open the dynamic regime (O3 is the rail). O1 is the shared
    prerequisite either way.

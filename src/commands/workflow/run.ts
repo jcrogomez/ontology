@@ -70,6 +70,16 @@ export async function workflowRunCommand(
     fail(`input file not found: ${inputPath}`, options.json);
     return;
   }
+  // A dry run forces every verifier to pass and produces canned placeholder
+  // output; turning that into a pending proposal would pollute the
+  // append-only proposal sequence and audit chain with junk. Refuse upfront.
+  if (options.asProposal && options.dryRun) {
+    fail(
+      `--as-proposal cannot be combined with --dry-run (a dry run produces placeholder output, not a real artefact)`,
+      options.json,
+    );
+    return;
+  }
 
   let loaded;
   try {
@@ -402,6 +412,9 @@ function printResultHuman(
 }
 
 function fail(message: string, json: boolean | undefined): void {
+  // Nonzero exit so scripts/CI can detect failure without parsing output.
+  // `exitCode` (not `process.exit`) lets pending writes flush.
+  process.exitCode = 1;
   if (json) {
     console.log(JSON.stringify({ ok: false, error: message }, null, 2));
   } else {

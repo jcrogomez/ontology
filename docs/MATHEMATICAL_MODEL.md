@@ -109,7 +109,7 @@ so the functor refuses to step forward when the candidate $A_n$ would violate th
 - Framework choice must come from target/stack nodes, not from hardcoded compiler assumptions.
 - **Implemented (Bootstrap 0.8 + post-0.9 hardening).** `onto compile run <nodeId>` walks the topological plan and dispatches each step's prompt against the configured provider. The structure-preserving property is *derived* from the graph + Kahn's algorithm, not hand-coded.
 - The mock provider acts as the **identity functor** when `task: code_sketch` — it returns the prompt verbatim. This makes mock-driven compilation a degenerate but mathematically valid case of axiom 6, and is what powers the offline `npm run example:hello-world` demo.
-- **The inverse direction** $G\colon \mathcal{C} \to \mathcal{I}$ — extracting intent from existing code — is the subject of [Project Legend](PROJECT_LEGEND.md). It tests the operational adjunction $F \dashv G$ and measures the round-trip $F \circ G \approx \mathrm{id}$ on a quantified subcategory.
+- **The inverse direction** $G\colon \mathcal{C} \to \mathcal{I}$ — extracting intent from existing code — is the subject of [Project Legend](PROJECT_LEGEND.md). It tests the operational adjunction $G \dashv F$ ($G$ the left adjoint) and measures the round-trip $F \circ G \approx \mathrm{id}$ on a quantified subcategory.
 
 ## 7. Code as Compiled Shadow
 
