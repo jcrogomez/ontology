@@ -212,16 +212,40 @@ instance of "variable intent: grow, improve, learn patterns."
   (not node-update or edges); `source: null` (workflows don't persist a run
   record yet — a future enrichment for a tighter audit link); opt-in and
   human-gated (nothing auto-mutates).
-- **Snag found wiring O3→O2 (2026-06-09):** a workflow-proposed node carries a
-  `prompt` but **no `provides` contract**, so `identify-if-equal` has nothing
-  to act on from the workflow path — wiring it "on apply" today would be a
-  no-op dressed as a consumer. O2's real first consumer therefore lives in the
-  *validation* path over static-ingest contracts (see O2 above), not the
-  workflow loop. **To truly close O3→O2, a further increment must make the
-  workflow proposal carry a contract** (extract `provides` + signatures from
-  the artefact when it is code, or let the graph declare what the workflow
-  produces) — only then does an execution-proposed re-provision exist for the
-  sheaf to reconcile.
+- **Snag found wiring O3→O2 (2026-06-09, resolved by O4 below):** a workflow-
+  proposed node carried a `prompt` but **no `provides` contract**, so
+  `identify-if-equal` had nothing to act on from the workflow path. Resolved
+  by O4: the workflow now *declares* a contract and (for code) the artefact is
+  *measured*, so the proposed node is born with `provides` + signatures.
+
+### O4 — ✅ contracted workflow proposals + the round-trip (landed 2026-06-09)
+The execution→intent loop now carries a **verified contract**, closing O3→O2.
+- **Declare (intent):** a workflow graph may declare `provides`
+  (`[{key, signature?}]`) and an optional `artefactLanguage`
+  (`src/schemas/workflow.ts`). This is the author's commitment — *what* the
+  agentic execution produces.
+- **Measure + round-trip (teeth):** when `artefactLanguage` names code,
+  `onto workflow run --as-proposal` parses the produced artefact (G, the O1
+  extractor) and compares the **measured** contract to the **declared** one.
+  Declared-but-not-produced, signature drift, and over-delivery are surfaced
+  as `contractCheck.mismatches` (a defect for human review, not a hard block)
+  and noted in the proposal's provenance. This is `F∘G ≈ id` on a single
+  output — "did the execution produce what it promised?", the dynamic-regime
+  way of caging LLM defects.
+- **Carry:** the proposed node is born with the contract — the **measured**
+  one when available (grounded), the **declared** one otherwise — via O1's
+  `provides` + `provideSignatures` side channel. On apply it lands on
+  `context.provides[].signature`, exactly what O2's `identify-if-equal`
+  reconciles. **The loop closes.**
+- **Graceful degradation:** non-code / undeclared artefacts → the declaration
+  stands alone (intent without measurement) or no contract at all (O3 v0
+  behaviour). The machinery never claims verification it cannot perform.
+- Pinned by `tests/workflow-contract-roundtrip.test.ts` (the round-trip:
+  measure / drift / missing / over-deliver) and `tests/workflow-as-proposal-cli.test.ts`
+  (declared contract → proposal → applied node carries provides+signature).
+- **v0 honest gaps:** the discriminator is still the *syntactic* signature
+  proxy (O1's tier); `source` is still null (no run record); the measurement
+  covers TS/JS only. Same Path-to-T1 as O2 §Axiom 5.
 
 ## 5. Pre-registered open decisions
 
@@ -237,9 +261,15 @@ instance of "variable intent: grow, improve, learn patterns."
 
 ## 6. Honest scope
 
-O1, O2, and O3 v0 have shipped (all opt-in / default-preserving / human-gated;
-no math claim downgraded). What remains design-ahead-of-code: the **full
-agentic-graph regime** — executions routinely proposing and the graph growing
-under `identify-if-equal` consistency. O3 v0 is the first turn of that loop, not
-the whole loop: it proposes new nodes only, doesn't yet request signature-based
-gluing on apply, and doesn't persist a run record. The sequence is deliberate.
+O1, O2, O3 v0, and O4 have shipped (all opt-in / default-preserving /
+human-gated; no math claim downgraded). The loop now closes end-to-end:
+an execution declares a contract, the artefact is measured against it
+(round-trip, for code), and the proposed node is born with a signature O2 can
+reconcile. What remains: (a) the discriminator is still syntactic — the
+resolved-type tier is the Path to T1; (b) apply still doesn't *automatically*
+run `identify-if-equal` against the existing graph (it's reachable via the
+validation flag, but not yet a step of apply itself); (c) workflows propose new
+nodes only (not node-update / edges) and persist no run record. The full
+agentic-graph regime — executions routinely proposing and the graph growing
+and rewiring under sheaf consistency — is the remaining horizon. The sequence
+is deliberate.

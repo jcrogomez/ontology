@@ -20,6 +20,18 @@ const ACCEPT_GRAPH = {
   edges: [{ from: "g1", to: "t", type: "feeds" }],
 };
 
+const ACCEPT_GRAPH_CONTRACT = {
+  name: "minimal-accept-contract",
+  description: "declares an output contract (intent) — no artefactLanguage, so the declaration stands alone (no measurement)",
+  entry: "g1",
+  provides: [{ key: "podcast_pipeline", signature: "(brief: string): Episode" }],
+  nodes: [
+    { id: "g1", kind: "generator", prompt: "Echo the input: ${INPUT}" },
+    { id: "t", kind: "terminal", terminalVerdict: "accept" },
+  ],
+  edges: [{ from: "g1", to: "t", type: "feeds" }],
+};
+
 const REJECT_GRAPH = {
   name: "minimal-reject",
   description: "entry generator feeds straight into a reject terminal",
@@ -136,6 +148,65 @@ describe("onto workflow run --as-proposal (O3)", () => {
     const proposalsDir = path.join(tempDir, ".ontology/proposals");
     const files = fs.existsSync(proposalsDir) ? fs.readdirSync(proposalsDir) : [];
     expect(files.filter((f) => f.endsWith(".json"))).toHaveLength(0);
+  });
+
+  it("a declared output contract (O4) is inherited into the proposal payload", () => {
+    writeGraph("contract.json", ACCEPT_GRAPH_CONTRACT);
+    const r = runCli(tempDir, [
+      "workflow", "run", "contract.json",
+      "--input", "input.txt",
+      "--provider", "mock",
+      "--as-proposal",
+      "--proposal-level", "domain",
+      "--proposal-kind", "action",
+      "--json",
+    ]);
+    expect(r.status).toBe(0);
+    const parsed = JSON.parse(r.stdout);
+    // No artefactLanguage → declaration stands alone (no measurement).
+    expect(parsed.contractCheck.measured).toBe(false);
+    expect(parsed.contractCheck.mismatches).toEqual([]);
+
+    const proposalFile = JSON.parse(
+      fs.readFileSync(
+        path.join(tempDir, ".ontology/proposals", `${parsed.proposal.id}.json`),
+        "utf-8",
+      ),
+    );
+    expect(proposalFile.mutation.payload.provides).toEqual(["podcast_pipeline"]);
+    expect(proposalFile.mutation.payload.provideSignatures).toEqual({
+      podcast_pipeline: "(brief: string): Episode",
+    });
+  });
+
+  it("the contract survives apply onto the created node (O3→O2 loop: node born with provides+signature)", () => {
+    writeGraph("contract.json", ACCEPT_GRAPH_CONTRACT);
+    const run = runCli(tempDir, [
+      "workflow", "run", "contract.json",
+      "--input", "input.txt",
+      "--provider", "mock",
+      "--as-proposal",
+      "--proposal-level", "domain",
+      "--proposal-kind", "action",
+      "--json",
+    ]);
+    const proposalId = JSON.parse(run.stdout).proposal.id;
+    const apply = runCli(tempDir, ["proposal", "apply", proposalId, "--json"]);
+    expect(apply.status).toBe(0);
+
+    // Read the created node and confirm it carries the contract — which is
+    // exactly what O2's identify-if-equal needs to reconcile re-provisions
+    // downstream.
+    const nodeId = JSON.parse(apply.stdout).mutation.createdEntityId;
+    expect(nodeId).toMatch(/^node_/);
+    const node = JSON.parse(
+      fs.readFileSync(path.join(tempDir, ".ontology/nodes", `${nodeId}.json`), "utf-8"),
+    );
+    expect(node.context.provides).toContainEqual({
+      key: "podcast_pipeline",
+      nodeType: "declared",
+      signature: "(brief: string): Episode",
+    });
   });
 
   it("without --as-proposal, a run creates no proposal (default unchanged)", () => {

@@ -16,6 +16,8 @@ import {
   NodeKindSchema,
   type Proposal,
 } from "../../schemas/ontology.js";
+import { parseTypeScriptFile } from "../../runtime/static/typescript.js";
+import type { WorkflowProvision } from "../../schemas/workflow.js";
 
 // `onto workflow run` — Phase ζ v0.
 //
@@ -117,6 +119,7 @@ export async function workflowRunCommand(
   // proposal substrate — nothing mutates the graph here; `onto proposal
   // apply` is the human-gated step.
   let proposalInfo: { id: string; status: string } | undefined;
+  let contractCheck: ContractCheck | undefined;
   if (options.asProposal) {
     if (result.verdict !== "accept") {
       fail(
@@ -141,6 +144,22 @@ export async function workflowRunCommand(
       );
       return;
     }
+    // O4: resolve the output contract. The workflow's declared `provides`
+    // (intent) is measured against the produced artefact when it is code
+    // (the round-trip); the node carries the MEASURED contract when available
+    // (grounded) and the declared one otherwise (intent), with declared≠
+    // produced surfaced as a defect.
+    contractCheck = resolveContract(
+      loaded.graph.provides ?? [],
+      loaded.graph.artefactLanguage,
+      result.output,
+    );
+    // Surface mismatches before the (still-created) proposal — a defect to
+    // review, not a hard block: the human decides on apply.
+    if (!options.json && contractCheck.mismatches.length > 0) {
+      console.error(`⚠ contract check (declared ≠ produced):`);
+      for (const m of contractCheck.mismatches) console.error(`  - ${m}`);
+    }
     try {
       const proposal = buildProposalFromWorkflow({
         output: result.output,
@@ -151,6 +170,12 @@ export async function workflowRunCommand(
         rationale: options.proposalRationale,
         graphName: path.basename(graphPath),
         stepCount: result.stepCount,
+        provides: contractCheck.provides,
+        provideSignatures: contractCheck.provideSignatures,
+        contractNote:
+          contractCheck.mismatches.length > 0
+            ? `contract mismatch (declared≠produced): ${contractCheck.mismatches.join("; ")}`
+            : undefined,
       });
       proposalInfo = { id: proposal.id, status: proposal.status };
     } catch (err) {
@@ -167,6 +192,7 @@ export async function workflowRunCommand(
           warnings: loaded.warnings,
           result,
           ...(proposalInfo ? { proposal: proposalInfo } : {}),
+          ...(contractCheck ? { contractCheck } : {}),
         },
         null,
         2,
@@ -180,8 +206,99 @@ export async function workflowRunCommand(
     console.log(
       `proposal:  ${proposalInfo.id} (${proposalInfo.status}) — review with \`onto proposal apply ${proposalInfo.id}\``,
     );
+    if (contractCheck && contractCheck.provides.length > 0) {
+      const tag = contractCheck.measured ? "measured" : "declared";
+      console.log(
+        `contract:  ${contractCheck.provides.join(", ")} (${tag})${
+          contractCheck.mismatches.length > 0 ? ` — ⚠ ${contractCheck.mismatches.length} mismatch(es)` : " — ✓ verified"
+        }`,
+      );
+    }
     console.log(``);
   }
+}
+
+// ── Output contract resolution (O4) ───────────────────────────────────────────
+
+export interface ContractCheck {
+  // Keys + signatures the proposed node will carry (measured when available,
+  // else declared).
+  provides: string[];
+  provideSignatures: Record<string, string>;
+  // True when the contract was MEASURED from the artefact (code), false when
+  // it is the author's declaration only (no measurement possible).
+  measured: boolean;
+  // declared ≠ produced findings (empty when verified or not measurable).
+  mismatches: string[];
+}
+
+const CODE_LANGUAGES = new Set([
+  "typescript", "ts", "tsx", "javascript", "js", "jsx",
+]);
+
+// The round-trip F∘G ≈ id on a single output. `declared` is the workflow's
+// intent; when `language` is code, the artefact is parsed (G) and the measured
+// contract is compared to the declaration. The node carries the measured
+// contract when available (grounded), the declared one otherwise.
+export function resolveContract(
+  declared: WorkflowProvision[],
+  language: string | undefined,
+  artefact: string,
+): ContractCheck {
+  const declaredByKey = new Map(declared.map((p) => [p.key, p.signature]));
+  const canMeasure =
+    language !== undefined && CODE_LANGUAGES.has(language.toLowerCase());
+
+  if (!canMeasure) {
+    // Declaration stands alone — intent without measurement (honest
+    // degradation for non-extractable artefacts).
+    const provideSignatures: Record<string, string> = {};
+    for (const p of declared) if (p.signature) provideSignatures[p.key] = p.signature;
+    return {
+      provides: declared.map((p) => p.key),
+      provideSignatures,
+      measured: false,
+      mismatches: [],
+    };
+  }
+
+  // Measure the produced artefact (G). A synthetic filename gives the parser
+  // its script kind; the source is the artefact text.
+  const ext = language!.toLowerCase().startsWith("ts") ? "ts" : "js";
+  const measured = parseTypeScriptFile(`workflow-artefact.${ext}`, artefact)
+    .exports.filter((e) => !e.isDefault)
+    .map((e) => ({ key: e.name, signature: e.signature }));
+  const measuredByKey = new Map(measured.map((m) => [m.key, m.signature]));
+
+  const mismatches: string[] = [];
+  for (const [key, decSig] of declaredByKey) {
+    if (!measuredByKey.has(key)) {
+      mismatches.push(`declared "${key}" but the artefact does not provide it`);
+      continue;
+    }
+    const prodSig = measuredByKey.get(key);
+    if (decSig !== undefined && prodSig !== undefined && decSig !== prodSig) {
+      mismatches.push(
+        `"${key}" signature drift — declared \`${decSig}\`, produced \`${prodSig}\``,
+      );
+    }
+  }
+  // Produced-but-not-declared is informational (the workflow over-delivered),
+  // surfaced so the author can tighten the declaration.
+  for (const m of measured) {
+    if (!declaredByKey.has(m.key)) {
+      mismatches.push(`produced "${m.key}" which the workflow did not declare`);
+    }
+  }
+
+  const provideSignatures: Record<string, string> = {};
+  for (const m of measured) if (m.signature) provideSignatures[m.key] = m.signature;
+  return {
+    provides: measured.map((m) => m.key),
+    provideSignatures,
+    measured: true,
+    mismatches,
+  };
 }
 
 // Map an accepted workflow's final artefact onto a pending `node_create`
@@ -198,6 +315,11 @@ function buildProposalFromWorkflow(args: {
   rationale?: string;
   graphName: string;
   stepCount: number;
+  // O4: the resolved output contract (measured-or-declared) the node carries.
+  provides?: string[];
+  provideSignatures?: Record<string, string>;
+  // Appended to the rationale when the round-trip found declared≠produced.
+  contractNote?: string;
 }): Proposal {
   const state = readState();
   const parentNodeId = args.parent ?? state.rootNodeId;
@@ -205,6 +327,16 @@ function buildProposalFromWorkflow(args: {
   if (!parentNode) {
     throw new Error(`parent node not found: ${parentNodeId}`);
   }
+  const baseRationale =
+    args.rationale ??
+    `Produced by workflow run "${args.graphName}" (${args.stepCount} steps).`;
+  const rationale = args.contractNote
+    ? `${baseRationale} ⚠ ${args.contractNote}`
+    : baseRationale;
+  const hasContract = args.provides !== undefined && args.provides.length > 0;
+  const hasSigs =
+    args.provideSignatures !== undefined &&
+    Object.keys(args.provideSignatures).length > 0;
   const { proposal } = createProposal({
     mutation: {
       kind: "node_create",
@@ -214,6 +346,8 @@ function buildProposalFromWorkflow(args: {
         prompt: args.output,
         label: args.label ?? null,
         parentNodeId,
+        ...(hasContract ? { provides: args.provides } : {}),
+        ...(hasSigs ? { provideSignatures: args.provideSignatures } : {}),
       },
       parentHash: parentNode.integrity.hash,
     },
@@ -221,9 +355,7 @@ function buildProposalFromWorkflow(args: {
     validation: null,
     provenance: {
       derivedFrom: [parentNodeId],
-      rationale:
-        args.rationale ??
-        `Produced by workflow run "${args.graphName}" (${args.stepCount} steps).`,
+      rationale,
     },
   });
   return proposal;

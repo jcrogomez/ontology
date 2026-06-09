@@ -181,6 +181,25 @@ export type WorkflowFeedsEdge = z.infer<typeof WorkflowFeedsEdgeSchema>;
 export type WorkflowBranchesOnEdge = z.infer<typeof WorkflowBranchesOnEdgeSchema>;
 export type WorkflowEdge = z.infer<typeof WorkflowEdgeSchema>;
 
+// ── Output contract (O4 — CONTEXT_GLUING_REGIMES.md) ──────────────────────────
+
+/**
+ * One capability a workflow declares it produces. `key` is the capability
+ * name (becomes the proposed node's `context.provides[].key`); `signature`
+ * is the optional syntactic interface the author commits to (becomes
+ * `…provides[].signature`, O1's discriminator). This is the *intent* half of
+ * the round-trip: what the agentic execution promises. When the produced
+ * artefact is extractable (code), the static extractor MEASURES the actual
+ * contract and a declared≠produced mismatch is surfaced as a defect
+ * (F∘G ≈ id on a single output). For non-extractable artefacts the
+ * declaration stands alone (intent without measurement — honest degradation).
+ */
+export const WorkflowProvisionSchema = z.object({
+  key: z.string().min(1),
+  signature: z.string().optional(),
+});
+export type WorkflowProvision = z.infer<typeof WorkflowProvisionSchema>;
+
 // ── Graph ───────────────────────────────────────────────────────────────────
 
 /**
@@ -201,6 +220,23 @@ export const WorkflowGraphSchema = z
     entry: z.string().min(1),
     nodes: z.array(WorkflowNodeSchema).min(1),
     edges: z.array(WorkflowEdgeSchema),
+    /**
+     * Optional output contract: the capabilities this workflow declares it
+     * produces (O4). Inherited by an `--as-proposal` node so the proposed
+     * node is born with a contract — which is what gives O2's
+     * `identify-if-equal` something to reconcile and what the round-trip
+     * verifies against the extracted artefact. Absent → the proposal carries
+     * no contract (the O3 v0 behaviour).
+     */
+    provides: z.array(WorkflowProvisionSchema).optional(),
+    /**
+     * Optional hint for the round-trip measurement: the language of the
+     * produced artefact (e.g. "typescript"). When it names a language the
+     * static extractor understands, `--as-proposal` MEASURES the artefact's
+     * real contract and flags declared≠produced mismatches. Absent or
+     * non-code → declaration stands alone (no measurement).
+     */
+    artefactLanguage: z.string().optional(),
   })
   .refine(
     (g) => g.nodes.some((n) => n.id === g.entry),
