@@ -18,7 +18,23 @@ close, and what is the cheapest sound path there?
 The answer is regime-dependent, and the cheapest path is **bottom-up**:
 the gluing tweak is the *last* step, not the first.
 
-## 1. The two regimes (the objective frames everything)
+## 1. Two tempos of one variable intent (the objective frames everything)
+
+> **Framing correction (2026-06-09).** An earlier draft called the static and
+> dynamic sides "two regimes with opposite needs" and the ζ runtime
+> "orthogonal" to the intention graph. That overstates it. Intent is
+> *inherently variable* — the whole project versions intent that grows,
+> improves, and learns patterns. Compile (F), the mutable graph (proposals),
+> and dynamic execution (ζ) are not separate systems; they are **the same
+> substance — intent — in motion, at different tempos.** Provider-uniqueness
+> is right for *settled / authored* intent; the sheaf relaxation is right for
+> intent *in flux*. The code-level separation of ζ (a standalone
+> `WorkflowNode` schema, read-only executor) is a **deliberate-but-revisable
+> implementation choice** (`WORKFLOW_RUNTIME_SPEC §6`: "small-blast-radius
+> move; v1 can revisit"), not a conceptual orthogonality. Consequence for O3
+> (§4): it is **closing a loop that should close itself** — execution observes
+> → proposes intent changes → the graph grows — over the mutation substrate
+> (`createProposal`) that *already exists*. ζ just doesn't speak it yet.
 
 The project's bet is an **intelligence resistant to LLM defects**: push
 everything that can be static + deterministic into the kernel (graph,
@@ -28,9 +44,10 @@ so the LLM's unreliable part is *caged and checked*, never trusted.
 defect: a second, divergent definition of a capability that already
 exists.
 
-There are two regimes with **opposite** needs for that bar:
+The two tempos pull that bar in opposite directions (same substance, not
+separate systems):
 
-| | Static regime (F: Intent → Code) | Dynamic regime (agentic ζ) |
+| | Settled tempo (F: Intent → Code) | In-flux tempo (agentic ζ) |
 |---|---|---|
 | What it is | The prompt map; compile walks it → final code. Update = edit the prompt, recompile. | Agentic nodes performing a live function; a mutable graph that grows / rewires. |
 | `provides` means | "this node's compiled artifact exposes capability X" | "this node/agent at runtime offers capability X" |
@@ -74,12 +91,15 @@ Re-verified against source. The uncomfortable parts are load-bearing:
    (`assembler.ts:14`), and `compare`/`propose` are already reserved
    (T4, §4.5). A gluing policy must be a **new parameter**, not an
    overload of `mode`.
-5. **The dynamic regime does not exist yet.** The ζ workflow runtime is
-   **orthogonal** to the intention graph: separate schema
-   (`WorkflowNode`, `src/schemas/workflow.ts`), read-only executor, no
-   context access, no graph mutation. Graph mutation is **exclusively**
-   via the proposal system, *outside* the runtime. "Agentic nodes that
-   grow/rewire the graph in vivo" is **100% aspirational**.
+5. **The loop is unclosed in code (but the substrate exists).** The ζ
+   workflow runtime is, *today*, separated from the intention graph: a
+   standalone schema (`WorkflowNode`, `src/schemas/workflow.ts`), a
+   read-only executor, no context access, no graph mutation. Graph mutation
+   already has a substrate — the proposal system (`createProposal`) — but ζ
+   does not emit into it yet. So "execution proposes intent changes" is
+   **unbuilt**, not impossible: it is one wire (executor → `createProposal`)
+   over an existing channel, not a new system. The schema separation is the
+   deliberate-but-revisable choice noted in §1, not a conceptual divide.
 
 → **Consequence:** relaxing the sheaf *today* is rail-before-train — no
 dynamic consumer needs it. The sheaf is a downstream *consistency guard*,
