@@ -410,6 +410,7 @@ run
   .option("--time <time>", "Time to use for context")
   .option("--mode <mode>", "Mode for context assembly")
   .option("--validate", "Run deterministic intent validation")
+  .option("--identify-equal-providers", "With --validate: treat two providers of the same key as compatible (glued) when they carry an identical syntactic signature, instead of a duplicate-provider conflict (O2 sheaf policy). Opt-in; default enforces provider-uniqueness.")
   .option("--model <model>", "Model to use for the selected LLM provider")
   .option("--ollama-host <host>", "Host for Ollama provider")
   .option("--include-edges", "Include edge-aware context in the assembled prompt")
@@ -903,6 +904,7 @@ program
   .option("--ensemble <mode>", "Phase ε E6 step 4: structured-extraction ensemble strategy. \"none\" (default) — single-run via the resolved model. \"high-confidence\" — run llama3.2:3b three times and select the most complete valid extraction. Use when 100% coverage on the perimeter matters more than per-file wall-clock. Currently honoured for semantic_parse (ingest extraction) only; other LlmTasks ignore the flag. Calibration: BAKEOFF_3B_FAMILY_2026-05-15.md §2.2.")
   .option("--static-classifier <mode>", "Structural Semantic Classifier integration. Two modes: \"report-only\" — classify every file with the deterministic AST-based classifier (src/runtime/legend/structural-classifier.ts) and surface aggregates in the INGEST report; does NOT change LLM routing. \"enabled\" — additionally consume those facts as ingest policy: files classified as `barrel` or `declaration_only` bypass the LLM entirely and receive a deterministic static summary (src/runtime/legend/static-summary.ts); every other shape — including `schema_module` — still dispatches via semantic_parse. Conservative on purpose: the v0 deflection set is intentionally small (smoke-test data showed ~5% of a typical perimeter deflects). The INGEST report's \"Classifier routing\" section surfaces the actual savings.")
   .option("--json", "Output results in JSON format.")
+  .option("--resolved-signatures", "Directory / multi-input mode only: attach RESOLVED-type signatures to ingested `provides` (a whole-program TypeChecker pass — alias expansion, inferred types) instead of the syntactic tier. Tier-tagged so resolved signatures never glue with syntactic ones. Heavier (builds one ts.Program over the swept TS/JS files); opt-in. Refines the O2 sheaf's equal-signature subcategory. See docs/legend/CONTEXT_GLUING_REGIMES.md.")
   .option("--from-pr <number>", "#2: ingest intent from a GitHub pull request (via `gh`) instead of source paths. Runs the prose extractor → one node_create proposal with manifestation=intent. Mutually exclusive with positional paths and --from-issue.")
   .option("--from-issue <number>", "#2: ingest intent from a GitHub issue (via `gh`) instead of source paths. Runs the prose extractor → one node_create proposal with manifestation=intent. Mutually exclusive with positional paths and --from-pr.")
   .option("--repo <owner/repo>", "Optional repository override for --from-pr/--from-issue (defaults to the gh-resolved repo of the current directory).")
@@ -1017,6 +1019,12 @@ workflowCmd
   .option("--ollama-host <host>", "Host for Ollama provider.")
   .option("--dry-run", "Validate the graph + input and emit a canned trace without any LLM dispatch. Useful for testing graph shapes before paying for tokens.")
   .option("--json", "Output the result as JSON to stdout.")
+  .option("--as-proposal", "On an ACCEPTED run, turn the final artefact into a pending `node_create` proposal (review with `onto proposal apply`). Closes the execution→intent loop. Requires an initialised `.ontology/` project.")
+  .option("--proposal-level <level>", "Required with --as-proposal: abstraction level for the proposed node.")
+  .option("--proposal-kind <kind>", "Required with --as-proposal: semantic kind for the proposed node.")
+  .option("--proposal-parent <nodeId>", "Optional with --as-proposal: parent node id (defaults to the root canon).")
+  .option("--proposal-label <label>", "Optional with --as-proposal: human label for the proposed node.")
+  .option("--proposal-rationale <text>", "Optional with --as-proposal: rationale recorded in the proposal's provenance (defaults to a workflow-run note).")
   .action(async (graph, rawOptions) => {
     try {
       await workflowRunCommand(graph, rawOptions);

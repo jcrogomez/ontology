@@ -131,6 +131,13 @@ export const ContextProvisionSchema = z.object({
   nodeType: z.string(),
   entity: z.string().optional(),
   description: z.string().optional(),
+  // Optional syntactic interface signature of the provided symbol (O1,
+  // docs/legend/CONTEXT_GLUING_REGIMES.md). Populated by static ingest where
+  // the TS parser can read a written signature; absent for manually-declared
+  // / LLM-extracted / untyped provisions. Gluing IGNORES this today — it is
+  // future discriminator material for O2's identify-if-equal policy, never a
+  // token the validator reads.
+  signature: z.string().optional(),
 });
 
 // Context is local. A node must declare what it requires, provides, forbids and optionally accepts instead of stealing global context.
@@ -486,6 +493,12 @@ export const ProposalNodeCreatePayloadSchema = z.object({
   provides: z.array(z.string()).optional(),
   forbids: z.array(z.string()).optional(),
   rules: z.array(z.string()).optional(),
+  // O1 side channel: per-provides syntactic signature (key → signature),
+  // carried PARALLEL to `provides` so the existing `string[]` contract and
+  // proposal hash are unchanged when absent (manual / LLM proposals omit it).
+  // Threaded verbatim to createNode, which merges it onto the provision
+  // objects. See docs/legend/CONTEXT_GLUING_REGIMES.md O1(c).
+  provideSignatures: z.record(z.string(), z.string()).optional(),
   // The β-2 literal escape hatch can also be proposed: an ingest run
   // can flag a node as "pin verbatim" so apply creates it with
   // node.literal already set.

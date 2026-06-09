@@ -74,6 +74,17 @@ export interface ExportRef {
   kind: "value" | "type";
   isDefault: boolean;
   reExportedFrom?: string;
+  // Normalised *syntactic* interface signature — the WRITTEN type surface
+  // of the export (param + annotation + return for functions; the RHS for
+  // type aliases; the public member shape for interfaces/classes/enums; the
+  // annotation for typed consts). This is the syntactic tier (O1 of
+  // docs/legend/CONTEXT_GLUING_REGIMES.md): it reads source text, it does
+  // NOT resolve types (no TypeChecker), so inferred returns, un-annotated
+  // consts, cross-file re-exports and aliased types yield `undefined`
+  // ("unknown" — downstream gluing must fall back to the conservative path,
+  // never a false identification). Whitespace is collapsed so formatting
+  // differences do not change the signature.
+  signature?: string;
 }
 
 export interface ParsedTSFile {
@@ -368,7 +379,18 @@ function readExportedVariables(
   const isType = false; // a `const` / `let` is always a value
   for (const decl of node.declarationList.declarations) {
     if (ts.isIdentifier(decl.name)) {
-      exports.push({ name: decl.name.text, kind: "value", isDefault: false });
+      // A typed const carries its annotation as the signature; an
+      // un-annotated const has an inferred type we cannot read without a
+      // TypeChecker, so leave the signature undefined.
+      const signature = decl.type
+        ? normaliseSignature(decl.type.getText())
+        : undefined;
+      exports.push({
+        name: decl.name.text,
+        kind: "value",
+        isDefault: false,
+        ...(signature ? { signature } : {}),
+      });
     } else {
       // Destructuring patterns are rare and complicated to surface
       // structurally; skip for v0.
@@ -390,15 +412,24 @@ function readExportedDeclaration(
     }
     return;
   }
+  const signature = ts.isFunctionDeclaration(node)
+    ? functionSignature(node)
+    : classSignature(node);
   if (hasDefaultModifier(node)) {
     exports.push({
       name: "default",
       localName: node.name.text,
       kind: "value",
       isDefault: true,
+      ...(signature ? { signature } : {}),
     });
   } else {
-    exports.push({ name: node.name.text, kind: "value", isDefault: false });
+    exports.push({
+      name: node.name.text,
+      kind: "value",
+      isDefault: false,
+      ...(signature ? { signature } : {}),
+    });
   }
 }
 
@@ -413,7 +444,13 @@ function readExportedTypeDeclaration(
   // Enums are runtime values (compiled to an object), so emit as
   // value. Interfaces and type aliases are erased at compile time.
   const kind: "value" | "type" = ts.isEnumDeclaration(node) ? "value" : "type";
-  exports.push({ name: node.name.text, kind, isDefault: false });
+  const signature = typeDeclSignature(node);
+  exports.push({
+    name: node.name.text,
+    kind,
+    isDefault: false,
+    ...(signature ? { signature } : {}),
+  });
 }
 
 function hasExportModifier(node: ts.HasModifiers): boolean {
@@ -424,6 +461,114 @@ function hasExportModifier(node: ts.HasModifiers): boolean {
 function hasDefaultModifier(node: ts.HasModifiers): boolean {
   const mods = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
   return mods?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword) === true;
+}
+
+// ── Syntactic signature extraction (O1, CONTEXT_GLUING_REGIMES.md) ─────────────
+//
+// These read the *written* type surface of an export from the AST source
+// text (parent pointers are set, so `node.getText()` resolves to the root
+// SourceFile). They never resolve types — a value whose type is inferred,
+// or a type alias referencing another alias, is reported verbatim, not
+// expanded. Whitespace is collapsed so re-formatting a file does not churn
+// the signature.
+
+// Collapse all runs of whitespace to single spaces and trim, so two exports
+// with the same canonical tokens but different indentation / line-breaks
+// produce the same signature. NOTE: this does not *canonicalise* spacing —
+// `a:number` and `a: number` remain distinct. That is deliberate: under-
+// normalisation only ever yields a false NON-match (→ a conservative
+// conflict downstream), never a false identification (the dangerous
+// direction). True canonicalisation would need an AST printer; deferred.
+function normaliseSignature(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+// `<T>(a: X, b: Y): Z` for a function declaration. Bodies are never read —
+// only type parameters, parameter declarations (name + annotation + default)
+// and the return annotation.
+function functionSignature(node: ts.FunctionDeclaration): string {
+  const tp = node.typeParameters?.length
+    ? `<${node.typeParameters.map((t) => t.getText()).join(", ")}>`
+    : "";
+  const params = node.parameters.map((p) => p.getText()).join(", ");
+  const ret = node.type ? `: ${node.type.getText()}` : "";
+  return normaliseSignature(`${tp}(${params})${ret}`);
+}
+
+// The RHS of a type alias, the member shape of an interface, or the member
+// list of an enum. Implementation-free by construction.
+function typeDeclSignature(
+  node:
+    | ts.InterfaceDeclaration
+    | ts.TypeAliasDeclaration
+    | ts.EnumDeclaration,
+): string | undefined {
+  if (ts.isTypeAliasDeclaration(node)) {
+    return normaliseSignature(node.type.getText());
+  }
+  if (ts.isInterfaceDeclaration(node)) {
+    const heritage = node.heritageClauses?.map((h) => h.getText()).join(" ") ?? "";
+    const members = node.members.map((m) => m.getText()).join(" ");
+    return normaliseSignature(`${heritage} { ${members} }`);
+  }
+  // Enum: member names + any initialisers, in source order.
+  const members = node.members.map((m) => m.getText()).join(", ");
+  return normaliseSignature(`{ ${members} }`);
+}
+
+// The public member shape of a class — never the method bodies. Private
+// (`private` / `protected` / `#field`) members are excluded: they are not
+// part of the contract a consumer can rely on. Members are sorted so member
+// re-ordering does not change the signature.
+function classSignature(node: ts.ClassDeclaration): string {
+  const heritage = node.heritageClauses?.map((h) => h.getText()).join(" ") ?? "";
+  const members = node.members
+    .filter(isPublicClassMember)
+    .map(classMemberSignature)
+    .filter((s): s is string => s !== undefined)
+    .sort();
+  return normaliseSignature(`${heritage} { ${members.join("; ")} }`);
+}
+
+function isPublicClassMember(m: ts.ClassElement): boolean {
+  if (m.name && ts.isPrivateIdentifier(m.name)) return false; // `#field`
+  const mods = ts.canHaveModifiers(m) ? ts.getModifiers(m) : undefined;
+  if (
+    mods?.some(
+      (x) =>
+        x.kind === ts.SyntaxKind.PrivateKeyword ||
+        x.kind === ts.SyntaxKind.ProtectedKeyword,
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
+// `name(a: X): Y` for a method/accessor, `name: T` for a property. Bodies
+// are excluded — only the declared signature surface is read.
+function classMemberSignature(m: ts.ClassElement): string | undefined {
+  const name =
+    m.name && ts.isIdentifier(m.name)
+      ? m.name.text
+      : m.name
+        ? m.name.getText()
+        : undefined;
+  if (name === undefined) return undefined;
+  if (
+    ts.isMethodDeclaration(m) ||
+    ts.isGetAccessorDeclaration(m) ||
+    ts.isSetAccessorDeclaration(m)
+  ) {
+    const params = m.parameters.map((p) => p.getText()).join(", ");
+    const ret = m.type ? `: ${m.type.getText()}` : "";
+    return `${name}(${params})${ret}`;
+  }
+  if (ts.isPropertyDeclaration(m)) {
+    const t = m.type ? `: ${m.type.getText()}` : "";
+    return `${name}${t}`;
+  }
+  return undefined;
 }
 
 // Resolve `modulePath` relative to `fromFile`. Returns the absolute

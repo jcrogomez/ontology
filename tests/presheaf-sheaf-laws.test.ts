@@ -33,7 +33,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
 import { assembleContext } from "../src/runtime/context/assembler.js";
-import { glueFragments } from "../src/runtime/context/gluing.js";
+import { glueFragments, restrictSection } from "../src/runtime/context/gluing.js";
 import type { ContextFragment } from "../src/runtime/context/presheaf.js";
 import type { OntologyNode, OntologyEdge } from "../src/schemas/ontology.js";
 
@@ -298,5 +298,136 @@ describe("Axiom 5 — glueFragments is a separated presheaf, NOT a sheaf", () =>
     expect(ab.ok).toBe(true);
     expect(ba.ok).toBe(true);
     expect(ab.merged).toEqual(ba.merged);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Part 3 — the SHEAF GLUING AXIOM as a stated law over an explicit cover
+// (Path-to-T1 gate #2). Part 2 pinned behaviour (equal-sig duplicates glue);
+// this pins the categorical LAW with restriction maps: on the subcategory of
+// covers whose overlaps carry identical signatures, a COMPATIBLE FAMILY glues
+// to a section that RESTRICTS BACK to each piece (existence + s|_Ui = s_i),
+// and is the UNIQUE such section (well-defined + reconstructible). Off the
+// subcategory (drift on the overlap) the axiom fails — still only a sheaf on
+// the equal-signature subcategory.
+// ---------------------------------------------------------------------------
+
+describe("Axiom 5 — sheaf gluing axiom over an explicit cover (equal-signature subcategory)", () => {
+  const frag = (over: Partial<ContextFragment> & { nodeId: string }): ContextFragment => ({
+    branch: "main",
+    provides: [],
+    requires: [],
+    forbids: [],
+    optional: [],
+    rules: [],
+    ...over,
+  });
+
+  // Compare two sections up to order/dedup (sections are sets, not lists).
+  const sameSection = (a: ContextFragment, b: ContextFragment) => {
+    const s = (xs: string[]) => [...xs].sort();
+    expect(s(a.provides)).toEqual(s(b.provides));
+    expect(s(a.requires)).toEqual(s(b.requires));
+    expect(s(a.forbids)).toEqual(s(b.forbids));
+    expect(s(a.optional)).toEqual(s(b.optional));
+    expect(s(a.rules)).toEqual(s(b.rules));
+    expect(a.provideSignatures ?? {}).toEqual(b.provideSignatures ?? {});
+  };
+
+  // A cover of two pieces overlapping on key "B" (declared with the SAME
+  // signature on both → a compatible family).
+  const f1 = frag({
+    nodeId: "n1",
+    provides: ["A", "B"],
+    provideSignatures: { A: "(): number", B: "(): string" },
+  });
+  const f2 = frag({
+    nodeId: "n2",
+    provides: ["B", "C"],
+    provideSignatures: { B: "(): string", C: "(): boolean" }, // B agrees on the overlap
+  });
+
+  it("EXISTENCE + RESTRICTION: a compatible family glues, and the glue restricts back to each piece (s|_Ui = s_i)", () => {
+    const glued = glueFragments([f1, f2], { onDuplicateProvider: "identify-if-equal" });
+    expect(glued.ok).toBe(true); // existence
+
+    // The glued global section restricts back to each local section — the
+    // gluing axiom's defining property.
+    sameSection(restrictSection(glued.merged, f1), f1);
+    sameSection(restrictSection(glued.merged, f2), f2);
+  });
+
+  it("UNIQUENESS: the glue is well-defined (order-independent) and reconstructible from its restrictions", () => {
+    const ab = glueFragments([f1, f2], { onDuplicateProvider: "identify-if-equal" });
+    const ba = glueFragments([f2, f1], { onDuplicateProvider: "identify-if-equal" });
+    expect(ab.merged).toEqual(ba.merged); // well-defined on the cover, not its enumeration
+
+    // Re-gluing the restrictions of the global section recovers it exactly —
+    // separation (Part 2) + this ⇒ the glued section is the unique one with
+    // those restrictions.
+    const r1 = restrictSection(ab.merged, f1);
+    const r2 = restrictSection(ab.merged, f2);
+    const reglued = glueFragments([r1, r2], { onDuplicateProvider: "identify-if-equal" });
+    expect(reglued.ok).toBe(true);
+    expect(reglued.merged).toEqual(ab.merged);
+
+    // The glued provides are EXACTLY the union of the cover — no spurious keys.
+    expect(ab.merged.provides).toEqual(["A", "B", "C"]);
+  });
+
+  it("CHARACTERISATION (exhaustive over 2-piece covers on {A,B,C}): glue ⟺ overlaps agree, and every glue restricts back", () => {
+    // Not a sample — a sweep over ALL 49 ordered pairs of non-empty provide-sets
+    // on a 3-key universe (with requires/forbids empty to isolate the gluing
+    // axiom). Combined with Part 2's order-independence (n-piece reduces to
+    // pairwise on an order-independent presheaf), this characterises the sheaf
+    // gluing axiom on the equal-signature subcategory rather than illustrating
+    // it — the §3.9-style exhaustiveness the T1 bar asks for.
+    const universe = ["A", "B", "C"];
+    const subsets: string[][] = [];
+    for (let m = 1; m < 1 << universe.length; m++) {
+      subsets.push(universe.filter((_, i) => (m & (1 << i)) !== 0));
+    }
+    const SIG = "(): T";
+    let glued = 0;
+    let blocked = 0;
+    for (const p1 of subsets) {
+      for (const p2 of subsets) {
+        const sig = (ks: string[]) => Object.fromEntries(ks.map((k) => [k, SIG]));
+        const f1 = frag({ nodeId: "n1", provides: p1, provideSignatures: sig(p1) });
+        const f2 = frag({ nodeId: "n2", provides: p2, provideSignatures: sig(p2) });
+        // Agreeing overlap ⇒ compatible family ⇒ glues, and restricts back.
+        const g = glueFragments([f1, f2], { onDuplicateProvider: "identify-if-equal" });
+        expect(g.ok).toBe(true);
+        sameSection(restrictSection(g.merged, f1), f1);
+        sameSection(restrictSection(g.merged, f2), f2);
+        glued++;
+
+        // Disagree on a non-empty overlap ⇒ NOT a compatible family ⇒ no glue.
+        const overlap = p1.filter((k) => p2.includes(k));
+        if (overlap.length > 0) {
+          const f2b = frag({
+            nodeId: "n2",
+            provides: p2,
+            provideSignatures: { ...sig(p2), [overlap[0]]: "(): OTHER" },
+          });
+          const gb = glueFragments([f1, f2b], { onDuplicateProvider: "identify-if-equal" });
+          expect(gb.ok).toBe(false);
+          blocked++;
+        }
+      }
+    }
+    expect(glued).toBe(subsets.length * subsets.length); // 49 covers all glued + round-tripped
+    expect(blocked).toBeGreaterThan(0); // and the disagreeing overlaps were all blocked
+  });
+
+  it("BOUNDARY: off the equal-signature subcategory (drift on the overlap) the gluing axiom FAILS — still only a sheaf on the subcategory", () => {
+    const f2drift = frag({
+      nodeId: "n2",
+      provides: ["B", "C"],
+      provideSignatures: { B: "(): number", C: "(): boolean" }, // B DRIFTS from f1's "(): string"
+    });
+    const glued = glueFragments([f1, f2drift], { onDuplicateProvider: "identify-if-equal" });
+    expect(glued.ok).toBe(false);
+    expect(glued.conflicts.map((c) => c.type)).toContain("duplicate_provider");
   });
 });

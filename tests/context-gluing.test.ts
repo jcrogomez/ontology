@@ -108,3 +108,67 @@ describe("context gluing", () => {
     expect(result.merged.rules).toEqual(["Rule 1", "Rule 2"]);
   });
 });
+
+describe("context gluing — identify-if-equal policy (O2)", () => {
+  const frag = (over: Partial<ContextFragment> & { nodeId: string }): ContextFragment => ({
+    branch: "main",
+    provides: [],
+    requires: [],
+    forbids: [],
+    optional: [],
+    rules: [],
+    ...over,
+  });
+
+  it("default policy still conflicts on duplicate providers EVEN with equal signatures (back-compat / separated presheaf)", () => {
+    const fragments = [
+      frag({ nodeId: "n1", provides: ["A"], provideSignatures: { A: "(): number" } }),
+      frag({ nodeId: "n2", provides: ["A"], provideSignatures: { A: "(): number" } }),
+    ];
+    const result = glueFragments(fragments); // no options → "conflict"
+    expect(result.ok).toBe(false);
+    expect(result.conflicts.map((c) => c.type)).toContain("duplicate_provider");
+  });
+
+  it("identify-if-equal GLUES two providers with an identical defined signature", () => {
+    const fragments = [
+      frag({ nodeId: "n1", provides: ["A"], provideSignatures: { A: "(): number" } }),
+      frag({ nodeId: "n2", provides: ["A"], provideSignatures: { A: "(): number" } }),
+    ];
+    const result = glueFragments(fragments, { onDuplicateProvider: "identify-if-equal" });
+    expect(result.ok).toBe(true);
+    expect(result.conflicts).toHaveLength(0);
+    expect(result.merged.provides).toEqual(["A"]); // identified to one
+    expect(result.warnings.join(" ")).toMatch(/Identified 2 providers of key "A"/);
+  });
+
+  it("identify-if-equal CONFLICTS when signatures differ (drift is caught, never silently merged)", () => {
+    const fragments = [
+      frag({ nodeId: "n1", provides: ["A"], provideSignatures: { A: "(): number" } }),
+      frag({ nodeId: "n2", provides: ["A"], provideSignatures: { A: "(): string" } }),
+    ];
+    const result = glueFragments(fragments, { onDuplicateProvider: "identify-if-equal" });
+    expect(result.ok).toBe(false);
+    expect(result.conflicts.map((c) => c.type)).toContain("duplicate_provider");
+  });
+
+  it("identify-if-equal CONFLICTS when a signature is missing on either side (unknown ⇒ conflict)", () => {
+    const fragments = [
+      frag({ nodeId: "n1", provides: ["A"], provideSignatures: { A: "(): number" } }),
+      frag({ nodeId: "n2", provides: ["A"] }), // no signature
+    ];
+    const result = glueFragments(fragments, { onDuplicateProvider: "identify-if-equal" });
+    expect(result.ok).toBe(false);
+    expect(result.conflicts.map((c) => c.type)).toContain("duplicate_provider");
+  });
+
+  it("identify-if-equal does not affect non-duplicate keys", () => {
+    const fragments = [
+      frag({ nodeId: "n1", provides: ["A"], provideSignatures: { A: "(): number" } }),
+      frag({ nodeId: "n2", provides: ["B"], requires: ["A"] }),
+    ];
+    const result = glueFragments(fragments, { onDuplicateProvider: "identify-if-equal" });
+    expect(result.ok).toBe(true);
+    expect(result.merged.provides).toEqual(["A", "B"]);
+  });
+});

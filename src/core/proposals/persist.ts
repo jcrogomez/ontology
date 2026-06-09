@@ -406,6 +406,7 @@ function applyNodeCreate(
       language: current.mutation.payload.language,
       requires: current.mutation.payload.requires,
       provides: current.mutation.payload.provides,
+      provideSignatures: current.mutation.payload.provideSignatures,
       forbids: current.mutation.payload.forbids,
       rules: current.mutation.payload.rules,
       literal: current.mutation.payload.literal,

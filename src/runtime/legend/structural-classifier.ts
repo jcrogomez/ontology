@@ -116,6 +116,9 @@ export interface ClassificationVocabulary {
     /** Set when this export passes through from another module
      * (`export { X } from "./y.js"`). */
     reExportedFrom?: string;
+    /** Syntactic interface signature (O1), when the parser could read one.
+     * Carried so static-summary can attach it to the provided symbol. */
+    signature?: string;
   }>;
   /** Every module specifier this file consumes — including the
    * synthetic specifiers from `export * from "./x.js"` (which look
@@ -731,10 +734,9 @@ function buildVocabulary(parsed: ParsedTSFile): ClassificationVocabulary {
     const entry: ClassificationVocabulary["exports"][number] = {
       name: e.name,
       kind: e.kind,
+      ...(e.reExportedFrom !== undefined ? { reExportedFrom: e.reExportedFrom } : {}),
+      ...(e.signature !== undefined ? { signature: e.signature } : {}),
     };
-    if (e.reExportedFrom !== undefined) {
-      return { ...entry, reExportedFrom: e.reExportedFrom };
-    }
     return entry;
   });
   const imports = parsed.imports.map((i) => {

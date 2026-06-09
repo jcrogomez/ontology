@@ -641,3 +641,50 @@ describe("Move 1b — requires carries symbol names, never module paths", () => 
     }
   });
 });
+
+describe("buildStaticSummary — provideSignatures (O1)", () => {
+  it("threads per-export signatures from vocabulary into provideSignatures, omitting un-signed exports", () => {
+    const classification = fixtureClassification({
+      path: "src/types.ts",
+      shape: "declaration_only",
+      role: "type_module",
+      vocabulary: {
+        exports: [
+          { name: "Id", kind: "type", signature: "string | number" },
+          { name: "Box", kind: "type", signature: "{ x: number }" },
+          // No signature (e.g. inferred / unreadable) — must be absent.
+          { name: "Bare", kind: "type" },
+        ],
+        imports: [],
+      },
+    });
+    const summary = buildStaticSummary({
+      filePath: "src/types.ts",
+      classification,
+    });
+    // provides stays a bare name list.
+    expect(summary.provides).toEqual(["Id", "Box", "Bare"]);
+    // signatures ride parallel, only for exports that carry one.
+    expect(summary.provideSignatures).toEqual({
+      Id: "string | number",
+      Box: "{ x: number }",
+    });
+  });
+
+  it("omits provideSignatures entirely when no export carries a signature", () => {
+    const classification = fixtureClassification({
+      path: "src/types.ts",
+      shape: "declaration_only",
+      role: "type_module",
+      vocabulary: {
+        exports: [{ name: "Bare", kind: "type" }],
+        imports: [],
+      },
+    });
+    const summary = buildStaticSummary({
+      filePath: "src/types.ts",
+      classification,
+    });
+    expect(summary.provideSignatures).toBeUndefined();
+  });
+});

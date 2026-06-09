@@ -78,6 +78,45 @@ describe("context presheaf", () => {
     expect(fragment.rules).toEqual(["First rule", "Second rule", "No prefix rule"]);
   });
 
+  it("buildFragment surfaces per-key signatures as a side channel, keeping provides a string[] (O1)", () => {
+    const node = createMockNode({
+      context: {
+        provides: [
+          { key: "add", nodeType: "declared", signature: "(a: number, b: number): number" },
+          { key: "Untyped", nodeType: "declared" },
+        ],
+        requires: [],
+        forbids: [],
+        optional: [],
+      },
+    });
+
+    const fragment = buildFragment(node);
+
+    // provides stays a bare string[] — the gluing token set is unchanged.
+    expect(fragment.provides).toEqual(["add", "Untyped"]);
+    // signatures ride alongside, only for keys that carry one.
+    expect(fragment.provideSignatures).toEqual({
+      add: "(a: number, b: number): number",
+    });
+  });
+
+  it("buildFragment omits provideSignatures entirely when no provision carries one", () => {
+    const node = createMockNode({
+      context: {
+        provides: [{ key: "db_access", nodeType: "domain" }],
+        requires: [],
+        forbids: [],
+        optional: [],
+      },
+    });
+
+    const fragment = buildFragment(node);
+
+    expect(fragment.provides).toEqual(["db_access"]);
+    expect(fragment.provideSignatures).toBeUndefined();
+  });
+
   it("buildFragment does not mutate original node", () => {
     const node = createMockNode({
       rules: ["1. Rule"],
