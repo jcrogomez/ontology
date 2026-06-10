@@ -9,13 +9,17 @@ export interface IdentityBarProps {
   // "(draft pending)" annotation so a user returning to a node sees there's
   // unfinished authoring work attached to it.
   hasDraft?: boolean;
+  // Shadow freshness vs the last `onto drift --update` anchor. Only the two
+  // states that demand attention are annotated; clean/no-anchor/no-shadow
+  // stay silent here (the artifact preview panel carries the full detail).
+  shadowStatus?: "drifted" | "missing" | null;
 }
 
 // The identity bar carries the focal node's id, label, and the three coordinate
 // tags (abstraction, plane, manifestation). Color encodes the abstraction level.
 // When colors are off we fall back to a textual [LEVEL] marker so the hierarchy
 // is still legible.
-export function IdentityBar({ node, hasDraft }: IdentityBarProps): React.ReactElement {
+export function IdentityBar({ node, hasDraft, shadowStatus }: IdentityBarProps): React.ReactElement {
   const color = POSET_COLORS[node.coordinates.abstraction];
   const showColors = colorsEnabled();
   return (
@@ -40,6 +44,18 @@ export function IdentityBar({ node, hasDraft }: IdentityBarProps): React.ReactEl
           <Box flexShrink={0}>
             <Text>  </Text>
             <Text color="yellow">(draft pending)</Text>
+          </Box>
+        )}
+        {shadowStatus === "drifted" && (
+          <Box flexShrink={0}>
+            <Text>  </Text>
+            <Text color="yellow">≠ shadow drifted</Text>
+          </Box>
+        )}
+        {shadowStatus === "missing" && (
+          <Box flexShrink={0}>
+            <Text>  </Text>
+            <Text color="red">? shadow missing</Text>
           </Box>
         )}
       </Box>

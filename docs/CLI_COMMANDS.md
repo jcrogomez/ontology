@@ -331,6 +331,7 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **Purpose:** Open the Walker, an interactive focal-cell terminal interface for the intention graph. Color encodes the abstraction level, tokens shared across the local neighborhood are underlined (presheaf overlap), and the path bar renders a colored breadcrumb from canon to focal.
 - **Example:** `npm run dev -- walk node_0000_canon`
 - **v0 keys:** `↑` parent · `↓` child · `←/→` siblings · `:q` / `q` quit · `:help` flash help.
+- **v1.6 — intent-first editing loop, slice 1 (2026-06-10):** `a` / `:preview` toggles the read-only artifact preview of the focal's shadow (`outputs.files[0]`) with a drift badge against the last `onto drift --update` anchor; `:which <file>` jumps the focal to the node that owns that file (inverse traceability) and opens the preview; the identity bar shows `≠ shadow drifted` / `? shadow missing` when the focal's artifact diverges from the anchor. Recompiling is always manual (`:compile`). See `docs/WALKER_INTERFACE.md` §v1.6.
 - **v1 PR-A — drafts + propose:**
   - `i` enters edit mode. The user composes the prompt for a *candidate child* of the focal (the focal node itself is never edited — only explicit graph commands may mutate the network).
   - `Esc` exits edit mode and saves the buffer as a draft to `.ontology/work/drafts/<focalId>.draft.json`. Re-entering edit mode resumes from the saved draft.

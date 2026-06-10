@@ -28,7 +28,7 @@ export function HintBar({ mode, command, message }: HintBarProps): React.ReactEl
   }
   return (
     <Box marginTop={1}>
-      <Text dimColor>↑ parent  ↓ child  ←/→ sibling  i edit  m model  TAB plane  : cmd  q quit</Text>
+      <Text dimColor>↑ parent  ↓ child  ←/→ sibling  i edit  a artifact  m model  TAB plane  : cmd  q quit</Text>
     </Box>
   );
 }
