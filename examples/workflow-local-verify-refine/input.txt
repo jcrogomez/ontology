@@ -1,0 +1,6 @@
+We need a slug generator for episode pages of a small podcast site.
+Example expected behaviour:
+  "Micro Brócoli: ¿el futuro?"  →  "micro-brcoli-el-futuro"
+  "  Hello __ World!! "          →  "hello-world"
+Edge cases that matter: accented characters are simply dropped by rule 4
+(no transliteration required), and the empty string must return "".
