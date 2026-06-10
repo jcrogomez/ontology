@@ -506,8 +506,9 @@ function buildProposalFromWorkflow(args: {
 // per graph-declared edge. All edge declarations are validated (type
 // vocabulary, endpoint existence, self-loop, poset direction) BEFORE any
 // proposal is created, so a bad declaration never leaves a partial set in
-// the append-only sequence.
-function buildUpdateProposalsFromWorkflow(args: {
+// the append-only sequence. Exported for the walker's `:workflow
+// --propose-update` (v1.5), which reuses the exact same provenance path.
+export function buildUpdateProposalsFromWorkflow(args: {
   nodeId: string;
   output: string;
   label?: string;
@@ -521,10 +522,11 @@ function buildUpdateProposalsFromWorkflow(args: {
   // §3.6 provenance: the persisted workflow run record every proposal of
   // this run references.
   source: ProposalWorkflowSource;
+  cwd?: string;
 }): { edgeProposals: Proposal[]; nodeProposal: Proposal } {
-  const target = loadNodeById(args.nodeId);
+  const target = loadNodeById(args.nodeId, args.cwd);
   if (!target) {
-    throw new Error(`--update-node target not found: ${args.nodeId}`);
+    throw new Error(`update target not found: ${args.nodeId}`);
   }
 
   // Validation pass over every declared edge — no proposal is created yet.
@@ -540,7 +542,7 @@ function buildUpdateProposalsFromWorkflow(args: {
         `proposesEdges: invalid edge type "${e.type}" (expected one of: ${EdgeTypeSchema.options.join(", ")})`,
       );
     }
-    const other = loadNodeById(e.target);
+    const other = loadNodeById(e.target, args.cwd);
     if (!other) {
       throw new Error(`proposesEdges: target node not found: ${e.target}`);
     }
@@ -576,6 +578,7 @@ function buildUpdateProposalsFromWorkflow(args: {
         derivedFrom: [e.fromNode.id, e.toNode.id],
         rationale: `Edge declared by workflow "${args.graphName}" (proposesEdges, §3.6).`,
       },
+      cwd: args.cwd,
     });
     edgeProposals.push(proposal);
   }
@@ -606,6 +609,7 @@ function buildUpdateProposalsFromWorkflow(args: {
       derivedFrom: [target.id],
       rationale,
     },
+    cwd: args.cwd,
   });
   return { edgeProposals, nodeProposal: proposal };
 }

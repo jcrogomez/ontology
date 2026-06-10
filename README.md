@@ -70,7 +70,7 @@ Longer term, the **Open-Prompt protocol** turns the signed intent + audit chain 
 | `onto bakeoff <reports…>` | Fidelity regression gate over recorded verify reports (wired into CI). |
 | `onto query` | Search nodes by Hom-profile (edges + contract + coordinates). |
 | `onto mcp` | Read-only MCP server over the intent graph + audit chain — a third party can judge the declared intent without mutation access. |
-| `onto walk <id>` | The Walker: interactive TUI — navigate, draft, propose, review proposals, run models, compile. |
+| `onto walk <id>` | The Walker: interactive TUI — navigate, draft, propose (create or in-place update), review proposals, run models, compile, verify the focal's round-trip, run workflows. |
 | `onto replay` | Rebuild the state summary from the event log alone, verify chain integrity, `--write` to repair. |
 | `onto validate / inspect / doctor / events tail / model doctor` | Observability and health checks. |
 

@@ -28,7 +28,10 @@ import { RunResultPanel, type RunResultPanelProps } from "./layout/run-result-pa
 import { CompilePlanPanel, type CompilePlanPanelProps } from "./layout/compile-plan-panel.js";
 import { CompileResultPanel, type CompileResultPanelProps } from "./layout/compile-result-panel.js";
 import { loadDraft, saveDraft, clearDraft } from "../core/drafts/persist.js";
-import { proposeFromDraft } from "./actions/propose-from-draft.js";
+import { proposeFromDraft, proposeUpdateFromDraft } from "./actions/propose-from-draft.js";
+import { verifyFromWalker } from "./actions/verify-from-walker.js";
+import { workflowFromWalker } from "./actions/workflow-from-walker.js";
+import { parseWorkflowArgs, type WorkflowArgs } from "./state/parse-workflow-args.js";
 import { runFromWalker } from "./actions/run-from-walker.js";
 import { planFromWalker } from "./actions/plan-from-walker.js";
 import { compileFromWalker } from "./actions/compile-from-walker.js";
@@ -120,6 +123,8 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
     cursor: 0,
   });
   const [pendingLinkAnalysis, setPendingLinkAnalysis] = useState<{ focalId: string } | null>(null);
+  // Async sentinel for `:workflow` (v1.5) — same two-stage pattern as :run.
+  const [pendingWorkflow, setPendingWorkflow] = useState<WorkflowArgs | null>(null);
 
   const neighborhood = useMemo<FocalNeighborhood | { error: string }>(() => {
     try {
@@ -211,6 +216,36 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingLinkAnalysis]);
+
+  // Async dispatcher for `:workflow`. Mirrors the :run pattern: the handler
+  // sets the sentinel + a transient message synchronously; this effect runs
+  // the (potentially long, multi-step) workflow off the keystroke path and
+  // lands the result in the info panel.
+  useEffect(() => {
+    if (!pendingWorkflow) return;
+    if ("error" in neighborhood) {
+      setInfoState({ kind: "workflow", result: { ok: false, message: "focal node failed to load" } });
+      setPendingWorkflow(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const result = await workflowFromWalker({
+        focal: neighborhood.focal,
+        ...pendingWorkflow,
+        cwd,
+      });
+      if (cancelled) return;
+      setInfoState({ kind: "workflow", result });
+      if (!result.ok) setMessage(result.message);
+      else if (result.proposalId) setDraftTick((t) => t + 1);
+      setPendingWorkflow(null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingWorkflow]);
 
   // Async dispatcher for `:compile`. Mirrors the :run pattern.
   useEffect(() => {
@@ -526,7 +561,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       return;
     }
     if (cmd === "help") {
-      setMessage("i edit · :propose · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :clear{run,plan,compile,info,draft} · :q");
+      setMessage("i edit · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :clear{run,plan,compile,info,draft} · :q");
       return;
     }
     if (cmd === "propose") {
@@ -542,6 +577,53 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       // Re-evaluate hasDraft (clearDraft may have been called by the action).
       setDraftTick(t => t + 1);
       setMessage(`proposal ${result.proposalId} created (pending)`);
+      return;
+    }
+    // :propose-update — the draft becomes a node_update proposal on the
+    // focal ITSELF (in-place refinement; :propose creates a child instead).
+    // Pinned to the focal's hash; apply via :proposals or the CLI.
+    if (cmd === "propose-update") {
+      if ("error" in neighborhood) {
+        setMessage("cannot propose: focal node failed to load");
+        return;
+      }
+      const result = proposeUpdateFromDraft({ focal: neighborhood.focal, cwd });
+      if (!result.ok) {
+        setMessage(result.message);
+        return;
+      }
+      setDraftTick(t => t + 1);
+      setMessage(`proposal ${result.proposalId} created (pending node_update on ${focalId})`);
+      return;
+    }
+    // :verify — the focal's round-trip verdict against the LAST compiled
+    // artifact. Pure + synchronous (no dispatch); :compile first to refresh.
+    if (cmd === "verify") {
+      if ("error" in neighborhood) {
+        setMessage("cannot verify: focal node failed to load");
+        return;
+      }
+      const result = verifyFromWalker(neighborhood.focal, cwd);
+      setInfoState({ kind: "verify", result });
+      setMessage(result.ok ? `verify: ${result.verdict}` : result.message);
+      return;
+    }
+    // :workflow <graph> --input <file> [provider] [--model X] [--propose-update]
+    // Run a Phase ζ workflow graph from the TUI. With --propose-update an
+    // ACCEPTED run proposes a node_update of the focal via the §3.6 path
+    // (wfrun_* record + proposals, same substrate as the CLI).
+    if (cmd === "workflow" || cmd.startsWith("workflow ")) {
+      if ("error" in neighborhood) {
+        setMessage("cannot run workflow: focal node failed to load");
+        return;
+      }
+      const parsed = parseWorkflowArgs(cmd.slice("workflow".length));
+      if (!parsed.ok) {
+        setMessage(parsed.message);
+        return;
+      }
+      setMessage(`running workflow ${parsed.args.graphFile}…`);
+      setPendingWorkflow(parsed.args);
       return;
     }
     // :link --to <nodeId> --type <edgeType> [--rationale <text>]
