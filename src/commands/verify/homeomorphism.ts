@@ -39,6 +39,7 @@ import {
   meanHonesty,
   HONESTY_AXES,
   type ByAxis,
+  type ContractState,
   type PerNodeMatrix,
 } from "../../runtime/legend/matrix.js";
 import {
@@ -79,6 +80,10 @@ import {
   runBehaviorCheck,
   type BehaviorCheckResult,
 } from "../../runtime/legend/behavior-checker.js";
+import {
+  checkContract,
+  type ContractCheckResult,
+} from "../../runtime/legend/contract-checker.js";
 
 // `onto verify-homeomorphism` — Project Legend δ-2.
 //
@@ -189,6 +194,13 @@ export interface VerifyHomeomorphismOptions {
   // Per-case wall-clock cap for the behaviour checker. Clamped to
   // [100ms, 60s] inside the runner. Default 5s.
   behaviorTimeoutMs?: number;
+  // Contract-axis checker (v0, 2026-06-09). When set, statically
+  // compares each node's declared `context.provides` (keys + O1
+  // signatures) against the regen artifact's extracted exports and
+  // overrides the matrix cell's `contract` axis with the measured
+  // pass/fail/unknown state. $0 — no LLM, no execution. Requires
+  // --matrix. See docs/legend/CONTRACT_AXIS_CHECKER_SPEC.md.
+  contractCheck?: boolean;
   json?: boolean;
 }
 
@@ -388,6 +400,17 @@ export async function verifyHomeomorphismCommand(
   // without it the override has nowhere to land. Tracked separately
   // so the per-node result can be surfaced in the JSON report.
   const behaviorResults: Map<string, BehaviorCheckResult> = new Map();
+  // Contract-axis checker (CONTRACT_AXIS_CHECKER_SPEC.md): pure and
+  // synchronous, so it runs inline in the matrix loop below; this map
+  // only collects the per-node results for the JSON report.
+  const contractResults: Map<string, ContractCheckResult> = new Map();
+  if (options.contractCheck && !options.matrix) {
+    fail(
+      "--contract-check requires --matrix (the contract axis lives on the matrix cell).",
+      options.json,
+    );
+    return;
+  }
   if (options.behaviorCheck) {
     if (!options.matrix) {
       fail(
@@ -515,6 +538,30 @@ export async function verifyHomeomorphismCommand(
       const behaviorOverride = behaviorResult
         ? behaviorVerdictToMatrixState(behaviorResult.verdict)
         : undefined;
+      // Contract-axis checker: declared provides/signatures vs the
+      // regen's extracted exports, static. Unrecoverable verdicts have
+      // no regen artifact — the cell builder keeps `not-measured`.
+      let contractOverride: ContractState | undefined;
+      if (options.contractCheck && r.verdict !== "unrecoverable" && r.regenPath) {
+        let regenText: string | undefined;
+        try {
+          regenText = fs.readFileSync(r.regenPath, "utf-8");
+        } catch {
+          regenText = undefined; // artifact vanished → not-measured
+        }
+        const declared = (node?.context.provides ?? []).map((p) => ({
+          key: p.key,
+          ...(p.signature !== undefined ? { signature: p.signature } : {}),
+        }));
+        const checkResult = checkContract({
+          nodeId: r.nodeId,
+          declared,
+          regenText,
+          regenFileName: r.regenPath,
+        });
+        contractResults.set(r.nodeId, checkResult);
+        contractOverride = checkResult.state;
+      }
       matrix.push(
         buildPerNodeMatrix({
           nodeId: r.nodeId,
@@ -526,6 +573,7 @@ export async function verifyHomeomorphismCommand(
           metrics: r.metrics,
           extraDerivedTags,
           ...(behaviorOverride !== undefined ? { behaviorOverride } : {}),
+          ...(contractOverride !== undefined ? { contractOverride } : {}),
         }),
       );
     }
@@ -556,6 +604,9 @@ export async function verifyHomeomorphismCommand(
     ...(failureModes ? { failureModes } : {}),
     ...(options.behaviorCheck
       ? { behaviorResults: Array.from(behaviorResults.values()) }
+      : {}),
+    ...(options.contractCheck
+      ? { contractResults: Array.from(contractResults.values()) }
       : {}),
   };
 

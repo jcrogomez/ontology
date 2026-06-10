@@ -329,6 +329,14 @@ export interface AggregateReport {
    * docs/legend/BEHAVIOUR_AXIS_CHECKER_SPEC.md §3.2.
    */
   behaviorResults?: import("./behavior-checker.js").BehaviorCheckResult[];
+  /**
+   * Contract-axis checker (v0, 2026-06-09): per-node results — the
+   * node's declared `context.provides` (keys + O1 signatures) vs the
+   * regen's extracted exports, static and $0. Undefined when
+   * --contract-check was not passed. See
+   * docs/legend/CONTRACT_AXIS_CHECKER_SPEC.md.
+   */
+  contractResults?: import("./contract-checker.js").ContractCheckResult[];
 }
 
 export function emptyVerdictCounts(): Record<HomeomorphismVerdict, number> {

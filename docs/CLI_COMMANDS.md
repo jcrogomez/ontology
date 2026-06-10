@@ -513,6 +513,7 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
   - `--behavior-check` — behaviour-axis checker v0: run the registered fixture's call-sites against source and regen and override the matrix's `behavior` axis with the measured state. Requires `--matrix`. See `docs/legend/BEHAVIOUR_AXIS_CHECKER_SPEC.md`.
   - `--behavior-fixtures-dir <path>` — override the fixtures directory (default `tests/behavior-fixtures/`).
   - `--behavior-timeout-ms <n>` — per-case wall-clock cap, clamped to [100, 60000]; default 5000.
+  - `--contract-check` — contract-axis checker v0: statically compare declared `context.provides` (keys + O1 signatures) against the regen's extracted exports and override the matrix's `contract` axis (`pass`/`fail`/`unknown`). $0 — no LLM, no execution; incomparable signatures never produce a `fail`. Requires `--matrix`. See `docs/legend/CONTRACT_AXIS_CHECKER_SPEC.md`.
 - **Examples:**
   - `npm run dev -- verify-homeomorphism node_0001 --provider anthropic`
   - `npm run dev -- verify-homeomorphism --all-artifacts --cost-estimate`

@@ -230,11 +230,21 @@ export interface VerdictToCellInputs {
    * See docs/legend/BEHAVIOUR_AXIS_CHECKER_SPEC.md §3.3.
    */
   behaviorOverride?: BehaviorState;
+  /**
+   * Contract-axis checker (v0, 2026-06-09) supplies a measured state
+   * per node — declared provides/signatures vs the regen's extracted
+   * exports, static. Same guard as behaviour: an unrecoverable verdict
+   * keeps `not-measured` regardless (no regen artifact to check).
+   * See docs/legend/CONTRACT_AXIS_CHECKER_SPEC.md.
+   */
+  contractOverride?: ContractState;
 }
 
 // Builds the six-axis cell from a verdict + node metadata + cost. The
 // unmeasured axes are explicit:
-//   - contract: "not-measured" (no contract checker in the pilot)
+//   - contract: "not-measured" unless a measured `contractOverride`
+//     arrives from the contract-axis checker (--contract-check,
+//     2026-06-09 — CONTRACT_AXIS_CHECKER_SPEC.md)
 //   - behavior: "untested" (or "not-applicable" when compile-back never
 //     produced an artifact); a measured `behaviorOverride` replaces the
 //     default once the behaviour-axis checker runs
@@ -246,12 +256,15 @@ export function verdictToMatrixCell(inputs: VerdictToCellInputs): MatrixCell {
   // Unrecoverable nodes never get a runtime equivalence reading —
   // there is no regen artifact to import. The override is honoured
   // only when the regen actually exists (every non-unrecoverable
-  // verdict guarantees a regen path on disk).
+  // verdict guarantees a regen path on disk). Same rule for contract.
   const behavior: BehaviorState = isUnrecoverable
     ? "not-applicable"
     : (inputs.behaviorOverride ?? "untested");
+  const contract: ContractState = isUnrecoverable
+    ? "not-measured"
+    : (inputs.contractOverride ?? "not-measured");
   return {
-    contract: "not-measured",
+    contract,
     structural,
     behavior,
     intent: isUnrecoverable ? "needs-human" : "not-reviewed",
@@ -280,8 +293,9 @@ export interface AxisHonesty {
   structural: number | null;
   /**
    * Contract fidelity. `pass` → 1, `fail` → 0, otherwise null.
-   * No contract checker in the pilot, so this is null for every
-   * node until that axis ships.
+   * Measured by the contract-axis checker (--contract-check,
+   * 2026-06-09); null when the checker did not run or could not
+   * evaluate (`unknown` / `not-measured`).
    */
   contract: number | null;
   /**
@@ -445,6 +459,12 @@ export function buildPerNodeMatrix(args: {
    * was not run (legacy verify-homeomorphism --matrix call).
    */
   behaviorOverride?: BehaviorState;
+  /**
+   * Contract-axis checker override (--contract-check, 2026-06-09).
+   * Same contract as behaviorOverride: measured state in, the
+   * unrecoverable guard in `verdictToMatrixCell` still applies.
+   */
+  contractOverride?: ContractState;
 }): PerNodeMatrix {
   const cell = verdictToMatrixCell({
     verdict: args.verdict,
@@ -452,6 +472,9 @@ export function buildPerNodeMatrix(args: {
     cost: args.cost,
     ...(args.behaviorOverride !== undefined
       ? { behaviorOverride: args.behaviorOverride }
+      : {}),
+    ...(args.contractOverride !== undefined
+      ? { contractOverride: args.contractOverride }
       : {}),
   });
   const derived = verdictDerivedTags(cell);
