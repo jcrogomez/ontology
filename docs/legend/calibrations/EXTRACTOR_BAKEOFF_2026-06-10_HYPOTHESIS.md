@@ -22,6 +22,14 @@ shared pre-registered protocol instead of trusting catalog blurbs.
 | A1 | `qwen3.5:4b` | Successor family of the incumbent |
 | A2 | `lfm2.5` (8B-A1B) | Built for reliable structured output on consumer hardware; ~1B active params |
 | A3 | `gemma4:e4b` | Diverse-family edge model, frontier-per-size claim |
+| A4 | `qwen3.5:9b` | **Amendment 2026-06-10, added BEFORE any arm's results were read** (A0/A1 in flight, unscored): the owner flagged the 9b tag's existence; same deployable class as the 7b compile workhorse. Same metrics, same decision rule. |
+
+> Out of local scope, recorded for honesty: `qwen3.6` (min tag 27b) exceeds
+> the 8 GB machine — it is a future cloud/rented-GPU arm, not a local one.
+> Separately, `qwen3.5:9b` is also the pre-registered CANDIDATE for the
+> compile role (F/code_sketch vs `qwen2.5-coder:7b`) — that comparison is a
+> different task and gets its own hypothesis file when run; this bake-off
+> only decides extraction.
 
 ## Sample (fixed before any run)
 
