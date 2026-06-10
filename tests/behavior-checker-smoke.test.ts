@@ -38,22 +38,63 @@ interface IdentityCase {
   sourceRelative: string;
 }
 
-// One per fixture-eligible node from the v0 cohort. The runner reads
+// EVERY shipped fixture, with the source module its cases exercise
+// (per the fixture's own header — node_0091/0092 are second fixtures
+// for poset/traversal, not commands/graph/*). The runner reads
 // src + regen from the same path → fixture must report `pass` if the
 // plumbing works. A `fail` or `untested` here means: fixture
 // signature drifted from the source's export, or vitest's resolver
-// rejected the `.ts` import, or the runner has a bug.
+// rejected the `.ts` import, or the runner has a bug. The
+// completeness guard below fails if a fixture lands in the directory
+// without being registered here.
 const CASES: readonly IdentityCase[] = [
+  { nodeId: "node_0005", sourceRelative: "src/runtime/compile/post/extract-code-fence.ts" },
   { nodeId: "node_0006", sourceRelative: "src/runtime/compile/post/runtime-check.ts" },
+  { nodeId: "node_0007", sourceRelative: "src/runtime/compile/post/validate-language.ts" },
+  { nodeId: "node_0008", sourceRelative: "src/runtime/compile/upstream-context.ts" },
+  { nodeId: "node_0011", sourceRelative: "src/runtime/context/gluing.ts" },
+  { nodeId: "node_0019", sourceRelative: "src/runtime/effects/result.ts" },
+  { nodeId: "node_0024", sourceRelative: "src/runtime/graph/compile-plan.ts" },
+  { nodeId: "node_0026", sourceRelative: "src/runtime/graph/poset.ts" },
+  { nodeId: "node_0027", sourceRelative: "src/runtime/graph/traversal.ts" },
+  { nodeId: "node_0028", sourceRelative: "src/runtime/legend/frontier-tagger.ts" },
+  { nodeId: "node_0029", sourceRelative: "src/runtime/legend/matrix-intersections.ts" },
+  { nodeId: "node_0030", sourceRelative: "src/runtime/legend/matrix.ts" },
+  { nodeId: "node_0031", sourceRelative: "src/runtime/legend/pareto.ts" },
   { nodeId: "node_0033", sourceRelative: "src/runtime/legend/render-ascii.ts" },
+  { nodeId: "node_0034", sourceRelative: "src/runtime/legend/static-summary.ts" },
+  { nodeId: "node_0035", sourceRelative: "src/runtime/legend/structural-classifier.ts" },
   { nodeId: "node_0036", sourceRelative: "src/runtime/legend/translator.ts" },
   { nodeId: "node_0038", sourceRelative: "src/runtime/legend/vocab-gap.ts" },
+  { nodeId: "node_0044", sourceRelative: "src/runtime/llm/registry.ts" },
+  { nodeId: "node_0047", sourceRelative: "src/runtime/prompt/parse.ts" },
+  { nodeId: "node_0053", sourceRelative: "src/runtime/static/typescript.ts" },
   { nodeId: "node_0055", sourceRelative: "src/runtime/topos/omega.ts" },
+  { nodeId: "node_0056", sourceRelative: "src/runtime/topos/predicate.ts" },
+  { nodeId: "node_0057", sourceRelative: "src/runtime/topos/rule-compiler.ts" },
   { nodeId: "node_0062", sourceRelative: "src/core/errors.ts" },
   { nodeId: "node_0065", sourceRelative: "src/core/integrity/hash.ts" },
+  { nodeId: "node_0067", sourceRelative: "src/core/nodes/node-id.ts" },
+  { nodeId: "node_0074", sourceRelative: "src/core/render/box.ts" },
+  { nodeId: "node_0075", sourceRelative: "src/core/render/style.ts" },
+  { nodeId: "node_0076", sourceRelative: "src/core/render/table.ts" },
+  { nodeId: "node_0091", sourceRelative: "src/runtime/graph/poset.ts" },
+  { nodeId: "node_0092", sourceRelative: "src/runtime/graph/traversal.ts" },
+  { nodeId: "node_0093", sourceRelative: "src/commands/ingest/cost-estimate.ts" },
+  { nodeId: "node_0095", sourceRelative: "src/commands/ingest/static-classifier-policy.ts" },
 ];
 
 describe("behavior-checker / E2E smoke against real source files (identity)", () => {
+  it("completeness guard: every fixture in the directory is registered above", () => {
+    const onDisk = fs
+      .readdirSync(FIXTURES_DIR)
+      .filter((f) => f.endsWith(".fixture.ts"))
+      .map((f) => f.replace(/\.fixture\.ts$/, ""))
+      .sort();
+    const registered = CASES.map((c) => c.nodeId).sort();
+    expect(onDisk).toEqual(registered);
+  });
+
   for (const c of CASES) {
     it(`${c.nodeId} (${c.sourceRelative}) — identity check passes`, async () => {
       const sourceAbs = path.resolve(PROJECT_ROOT, c.sourceRelative);
