@@ -22,6 +22,7 @@ import {
 } from "../../schemas/ontology.js";
 import { validateEdgeDirection } from "../../runtime/graph/poset.js";
 import { parseTypeScriptFile } from "../../runtime/static/typescript.js";
+import { extractCodeFence } from "../../runtime/compile/post/extract-code-fence.js";
 import type { WorkflowProposedEdge, WorkflowProvision } from "../../schemas/workflow.js";
 
 // `onto workflow run` — Phase ζ v0.
@@ -187,6 +188,13 @@ export async function workflowRunCommand(
       contractCheck.mismatches.length > 0
         ? `contract mismatch (declared≠produced): ${contractCheck.mismatches.join("; ")}`
         : undefined;
+    // The proposal carries the PROJECTED artefact (fences stripped for code
+    // languages) — the same text the contract was measured against, and the
+    // same projection the compiler applies before writing artifacts.
+    const artefactForProposal = projectWorkflowArtefact(
+      result.output,
+      loaded.graph.artefactLanguage,
+    );
 
     // §3.6 provenance: persist the workflow run record FIRST so every
     // proposal born from this run carries a non-null source pointing at it.
@@ -236,7 +244,7 @@ export async function workflowRunCommand(
       try {
         const built = buildUpdateProposalsFromWorkflow({
           nodeId: options.updateNode,
-          output: result.output,
+          output: artefactForProposal,
           label: options.proposalLabel,
           rationale: options.proposalRationale,
           graphName: path.basename(graphPath),
@@ -279,7 +287,7 @@ export async function workflowRunCommand(
       }
       try {
         const proposal = buildProposalFromWorkflow({
-          output: result.output,
+          output: artefactForProposal,
           level: lvl.data,
           kind: knd.data,
           parent: options.proposalParent,
@@ -374,6 +382,24 @@ const CODE_LANGUAGES = new Set([
   "typescript", "ts", "tsx", "javascript", "js", "jsx",
 ]);
 
+// Parity with the compiler (2026-06-09, found by the first live ζ run):
+// models wrap code artefacts in markdown fences, and compile-node strips
+// them via extractCodeFence before writing artifacts. The workflow path
+// must apply the SAME projection before measuring the contract and before
+// carrying the artefact into a proposal — otherwise a fenced-but-correct
+// artefact measures as an empty contract and the proposed node's prompt
+// carries LLM packaging instead of the work product. Non-code artefacts
+// pass through verbatim (a fence may be content there).
+export function projectWorkflowArtefact(
+  artefact: string,
+  language: string | undefined,
+): string {
+  if (language === undefined || !CODE_LANGUAGES.has(language.toLowerCase())) {
+    return artefact;
+  }
+  return extractCodeFence({ text: artefact, language }).content;
+}
+
 // The round-trip F∘G ≈ id on a single output. `declared` is the workflow's
 // intent; when `language` is code, the artefact is parsed (G) and the measured
 // contract is compared to the declaration. The node carries the measured
@@ -401,9 +427,13 @@ export function resolveContract(
   }
 
   // Measure the produced artefact (G). A synthetic filename gives the parser
-  // its script kind; the source is the artefact text.
+  // its script kind; the source is the FENCE-STRIPPED artefact text (the
+  // same projection the compiler applies before writing artifacts).
   const ext = language!.toLowerCase().startsWith("ts") ? "ts" : "js";
-  const measured = parseTypeScriptFile(`workflow-artefact.${ext}`, artefact)
+  const measured = parseTypeScriptFile(
+    `workflow-artefact.${ext}`,
+    projectWorkflowArtefact(artefact, language),
+  )
     .exports.filter((e) => !e.isDefault)
     .map((e) => ({ key: e.name, signature: e.signature }));
   const measuredByKey = new Map(measured.map((m) => [m.key, m.signature]));

@@ -44,6 +44,22 @@ describe("resolveContract — code artefact (the round-trip has teeth)", () => {
     expect(c.mismatches).toEqual([]);
   });
 
+  it("strips markdown fences before measuring (compiler parity — found by the first live ζ run, 2026-06-09)", () => {
+    // qwen2.5-coder:7b wrapped a CORRECT artefact in ```typescript fences;
+    // pre-fix the measurement parsed the fenced text, found zero exports,
+    // and reported a false "declared but not provided" mismatch.
+    const fenced = "```typescript\nexport function slugify(title: string): string { return title; }\n```";
+    const c = resolveContract(
+      [decl("slugify", "(title: string): string")],
+      "typescript",
+      fenced,
+    );
+    expect(c.measured).toBe(true);
+    expect(c.provides).toEqual(["slugify"]);
+    expect(c.provideSignatures.slugify).toBe("(title: string): string");
+    expect(c.mismatches).toEqual([]);
+  });
+
   it("flags a declared capability the artefact does not produce", () => {
     const c = resolveContract(
       [decl("add"), decl("subtract")], // subtract is never produced

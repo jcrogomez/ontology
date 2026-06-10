@@ -6,6 +6,7 @@ import { createWorkflowRunRecord } from "../../core/runs/workflow-record.js";
 import {
   resolveContract,
   buildUpdateProposalsFromWorkflow,
+  projectWorkflowArtefact,
 } from "../../commands/workflow/run.js";
 import type { OntologyNode, ProposalWorkflowSource } from "../../schemas/ontology.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
@@ -143,7 +144,8 @@ export async function workflowFromWalker(
     };
     const built = buildUpdateProposalsFromWorkflow({
       nodeId: options.focal.id,
-      output: result.output,
+      // Same projection as the CLI: fences stripped for code artefacts.
+      output: projectWorkflowArtefact(result.output, loaded.graph.artefactLanguage),
       graphName: path.basename(graphPath),
       stepCount: result.stepCount,
       provides: contractCheck.provides,
