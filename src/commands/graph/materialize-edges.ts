@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { z } from "zod";
 import {
-  inferEdgesAutoFromDirectory,
+  inferEdgesAutoFromDirectoryAsync,
   type InferredEdge,
 } from "../../runtime/static/edges.js";
 import {
@@ -117,7 +117,7 @@ export async function graphMaterializeEdgesCommand(
   }
 
   // 2. Infer static edges from the source root.
-  const inferredEdges = inferEdgesAutoFromDirectory(
+  const inferredEdges = await inferEdgesAutoFromDirectoryAsync(
     sourceRootAbs,
     extensions,
   );
