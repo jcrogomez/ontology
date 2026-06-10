@@ -1,6 +1,8 @@
 import { Ollama } from "ollama";
 import type {
   LlmAdapter,
+  LlmEmbedRequest,
+  LlmEmbedResponse,
   LlmModelHandle,
   LlmRequest,
   LlmResponse,
@@ -55,6 +57,19 @@ export function createOllamaAdapter(options?: {
         // except health() which returns ok:false.
         throw err;
       }
+    },
+
+    async embed(request: LlmEmbedRequest): Promise<LlmEmbedResponse> {
+      // Embedding-only models (nomic-embed-text & co) live behind a
+      // separate endpoint from chat; the default chat model is never a
+      // valid fallback here, so the embedding default is its own.
+      const model = request.model || "nomic-embed-text";
+      const response = await ollama.embed({ model, input: request.input });
+      return {
+        embeddings: response.embeddings,
+        model: response.model || model,
+        provider: "ollama",
+      };
     },
 
     async generate(request: LlmRequest): Promise<LlmResponse> {

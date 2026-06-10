@@ -7,6 +7,7 @@ import { doctorCommand } from "./commands/doctor.js";
 import { validateCommand } from "./commands/validate.js";
 import { replayCommand } from "./commands/replay.js";
 import { driftCommand } from "./commands/drift.js";
+import { semanticIndexCommand, semanticLinksCommand } from "./commands/semantic/index.js";
 import { inspectCommand } from "./commands/inspect.js";
 import { createNodeCommand } from "./commands/node/create.js";
 import { nodeListCommand } from "./commands/node/list.js";
@@ -179,6 +180,43 @@ program
       await driftCommand(options);
     } catch (err: unknown) {
       console.error(`✖ Error during drift: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+const semantic = program
+  .command("semantic")
+  .description("Local semantic index over the INTENT graph (embeddings as hypothesis generation, never as truth). Index is derived cache under .ontology/embeddings/; suggestions become proposals through the standard gate.");
+
+semantic
+  .command("index")
+  .description("Build/refresh the embedding index over every node's intent text (label + prompt + rules + provided-token descriptions). Incremental: nodes whose text is unchanged reuse their cached vector. Providers: mock (deterministic, $0) or ollama (nomic-embed-text by default, local).")
+  .option("--provider <provider>", "Embedding provider: mock | ollama (default mock)")
+  .option("--model <model>", "Embedding model (default: nomic-embed-text for ollama, mock_embed for mock)")
+  .option("--host <url>", "Ollama host (default OLLAMA_HOST or http://127.0.0.1:11434)")
+  .option("--json", "Output the index report as JSON.")
+  .action(async (options) => {
+    try {
+      await semanticIndexCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during semantic index: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+semantic
+  .command("links")
+  .description("Rank high-similarity node pairs that have NO edge between them — embedding-generated hypotheses for missing links. Read-only by default (prints copy-pasteable `onto propose link` commands); with --propose --type <t> each pair becomes an edge_create proposal pinned to both endpoints' hashes.")
+  .option("--threshold <x>", "Minimum cosine similarity to report (default 0.7)")
+  .option("--top <n>", "Maximum pairs to report (default 10)")
+  .option("--propose", "Create an edge_create proposal per pair (requires --type).")
+  .option("--type <edgeType>", "Edge type for proposed links — similarity is symmetric, the human picks the semantics.")
+  .option("--json", "Output the suggestion report as JSON.")
+  .action(async (options) => {
+    try {
+      await semanticLinksCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during semantic links: ${errorMessage(err)}`);
       process.exit(1);
     }
   });

@@ -25,6 +25,9 @@ export function registerQueryCommand(program: Command): void {
     .option("--forbids <list>", "Concept sources the node MUST forbid (all-of)")
     .option("--has-incoming <types>", "Edge types the node MUST have incoming, all-of (comma-separated)")
     .option("--has-outgoing <types>", "Edge types the node MUST have outgoing, all-of (comma-separated)")
+    .option("--semantic <text>", "Hybrid retrieval: re-rank the structural matches by cosine similarity against the local embedding index (requires `onto semantic index`)")
+    .option("--top <n>", "With --semantic: keep the N best-scoring matches (default 10)")
+    .option("--min-score <x>", "With --semantic: drop matches scoring below x")
     .option("--json", "Output full node objects as JSON instead of the pretty table")
     .action(async (options) => {
       try {

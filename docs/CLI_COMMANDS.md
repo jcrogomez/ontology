@@ -86,6 +86,19 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **Files Touched:** Reads nodes + the referenced artifact files; `--update` writes `.ontology/drift/snapshot.json` and appends to `events.jsonl`.
 - **Honest scope:** drift is detected at file-content granularity (sha256), not semantic granularity — a comment-only edit drifts. Deleted files surface as `missing` and stay visible until re-anchored.
 
+### `semantic index` / `semantic links` *(2026-06-10 — local embedding index, hypothesis generation)*
+
+- **Purpose:** `semantic index` embeds every node's INTENT text (label + prompt + rules + provided-token descriptions) into a local index (`.ontology/embeddings/index.json`) — derived cache, content-addressed per node, incremental on rebuild. `semantic links` ranks high-similarity node pairs with NO edge between them: embedding-generated hypotheses for missing links.
+- **Example:** `npm run dev -- semantic index --provider ollama` (real local embeddings via `nomic-embed-text`; `--provider mock` is deterministic and $0 for tests) · `npm run dev -- semantic links --threshold 0.7` (prints copy-pasteable `onto propose link` commands) · `... semantic links --propose --type documents` (creates one `edge_create` proposal per pair, pinned to both endpoints' hashes, rationale carrying the similarity score).
+- **Governance:** similarity NEVER mutates the graph. `--propose` requires an explicit `--type` (similarity is symmetric — the human picks edge semantics), and every suggestion passes the standard proposal gate (`onto proposal apply/reject`).
+- **Honest scope:** brute-force cosine over the index (exact at this scale; no vector DB, no cloud). Pairs are same-branch only. The index can go stale — both consumers warn and point back to `semantic index`.
+
+### `query --semantic <text>` *(2026-06-10 — hybrid retrieval)*
+
+- **Purpose:** Re-ranks the structural matches of an `onto query` shape by cosine similarity against the local embedding index. The shape filters FIRST (exact, deterministic); similarity only orders the survivors — it never overrides a structural constraint.
+- **Example:** `npm run dev -- query --kind entity --semantic "how is intent compiled" --top 5 --min-score 0.4`
+- **Requires:** a built index (`onto semantic index`); fails with that pointer otherwise.
+
 ### `inspect`
 
 - **Purpose:** Summarizes the current topological state, detailing nodes, events, and edge counts.

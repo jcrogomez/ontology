@@ -43,6 +43,8 @@ export function getOntologyPaths(cwd = process.cwd()) {
     buildsDir: path.join(ontologyDir, "builds"),
     driftDir: path.join(ontologyDir, "drift"),
     driftSnapshotPath: path.join(ontologyDir, "drift", "snapshot.json"),
+    embeddingsDir: path.join(ontologyDir, "embeddings"),
+    embeddingIndexPath: path.join(ontologyDir, "embeddings", "index.json"),
     reportsDir,
     validationReportsDir: path.join(reportsDir, "validations"),
     compilationReportsDir: path.join(reportsDir, "compilations"),
