@@ -27,9 +27,16 @@ permitan que no truene todo."*
 3. **The state is reconstructible.** `onto replay` (T1, §4.4) rebuilds the
    summary from the event log and verifies chain integrity — run it after
    every batch.
-4. **Git is the outer undo.** Everything happens on a dedicated branch with
-   a pre-ingest tag; every applied batch is a commit. Worst case = reset to
-   the previous checkpoint. `main` never sees an unreviewed graph.
+4. **The archive copy is the outer undo — NOT git.** Corrected 2026-06-10
+   after the first execution: `.ontology/` is GITIGNORED (line 6 of
+   .gitignore) — the live graph is not in version control, so a git tag
+   protects the CODE and docs, never the graph. The graph's undo is a
+   directory copy using the convention the gitignore already reserves:
+   `cp -r .ontology .ontology.archive-pre-self-ingest-<date>` before
+   anything moves, plus a per-batch copy of `events.jsonl` + `state.json`
+   into the archive (cheap — the whole graph is KBs). Restore = copy back.
+5. **Git still guards the code side.** The dedicated branch + tag cover
+   src/, docs/, and the runbook itself; `main` never sees unreviewed work.
 
 ## Protocol
 
@@ -40,8 +47,9 @@ git status --short          # must be clean
 git tag pre-self-ingest-<date>
 git checkout -b self-ingest/<date>
 
-# 1. Anchor the drift baseline BEFORE anything moves.
+# 1. Anchor the drift baseline AND archive the graph BEFORE anything moves.
 onto drift --update
+cp -r .ontology .ontology.archive-pre-self-ingest-<date>   # the real undo
 
 # 2. Pre-flight the cost (zero for local, but the report goes in the log).
 onto ingest src --provider ollama --static-classifier enabled --cost-estimate
@@ -82,11 +90,16 @@ onto walk node_0000_canon   # :which src/<any-file>.ts must jump to its node
 
 ## Abort / rollback
 
-- **Mid-batch failure** (validate or replay fails): `git checkout .ontology`
-  to drop the partial batch, inspect the offending proposal, reject it,
-  re-apply the rest. The previous checkpoint commit is intact.
-- **Abandon the run entirely:** `git checkout <base-branch> && git branch -D
-  self-ingest/<date>`. The tag marks where the world was before anything.
+- **Mid-batch failure** (validate or replay fails): restore `.ontology/`
+  from the latest per-batch archive copy, inspect the offending proposal,
+  reject it, re-apply the rest. (`git checkout .ontology` does NOTHING —
+  the directory is gitignored.)
+- **Abandon the run entirely:** restore the pre-ingest archive
+  (`rm -rf .ontology && cp -r .ontology.archive-pre-self-ingest-<date>
+  .ontology`), then `git checkout <base-branch>` for the code side.
+- **Aborted extraction (no applies yet):** the leftovers are PENDING
+  proposals — reject them formally with a reason (`onto proposal reject`),
+  never hand-edit the log. Rejection events keep the audit trail honest.
 - **Bad extraction quality overall** (e.g. wrong model answered): reject the
   pending proposals wholesale — `.ontology/proposals/` holds only `pending`
   files until applied — and re-run step 3 with the corrected recipe.
