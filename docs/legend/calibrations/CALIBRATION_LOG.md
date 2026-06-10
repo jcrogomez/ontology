@@ -87,6 +87,17 @@ devstral cloud deferred).
 - [`SELF_INGEST_EPSILON_3A_2026-05-19_ARM_A0_CONTROL.md`](./SELF_INGEST_EPSILON_3A_2026-05-19_ARM_A0_CONTROL.md) — Arm A0 control (landed 2026-05-24): `qwen2.5-coder:7b` + safety-net **without** `--ast-grounding`, identical perimeter to Arm A. Mean Jaccard 0.226, structural honesty 0.332, exportRecovery 25.6%, 0 unrecoverable. Decomposes Arm A's 28× margin over the δ' floor into ~0.205 baseline-qwen-7b + ~0.355 grounding-intervention lift; resolves the §3.1 circularity worry as "real lift, not artefact".
 - [`SELF_INGEST_EPSILON_3A_2026-05-19_SYNTHESIS.md`](./SELF_INGEST_EPSILON_3A_2026-05-19_SYNTHESIS.md) — cross-arm bake-off synthesis over 4 arms (driver `scripts/run-3a-bakeoff-synthesis.ts`). H1 anyPass=true, allPass=false (A and A0 both clear 0.1 floor; B and C-local don't). Per-mode failure deltas decompose the grounding contribution exactly.
 
+### Contract-column fill (2026-06-09) — matrix 2/5 → 3/5, $0
+
+First measured fill of the CONTRACT column (checker shipped same day,
+PR #136). Run over the archived Arm A graph (copy), local qwen via
+the content-addressed run cache — the May regens were resurrected, so
+the sweep cost $0 and ~5 min, with zero sampling variance vs Arm A.
+
+- [`SELF_INGEST_CONTRACT_COLUMN_2026-06-09_HYPOTHESIS.md`](./SELF_INGEST_CONTRACT_COLUMN_2026-06-09_HYPOTHESIS.md) — pre-registered H-C1..H-C4 + audited premises (committed before launch, PR #137).
+- [`SELF_INGEST_CONTRACT_COLUMN_2026-06-09.md`](./SELF_INGEST_CONTRACT_COLUMN_2026-06-09.md) — raw report (sidecar `.ontology.contract-column-2026-06-09.json`).
+- [`SELF_INGEST_CONTRACT_COLUMN_2026-06-09_SYNTHESIS.md`](./SELF_INGEST_CONTRACT_COLUMN_2026-06-09_SYNTHESIS.md) — **117/125 measured, pass 85 / fail 32 / unknown 8; pass rate 0.726.** H-C1/H-C3/H-C4 hold; H-C2's band [0.10, 0.55] missed HIGH (no falsifier fired; spot-audited non-tautological). All fails are `missing_keys` (presence-only regime — the May graph predates O1 signatures); fails concentrate in `divergent_both` (22/32) while 60/73 `divergent_loc` nodes PASS — the axis discriminates. Premise-4 correction recorded: run-cache resurrection, benign.
+
 ---
 
 ## 2. Pre-Phase-ε calibrations
