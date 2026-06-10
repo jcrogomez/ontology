@@ -29,6 +29,7 @@
     "start": "node dist/cli.js",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:smoke:ollama": "ONTOLOGY_LIVE_OLLAMA=1 vitest run tests/ollama-live-smoke.test.ts",
     "example:hello-world": "bash examples/hello-world/build.sh"
   },
   "dependencies": {
