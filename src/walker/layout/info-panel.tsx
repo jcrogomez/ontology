@@ -6,6 +6,8 @@ import type { QueryFromWalkerResult } from "../actions/query-from-walker.js";
 import type { ContextFromWalkerResult } from "../actions/context-from-walker.js";
 import type { LinkAnalysisFromWalkerResult } from "../actions/link-analysis-from-walker.js";
 import type { GraphViewResult, GraphViewNodeRow } from "../actions/graph-view-from-walker.js";
+import type { VerifyFromWalkerResult } from "../actions/verify-from-walker.js";
+import type { WorkflowFromWalkerResult } from "../actions/workflow-from-walker.js";
 import { POSET_COLORS } from "../theme/colors.js";
 
 // Unified info panel for read-only walker commands that produce a small,
@@ -25,7 +27,9 @@ export type InfoPanelState =
   | { kind: "query"; result: QueryFromWalkerResult; shapeSummary: string }
   | { kind: "context"; result: ContextFromWalkerResult; focalId: string }
   | { kind: "link-analysis"; result: LinkAnalysisFromWalkerResult }
-  | { kind: "graph-view"; result: GraphViewResult };
+  | { kind: "graph-view"; result: GraphViewResult }
+  | { kind: "verify"; result: VerifyFromWalkerResult }
+  | { kind: "workflow"; result: WorkflowFromWalkerResult };
 
 export interface InfoPanelProps {
   state: InfoPanelState;
@@ -42,6 +46,12 @@ export function InfoPanel({ state }: InfoPanelProps): React.ReactElement | null 
     ? "red"
     : state.kind === "graph-view" && !state.result.ok
     ? "red"
+    : (state.kind === "verify" || state.kind === "workflow") && !state.result.ok
+    ? "red"
+    : state.kind === "verify"
+    ? (state.result.ok && state.result.verdict === "epsilon_equivalent" ? "green" : "yellow")
+    : state.kind === "workflow"
+    ? (state.result.ok && state.result.verdict === "accept" ? "green" : "red")
     : state.kind === "query" || state.kind === "branches" || state.kind === "graph-view"
     ? "yellow"
     : "blue";
@@ -243,6 +253,92 @@ function renderBody(state: Exclude<InfoPanelState, { kind: "idle" }>): React.Rea
             ))}
             {suggestions.length > 6 && (
               <Text dimColor>  ...and {suggestions.length - 6} more</Text>
+            )}
+          </Box>
+        )}
+      </>
+    );
+  }
+
+  if (state.kind === "verify") {
+    const { result } = state;
+    if (!result.ok) {
+      return (
+        <>
+          <Text bold color="red">VERIFY — not verifiable</Text>
+          <Text>{result.message}</Text>
+        </>
+      );
+    }
+    const verdictColor = result.verdict === "epsilon_equivalent" ? "green" : "yellow";
+    return (
+      <>
+        <Text bold color={verdictColor}>
+          VERIFY — {result.verdict}
+        </Text>
+        <Text dimColor>
+          source {result.sourcePath} vs last compile {result.artifactPath} ({result.language})
+        </Text>
+        <Box marginTop={1} flexDirection="column">
+          <Text>
+            LoC distance:        {result.metrics.locDistance.toFixed(3)} ({result.metrics.originalLineCount} → {result.metrics.regenLineCount} lines)
+          </Text>
+          <Text>
+            structural Jaccard:  {result.metrics.structuralJaccard.toFixed(3)} ({result.metrics.originalDeclarations.length} vs {result.metrics.regenDeclarations.length} declarations)
+          </Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>
+            verdict is against the LAST compile — :compile to refresh; full sweep via `onto verify-homeomorphism`
+          </Text>
+        </Box>
+      </>
+    );
+  }
+
+  if (state.kind === "workflow") {
+    const { result } = state;
+    if (!result.ok) {
+      return (
+        <>
+          <Text bold color="red">WORKFLOW — error</Text>
+          <Text>{result.message}</Text>
+        </>
+      );
+    }
+    const headerColor = result.verdict === "accept" ? "green" : "red";
+    return (
+      <>
+        <Text bold color={headerColor}>
+          WORKFLOW — {result.verdict === "accept" ? "✓ ACCEPT" : "✗ REJECT"} ({result.graphName})
+        </Text>
+        <Text dimColor>
+          {result.stepCount} step(s) · {result.durationMs}ms
+          {result.verdict === "reject" && result.reason ? ` · reason: ${result.reason}` : ""}
+        </Text>
+        {result.warnings.length > 0 && (
+          <Box marginTop={1} flexDirection="column">
+            {result.warnings.slice(0, 4).map((w, i) => (
+              <Text key={i} color="yellow">⚠ {w}</Text>
+            ))}
+          </Box>
+        )}
+        {result.outputPreview.length > 0 && (
+          <Box marginTop={1} flexDirection="column">
+            <Text bold>output preview</Text>
+            <Text>{result.outputPreview}</Text>
+          </Box>
+        )}
+        {result.proposalId && (
+          <Box marginTop={1} flexDirection="column">
+            {(result.edgeProposalIds ?? []).map((id) => (
+              <Text key={id}>proposal {id} (pending, edge) — apply BEFORE the node update</Text>
+            ))}
+            <Text>
+              proposal {result.proposalId} (pending, node_update on focal) — review via :proposals
+            </Text>
+            {result.workflowRunId && (
+              <Text dimColor>provenance: {result.workflowRunId}</Text>
             )}
           </Box>
         )}

@@ -217,6 +217,11 @@ Walker v1 ships in three slices:
 - The walker renders a green panel listing each step with its node id and the count of dependency edges resolved at that step. The focal is marked `*`. A cycle in the closure renders the panel in red with the unresolved set.
 - `:clearplan` dismisses the panel.
 - The same helper backs `onto compile plan <nodeId> [--json]` so scripts and the TUI agree on the order.
+
+**v1.5 (2026-06-09) — the three scope gaps closed:**
+- `:propose-update` — the draft becomes a **`node_update` proposal on the focal itself** (in-place refinement; `:propose` keeps creating a child). Pinned to the focal's hash, applied via `:proposals` or the CLI — the two-step mutation discipline is unchanged.
+- `:verify` — the focal's round-trip verdict (dual distances + five-label fold, same primitives as `onto verify-homeomorphism`) computed **against the last compiled artifact**, pure and synchronous — no dispatch. Honest scope: a stale artifact gives a stale verdict (`:compile` first); the full sweep (regen, reps, matrix, behaviour axis) stays on the CLI.
+- `:workflow <graph> --input <file> [provider] [--model X] [--propose-update]` — run a Phase ζ workflow graph from the TUI (async, same two-stage pattern as `:run`). With `--propose-update`, an ACCEPTED run goes through the exact §3.6 provenance path the CLI uses: a `wfrun_*` record is persisted first, then a `node_update` proposal on the focal (plus `edge_create` proposals for graph-declared edges, listed in apply order).
 - Read-only. The actual compiler ships in Bootstrap 0.8.
 
 ### v1.x — `:graph view [depth]` (post-0.9)
