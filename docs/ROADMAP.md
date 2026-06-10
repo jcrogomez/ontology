@@ -7,9 +7,11 @@ active.** Phase ε (self-ingestion) closed 2026-05-26 on a 4-arm +
 2-column substate: five iterative self-ingest runs (β / β′ / γ / δ / δ′)
 plus the Move 3α multi-arm bake-off established that AST grounding
 contributes a real Δ = +0.355 mean Jaccard, and the §3.10 adjoint claim
-was upgraded T4 → T2. The fidelity-cartography matrix fills **2 of 5
-columns** (structural + behaviour; contract / intent are explicit
-no-data). Phase ζ has shipped a workflow-runtime v0 (typed-node state
+was upgraded T4 → T2. The fidelity-cartography matrix fills **3 of 5
+columns** (structural + behaviour, and **contract filled 2026-06-09**
+at $0 over the archived Arm A regens — pass rate 0.726 on 117/125
+measured, [`CALIBRATION_LOG`](legend/calibrations/CALIBRATION_LOG.md)
+§contract-column; intent remains explicit no-data). Phase ζ has shipped a workflow-runtime v0 (typed-node state
 machine, predicate DSL, artefact-slot dataflow). The platform
 underneath (network kernel, proposal system, semantic linker, compiler
 with intent gate + `--runtime-check`, four categorical extensions,
@@ -74,7 +76,7 @@ These close the largest distance between what's *built* and what's
 ### Cartography / ε tail (optional reinforcement)
 
 - 🔵 **Arm C-cloud — `devstral-small-2:24b`** on rented GPU (~$5–10). ε closed without it; this is a reinforcement of H3, not a blocker. Local 8 GB Mac is infeasible.
-- 🟡 **Contract / intent columns** — the matrix fills 2 of 5; these two remain explicit no-data. **Contract column now has a shipped checker (2026-06-09, $0):** `onto verify-homeomorphism --matrix --contract-check` statically compares declared `context.provides` (keys + O1 signatures) against the regen's extracted exports — no LLM, no execution; incomparable signatures (resolved-tier, unannotated regen) never accuse (`unknown ⇒ do-not-accuse`, the reverse of gluing's conservatism). Spec: [`legend/CONTRACT_AXIS_CHECKER_SPEC.md`](legend/CONTRACT_AXIS_CHECKER_SPEC.md); pinned by `tests/contract-checker.test.ts`. **Remaining to fill the column: a rerun with the flag — free on local (Arm-A-style sweep), no budget gate.** **Intent column has a designed extractor (2026-06-01):** `src/runtime/legend/intent-narration.ts` lifts the *why* over file *neighbourhoods* (spec: [`legend/INTENT_NARRATION_SPEC.md`](legend/INTENT_NARRATION_SPEC.md)), wired as `onto ingest --intent`. Remaining to fill: a frontier run judged by the behaviour oracle (budget-gated, like the §3.10 variance run).
+- ✅→🟡 **Contract / intent columns** — matrix now **3 of 5**. **Contract column FILLED 2026-06-09 ($0, ~5 min):** checker shipped same day (`--contract-check`, spec [`legend/CONTRACT_AXIS_CHECKER_SPEC.md`](legend/CONTRACT_AXIS_CHECKER_SPEC.md)) and run pre-registered over the archived Arm A regens (run-cache resurrection — zero sampling variance): **pass 85 / fail 32 / unknown 8, pass rate 0.726**; all fails `missing_keys` (the May graph predates O1 signatures → presence-only regime); fails concentrate in `divergent_both` while 60/73 `divergent_loc` nodes pass — the axis discriminates. Triplet in [`CALIBRATION_LOG`](legend/calibrations/CALIBRATION_LOG.md). Upgrade path (not a gate): an O1-signature re-ingest lifts the column from key-presence to interface compatibility. **Intent column (the last no-data):** extractor designed + wired (`onto ingest --intent`, spec [`legend/INTENT_NARRATION_SPEC.md`](legend/INTENT_NARRATION_SPEC.md)); remaining to fill: a frontier run judged by the behaviour oracle (budget-gated, like the §3.10 variance run).
 - ✅ **Cross-arm synthesis CLI** — superseded by the shipped `onto bakeoff` (see Interop #4 below); `scripts/run-3a-bakeoff-synthesis.ts` stays as the dated Move 3α driver.
 - 🟡 **Next fidelity lever = extraction/prompt completeness on large modules.** The 2026-05-29 loss-breakdown (`scripts/loss-report.ts`) showed Arm A's residual loss is **recall-bound, not precision-bound** — 22 large multi-export modules collapse into recoverable-but-truncated stubs (0/125 unrecoverable). Curbing over-emission is the *smaller* cost; the win is making regen emit the modules it currently drops. See `MATHEMATICAL_CLAIMS.md` §3.10.
 
