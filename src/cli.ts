@@ -1009,6 +1009,7 @@ program
   .option("--behavior-check", "Phase ε behaviour-axis checker (v0): for each node, import the source file and the regen, run the registered fixture's call-sites against both, and override the matrix's `behavior` axis with the measured pass/fail/untested state. Requires --matrix. See docs/legend/BEHAVIOUR_AXIS_CHECKER_SPEC.md.")
   .option("--behavior-fixtures-dir <path>", "Override the fixtures directory (default tests/behavior-fixtures/). Path is relative to cwd or absolute. Used with --behavior-check.")
   .option("--behavior-timeout-ms <n>", "Per-case wall-clock cap for the behaviour checker. Clamped to [100, 60000]. Default 5000.", (v) => parseInt(v, 10))
+  .option("--contract-check", "Contract-axis checker (v0): statically compare each node's declared context.provides (keys + O1 signatures) against the regen artifact's extracted exports and override the matrix's `contract` axis with the measured pass/fail/unknown state. $0 — no LLM, no execution. Requires --matrix. See docs/legend/CONTRACT_AXIS_CHECKER_SPEC.md.")
   .option("--no-lock", "Skip the .ontology/.lock advisory lock — see compile run for semantics.")
   .option("--json", "Output results in JSON format.")
   .action(async (focal, rawOptions) => {
