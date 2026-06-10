@@ -1,5 +1,12 @@
 # Project Legend — Ingest, Homeomorphism, and the Open-Prompt Layer
 
+> **Current state (2026-06-10):** Phases α–ε closed (ε 2026-05-26). Phase ζ =
+> the WORKFLOW RUNTIME (v0 shipped 2026-05-30; first clean real-LLM
+> verify-refine pass 2026-06-09). §4 (Open-Prompt protocol: `onto sign`,
+> `verify-published`) is ASPIRATIONAL design — none of it has shipped and it
+> is NOT what "Phase ζ" means. Authoritative phase state:
+> [`docs/ROADMAP.md`](ROADMAP.md).
+
 > *Legens* in Latin: "the one who reads". A legend (in maps) is the key that
 > tells you how to read the territory. Project Legend is exactly that — the
 > key that turns an existing codebase into a readable, navigable network of
@@ -373,6 +380,8 @@ prose), because the intent already *is* the description.
 ---
 
 ## 4. The Open-Prompt protocol
+
+> Aspirational spec — unshipped as of 2026-06-10; see the box at the top.
 
 The user's framing:
 

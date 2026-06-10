@@ -111,6 +111,7 @@ program. Useful for grounding individual claims in the synthesis docs.
 - [`BAKEOFF_3B_FAMILY_2026-05-15.md`](./BAKEOFF_3B_FAMILY_2026-05-15.md) — Phase ε E6 deliverable: cross-model variance and ensemble effectiveness on a curated 20-file subset. Establishes per-model variance (not just point estimates) to falsify/strengthen the pilot's "82.3% → 95.97% recovery" headline.
 - [`SMOKE_PR3_ENABLED_2026-05-15.md`](./SMOKE_PR3_ENABLED_2026-05-15.md) — Phase ε prework C: end-to-end smoke of `onto ingest --static-classifier enabled` against the Ontology core perimeter. Falsifies/confirms the deflection distribution predicted by the report-only smoke before PR3 shipped.
 - [`SELF_INGEST_HYPOTHESIS_2026-05-13.md`](./SELF_INGEST_HYPOTHESIS_2026-05-13.md) — the canonical Phase ε pre-registration. Frames the success matrix, the frontier taxonomy, and the falsifiers for everything that follows.
+- [`PREWORK_2026-05-13.md`](../../archive/PREWORK_2026-05-13.md) (now `docs/archive/PREWORK_2026-05-13.md`) — pre-pilot $0 tooling plan; all five items A–E shipped 2026-05-16 (`373eb8a`).
 - `bakeoff-2026-05-15-raw/` — raw bake-off CSV/log data referenced by `BAKEOFF_3B_FAMILY_2026-05-15.md`.
 
 ---
