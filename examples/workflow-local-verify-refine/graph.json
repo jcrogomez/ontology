@@ -1,0 +1,73 @@
+{
+  "name": "local-verify-refine",
+  "description": "Verify-refine workflow SIZED FOR LOCAL 7B MODELS (8 GB Mac): generate a small TypeScript function against an explicit checklist, verify it, correct on failure, accept after 2 consecutive passes. Declares an O4 output contract (provides + signature + artefactLanguage) so an accepted run measured with --as-proposal exercises the full execution→intent chain: wfrun_* record → node proposal with workflow_run source → apply --check-providers --strict. Prompts are deliberately short (prefill-bound local models) and the LLM step count is minimal: no self-improvement pass, corrector reads the critique directly.",
+  "entry": "g1_generate",
+  "provides": [
+    { "key": "slugify", "signature": "(title: string): string" }
+  ],
+  "artefactLanguage": "typescript",
+  "nodes": [
+    {
+      "id": "g1_generate",
+      "kind": "generator",
+      "prompt": "Write a TypeScript function that converts a title into a URL slug.\n\nRequirements (ALL mandatory):\n1. Exactly this export and written signature: export function slugify(title: string): string\n2. Lowercase the input.\n3. Replace every run of spaces or underscores with a single hyphen.\n4. Remove every character that is not a-z, 0-9 or hyphen.\n5. Collapse consecutive hyphens into one and trim leading/trailing hyphens.\n\nOutput ONLY the TypeScript code. No explanation, no markdown fences, no tests.\n\nTASK CONTEXT:\n${INPUT}"
+    },
+    {
+      "id": "v1_verify",
+      "kind": "verifier",
+      "verifierSchema": "with-severity",
+      "prompt": "You are a strict code reviewer. Check the TypeScript code below against this checklist:\n1. It exports exactly: export function slugify(title: string): string\n2. It lowercases the input.\n3. Runs of spaces/underscores become a single hyphen.\n4. Characters outside a-z, 0-9, hyphen are removed.\n5. Consecutive hyphens are collapsed and leading/trailing hyphens trimmed.\n6. It is plain TypeScript with no imports and no markdown fences.\n\nRespond with ONLY one JSON object, no prose, no fences:\n{\"verdict\": \"pass\" | \"fail\", \"severity\": \"minor\" | \"major\", \"issues\": [\"...\"]}\n- verdict \"pass\" = every checklist item holds; omit severity and use issues: [].\n- verdict \"fail\" = any item fails; severity \"major\" if item 1 or 6 fails or the code would not compile, else \"minor\"; list each failing item in issues.\n\nCODE:\n${ARTIFACT}"
+    },
+    {
+      "id": "v1b_revisit",
+      "kind": "generator",
+      "passThrough": true
+    },
+    {
+      "id": "g2_correct",
+      "kind": "generator",
+      "prompt": "Fix the TypeScript code below so it satisfies the reviewer's issues. Keep the exact export signature: export function slugify(title: string): string. Output ONLY the corrected TypeScript code — no explanation, no markdown fences.\n\nCURRENT CODE:\n${ARTIFACT}\n\nREVIEWER ISSUES (JSON):\n${CRITIQUE}"
+    },
+    {
+      "id": "t_accept",
+      "kind": "terminal",
+      "terminalVerdict": "accept",
+      "metadata": { "reason": "2 consecutive verification passes" }
+    },
+    {
+      "id": "t_reject",
+      "kind": "terminal",
+      "terminalVerdict": "reject",
+      "metadata": { "reason": "8 consecutive verifications without a pass" }
+    }
+  ],
+  "edges": [
+    { "from": "g1_generate", "to": "v1_verify", "type": "feeds" },
+    {
+      "from": "v1_verify",
+      "to": "t_accept",
+      "type": "branches_on",
+      "predicate": "consecutive(verdict == \"pass\", 2)"
+    },
+    {
+      "from": "v1_verify",
+      "to": "t_reject",
+      "type": "branches_on",
+      "predicate": "since_last(verdict == \"pass\") >= 8"
+    },
+    {
+      "from": "v1_verify",
+      "to": "v1b_revisit",
+      "type": "branches_on",
+      "predicate": "verdict == \"pass\""
+    },
+    {
+      "from": "v1_verify",
+      "to": "g2_correct",
+      "type": "branches_on",
+      "predicate": "verdict == \"fail\""
+    },
+    { "from": "v1b_revisit", "to": "v1_verify", "type": "feeds" },
+    { "from": "g2_correct", "to": "v1_verify", "type": "feeds" }
+  ]
+}
