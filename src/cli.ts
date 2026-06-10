@@ -6,6 +6,7 @@ import { initCommand } from "./commands/init.js";
 import { doctorCommand } from "./commands/doctor.js";
 import { validateCommand } from "./commands/validate.js";
 import { replayCommand } from "./commands/replay.js";
+import { driftCommand } from "./commands/drift.js";
 import { inspectCommand } from "./commands/inspect.js";
 import { createNodeCommand } from "./commands/node/create.js";
 import { nodeListCommand } from "./commands/node/list.js";
@@ -163,6 +164,21 @@ program
       await replayCommand(options);
     } catch (err: unknown) {
       console.error(`✖ Error during replay: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("drift")
+  .description("Merkle change-detection over the compiled shadows: hashes every file referenced by node.outputs.files, compares the tree against the last anchor, and reports exactly which nodes' artifacts moved (feed them to verify-homeomorphism --nodes). Read-only by default.")
+  .option("--update", "Persist the current tree as the new anchor (.ontology/drift/snapshot.json) and append a drift_anchored event.")
+  .option("--fail-on-drift", "Exit 1 when anything drifted relative to the anchor (CI guard).")
+  .option("--json", "Output the drift report as JSON.")
+  .action(async (options) => {
+    try {
+      await driftCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during drift: ${errorMessage(err)}`);
       process.exit(1);
     }
   });

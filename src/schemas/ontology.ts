@@ -298,6 +298,12 @@ export const OntologyEventSchema = z.object({
     // aggregate verdict counts + per-node ids). The temporal log
     // becomes the canonical timeline of "what we measured, when".
     "homeomorphism_verified",
+    // `onto drift --update`: a new Merkle anchor over the compiled
+    // artifacts was persisted. Carries { rootHash, leafCount,
+    // changedNodeIds } relative to the previous anchor (if any). Pure
+    // measurement runs (no --update) do NOT emit — they are free to
+    // repeat and record nothing.
+    "drift_anchored",
   ]),
   branch: z.string().default("main"),
   previousEventId: z.string().nullable().default(null),

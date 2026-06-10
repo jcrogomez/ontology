@@ -79,6 +79,13 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **Repair:** `npm run dev -- replay --write` rewrites `state.json` from the replayed fold — the recovery primitive for a diverged or hand-mangled state file. Refused if the chain itself is broken (a replay of a corrupt log must not be trusted).
 - **Honest scope:** wall-clock fields (`createdAt`/`updatedAt`) are written at write time, not derived from the log, and are excluded from the comparison (on `--write` they are reconstructed from the genesis/last event timestamps). `projectName`/`rootNodeId` ride on the genesis payload for projects initialised from 2026-06-09 on; older logs fall back to conventions with a warning. See `MATHEMATICAL_CLAIMS.md` §4.4.
 
+### `drift` *(2026-06-10 — Merkle change-detection over the compiled shadows)*
+
+- **Purpose:** Hashes every file referenced by `node.outputs.files`, folds the hashes into a Merkle tree, and compares it against the last persisted anchor — reporting EXACTLY which nodes' artifacts moved since the baseline. Turns "re-measure the whole perimeter" into "re-measure the 3 that changed": the report ends with a ready-to-run `onto verify-homeomorphism --nodes <changed> --matrix` line.
+- **Example:** `npm run dev -- drift` (read-only, free to loop) · `npm run dev -- drift --update` (anchor the current tree as the new baseline; appends a `drift_anchored` event) · `npm run dev -- drift --fail-on-drift` (CI guard: exit 1 on any drift).
+- **Files Touched:** Reads nodes + the referenced artifact files; `--update` writes `.ontology/drift/snapshot.json` and appends to `events.jsonl`.
+- **Honest scope:** drift is detected at file-content granularity (sha256), not semantic granularity — a comment-only edit drifts. Deleted files surface as `missing` and stay visible until re-anchored.
+
 ### `inspect`
 
 - **Purpose:** Summarizes the current topological state, detailing nodes, events, and edge counts.
