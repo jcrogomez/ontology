@@ -64,6 +64,9 @@ export const DEFAULT_EMBEDDING_MODELS: Record<EmbeddingProvider, string> = {
   ollama: "nomic-embed-text",
 };
 
+/** Max characters of intent text sent to the embedder (small local context windows). */
+export const EMBED_MAX_CHARS = 4000;
+
 /**
  * The text that represents a node in the index: its intent surface, not its
  * compiled artifact. Stable concatenation — changing this function changes
@@ -134,7 +137,13 @@ export async function buildEmbeddingIndex(
   let reused = 0;
 
   for (const node of nodes) {
-    const text = embeddingSourceText(node);
+    // Truncated for embedding: local embedding models have small context
+    // windows (nomic-embed-text rejects inputs past its context length —
+    // surfaced by the 2026-06-11 self-ingest, where cli.ts's contract
+    // prompt alone overflowed it). The retrieval signal concentrates in
+    // the label + the head of the prompt, so the cut is cheap; the hash
+    // covers the SAME truncated text so re-embeds stay consistent.
+    const text = embeddingSourceText(node).slice(0, EMBED_MAX_CHARS);
     if (text.length === 0) {
       skippedEmpty += 1;
       continue;
