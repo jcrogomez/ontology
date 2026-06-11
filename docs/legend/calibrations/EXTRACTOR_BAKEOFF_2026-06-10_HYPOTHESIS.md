@@ -23,6 +23,7 @@ shared pre-registered protocol instead of trusting catalog blurbs.
 | A2 | `lfm2.5` (8B-A1B) | Built for reliable structured output on consumer hardware; ~1B active params |
 | A3 | `gemma4:e4b` | Diverse-family edge model, frontier-per-size claim |
 | A4 | `qwen3.5:9b` | **Amendment 2026-06-10, added BEFORE any arm's results were read** (A0/A1 in flight, unscored): the owner flagged the 9b tag's existence; same deployable class as the 7b compile workhorse. Same metrics, same decision rule. |
+| A5 | `claude-fable-5` (cold session subagents) | **Amendment 2026-06-11, added pre-unblinding** (A0/A1/A3 dispatched, scorer NOT yet run): owner's idea — frontier dispatches answered by the session's model via COLD subagents (no repo context beyond the exact pipeline prompt + file), zero marginal API cost. INFORMATIONAL arm: it does not compete for the local-extractor role (different deployment class); it measures the frontier gap and enables the governed-escalation pattern (local bulk, frontier for rejects). Caveats recorded: sampling params uncontrolled; model is fable-5 (not the pre-registered Opus ceiling); A5 output is RAW (no AST-rescue post-pass the local arms get) — recall comparisons are conservative against A5. |
 
 > Out of local scope, recorded for honesty: `qwen3.6` (min tag 27b) exceeds
 > the 8 GB machine — it is a future cloud/rented-GPU arm, not a local one.
