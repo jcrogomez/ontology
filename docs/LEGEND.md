@@ -154,7 +154,7 @@ targets `src/runtime + src/core + src/commands + src/schemas` (~117
 TS/TSX files) and pre-registers the faithful/resistant frontier
 prediction. The $0 tooling that makes the matrix output meaningful is
 spec'd in
-[`docs/legend/PREWORK_2026-05-13.md`](legend/PREWORK_2026-05-13.md) and
+[`docs/legend/PREWORK_2026-05-13.md`](archive/PREWORK_2026-05-13.md) and
 ships under `src/runtime/legend/{frontier-tagger,matrix,matrix-intersections}.ts`,
 exposed through `onto ingest <paths…>` (multi-positional) and `onto
 verify-homeomorphism --matrix`.
@@ -231,7 +231,7 @@ If you want to **read Project Legend specifically**:
 
 If you want to **contribute**:
 - [`ROADMAP.md`](ROADMAP.md) — the open follow-ups.
-- [`POST_GAMMA_PLAN.md`](POST_GAMMA_PLAN.md) — the detailed plan
+- [`POST_GAMMA_PLAN.md`](archive/POST_GAMMA_PLAN_2026-05-13.md) — the detailed plan
   for Phase ε / ζ / Hardening / Walker v2.
 - [`reviews/`](reviews/) — the daily milestone audits.
 

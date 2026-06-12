@@ -245,6 +245,15 @@ the slot, so a pass-through node carries no state — it is just a
 loop-back target. The earlier `output: input` in the pseudocode is
 therefore `output: artefact` in the implementation.
 
+> **Note (2026-06-09, commit `ba66010`, PR #140).** When the graph's
+> `artefactLanguage` is a code language, the final artefact is
+> FENCE-STRIPPED via `projectWorkflowArtefact`
+> (`src/commands/workflow/run.ts`) before BOTH the §3.6 contract
+> measurement and the proposal payload — the same projection
+> `compile-node` applies before writing artifacts (compiler parity).
+> Without it, a fenced-but-correct artefact measures as an EMPTY
+> contract. Bug caught in the first real-LLM verify-refine run.
+
 ### 3.5 CLI command
 
 ```
@@ -292,6 +301,15 @@ the graph declares an output contract (top-level `provides:
 measured (G) against the declaration and the proposed node is born with
 the measured `provides` + `provideSignatures` (declared ≠ produced is
 surfaced as a defect note, not a block).
+
+> **Note (2026-06-09, commit `ba66010`, PR #140).** For code
+> `artefactLanguage`, the artefact is fence-stripped via
+> `projectWorkflowArtefact` (`src/commands/workflow/run.ts`) before
+> BOTH the contract measurement above and the proposal payload (both
+> modes) — compiler parity. A markdown-fenced artefact would otherwise
+> measure as an empty contract and the proposed node's prompt would
+> carry LLM packaging instead of the work product. Found in the first
+> real-LLM run.
 
 **Mode 2 — refine (`node_update`, this section).** With
 `--update-node <nodeId>` instead of level/kind/parent, the artefact

@@ -300,3 +300,5 @@ You also exercised:
 - [**CLI Commands**](CLI_COMMANDS.md) for the full surface.
 - [**Roadmap**](ROADMAP.md) for what is shipped and what is next.
 - [**Walker Interface RFC**](WALKER_INTERFACE.md) if you want to extend or skin the walker.
+
+Once the basics feel comfortable, see [CLI_COMMANDS.md](CLI_COMMANDS.md) §`drift` (Merkle change-detection over compiled artifacts) and §`semantic index` / `semantic links` (local embedding index + `query --semantic` hybrid retrieval).

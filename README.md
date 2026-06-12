@@ -66,9 +66,11 @@ Longer term, the **Open-Prompt protocol** turns the signed intent + audit chain 
 | `onto ingest <paths…>` | The inverse direction: lift source files, a directory, a GitHub PR/issue, or the *why* of files (`--intent`) into intent proposals. |
 | `onto graph infer-edges / neighbors / path / subgraph / metrics` | Static edge inference (no LLM) and read-only graph queries. |
 | `onto verify-homeomorphism` | Measure the round-trip: dual distances, five-label verdict, fidelity-cartography matrix, behaviour checker. |
+| `onto drift` | Merkle change-detection over compiled artifacts; `--update` re-anchors the baseline, `--fail-on-drift` gates CI; feeds `verify-homeomorphism --nodes`. |
 | `onto workflow run` | Verify-refine state machine over a typed workflow graph; `--as-proposal` feeds accepted results back into the intent graph (create or `--update-node`). |
 | `onto bakeoff <reports…>` | Fidelity regression gate over recorded verify reports (wired into CI). |
-| `onto query` | Search nodes by Hom-profile (edges + contract + coordinates). |
+| `onto query` | Search nodes by Hom-profile (edges + contract + coordinates); `--semantic <text>` adds embedding re-rank (hybrid retrieval). |
+| `onto semantic index / links` | Local embedding index over intent text; `links` ranks similar-but-unlinked node pairs, `--propose --type` stages governed `edge_create` proposals. |
 | `onto mcp` | Read-only MCP server over the intent graph + audit chain — a third party can judge the declared intent without mutation access. |
 | `onto walk <id>` | The Walker: interactive TUI — navigate, draft, propose (create or in-place update), review proposals, run models, compile, verify the focal's round-trip, run workflows. |
 | `onto replay` | Rebuild the state summary from the event log alone, verify chain integrity, `--write` to repair. |

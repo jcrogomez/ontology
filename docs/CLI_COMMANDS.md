@@ -613,7 +613,7 @@ fail fast with a friendly message naming the holder.
   the file is stale beyond what the auto-detector can verify (e.g.
   cross-host).
 
-Spec: `src/core/fs/lock.ts`. Reasoning: POST_GAMMA_PLAN §5.1.
+Spec: `src/core/fs/lock.ts`. Reasoning: `docs/archive/POST_GAMMA_PLAN_2026-05-13.md` §5.1.
 
 ### Model Routing (post-γ-7 reviewer fix)
 

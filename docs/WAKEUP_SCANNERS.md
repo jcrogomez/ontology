@@ -1,5 +1,7 @@
 # RFC: Wakeup Scanners
 
+> **Status: RFC only — NOT IMPLEMENTED (verified 2026-06-10).** No `onto wakeup` commands exist; Phase 1 substrate has not shipped. Do not build against this spec without checking src/ first.
+
 **Status:** Draft
 **Bootstrap target:** post-0.9 / Phase ε+ (extension on top of Proposal System 0.5)
 **Depends on:** [`PROPOSAL_SYSTEM.md`](PROPOSAL_SYSTEM.md) (shipped), [`RUN_PERSISTENCE.md`](RUN_PERSISTENCE.md) (shipped)
