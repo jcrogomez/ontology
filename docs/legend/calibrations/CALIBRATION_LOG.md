@@ -175,3 +175,5 @@ When you land a calibration artifact in this directory:
 2. Add a one-line entry to the appropriate section here (`§1` for ε runs, `§2` for pre-ε, `§3` for hierarchizer). Daily reviews go to `docs/ROADMAP.md`, not here.
 3. Cross-link the triplet siblings if applicable.
 4. Bump the "Maintained:" date at the top.
+- [EXTRACTOR_BAKEOFF_2026-06-10_HYPOTHESIS](EXTRACTOR_BAKEOFF_2026-06-10_HYPOTHESIS.md) + [RESULT](EXTRACTOR_BAKEOFF_2026-06-10_RESULT.md) — extractor selection for the live-graph self-ingest: incumbent qwen2.5-coder:3b wins per pre-registered rule (M1 8/8); frontier gap measured at +0.224 recall via cold claude-fable-5 subagents ($0 marginal); qwen3.5:9b not deployable on 8 GB (machine crash).
+- [SELF_INGEST_LIVE_GRAPH_2026-06-11_RESULT](SELF_INGEST_LIVE_GRAPH_2026-06-11_RESULT.md) — first live-graph population: 221 files → 228 nodes + 710 edges, governed escalation (213 local + 8 frontier subagents), 63 verified batches with zero failures; :which loop closed.
