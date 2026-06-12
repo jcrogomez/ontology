@@ -5,6 +5,14 @@ import {
   isModelUnavailableError,
 } from '../src/runtime/llm/dispatcher.js';
 import type { LlmRequest } from '../src/runtime/llm/types.js';
+import { probeOllama, smallestInstalledModel } from './helpers/ollama-probe.js';
+
+// Fast-fail guard for the two tests that touch a live local Ollama: probe
+// /api/tags with a 1.5 s timeout at collection time and skip when the
+// daemon is absent or has no models, instead of stalling toward the 30 s
+// vitest timeout. The full live surface lives in ollama-live-smoke.test.ts
+// (opt-in via ONTOLOGY_LIVE_OLLAMA=1).
+const ollamaProbe = await probeOllama();
 
 describe('LLM Dispatcher', () => {
   it('dispatches text request to mock adapter', async () => {
@@ -59,19 +67,26 @@ describe('LLM Dispatcher', () => {
     ).rejects.toThrow('Unsupported LLM provider: local');
   });
 
-  it('can route to ollama adapter', async () => {
-    const request: LlmRequest = {
-      task: 'semantic_parse',
-      prompt: 'Test prompt',
-    };
+  it.skipIf(!ollamaProbe.up || smallestInstalledModel(ollamaProbe) === undefined)(
+    'can route to ollama adapter',
+    async () => {
+      // Pin the model to the smallest INSTALLED one: the registry's
+      // preferred list may not be pulled on this machine, and a real
+      // generation against a large model can stall the suite.
+      const request: LlmRequest = {
+        task: 'semantic_parse',
+        prompt: 'Reply with exactly one word: pong',
+        model: smallestInstalledModel(ollamaProbe),
+        temperature: 0,
+        maxTokens: 16,
+      };
 
-    try {
       const response = await dispatchLlmRequest(request, { provider: 'ollama' });
       expect(response.provider).toBe('ollama');
-    } catch (err: unknown) {
-      expect((err as Error).message).toBeDefined();
-    }
-  });
+      expect(response.text.trim().length).toBeGreaterThan(0);
+    },
+    300_000,
+  );
 
   it('ollama dispatch soft-fails gracefully when unavailable', async () => {
     const request: LlmRequest = {

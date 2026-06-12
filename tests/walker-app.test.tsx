@@ -8,11 +8,12 @@ import { saveDraft } from "../src/core/drafts/persist.js";
 
 // Render-mounting tests for the walker App.
 //
-// Keystroke-driven tests are intentionally NOT included here. ink-testing-library
-// does not replicate raw-mode terminal escape-sequence delivery faithfully, which
-// makes such tests flaky. Navigation transitions are exercised directly in
-// `walker-navigation.test.ts` against pure functions; the keystroke wiring is a
-// thin call site over those functions and is exercised manually via `onto walk`.
+// Keystroke-driven tests live in `walker-keyboard-flows.test.tsx` (2026-06-10).
+// The historical flakiness of stdin-driven tests turned out to be a write/
+// resubscribe race (ink re-attaches useInput's stdin listener across renders),
+// solved there by spacing writes and polling frames — see that file's header.
+// Navigation transitions are additionally exercised as pure functions in
+// `walker-navigation.test.ts`.
 
 describe("walker App (read-only v0)", () => {
   let tempDir: string;

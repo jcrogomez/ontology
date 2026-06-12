@@ -34,6 +34,7 @@ npm run check        # tsc --noEmit (typecheck). Works on Node 18.
 npm run check:nul    # NUL-byte guard. Works on Node 18.
 npm run dev -- <cmd> # run the CLI via tsx, e.g. `npm run dev -- validate`. Node 18 OK.
 npm run test:run     # vitest run — REQUIRES Node >= 20.12 (see below).
+npm run test:smoke:ollama  # opt-in LIVE smoke vs local Ollama (skipped in CI/normal runs; run ~weekly)
 ```
 
 **Node version is the #1 gotcha.** `package.json` `engines` requires
