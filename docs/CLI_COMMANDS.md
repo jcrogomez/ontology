@@ -79,6 +79,26 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **Repair:** `npm run dev -- replay --write` rewrites `state.json` from the replayed fold — the recovery primitive for a diverged or hand-mangled state file. Refused if the chain itself is broken (a replay of a corrupt log must not be trusted).
 - **Honest scope:** wall-clock fields (`createdAt`/`updatedAt`) are written at write time, not derived from the log, and are excluded from the comparison (on `--write` they are reconstructed from the genesis/last event timestamps). `projectName`/`rootNodeId` ride on the genesis payload for projects initialised from 2026-06-09 on; older logs fall back to conventions with a warning. See `MATHEMATICAL_CLAIMS.md` §4.4.
 
+### `drift` *(2026-06-10 — Merkle change-detection over the compiled shadows)*
+
+- **Purpose:** Hashes every file referenced by `node.outputs.files`, folds the hashes into a Merkle tree, and compares it against the last persisted anchor — reporting EXACTLY which nodes' artifacts moved since the baseline. Turns "re-measure the whole perimeter" into "re-measure the 3 that changed": the report ends with a ready-to-run `onto verify-homeomorphism --nodes <changed> --matrix` line.
+- **Example:** `npm run dev -- drift` (read-only, free to loop) · `npm run dev -- drift --update` (anchor the current tree as the new baseline; appends a `drift_anchored` event) · `npm run dev -- drift --fail-on-drift` (CI guard: exit 1 on any drift).
+- **Files Touched:** Reads nodes + the referenced artifact files; `--update` writes `.ontology/drift/snapshot.json` and appends to `events.jsonl`.
+- **Honest scope:** drift is detected at file-content granularity (sha256), not semantic granularity — a comment-only edit drifts. Deleted files surface as `missing` and stay visible until re-anchored.
+
+### `semantic index` / `semantic links` *(2026-06-10 — local embedding index, hypothesis generation)*
+
+- **Purpose:** `semantic index` embeds every node's INTENT text (label + prompt + rules + provided-token descriptions) into a local index (`.ontology/embeddings/index.json`) — derived cache, content-addressed per node, incremental on rebuild. `semantic links` ranks high-similarity node pairs with NO edge between them: embedding-generated hypotheses for missing links.
+- **Example:** `npm run dev -- semantic index --provider ollama` (real local embeddings via `nomic-embed-text`; `--provider mock` is deterministic and $0 for tests) · `npm run dev -- semantic links --threshold 0.7` (prints copy-pasteable `onto propose link` commands) · `... semantic links --propose --type documents` (creates one `edge_create` proposal per pair, pinned to both endpoints' hashes, rationale carrying the similarity score).
+- **Governance:** similarity NEVER mutates the graph. `--propose` requires an explicit `--type` (similarity is symmetric — the human picks edge semantics), and every suggestion passes the standard proposal gate (`onto proposal apply/reject`).
+- **Honest scope:** brute-force cosine over the index (exact at this scale; no vector DB, no cloud). Pairs are same-branch only. The index can go stale — both consumers warn and point back to `semantic index`.
+
+### `query --semantic <text>` *(2026-06-10 — hybrid retrieval)*
+
+- **Purpose:** Re-ranks the structural matches of an `onto query` shape by cosine similarity against the local embedding index. The shape filters FIRST (exact, deterministic); similarity only orders the survivors — it never overrides a structural constraint.
+- **Example:** `npm run dev -- query --kind entity --semantic "how is intent compiled" --top 5 --min-score 0.4`
+- **Requires:** a built index (`onto semantic index`); fails with that pointer otherwise.
+
 ### `inspect`
 
 - **Purpose:** Summarizes the current topological state, detailing nodes, events, and edge counts.
@@ -311,6 +331,7 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **Purpose:** Open the Walker, an interactive focal-cell terminal interface for the intention graph. Color encodes the abstraction level, tokens shared across the local neighborhood are underlined (presheaf overlap), and the path bar renders a colored breadcrumb from canon to focal.
 - **Example:** `npm run dev -- walk node_0000_canon`
 - **v0 keys:** `↑` parent · `↓` child · `←/→` siblings · `:q` / `q` quit · `:help` flash help.
+- **v1.6 — intent-first editing loop, slice 1 (2026-06-10):** `a` / `:preview` toggles the read-only artifact preview of the focal's shadow (`outputs.files[0]`) with a drift badge against the last `onto drift --update` anchor; `:which <file>` jumps the focal to the node that owns that file (inverse traceability) and opens the preview; the identity bar shows `≠ shadow drifted` / `? shadow missing` when the focal's artifact diverges from the anchor. Recompiling is always manual (`:compile`). See `docs/WALKER_INTERFACE.md` §v1.6.
 - **v1 PR-A — drafts + propose:**
   - `i` enters edit mode. The user composes the prompt for a *candidate child* of the focal (the focal node itself is never edited — only explicit graph commands may mutate the network).
   - `Esc` exits edit mode and saves the buffer as a draft to `.ontology/work/drafts/<focalId>.draft.json`. Re-entering edit mode resumes from the saved draft.
@@ -443,7 +464,7 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 
 ### `graph infer-edges <dir>` *(γ-4 preview, γ-6 proposals)*
 
-- **Purpose (γ-4):** walk a source directory and report the import-derived edge graph — which file `depends_on` which (value imports) and which `uses_token` which (type-only `import type` statements). Pure static analysis; zero LLM cost; runs in milliseconds per file. Read-only. TypeScript files use the TS compiler API; Python files use a regex-based parser.
+- **Purpose (γ-4):** walk a source directory and report the import-derived edge graph — which file `depends_on` which (value imports) and which `uses_token` which (type-only `import type` statements). Pure static analysis; zero LLM cost; runs in milliseconds per file. Read-only. TypeScript files use the TS compiler API; Python files use a regex-based parser; Rust files use a tree-sitter (WASM) backend (γ-4-rust, 2026-06-10).
 - **Purpose (γ-6, with `--create-proposals`):** in addition to the report, resolve each inferred edge to applied node IDs by matching `outputs.files[0]` on each endpoint, then emit one `edge_create` proposal per resolved pair. Skips edges whose endpoints are not yet on the graph (the user hasn't applied that file's ingest proposal yet — surfaced as `from_node_missing` / `to_node_missing` in the JSON report) and edges that already exist with the same `(from, to, type)` tuple — so γ-6 is idempotent.
 - **Flags:** `--create-proposals` (γ-6 mode), `--metrics-preview` (resolve edges the same way `--create-proposals` does but simulate the resulting edge fabric and report before/after metrics — especially `closedWorldContextReachableSatisfaction` — without writing anything), `--ontology-dir <path>` (score `--metrics-preview` against an arbitrary ontology directory; mutually exclusive with `--create-proposals`), `--include <exts>` (comma-separated; default `ts,tsx` — pass `py` for a Python project, `py,ts,tsx` for a mixed-language repo), `--json`.
 - **Example (preview, TS):** `npm run dev -- graph infer-edges src/runtime/fibration`
@@ -454,6 +475,7 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **Edge-type mapping:** `depends_on` for value imports (runtime); `uses_token` for type-only imports. Both are first-class `EdgeType` enum values; γ-6 puts each in `payload.type` on the `edge_create` proposal. Python imports are all classified `depends_on` in v0 — Python has no static type-only import marker (TYPE_CHECKING runtime check is out of scope).
 - **Scope of γ-4 v0 (TS):** named imports, default imports, namespace imports, `import type`, named exports, default exports, re-exports. Out of scope: dynamic `import()`, CommonJS `require()`, triple-slash references.
 - **Scope of γ-4 v0 (Python):** `import X`, `import X.Y[.Z]`, `import X as Y`, `import X, Y` (multi), `from X import Y[, Z]`, single-line parenthesized form `from X import (Y, Z)`, `from X import Y as W`, wildcard `from X import *`, relative `from . / .X / ..X import Y`. Out of scope: multi-line parenthesized form, `if TYPE_CHECKING:` blocks, conditional imports inside functions. Modules resolve as `X.py` or `X/__init__.py` under the project root.
+- **Scope of γ-4-rust v0 (`--include rs`):** `mod foo;` declarations (resolving `foo.rs` / `foo/mod.rs` with the mod.rs/lib.rs/main.rs ownership rule) and `use crate:: / self:: / super::` paths (grouped lists flattened; `as` aliases keep the original symbol as the token). External crates (`use std::...`) are recorded but produce no edge; all rust imports map to `depends_on` (no syntactic type-only marker). Out of scope: `#[path]`, cfg-conditional modules, `pub use` re-export chains. **Optional backend:** parsing runs on `web-tree-sitter@0.22` + `tree-sitter-wasms` (devDependencies here; lazy-loaded with an install hint elsewhere). Note the pin: the prebuilt grammars are 0.20-era ABI — web-tree-sitter 0.23+ refuses to load them.
 - **Exit codes:** preview always exits 0. `--create-proposals` exits 0 unless every inferred edge was skipped AND there was at least one edge to process (almost always a sign the user forgot to run `onto proposal apply` first) — in that case exits 1 so CI / scripts notice. An empty walk (no edges at all) is always exit 0.
 
 ### `ingest [paths...]` *(γ-1 single-file, γ-5 multi-file)*
@@ -592,7 +614,7 @@ fail fast with a friendly message naming the holder.
   the file is stale beyond what the auto-detector can verify (e.g.
   cross-host).
 
-Spec: `src/core/fs/lock.ts`. Reasoning: POST_GAMMA_PLAN §5.1.
+Spec: `src/core/fs/lock.ts`. Reasoning: `docs/archive/POST_GAMMA_PLAN_2026-05-13.md` §5.1.
 
 ### Model Routing (post-γ-7 reviewer fix)
 

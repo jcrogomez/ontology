@@ -95,9 +95,26 @@ export interface LlmResponse {
   raw?: unknown;
 }
 
+// Embedding dispatch — the retrieval-side sibling of `generate`. Embeddings
+// are HYPOTHESIS-generation infrastructure (semantic index, edge suggestion,
+// query ranking); they are never a source of truth about the graph. Only
+// adapters with a real embedding endpoint implement it (ollama via
+// /api/embed; mock via deterministic feature hashing for $0 tests).
+export interface LlmEmbedRequest {
+  model?: string;
+  input: string[];
+}
+
+export interface LlmEmbedResponse {
+  embeddings: number[][];
+  model: string;
+  provider: LlmProvider;
+}
+
 export interface LlmAdapter {
   provider: LlmProvider;
   generate(request: LlmRequest): Promise<LlmResponse>;
   listModels?(): Promise<LlmModelHandle[]>;
   health?(): Promise<{ ok: boolean; message?: string }>;
+  embed?(request: LlmEmbedRequest): Promise<LlmEmbedResponse>;
 }

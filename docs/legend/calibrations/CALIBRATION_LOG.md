@@ -111,6 +111,7 @@ program. Useful for grounding individual claims in the synthesis docs.
 - [`BAKEOFF_3B_FAMILY_2026-05-15.md`](./BAKEOFF_3B_FAMILY_2026-05-15.md) — Phase ε E6 deliverable: cross-model variance and ensemble effectiveness on a curated 20-file subset. Establishes per-model variance (not just point estimates) to falsify/strengthen the pilot's "82.3% → 95.97% recovery" headline.
 - [`SMOKE_PR3_ENABLED_2026-05-15.md`](./SMOKE_PR3_ENABLED_2026-05-15.md) — Phase ε prework C: end-to-end smoke of `onto ingest --static-classifier enabled` against the Ontology core perimeter. Falsifies/confirms the deflection distribution predicted by the report-only smoke before PR3 shipped.
 - [`SELF_INGEST_HYPOTHESIS_2026-05-13.md`](./SELF_INGEST_HYPOTHESIS_2026-05-13.md) — the canonical Phase ε pre-registration. Frames the success matrix, the frontier taxonomy, and the falsifiers for everything that follows.
+- [`PREWORK_2026-05-13.md`](../../archive/PREWORK_2026-05-13.md) (now `docs/archive/PREWORK_2026-05-13.md`) — pre-pilot $0 tooling plan; all five items A–E shipped 2026-05-16 (`373eb8a`).
 - `bakeoff-2026-05-15-raw/` — raw bake-off CSV/log data referenced by `BAKEOFF_3B_FAMILY_2026-05-15.md`.
 
 ---
@@ -174,3 +175,5 @@ When you land a calibration artifact in this directory:
 2. Add a one-line entry to the appropriate section here (`§1` for ε runs, `§2` for pre-ε, `§3` for hierarchizer). Daily reviews go to `docs/ROADMAP.md`, not here.
 3. Cross-link the triplet siblings if applicable.
 4. Bump the "Maintained:" date at the top.
+- [EXTRACTOR_BAKEOFF_2026-06-10_HYPOTHESIS](EXTRACTOR_BAKEOFF_2026-06-10_HYPOTHESIS.md) + [RESULT](EXTRACTOR_BAKEOFF_2026-06-10_RESULT.md) — extractor selection for the live-graph self-ingest: incumbent qwen2.5-coder:3b wins per pre-registered rule (M1 8/8); frontier gap measured at +0.224 recall via cold claude-fable-5 subagents ($0 marginal); qwen3.5:9b not deployable on 8 GB (machine crash).
+- [SELF_INGEST_LIVE_GRAPH_2026-06-11_RESULT](SELF_INGEST_LIVE_GRAPH_2026-06-11_RESULT.md) — first live-graph population: 221 files → 228 nodes + 710 edges, governed escalation (213 local + 8 frontier subagents), 63 verified batches with zero failures; :which loop closed.

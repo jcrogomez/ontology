@@ -42,12 +42,13 @@ the `code_sketch` slice).
 
 The `ollama` provider acts as the bridge to local Ollama deployments. Currently implemented as an isolated adapter, it communicates with the local Ollama API to execute prompts.
 
-**Key constraints and planned capabilities for Ollama execution:**
+**Key constraints and capabilities for Ollama execution (all implemented):**
 - **Local Availability:** Ollama is local and may be unavailable.
 - **Graceful Failure:** The command must fail gracefully if Ollama is not running.
 - **Model Selection:** The `--model` flag permits selecting a specific local model.
 - **Host Selection:** The `--ollama-host` flag allows selecting a specific host for the Ollama connection.
 - **Read-Only / No Mutation:** Executing `run prompt` or `run context` with Ollama must not mutate `.ontology`. `run context` reads the assembled context for a node but never writes back; all executions remain side-effect free concerning the semantic state.
+- **Embeddings (2026-06-10):** the adapter exposes an optional `embed()` (default model `nomic-embed-text`, via `/api/embed`) consumed by the semantic index (`onto semantic index`, `query --semantic`).
 
 ### dispatchLlmRequest
 

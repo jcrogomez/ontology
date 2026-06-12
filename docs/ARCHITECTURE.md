@@ -2,9 +2,10 @@
 
 This document describes the current architectural state of the Ontology
 project (version `0.4.0-rc.1`: Bootstrap 0.9 + post-0.9 plasticity
-layer + Project Legend Phases β through δ + γ-7 prompt invariants +
-the cross-provider per-task routing / advisory lock / Walker v2 PR-1
-hardening sweep). It explains how the modules relate; for the
+layer + Project Legend Phases β through ε, all closed + γ-7 prompt
+invariants + the cross-provider per-task routing / advisory lock /
+Walker v2 PR-1 hardening sweep; Phase ζ — the workflow runtime — is
+active since 2026-05-30). It explains how the modules relate; for the
 mathematical interpretation, read this alongside
 [`CATEGORICAL_VISION.md`](CATEGORICAL_VISION.md) and
 [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md).
@@ -33,7 +34,10 @@ src/
                               {neighbors,path,subgraph}`, `propose
                               {node,link}`, `proposal
                               {list,show,apply,reject}`, `compile
-                              {plan,run}`, `query`, `walk`, `open`,
+                              {plan,run}`, `query` (incl.
+                              `--semantic` hybrid retrieval),
+                              `replay`, `drift`, `semantic
+                              {index,links}`, `walk`, `open`,
                               `projects {list,forget}`, `model
                               {doctor,list}`, `doctor`.
   walker/                   — Ink-based interactive TUI (`onto walk`).
@@ -48,6 +52,13 @@ src/
                               gluing; semantic linker; intent
                               validator (now built on the topos
                               predicate algebra — see §"Validator").
+    semantic/               — local embedding index over node intent
+                              text (`embedding-index.ts`, 2026-06-10);
+                              backs `semantic index|links` and
+                              `query --semantic`. Sibling:
+                              `core/integrity/merkle.ts` (2026-06-10)
+                              — Merkle tree over compiled artifacts
+                              backing `onto drift` change-detection.
     graph/                  — pure helpers: traversal, edges helper,
                               poset, compile-plan (Kahn's algorithm
                               over hard-dependency edges).

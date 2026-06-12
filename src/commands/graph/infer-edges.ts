@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { z } from "zod";
 import {
-  inferEdgesAutoFromDirectory,
+  inferEdgesAutoFromDirectoryAsync,
   type InferredEdge,
 } from "../../runtime/static/edges.js";
 import { loadEdges, loadNodes, loadState } from "../../core/project/load.js";
@@ -140,7 +140,7 @@ export async function graphInferEdgesCommand(
     return;
   }
 
-  const edges = inferEdgesAutoFromDirectory(absDir, extensions);
+  const edges = await inferEdgesAutoFromDirectoryAsync(absDir, extensions);
 
   // Render paths relative to the scanned root so the *display* reads
   // independently of the absolute mount point — same paths whether

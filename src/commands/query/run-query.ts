@@ -12,6 +12,11 @@ import { assertOntologyProject, loadEdges, loadNodes } from "../../core/project/
 import type { OntologyNode } from "../../schemas/ontology.js";
 import { QueryShapeSchema, type QueryShape } from "../../runtime/query/types.js";
 import { queryNodes } from "../../runtime/query/representable.js";
+import {
+  loadEmbeddingIndex,
+  resolveEmbeddingAdapter,
+  staleIndexNodeIds,
+} from "../../runtime/semantic/embedding-index.js";
 import { renderTable } from "../../core/render/table.js";
 import { bold, dim, byKind, byLevel, byStatus, statusGlyph } from "../../core/render/style.js";
 
@@ -29,6 +34,9 @@ export interface QueryCommandOptions {
   forbids?: string;
   hasIncoming?: string;
   hasOutgoing?: string;
+  semantic?: string;
+  top?: string;
+  minScore?: string;
   json?: boolean;
 }
 
@@ -165,6 +173,100 @@ export async function runQueryCommand(options: QueryCommandOptions): Promise<voi
   const edges = loadEdges();
   const matches = queryNodes(nodes, shape, edges);
 
+  // Semantic access path (hybrid retrieval): the structural shape filters
+  // FIRST — exact, deterministic — then the survivors are re-ranked by
+  // cosine similarity against the local embedding index. Similarity never
+  // overrides a structural constraint; it only orders what already matched.
+  if (options.semantic !== undefined) {
+    const queryText = options.semantic.trim();
+    if (queryText.length === 0) {
+      failWith("--semantic requires non-empty text", options.json);
+      return;
+    }
+    const index = loadEmbeddingIndex();
+    if (!index) {
+      failWith("no semantic index found — run `onto semantic index` first", options.json);
+      return;
+    }
+    const top = options.top !== undefined ? Number(options.top) : 10;
+    const minScore = options.minScore !== undefined ? Number(options.minScore) : -1;
+    if (!Number.isFinite(top) || top <= 0) {
+      failWith(`invalid --top: ${options.top} (expected a positive number)`, options.json);
+      return;
+    }
+    if (!Number.isFinite(minScore)) {
+      failWith(`invalid --min-score: ${options.minScore} (expected a number)`, options.json);
+      return;
+    }
+
+    const adapter = resolveEmbeddingAdapter(index.provider);
+    let queryVector: number[];
+    try {
+      const response = await adapter.embed!({ model: index.model, input: [queryText] });
+      queryVector = response.embeddings[0];
+    } catch (err) {
+      failWith(`failed to embed query text: ${err instanceof Error ? err.message : String(err)}`, options.json);
+      return;
+    }
+
+    const vectorsByNodeId = new Map(index.entries.map((e) => [e.nodeId, e.vector]));
+    const stale = staleIndexNodeIds(index, matches);
+    const ranked = matches
+      .filter((n) => vectorsByNodeId.has(n.id))
+      .map((n) => ({
+        node: n,
+        score: cosine(queryVector, vectorsByNodeId.get(n.id)!),
+      }))
+      .filter((r) => r.score >= minScore)
+      .sort((a, b) => b.score - a.score || (a.node.id < b.node.id ? -1 : 1))
+      .slice(0, top);
+    const notIndexed = matches.filter((n) => !vectorsByNodeId.has(n.id)).map((n) => n.id);
+
+    if (options.json) {
+      console.log(JSON.stringify({
+        shape,
+        semantic: {
+          query: queryText,
+          provider: index.provider,
+          model: index.model,
+          top,
+          minScore,
+          staleNodeIds: stale,
+          notIndexedNodeIds: notIndexed,
+        },
+        count: ranked.length,
+        nodes: ranked.map((r) => r.node),
+        scores: ranked.map((r) => r.score),
+      }, null, 2));
+      return;
+    }
+
+    console.log(bold("=== ONTOLOGY QUERY (representable + semantic) ==="));
+    console.log(`${dim("Shape:")}    ${describeShape(shape)}`);
+    console.log(`${dim("Semantic:")} "${queryText}" via ${index.provider}/${index.model}`);
+    if (stale.length > 0) {
+      console.log(`${dim("⚠ Stale:")}  ${stale.length} matched node(s) changed since indexing — run \`onto semantic index\``);
+    }
+    if (notIndexed.length > 0) {
+      console.log(`${dim("⚠ Missing:")} ${notIndexed.length} matched node(s) not in the index (no intent text or never indexed)`);
+    }
+    console.log(`${dim("Matches:")}  ${ranked.length === 0 ? dim("0") : String(ranked.length)}`);
+    console.log("");
+    if (ranked.length === 0) {
+      console.log(dim("(no indexed node satisfies the shape and score floor)"));
+      return;
+    }
+    console.log(renderTable(ranked, [
+      { header: "Score", render: (r) => (r as { score: number }).score.toFixed(3) },
+      { header: "", render: (r) => statusGlyph((r as { node: OntologyNode }).node.status) },
+      { header: "ID", render: (r) => (r as { node: OntologyNode }).node.id },
+      { header: "Kind", render: (r) => byKind((r as { node: OntologyNode }).node.kind) },
+      { header: "Level", render: (r) => byLevel((r as { node: OntologyNode }).node.coordinates.abstraction) },
+      { header: "Label", render: (r) => (r as { node: OntologyNode }).node.label, maxWidth: 44 },
+    ]));
+    return;
+  }
+
   if (options.json) {
     console.log(JSON.stringify({
       shape,
@@ -175,6 +277,19 @@ export async function runQueryCommand(options: QueryCommandOptions): Promise<voi
   }
 
   printPretty(matches, shape);
+}
+
+function cosine(a: number[], b: number[]): number {
+  if (a.length !== b.length || a.length === 0) return 0;
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  return na === 0 || nb === 0 ? 0 : dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
 function failWith(msg: string, json?: boolean): void {

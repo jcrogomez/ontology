@@ -1,4 +1,33 @@
-import type { LlmAdapter, LlmRequest, LlmResponse, LlmModelHandle } from "./types.js";
+import { createHash } from "node:crypto";
+import type {
+  LlmAdapter,
+  LlmEmbedRequest,
+  LlmEmbedResponse,
+  LlmRequest,
+  LlmResponse,
+  LlmModelHandle,
+} from "./types.js";
+
+// Deterministic mock embedding: bag-of-words FEATURE HASHING. Each
+// lowercase token hashes to one of MOCK_EMBED_DIM buckets; the vector
+// counts bucket hits and is L2-normalised. Unlike a hash-of-the-whole-text
+// (which would make every pair of texts unrelated), this preserves the one
+// property the semantic index actually relies on: texts sharing vocabulary
+// have high cosine similarity. That makes the full index → suggest →
+// propose pipeline testable at $0 with meaningful assertions.
+export const MOCK_EMBED_DIM = 64;
+
+export function mockEmbedText(text: string): number[] {
+  const vector = new Array<number>(MOCK_EMBED_DIM).fill(0);
+  const tokens = text.toLowerCase().split(/[^a-z0-9_]+/).filter((t) => t.length > 0);
+  for (const token of tokens) {
+    const digest = createHash("sha256").update(token).digest();
+    const bucket = digest.readUInt32BE(0) % MOCK_EMBED_DIM;
+    vector[bucket] += 1;
+  }
+  const norm = Math.sqrt(vector.reduce((acc, v) => acc + v * v, 0));
+  return norm === 0 ? vector : vector.map((v) => v / norm);
+}
 
 export function createMockLlmAdapter(): LlmAdapter {
   return {
@@ -19,6 +48,14 @@ export function createMockLlmAdapter(): LlmAdapter {
           temperatureDefault: 0,
         },
       ];
+    },
+
+    async embed(request: LlmEmbedRequest): Promise<LlmEmbedResponse> {
+      return {
+        embeddings: request.input.map((text) => mockEmbedText(text)),
+        model: request.model || "mock_embed",
+        provider: "mock",
+      };
     },
 
     async generate(request: LlmRequest): Promise<LlmResponse> {

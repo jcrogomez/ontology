@@ -1,3 +1,7 @@
+> **Archived planning snapshot (2026-05-13; archived 2026-06-10).** Its
+> streams shipped or moved: δ-1/δ-2 shipped; ε closed 2026-05-26; ζ active.
+> Current state: [`docs/ROADMAP.md`](../ROADMAP.md).
+
 # Post-γ plan — δ, ε, ζ y Hardening
 
 > *La luz que hace visible el código oscuro: convertir los streams pendientes
@@ -15,12 +19,12 @@ confirmado (2026-05-13). Lo que sigue son tres streams: **ε**
 como referencia histórica de la planificación original; las casillas
 con tooling y documentación que prometían `docs/INSPECTOR.md` o
 `docs/VERIFICATION.md` se materializaron como secciones inline en
-[`PROJECT_LEGEND.md`](PROJECT_LEGEND.md) §3 y §6 respectivamente.
+[`PROJECT_LEGEND.md`](../PROJECT_LEGEND.md) §3 y §6 respectivamente.
 
 > **Alcance de este documento.** Cubre los streams entre Phase γ y
 > Phase ζ. Las dos chapters que vienen *después* de ζ —
-> [`WAKEUP_SCANNERS.md`](WAKEUP_SCANNERS.md) (system-initiated
-> proposals) y [`PROMPT_GENERATORS.md`](PROMPT_GENERATORS.md)
+> [`WAKEUP_SCANNERS.md`](../WAKEUP_SCANNERS.md) (system-initiated
+> proposals) y [`PROMPT_GENERATORS.md`](../PROMPT_GENERATORS.md)
 > (content-addressed templates, prerrequisito de scanners LLM) —
 > viven en sus propios RFCs. Sus roadmaps no se duplican aquí.
 
@@ -322,7 +326,7 @@ y desbloquea Bootstrap 0.10 entero.
 *Documento creado 2026-05-12 tras el cierre de Phase γ (commit
 `bc350ce`). Refresco esperado cuando δ-1 / δ-2 lleguen a `main` o
 cuando el costo estimado de ε se revise tras una pasada Ollama de
-sanity-check. Vive junto a [`PROJECT_LEGEND.md`](PROJECT_LEGEND.md) y
-[`ROADMAP.md`](ROADMAP.md); reemplaza la sección "Open follow-ups" del
+sanity-check. Vive junto a [`PROJECT_LEGEND.md`](../PROJECT_LEGEND.md) y
+[`ROADMAP.md`](../ROADMAP.md); reemplaza la sección "Open follow-ups" del
 roadmap cuando cada stream termine — al merge, mover el item al
 "Bootstrap history" del ROADMAP.*

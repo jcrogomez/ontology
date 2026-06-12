@@ -21,7 +21,7 @@ import {
   extractResolvedSignatures,
   type ResolvedExport,
 } from "../../runtime/static/typescript-resolved.js";
-import { inferEdgesAutoFromDirectory } from "../../runtime/static/edges.js";
+import { inferEdgesAutoFromDirectoryAsync } from "../../runtime/static/edges.js";
 import { errorMessage } from "../../core/errors.js";
 import {
   computeCostEstimate,
@@ -1987,11 +1987,12 @@ async function runDirectoryIngest(
   }
 
   // Edge inference (γ-4): dispatches per language by the include
-  // list. TS files go to the TS compiler API parser; .py files go
-  // to the regex-based Python parser. Unknown extensions (e.g.
-  // `--include rs`) silently skip the static-edge step — γ-5 still
-  // produces the node proposals, just without auto-inferred edges.
-  const inferredEdges = inferEdgesAutoFromDirectory(absDir, opts.extensions).map(
+  // list. TS files go to the TS compiler API parser; .py files go to
+  // the regex-based Python parser; .rs files go to the lazy-loaded
+  // tree-sitter backend (γ-4-rust). Other unknown extensions silently
+  // skip the static-edge step — γ-5 still produces the node proposals,
+  // just without auto-inferred edges.
+  const inferredEdges = (await inferEdgesAutoFromDirectoryAsync(absDir, opts.extensions)).map(
     (e) => ({
       fromFile: path.relative(absDir, e.fromFile),
       toFile: path.relative(absDir, e.toFile),
@@ -2309,7 +2310,7 @@ async function runMultiInputIngest(
   for (const input of inputs) {
     if (!input.stat.isDirectory()) continue;
     const absDir = path.resolve(input.path);
-    const edges = inferEdgesAutoFromDirectory(absDir, opts.extensions);
+    const edges = await inferEdgesAutoFromDirectoryAsync(absDir, opts.extensions);
     for (const e of edges) {
       inferredEdges.push({
         fromFile: path.relative(absDir, e.fromFile),

@@ -115,6 +115,10 @@ export const cases: BehaviorCase[] = [
 most likely to compile cleanly under regen). NOT all 125 — v0's value
 is the column, not the saturation.
 
+> Postscript 2026-06-10: v0 landed and was later expanded —
+> `tests/behavior-fixtures/` now holds 34 fixtures (the ~20 here was
+> the pre-registered minimum, exceeded).
+
 ### 3.2 Runner — `verify-homeomorphism --behavior-check`
 
 New flag on the existing CLI. Pseudocode:

@@ -44,6 +44,12 @@ import { graphViewFromWalker } from "./actions/graph-view-from-walker.js";
 import { parseGraphViewArgs } from "./state/parse-graph-view-args.js";
 import { linkFromWalker } from "./actions/link-from-walker.js";
 import { InfoPanel, type InfoPanelState } from "./layout/info-panel.js";
+import { ArtifactPreviewPanel } from "./layout/artifact-preview-panel.js";
+import {
+  shadowReport,
+  readArtifactPreview,
+  nodesOwningFile,
+} from "./state/shadow-status.js";
 import { ProposalsPanel, type ProposalsPanelState } from "./layout/proposals-panel.js";
 import {
   loadProposalsForWalker,
@@ -54,7 +60,7 @@ import { parseProviderArgs } from "./state/parse-provider-args.js";
 import { parseQueryArgs } from "./state/parse-query-args.js";
 import { parseLinkArgs } from "./state/parse-link-args.js";
 import type { LlmProvider } from "../runtime/llm/types.js";
-import { loadModelsRegistry } from "../core/project/load.js";
+import { loadModelsRegistry, loadNodes } from "../core/project/load.js";
 import { updateNode } from "../core/nodes/update-node.js";
 import { modelTags } from "../runtime/llm/model-tags.js";
 
@@ -117,6 +123,9 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
   // synchronously; `:link-analysis` is async (semanticLink) and uses
   // the pendingLinkAnalysis sentinel below to stay interactive.
   const [infoState, setInfoState] = useState<InfoPanelState>({ kind: "idle" });
+  // Artifact preview (the editing-loop window): toggled with `a` or
+  // `:preview`. Content + shadow status are derived per focal below.
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [proposalsPanel, setProposalsPanel] = useState<ProposalsPanelState>({
     open: false,
     proposals: [],
@@ -147,6 +156,28 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
     // on its inclusion as a dep but the lint rule is not enabled here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focalId, cwd, draftTick, neighborhood]);
+
+  // Shadow freshness of the focal vs the drift anchor + the preview content.
+  // Recomputed on focal change and reloadTick (cheap: one snapshot read +
+  // one file hash). compileState in the deps refreshes the badge after a
+  // :compile lands a new artifact.
+  const focalShadow = useMemo(() => {
+    if ("error" in neighborhood) return null;
+    try {
+      return shadowReport(neighborhood.focal, cwd);
+    } catch {
+      return null;
+    }
+  }, [neighborhood, cwd, reloadTick, compileState]);
+
+  const artifactPreview = useMemo(() => {
+    if (!previewOpen || "error" in neighborhood) return null;
+    try {
+      return readArtifactPreview(neighborhood.focal, cwd);
+    } catch {
+      return null;
+    }
+  }, [previewOpen, neighborhood, cwd, reloadTick, compileState]);
 
   // Transient messages clear after a brief delay so the UI does not pile up state.
   useEffect(() => {
@@ -481,6 +512,12 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       else setMessage("no next sibling");
       return;
     }
+    if (input === "a") {
+      // Toggle the artifact preview — the read-only window on the focal's
+      // compiled shadow. Same toggle as `:preview`.
+      setPreviewOpen((open) => !open);
+      return;
+    }
     if (input === "i") {
       // Enter edit mode. Pre-populate the buffer from any existing draft so
       // the user resumes mid-thought instead of starting fresh.
@@ -561,7 +598,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       return;
     }
     if (cmd === "help") {
-      setMessage("i edit · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :clear{run,plan,compile,info,draft} · :q");
+      setMessage("i edit · a/:preview artifact · :which <file> · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :clear{run,plan,compile,info,draft,preview} · :q");
       return;
     }
     if (cmd === "propose") {
@@ -825,6 +862,38 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       setMessage("info panel dismissed");
       return;
     }
+    if (cmd === "preview" || cmd === "clearpreview") {
+      // Same semantics as the `a` key; :clearpreview always closes.
+      setPreviewOpen((open) => (cmd === "clearpreview" ? false : !open));
+      return;
+    }
+    if (cmd.startsWith("which")) {
+      // Inverse traceability: which intention built this file? Accepts a
+      // cwd-relative or absolute path and jumps the focal to the owning
+      // node (the node whose outputs.files contains it).
+      const fileArg = cmd.slice("which".length).trim();
+      if (fileArg.length === 0) {
+        setMessage("usage: :which <file> — e.g. :which src/core/errors.ts");
+        return;
+      }
+      try {
+        const owners = nodesOwningFile(loadNodes(cwd), fileArg, cwd);
+        if (owners.length === 0) {
+          setMessage(`no node owns ${fileArg} — not yet ingested/compiled?`);
+          return;
+        }
+        setFocalId(owners[0].id);
+        setPreviewOpen(true);
+        setMessage(
+          owners.length === 1
+            ? `${owners[0].id} owns ${fileArg}`
+            : `${owners.length} nodes own ${fileArg} — focal on ${owners[0].id} (also: ${owners.slice(1).map((n) => n.id).join(", ")})`,
+        );
+      } catch (err) {
+        setMessage(`which: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      return;
+    }
     if (cmd === "proposals" || cmd === "p") {
       // Walker v2 PR-1 — proposal review pane. Loads the pending list
       // and opens the panel. The operator drives it with j/k navigation
@@ -875,7 +944,15 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={borderColor} paddingX={1}>
-      <IdentityBar node={neighborhood.focal} hasDraft={hasDraft} />
+      <IdentityBar
+        node={neighborhood.focal}
+        hasDraft={hasDraft}
+        shadowStatus={
+          focalShadow?.status === "drifted" || focalShadow?.status === "missing"
+            ? focalShadow.status
+            : null
+        }
+      />
       <AiStatusBar />
       <PromptSection node={neighborhood.focal} />
       <ConstraintsSection node={neighborhood.focal} />
@@ -894,6 +971,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
           onSubmit={commitDraftAndExit}
         />
       )}
+      <ArtifactPreviewPanel open={previewOpen} preview={artifactPreview} shadow={focalShadow} />
       <RunResultPanel state={runState} />
       <CompilePlanPanel state={planState} />
       <CompileResultPanel state={compileState} />
