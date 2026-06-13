@@ -52,6 +52,8 @@ import { modelDoctorCommand } from "./commands/model/doctor.js";
 import { modelListCommand } from "./commands/model/list.js";
 import { registerQueryCommand } from "./commands/query/index.js";
 import { verifyHomeomorphismCommand } from "./commands/verify/homeomorphism.js";
+import { regenerateCommand } from "./commands/regenerate.js";
+import { probeCommand } from "./commands/probe.js";
 import { workflowRunCommand } from "./commands/workflow/run.js";
 import { openCommand } from "./commands/open.js";
 import { ontoMcpCommand } from "./commands/mcp/index.js";
@@ -1079,6 +1081,63 @@ program
       await verifyHomeomorphismCommand(focal, options);
     } catch (err: unknown) {
       console.error(`✖ Error during verify-homeomorphism: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("regenerate <nodeId>")
+  .description("Regenerate a node's code shadow from its intent (forward functor F), verify the candidate against the source on disk, and — only with --write, and only when the regeneration is structure-preserving — overwrite the real source file. Default is preview-only (stages + reports, touches no source). The governed lever for the kernel-of-equivalence map (ROUNDTRIP_BILATERAL_2026-06-12).")
+  .option("--write", "Overwrite the shadow source file. Gated: refuses unless the verdict is structure-preserving (epsilon_equivalent / divergent_loc) and any behaviour fixture passes.")
+  .option("--provider <provider>", "LLM provider override for the compile-back (mock|ollama|anthropic|gemini).")
+  .option("--model <model>", "Model override (use with --provider).")
+  .option("--ollama-host <host>", "Host for the Ollama provider.")
+  .option("--behavior-check", "Run the node's behaviour fixture (if present) against source vs regen; a failing check blocks --write.")
+  .option("--behavior-fixtures-dir <path>", "Override the behaviour-fixtures directory (default tests/behavior-fixtures).")
+  .option("--draws <n>", "Multi-draw consensus: compile N independent drafts and only write the majority structural-agreement class (defangs single-draw variance). Default 1.", (v) => parseInt(v, 10))
+  .option("--consensus <k>", "Consensus floor: write only when at least K of N draws agree (default strict majority, floor(N/2)+1).", (v) => parseInt(v, 10))
+  .option("--loc-threshold <n>", "LoC distance threshold for the verdict (default 0.3).", (v) => parseFloat(v))
+  .option("--jaccard-threshold <n>", "Structural Jaccard threshold for the verdict (default 0.5).", (v) => parseFloat(v))
+  .option("--no-open-world", "Enforce strict requires-satisfaction during compile-back (default open-world).")
+  .option("--max-tokens <n>", "Override max-output-tokens for the compile-back.", (v) => parseInt(v, 10))
+  .option("--no-ast-grounding", "Disable the MANDATORY EXPORTS grounding section (on by default — the calibrated F).")
+  .option("--no-lock", "Skip the .ontology/.lock advisory lock.")
+  .option("--json", "Output the result as JSON.")
+  .action(async (nodeId, rawOptions) => {
+    try {
+      const { openWorld, astGrounding, lock, ...rest } = rawOptions as Record<string, unknown> & {
+        openWorld?: boolean;
+        astGrounding?: boolean;
+        lock?: boolean;
+      };
+      const options = {
+        ...rest,
+        ...(openWorld === false ? { openWorld: false } : {}),
+        ...(astGrounding === false ? { astGrounding: false } : {}),
+        ...(lock === false ? { noLock: true } : {}),
+      };
+      await regenerateCommand(nodeId, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during regenerate: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("probe <nodeId>")
+  .description("Generate a SELF-VALIDATED behavioural fixture for a node: an LLM proposes characterization cases from the source + contract, each is run against the real source, and only the cases that cleanly match are persisted to tests/behavior-fixtures/<nodeId>.fixture.ts. The safety net for `onto regenerate --write` — a behavioural divergence (even a structurally-identical off-by-one) then blocks the write. Run under tsx (`npm run dev -- probe ...`).")
+  .option("--provider <provider>", "LLM provider (mock|ollama|anthropic|gemini).")
+  .option("--model <model>", "Model override (use with --provider).")
+  .option("--ollama-host <host>", "Host for the Ollama provider.")
+  .option("--force", "Replace an existing hand-written fixture (generated fixtures are always replaceable).")
+  .option("--fixtures-dir <path>", "Override the behaviour-fixtures directory (default tests/behavior-fixtures).")
+  .option("--max-tokens <n>", "Override max-output-tokens for the generation.", (v) => parseInt(v, 10))
+  .option("--json", "Output the result as JSON.")
+  .action(async (nodeId, options) => {
+    try {
+      await probeCommand(nodeId, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during probe: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
