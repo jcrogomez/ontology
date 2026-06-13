@@ -98,6 +98,20 @@ the sweep cost $0 and ~5 min, with zero sampling variance vs Arm A.
 - [`SELF_INGEST_CONTRACT_COLUMN_2026-06-09.md`](./SELF_INGEST_CONTRACT_COLUMN_2026-06-09.md) — raw report (sidecar `.ontology.contract-column-2026-06-09.json`).
 - [`SELF_INGEST_CONTRACT_COLUMN_2026-06-09_SYNTHESIS.md`](./SELF_INGEST_CONTRACT_COLUMN_2026-06-09_SYNTHESIS.md) — **117/125 measured, pass 85 / fail 32 / unknown 8; pass rate 0.726.** H-C1/H-C3/H-C4 hold; H-C2's band [0.10, 0.55] missed HIGH (no falsifier fired; spot-audited non-tautological). All fails are `missing_keys` (presence-only regime — the May graph predates O1 signatures); fails concentrate in `divergent_both` (22/32) while 60/73 `divergent_loc` nodes PASS — the axis discriminates. Premise-4 correction recorded: run-cache resurrection, benign.
 
+### Bilateral round-trip (2026-06-12) — first unit-side measurement, $0
+
+First measurement of the **unit side** of `G ⊣ F` (intent → code →
+intent) over the live 228-node graph — never measurable before the
+2026-06-11 graph population. Three arms (local floor / frontier-F /
+frontier-both, the frontier arms via cold session subagents replaying
+the *exact* pipeline prompts through a wire shim — $0 marginal), plus
+an updated counit baseline, a cold-reader altitude-legibility probe,
+and read-only simplification candidates. Sample 48 (40 main + 8
+escalated S7 overlay).
+
+- [`ROUNDTRIP_BILATERAL_2026-06-12_HYPOTHESIS.md`](./ROUNDTRIP_BILATERAL_2026-06-12_HYPOTHESIS.md) — pre-registered (M1/M2/M3 + null + echo guard, H-C1/H-U1/H-U2/H-ARM/H-S7/H-COLD, kernel-membership rule); **Amendment A1** (F = verify compile-back, registered pre-data).
+- [`ROUNDTRIP_BILATERAL_2026-06-12_REPORT.md`](./ROUNDTRIP_BILATERAL_2026-06-12_REPORT.md) — **unit side round-trips: Arm A median M1 0.80, `provides` recovery 1.0 (H-U1 PASS); M2 beats null 92–98% all arms (H-U2 PASS); rules ~total loss (M3 0% except frontier-G-on-rich-fichas 0.43). Kernel = 19/48 structurally regenerable (T2), 15 reachable on the local $0 stack.** Counit: structural Jaccard median 0.667 (H-C1 structural PASS), contract 0.638 (below 0.726 anchor, H-C1 contract FAIL). **Key methodological finding: M1 falls A→B→C on main strata but *rises* on S7 (frontier-extracted originals), peaking at C 0.60 — a reference-frame confound proving the binding constraint is extraction/ficha quality, not the compiler F (H-S7 CONFIRMED, sharpens the ROADMAP "extraction completeness" lever).** Cold-reader H-COLD PASS 3/3, 4/4 families. Sidecars: `.ontology.scratch-roundtrip-2026-06-12/` (fase1-verify, metrics-arm{A,B,C}, synthesis-data, simplification-candidates).
+
 ---
 
 ## 2. Pre-Phase-ε calibrations
