@@ -26,6 +26,7 @@ covering everything through Phase ζ (the workflow runtime).
 | Verify the round-trip (F∘G ≈ id) | `onto verify-homeomorphism [focal]` |
 | Regenerate a node's code from intent | `onto regenerate <nodeId>` (preview; `--write` to apply, gated) |
 | Generate a behavioural fixture for a node | `onto probe <nodeId>` (self-validated; gates `regenerate --write`) |
+| Verify / triage a node's rules | `onto rules check <nodeId>` · `onto rules audit` |
 | Run a workflow (verify-refine loop) | `onto workflow run <graph> --input <path>` |
 | Inspect a node (LLM summary) | `onto node inspect <id>` |
 | Serve the graph read-only over MCP | `onto mcp --cwd <path>` |
@@ -646,6 +647,34 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
   - `onto regenerate node_0017 --provider anthropic --behavior-check --write`
   - `onto regenerate node_0017 --provider ollama --model qwen2.5-coder:7b --rules-grounding` (round-trip rules)
 - **Output (JSON):** `{ ok, nodeId, sourceFile?, regenPath?, shadowStatus?, verdict?, metrics?, behaviorVerdict?, written, writeBlockedReason?, failure? }`.
+
+### `rules check <nodeId>` / `rules audit` *(2026-06-14 — rule enforcement + triage)*
+
+- **Purpose:** turn a node's `rules` from preserved text (rules-grounding
+  closed that, LENS_LAWS E2) into **verified invariants** where decidable,
+  and honestly **triage** the rest. `rules check <id>` classifies each rule
+  and statically checks the decidable ones against the node's compiled
+  artifact (the shadow, or `--regen <path>`); `rules audit` reports the
+  class distribution across the whole graph.
+- **Classes:** `forbid_static` / `require_static` (a clean code identifier
+  is forbidden-absent / required-present — deterministic, $0), `behavioural`
+  (assertable at runtime → route to `onto probe`), `meta` (a property like
+  "pure"/"idempotent" — needs effect analysis), `prose` (no imperative
+  marker — canon axioms, descriptions, extraction noise; not an enforceable
+  rule). The static path only fires when the whole forbidden/required
+  remainder is one identifier, so it never false-accuses on a phrase.
+- **Honest finding (what the audit surfaced on the live graph):** **0 of 88
+  rules are statically decidable** — 75% are prose/canon/extraction-noise,
+  23% behavioural, 2% meta. Static enforcement is *correct but near-vacuous
+  on the current corpus* (the `rules` field is where 3B-extraction noise
+  accumulates — the same bottleneck the bilateral round-trip measured). So
+  the audit's first value is the **ficha-quality signal** + routing
+  behavioural rules to the executable channel.
+- **`regenerate --check-rules`:** gates `--write` on a static violation. Its
+  *new* enforcement is REQUIRE-symbol (validateIntent already rejects FORBID
+  phrases at compile time, more crudely via substring).
+- **Output (`rules check --json`):** `{ ok, nodeId, artifact, checks: [{rule, ruleClass, verdict, symbol?, detail?}], staticChecked, violations, behavioural, meta, prose }`. Exits non-zero on a static violation.
+- **Output (`rules audit --json`):** `{ nodesWithRules, totalRules, distribution, staticallyEnforceable, behaviourallyEnforceable, proseOrNoise, proseFraction, proseSamples }`.
 
 ### `bakeoff <reports...>` *(#4 — fidelity release-gate)*
 

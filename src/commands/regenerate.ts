@@ -14,6 +14,7 @@ import {
   type DistanceMetrics,
 } from "../runtime/legend/verify-homeomorphism.js";
 import { loadFixture, runBehaviorCheck, type BehaviorVerdict } from "../runtime/legend/behavior-checker.js";
+import { checkRules } from "../runtime/legend/rule-checker.js";
 import type { LlmProvider } from "../runtime/llm/types.js";
 
 // `onto regenerate <nodeId>` — the governed lever that turns the
@@ -64,6 +65,7 @@ export interface RegenerateCommandOptions {
   maxTokens?: number;
   astGrounding?: boolean;
   rulesGrounding?: boolean;
+  checkRules?: boolean;
   draws?: number;
   consensus?: number;
   noLock?: boolean;
@@ -100,6 +102,7 @@ interface DraftEval {
   behaviorVerdict: BehaviorVerdict | "no_fixture";
   declKey?: string;
   acceptable: boolean;
+  ruleViolations?: number;
 }
 
 function emit(result: RegenerateResult, json: boolean | undefined): void {
@@ -262,8 +265,15 @@ export async function regenerateCommand(
       behaviorVerdict = bc.verdict;
     }
     const declKey = [...metrics.regenDeclarations].sort().join(",");
-    const acceptable = WRITE_SAFE_VERDICTS.has(verdict) && behaviorVerdict !== "fail";
-    evals.push({ i: c.i, regenPath: rp, compiled: true, metrics, verdict, behaviorVerdict, declKey, acceptable });
+    // Rule gate (--check-rules): a regen that violates a statically-decidable
+    // declared rule (FORBID/REQUIRE symbol) must not overwrite working source.
+    let ruleViolations = 0;
+    if (options.checkRules && (node.rules ?? []).length > 0) {
+      const rc = checkRules({ nodeId, rules: node.rules ?? [], artifactText: fs.readFileSync(rp, "utf-8") });
+      ruleViolations = rc.violations;
+    }
+    const acceptable = WRITE_SAFE_VERDICTS.has(verdict) && behaviorVerdict !== "fail" && ruleViolations === 0;
+    evals.push({ i: c.i, regenPath: rp, compiled: true, metrics, verdict, behaviorVerdict, declKey, acceptable, ruleViolations });
   }
 
   // ── Single-draw path (draws === 1): preserve the exact original gate. ──
@@ -296,6 +306,11 @@ export async function regenerateCommand(
     }
     if (e.behaviorVerdict === "fail") {
       emit({ ...base, writeBlockedReason: "behaviour check failed — refusing to overwrite working source" }, options.json);
+      process.exit(1);
+      return;
+    }
+    if ((e.ruleViolations ?? 0) > 0) {
+      emit({ ...base, writeBlockedReason: `${e.ruleViolations} declared rule(s) violated — refusing to overwrite working source` }, options.json);
       process.exit(1);
       return;
     }
