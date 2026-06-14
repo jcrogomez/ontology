@@ -68,6 +68,21 @@ describe("onto ficha cleanup", () => {
     expect(audit.totalMissingExports).toBe(0);
   });
 
+  it("--apply preserves existing provides signatures (does not drop O1 sigs)", () => {
+    const id = thinContractNode(tempDir);
+    // Give the existing `alpha` provide an O1 signature.
+    const nodePath = path.join(tempDir, ".ontology/nodes/node_0002.json");
+    const node = JSON.parse(fs.readFileSync(nodePath, "utf-8"));
+    node.context.provides = [{ key: "alpha", nodeType: "declared", signature: "resolved:1" }];
+    fs.writeFileSync(nodePath, JSON.stringify(node, null, 2));
+
+    expect(runCli(tempDir, ["ficha", "cleanup", id, "--apply"]).status).toBe(0);
+    const after = JSON.parse(fs.readFileSync(nodePath, "utf-8")).context.provides;
+    const alpha = after.find((p: { key: string }) => p.key === "alpha");
+    expect(alpha.signature).toBe("resolved:1"); // signature preserved
+    expect(after.map((p: { key: string }) => p.key).sort()).toEqual(["alpha", "beta", "gamma"]);
+  });
+
   it("is a no-op when the contract is already complete", () => {
     const id = thinContractNode(tempDir);
     runCli(tempDir, ["ficha", "cleanup", id, "--apply"]);
