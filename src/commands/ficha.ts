@@ -76,9 +76,24 @@ export async function fichaCleanupCommand(nodeId: string, options: FichaCleanupO
   }
 
   // Apply the deterministic contract completion: union the existing provides
-  // (preserving their signatures) with the AST-missing exports.
-  const existingKeys = (node.context?.provides ?? []).map((p) => (typeof p === "string" ? p : p.key));
-  updateNode({ id: nodeId, provides: [...existingKeys, ...missing], cwd, eventMetadata: { source: "ficha-cleanup", addedExports: missing } });
+  // with the AST-missing exports. CRITICAL: updateNode replaces the whole
+  // provides array, so we must re-supply the existing keys' O1 signatures via
+  // provideSignatures or they would be silently dropped (216/228 live nodes
+  // carry signatures). The newly-added exports are presence-only (the AST
+  // scanner gives names, not signatures).
+  const existingProvides = node.context?.provides ?? [];
+  const existingKeys = existingProvides.map((p) => (typeof p === "string" ? p : p.key));
+  const provideSignatures: Record<string, string> = {};
+  for (const p of existingProvides) {
+    if (typeof p === "object" && p.signature) provideSignatures[p.key] = p.signature;
+  }
+  updateNode({
+    id: nodeId,
+    provides: [...existingKeys, ...missing],
+    provideSignatures,
+    cwd,
+    eventMetadata: { source: "ficha-cleanup", addedExports: missing },
+  });
   out({ ...result, applied: true, note: `added ${missing.length} export(s) to the contract` }, options.json);
   if (!options.json) {
     console.log(`  ✔ contract completed: +${missing.join(", ")}`);
