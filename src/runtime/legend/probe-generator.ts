@@ -43,9 +43,10 @@ HARD RULES:
 - setup() MUST be deterministic and self-contained: build every input inline. No imports beyond the BehaviorCase type. No reading files. No Date.now()/Math.random().
 - CRITICAL — assert against the ACTUAL CODE, never the prose intent. Trace the SOURCE line by line to compute the exact output; the intent description may be out of date or wrong. If the code does \`padStart(n)\` it does NOT increment n. When you are not 100% certain of the exact output by reading the code, write \`assert: () => true\` — the harness independently compares the regeneration against this source, so a case with a trivial assert still catches divergence, whereas a WRONG assert silently drops the case. A wrong guess is worse than no assertion.
 - Prefer 4-8 cases that cover distinct branches/edge cases (empty input, boundary values, the typical case). A deterministic throw is a valid case (the harness locks "throws on this input").
-- The module must be valid standalone TypeScript that compiles with no unresolved references.`;
+- The module must be valid standalone TypeScript that compiles with no unresolved references.
+- RULE TARGETS: if the prompt lists "Behavioural rules to verify", write one case per rule that DIRECTLY verifies it (e.g. a rule "returns undefined when candidates is empty" → invoke with an empty list, assert the result is undefined). Name each such case EXACTLY \`rule:<N> — <short label>\` where <N> is the rule's number. Trace the source to compute the assert: if the source obeys the rule the case will pass and be kept (enforcing the rule); if it does not, the case will fail self-validation and be dropped (surfacing that the code violates its own declared rule). Write the case anyway — a dropped rule case is a signal, not a mistake.`;
 
-export function buildProbeUserPrompt(node: OntologyNode, sourceText: string): string {
+export function buildProbeUserPrompt(node: OntologyNode, sourceText: string, behaviouralRules: readonly string[] = []): string {
   const provides = (node.context?.provides ?? [])
     .map((p) => {
       if (typeof p === "string") return p;
@@ -54,12 +55,20 @@ export function buildProbeUserPrompt(node: OntologyNode, sourceText: string): st
     })
     .join("\n");
   const sourceRel = node.outputs?.files?.[0] ?? "(unknown)";
+  const rulesSection = behaviouralRules.length
+    ? [
+        "",
+        "Behavioural rules to verify (one `rule:<N> — ...` case each):",
+        ...behaviouralRules.map((r, i) => `  ${i + 1}. ${r}`),
+      ]
+    : [];
   return [
     `Source module: ${sourceRel}`,
     `Node intent: ${node.prompt?.raw ?? "(none)"}`,
     "",
     "Declared exports (contract):",
     provides || "(none declared)",
+    ...rulesSection,
     "",
     "Source code:",
     "```typescript",
@@ -68,6 +77,26 @@ export function buildProbeUserPrompt(node: OntologyNode, sourceText: string): st
     "",
     "Write the fixture module now. Output only the TypeScript module.",
   ].join("\n");
+}
+
+// Map self-validated cases back to the behavioural rules they target, via the
+// `rule:<N>` name convention. A rule is "enforced" when a kept case names it,
+// "violated_or_unassertable" when a case named it but was dropped (the source
+// failed it), or "uncovered" when no case targeted it.
+export type RuleCoverageStatus = "enforced" | "violated_or_unassertable" | "uncovered";
+
+export function ruleCoverage(
+  behaviouralRules: readonly string[],
+  caseResults: readonly CaseValidation[],
+): { ruleIndex: number; rule: string; status: RuleCoverageStatus }[] {
+  return behaviouralRules.map((rule, i) => {
+    const n = i + 1;
+    const tagged = caseResults.filter((c) => new RegExp(`^rule:\\s*${n}\\b`).test(c.name));
+    let status: RuleCoverageStatus = "uncovered";
+    if (tagged.some((c) => c.kept)) status = "enforced";
+    else if (tagged.length > 0) status = "violated_or_unassertable";
+    return { ruleIndex: n, rule, status };
+  });
 }
 
 // Strip markdown fences and any leading prose, returning the fixture module

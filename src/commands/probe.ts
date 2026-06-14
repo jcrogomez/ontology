@@ -11,7 +11,10 @@ import {
   renderValidatedFixture,
   fixturePathFor,
   isGeneratedFixture,
+  ruleCoverage,
+  type RuleCoverageStatus,
 } from "../runtime/legend/probe-generator.js";
+import { classifyRule } from "../runtime/legend/rule-checker.js";
 
 // `onto probe <nodeId>` — generate a SELF-VALIDATED behavioural fixture for a
 // node, the safety net that gives `onto regenerate --write` teeth. An LLM
@@ -43,6 +46,7 @@ interface ProbeResult {
   generatedCases?: number;
   keptCases?: number;
   dropped?: { name: string; outcome: string }[];
+  ruleCoverage?: { ruleIndex: number; rule: string; status: RuleCoverageStatus }[];
   written: boolean;
   failure?: string;
 }
@@ -59,6 +63,15 @@ function emit(r: ProbeResult, json?: boolean): void {
   console.log(`◆ probe ${r.nodeId}  (${r.sourceFile})`);
   console.log(`  generated ${r.generatedCases} case(s), ${r.keptCases} self-validated against source.`);
   for (const d of r.dropped ?? []) console.log(`    dropped: ${d.name} — ${d.outcome}`);
+  if (r.ruleCoverage?.length) {
+    const mark: Record<RuleCoverageStatus, string> = {
+      enforced: "✓ enforced",
+      violated_or_unassertable: "⚠ code may violate this rule (case dropped)",
+      uncovered: "· uncovered",
+    };
+    console.log(`  behavioural-rule coverage:`);
+    for (const rc of r.ruleCoverage) console.log(`    ${mark[rc.status]}  ${rc.rule.slice(0, 78)}`);
+  }
   if (r.written) {
     console.log(`  ✔ wrote ${r.fixturePath}`);
     console.log(`    now \`onto regenerate ${r.nodeId} --behavior-check --write\` is gated on behaviour.`);
@@ -113,8 +126,11 @@ export async function probeCommand(nodeId: string, options: ProbeCommandOptions)
     return;
   }
 
-  // 4. Dispatch: LLM proposes the fixture.
+  // 4. Dispatch: LLM proposes the fixture, with the node's behavioural rules as
+  //    explicit verification targets (the executable enforcement layer — each
+  //    becomes a self-validated case the regenerate behaviour-gate enforces).
   const sourceText = fs.readFileSync(sourcePath, "utf-8");
+  const behaviouralRules = (node.rules ?? []).filter((r) => classifyRule(r).ruleClass === "behavioural");
   let candidateRaw: string;
   try {
     const response = await dispatchLlmRequest(
@@ -122,7 +138,7 @@ export async function probeCommand(nodeId: string, options: ProbeCommandOptions)
         task: "test_generate",
         model: options.model,
         system: PROBE_SYSTEM_PROMPT,
-        prompt: buildProbeUserPrompt(node, sourceText),
+        prompt: buildProbeUserPrompt(node, sourceText, behaviouralRules),
         temperature: 0.2,
         maxTokens: options.maxTokens,
         metadata: { command: "probe", nodeId },
@@ -161,6 +177,7 @@ export async function probeCommand(nodeId: string, options: ProbeCommandOptions)
   }
 
   const dropped = validation.caseResults.filter((c) => !c.kept).map((c) => ({ name: c.name, outcome: c.outcome }));
+  const coverage = behaviouralRules.length ? ruleCoverage(behaviouralRules, validation.caseResults) : undefined;
   const base: ProbeResult = {
     ok: true,
     nodeId,
@@ -169,6 +186,7 @@ export async function probeCommand(nodeId: string, options: ProbeCommandOptions)
     generatedCases: validation.totalCases,
     keptCases: validation.kept.length,
     dropped,
+    ...(coverage ? { ruleCoverage: coverage } : {}),
     written: false,
   };
 

@@ -135,3 +135,28 @@ describe("onto probe — governance guards (mock provider, no real generation)",
     expect(fs.readFileSync(path.join(fxDir, "node_0002.fixture.ts"), "utf-8")).toContain("hand-written");
   });
 });
+
+describe("probe rule-targeting — the executable enforcement layer", () => {
+  it("buildProbeUserPrompt embeds numbered behavioural rules as targets", async () => {
+    const { buildProbeUserPrompt } = await import("../src/runtime/legend/probe-generator.js");
+    const node = { outputs: { files: ["src/x.ts"] }, prompt: { raw: "x" }, context: { provides: [] } } as any;
+    const prompt = buildProbeUserPrompt(node, "export const x = 1;", ["returns undefined when empty", "throws on negative"]);
+    expect(prompt).toContain("Behavioural rules to verify");
+    expect(prompt).toContain("1. returns undefined when empty");
+    expect(prompt).toContain("2. throws on negative");
+  });
+
+  it("ruleCoverage maps rule:N cases to enforced / violated / uncovered", async () => {
+    const { ruleCoverage } = await import("../src/runtime/legend/probe-generator.js");
+    const rules = ["returns undefined when empty", "throws on negative", "is monotonic"];
+    const caseResults = [
+      { index: 0, name: "rule:1 — empty -> undefined", kept: true, outcome: "match" },
+      { index: 1, name: "rule:2 — negative throws", kept: false, outcome: "divergent" },
+      // rule 3 untargeted
+    ];
+    const cov = ruleCoverage(rules, caseResults as any);
+    expect(cov[0].status).toBe("enforced");
+    expect(cov[1].status).toBe("violated_or_unassertable");
+    expect(cov[2].status).toBe("uncovered");
+  });
+});
