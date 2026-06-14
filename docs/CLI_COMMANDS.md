@@ -27,6 +27,7 @@ covering everything through Phase ζ (the workflow runtime).
 | Regenerate a node's code from intent | `onto regenerate <nodeId>` (preview; `--write` to apply, gated) |
 | Generate a behavioural fixture for a node | `onto probe <nodeId>` (self-validated; gates `regenerate --write`) |
 | Verify / triage a node's rules | `onto rules check <nodeId>` · `onto rules audit` |
+| Measure / fix ficha (intent record) quality | `onto ficha audit` · `onto ficha cleanup <nodeId>` |
 | Run a workflow (verify-refine loop) | `onto workflow run <graph> --input <path>` |
 | Inspect a node (LLM summary) | `onto node inspect <id>` |
 | Serve the graph read-only over MCP | `onto mcp --cwd <path>` |
@@ -686,6 +687,32 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
   phrases at compile time, more crudely via substring).
 - **Output (`rules check --json`):** `{ ok, nodeId, artifact, checks: [{rule, ruleClass, verdict, symbol?, detail?}], staticChecked, violations, behavioural, meta, prose }`. Exits non-zero on a static violation.
 - **Output (`rules audit --json`):** `{ nodesWithRules, totalRules, distribution, staticallyEnforceable, behaviourallyEnforceable, proseOrNoise, proseFraction, proseSamples }`.
+
+### `ficha audit` / `ficha cleanup <nodeId>` *(2026-06-14 — ficha quality, measure-before-construct)*
+
+- **Purpose:** measure + fix the quality of a node's **intent record** (its
+  "ficha": prompt + contract + rules). The live graph was populated by a 3B
+  extractor (2026-06-11), and every experiment — bilateral M1 confound,
+  lens-laws GET model-bound, rules-field 75% noise — pointed at the same
+  binding constraint: **ficha / extraction quality**. This quantifies it
+  per node and applies the one deterministic fix.
+- **`ficha audit` (read-only):** per code node, two $0 signals —
+  *contract thinness* (exports the source's AST actually has that the ficha's
+  `provides` does NOT declare — the recall-bound thinness the bilateral
+  round-trip measured) and *rule noise* (prose/extraction-noise rules). Emits
+  a cleanup worklist ranked by score (missing-exports ×2 + prose-rules ×1).
+  **Live-graph headline: 138 of 221 code nodes under-declare their exports —
+  430 missing export declarations** (worst: `effects/laws.ts` +30,
+  `schemas/ontology.ts` +30, `legend/matrix.ts` +22 — exactly the large
+  multi-export modules the bilateral experiment said collapse to stubs).
+- **`ficha cleanup <node>`:** the deterministic, high-confidence fix —
+  complete the contract by adding the AST-missing exports to `provides`. The
+  AST names them, so it is unambiguously correct and needs no LLM. **Preview
+  by default; `--apply` mutates** the node's `provides` via `updateNode`.
+  Prose-rule noise is *reported, never auto-removed* (that needs judgment).
+  This is the deterministic first cut of ficha cleanup; prompt refinement and
+  rule denoising are the LLM/judgment follow-on (the Walker loop).
+- **Output (`ficha audit --json`):** `{ nodesScanned, nodesWithMissingExports, totalMissingExports, totalProseRulesOnCodeNodes, worklist: [{nodeId, srcFile, contractGap, ruleNoise, promptChars, cleanupScore}] }`.
 
 ### `bakeoff <reports...>` *(#4 — fidelity release-gate)*
 

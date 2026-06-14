@@ -55,6 +55,7 @@ import { verifyHomeomorphismCommand } from "./commands/verify/homeomorphism.js";
 import { regenerateCommand } from "./commands/regenerate.js";
 import { probeCommand } from "./commands/probe.js";
 import { rulesCheckCommand, rulesAuditCommand } from "./commands/rules.js";
+import { fichaAuditCommand, fichaCleanupCommand } from "./commands/ficha.js";
 import { workflowRunCommand } from "./commands/workflow/run.js";
 import { openCommand } from "./commands/open.js";
 import { ontoMcpCommand } from "./commands/mcp/index.js";
@@ -1172,6 +1173,38 @@ rulesCmd
       await rulesAuditCommand(options);
     } catch (err: unknown) {
       console.error(`✖ Error during rules audit: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+const fichaCmd = program
+  .command("ficha")
+  .description("Measure + fix the quality of a node's intent record (its 'ficha': prompt + contract + rules). The live graph was populated by a 3B extractor; every experiment pointed at ficha/extraction quality as the binding constraint. `audit` is the read-only measure-before-construct worklist; `cleanup` applies the one deterministic fix — completing the contract with the export surface the AST actually has.");
+
+fichaCmd
+  .command("audit")
+  .description("Read-only ficha-quality report across the graph: contract thinness (AST exports the ficha under-declares), rule noise (prose/extraction-noise rules), and a ranked cleanup worklist.")
+  .option("--top <n>", "How many worklist entries to show (default 12).", (v) => parseInt(v, 10))
+  .option("--json", "Output the result as JSON.")
+  .action(async (options) => {
+    try {
+      await fichaAuditCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during ficha audit: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+fichaCmd
+  .command("cleanup <nodeId>")
+  .description("Complete a node's contract with the export surface its source actually has (the deterministic, AST-derived fix for the recall-bound thinness the bilateral round-trip measured). Preview by default; --apply mutates the node's provides. Prose-rule noise is reported, never auto-removed.")
+  .option("--apply", "Add the AST-missing exports to the node's provides (governed mutation via updateNode).")
+  .option("--json", "Output the result as JSON.")
+  .action(async (nodeId, options) => {
+    try {
+      await fichaCleanupCommand(nodeId, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during ficha cleanup: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
