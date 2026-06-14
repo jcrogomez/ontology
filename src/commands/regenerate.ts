@@ -63,6 +63,7 @@ export interface RegenerateCommandOptions {
   openWorld?: boolean;
   maxTokens?: number;
   astGrounding?: boolean;
+  rulesGrounding?: boolean;
   draws?: number;
   consensus?: number;
   noLock?: boolean;
@@ -218,6 +219,7 @@ export async function regenerateCommand(
             openWorld: options.openWorld ?? true,
             maxTokens: options.maxTokens,
             astGrounding: options.astGrounding ?? true,
+            rulesGrounding: options.rulesGrounding ?? false,
             repCacheBypassToken: draws === 1 ? undefined : `regen_draw_${i}_of_${draws}`,
           });
           compiled.push({ i, ok: r.ok, message: r.ok ? undefined : r.message ?? r.reason ?? "compile-back failed" });

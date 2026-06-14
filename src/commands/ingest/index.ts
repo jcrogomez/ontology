@@ -58,6 +58,7 @@ import {
   scanFileSymbols,
   patchProvidesWithAST,
 } from "../../runtime/legend/ast-symbol-scanner.js";
+import { extractRulesBlock } from "../../runtime/compile/rules-grounding.js";
 import {
   decideStaticClassifierIngestAction,
   type IngestAction,
@@ -1382,6 +1383,24 @@ async function extractWithRouting(args: {
         result.telemetry.astProvidesPatched = true;
         result.telemetry.astProvidesRescuedCount = patch.rescuedCount;
       }
+    }
+    // Rules-grounding recovery (LENS_LAWS_2026-06-13 §E2, dual of the
+    // provides rescue): if the source carries a deterministic
+    // `@ontology:rules` block, recover those rules verbatim — the LLM is
+    // unreliable for rules even at the frontier ceiling, so a present block
+    // is authoritative. Always-on: fires only when the marker exists, so
+    // ungrounded sources are unaffected.
+    try {
+      const sourceText = fs.readFileSync(args.inputs.filePath, "utf-8");
+      const blockRules = extractRulesBlock(sourceText);
+      if (blockRules.length > 0) {
+        const existing = result.extracted.rules ?? [];
+        const merged = [...blockRules];
+        for (const r of existing) if (!merged.includes(r)) merged.push(r);
+        result.extracted = { ...result.extracted, rules: merged };
+      }
+    } catch {
+      // unreadable source — leave the LLM-extracted rules untouched.
     }
   }
   return { result, action };

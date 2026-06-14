@@ -622,14 +622,29 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
   the export, one correct-logic but missing the export — so **no draft was
   both structurally and behaviourally correct, consensus was 0/3, and the
   write was refused.** Exactly the danger single-draw `--write` would hit.
+- **Rules-grounding (`--rules-grounding`):** the deterministic dual of
+  `--ast-grounding`, closing the LENS_LAWS_2026-06-13 **E2 gap** (rule
+  edits don't round-trip). It prepends a marked `@ontology:rules` comment
+  block to the artifact, built deterministically from `node.rules`;
+  `onto ingest` recovers it with a deterministic pre-pass — **neither side
+  trusts the LLM with rules** (which it drops even at the frontier ceiling,
+  and which plain code cannot express). Re-running the E2 arm with it on
+  took rule survival from **0/6 → 6/6**, model-independently. This is
+  **preservation** (the rule text round-trips as a versioned artifact),
+  not **enforcement** (verifying the code obeys); assertable rules should
+  additionally route to a runtime check / behaviour fixture. Off by
+  default — it changes artifact content. See
+  `src/runtime/compile/rules-grounding.ts`.
 - **Flags:** `--write`, `--draws <n>`, `--consensus <k>`, `--provider`,
   `--model`, `--ollama-host`, `--behavior-check`,
   `--behavior-fixtures-dir <path>`, `--loc-threshold`, `--jaccard-threshold`,
   `--no-open-world`, `--max-tokens`, `--no-ast-grounding` (grounding is **on**
-  by default — the calibrated F), `--no-lock`, `--json`.
+  by default — the calibrated F), `--rules-grounding` (off by default),
+  `--no-lock`, `--json`.
 - **Examples:**
   - `onto regenerate node_0017 --provider ollama --model qwen2.5-coder:7b` (preview)
   - `onto regenerate node_0017 --provider anthropic --behavior-check --write`
+  - `onto regenerate node_0017 --provider ollama --model qwen2.5-coder:7b --rules-grounding` (round-trip rules)
 - **Output (JSON):** `{ ok, nodeId, sourceFile?, regenPath?, shadowStatus?, verdict?, metrics?, behaviorVerdict?, written, writeBlockedReason?, failure? }`.
 
 ### `bakeoff <reports...>` *(#4 — fidelity release-gate)*
