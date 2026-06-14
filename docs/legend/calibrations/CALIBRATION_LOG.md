@@ -112,6 +112,17 @@ escalated S7 overlay).
 - [`ROUNDTRIP_BILATERAL_2026-06-12_HYPOTHESIS.md`](./ROUNDTRIP_BILATERAL_2026-06-12_HYPOTHESIS.md) — pre-registered (M1/M2/M3 + null + echo guard, H-C1/H-U1/H-U2/H-ARM/H-S7/H-COLD, kernel-membership rule); **Amendment A1** (F = verify compile-back, registered pre-data).
 - [`ROUNDTRIP_BILATERAL_2026-06-12_REPORT.md`](./ROUNDTRIP_BILATERAL_2026-06-12_REPORT.md) — **unit side round-trips: Arm A median M1 0.80, `provides` recovery 1.0 (H-U1 PASS); M2 beats null 92–98% all arms (H-U2 PASS); rules ~total loss (M3 0% except frontier-G-on-rich-fichas 0.43). Kernel = 19/48 structurally regenerable (T2), 15 reachable on the local $0 stack.** Counit: structural Jaccard median 0.667 (H-C1 structural PASS), contract 0.638 (below 0.726 anchor, H-C1 contract FAIL). **Key methodological finding: M1 falls A→B→C on main strata but *rises* on S7 (frontier-extracted originals), peaking at C 0.60 — a reference-frame confound proving the binding constraint is extraction/ficha quality, not the compiler F (H-S7 CONFIRMED, sharpens the ROADMAP "extraction completeness" lever).** Cold-reader H-COLD PASS 3/3, 4/4 families. Sidecars: `.ontology.scratch-roundtrip-2026-06-12/` (fase1-verify, metrics-arm{A,B,C}, synthesis-data, simplification-candidates).
 
+### Lens laws under edits (2026-06-13) — bidirectional transformation, $0
+
+First measurement of the `G ⊣ F` lens laws **under deliberate edits**
+(the bilateral experiment measured only the identity point). Mapping
+S=code/V=intent, get=`onto ingest`/put=`onto regenerate`. Marker edits
+isolate lens propagation from model capability; 6 kernel nodes, local +
+frontier-GET arms.
+
+- [`LENS_LAWS_2026-06-13_HYPOTHESIS.md`](./LENS_LAWS_2026-06-13_HYPOTHESIS.md) — pre-registered (E1 contract / E2 rule / E3 code edits; H-PG1/H-PG2/H-GP1/H-ARM; committed before runs).
+- [`LENS_LAWS_2026-06-13_REPORT.md`](./LENS_LAWS_2026-06-13_REPORT.md) — **PUT (F) propagates a declared contract edit 6/6; GET (extraction) is the binding constraint and decisively model-bound — local 3B recovers the edit 4/6 (E1) / 2/6 (E3), frontier 6/6 / 6/6 through the same pipeline.** Rules don't round-trip (E2 0/6) — a representational gap (code doesn't carry rules), not capacity. H-PG1 PASS, H-PG2 confirmed, H-GP1 fails-on-local-recovers-at-frontier, H-ARM model-bound (+2/+4). Product upshot: "edit a contract in the Walker and regenerate" is sound (F reliable); the legible-intent round-trip is gated by extractor quality; rule-level intent needs a rules-aware channel. Laws stay T2.
+
 ---
 
 ## 2. Pre-Phase-ε calibrations
