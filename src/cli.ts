@@ -54,6 +54,7 @@ import { registerQueryCommand } from "./commands/query/index.js";
 import { verifyHomeomorphismCommand } from "./commands/verify/homeomorphism.js";
 import { regenerateCommand } from "./commands/regenerate.js";
 import { probeCommand } from "./commands/probe.js";
+import { rulesCheckCommand, rulesAuditCommand } from "./commands/rules.js";
 import { workflowRunCommand } from "./commands/workflow/run.js";
 import { openCommand } from "./commands/open.js";
 import { ontoMcpCommand } from "./commands/mcp/index.js";
@@ -1102,6 +1103,7 @@ program
   .option("--max-tokens <n>", "Override max-output-tokens for the compile-back.", (v) => parseInt(v, 10))
   .option("--no-ast-grounding", "Disable the MANDATORY EXPORTS grounding section (on by default — the calibrated F).")
   .option("--rules-grounding", "Prepend a deterministic @ontology:rules block to the artifact so rule-level intent round-trips (closes the LENS_LAWS E2 gap). Off by default — it changes artifact content.")
+  .option("--check-rules", "Block --write when a regeneration violates a statically-decidable declared rule (FORBID/REQUIRE symbol). See `onto rules check`.")
   .option("--no-lock", "Skip the .ontology/.lock advisory lock.")
   .option("--json", "Output the result as JSON.")
   .action(async (nodeId, rawOptions) => {
@@ -1139,6 +1141,37 @@ program
       await probeCommand(nodeId, options);
     } catch (err: unknown) {
       console.error(`✖ Error during probe: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+const rulesCmd = program
+  .command("rules")
+  .description("Rule enforcement + triage for a node's `rules`. rules-grounding (LENS_LAWS E2) made rules round-trip as preserved text; this turns the statically-decidable ones into VERIFIED invariants, routes behavioural rules to `onto probe`, and flags prose/axiom/extraction-noise (a ficha-quality signal).");
+
+rulesCmd
+  .command("check <nodeId>")
+  .description("Classify and check a node's rules against its compiled artifact (the shadow, or --regen <path>). Static forbid/require-symbol rules are verified deterministically; behavioural rules are routed to `onto probe`; prose is flagged. Exits non-zero on a static violation.")
+  .option("--regen <path>", "Artifact to check against (default: the node's outputs.files shadow).")
+  .option("--json", "Output the result as JSON.")
+  .action(async (nodeId, options) => {
+    try {
+      await rulesCheckCommand(nodeId, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during rules check: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+rulesCmd
+  .command("audit")
+  .description("Classify every node's rules across the graph and report the distribution — statically enforceable / behavioural / meta / prose. The prose fraction is a ficha-quality signal (the `rules` field is where 3B extraction noise + canon axioms accumulate).")
+  .option("--json", "Output the result as JSON.")
+  .action(async (options) => {
+    try {
+      await rulesAuditCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during rules audit: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
