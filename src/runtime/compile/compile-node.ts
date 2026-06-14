@@ -14,6 +14,7 @@ import {
   type WriteArtifactResult,
 } from "./artifact-writer.js";
 import { extractCodeFence } from "./post/extract-code-fence.js";
+import { groundArtifactWithRules, stripRulesBlock } from "./rules-grounding.js";
 import { validateLanguage } from "./post/validate-language.js";
 import { runtimeCheck } from "./post/runtime-check.js";
 import { assembleContext } from "../context/assembler.js";
@@ -162,6 +163,12 @@ export interface CompileNodeOptions {
   // calibrations are unaffected. See `ast-grounding.ts` for the
   // section format and hash semantics.
   astGrounding?: boolean;
+  // Rules-grounding (LENS_LAWS_2026-06-13 §E2). When true and the node has
+  // `rules`, the compiler deterministically prepends a marked
+  // `@ontology:rules` block to the artifact so rule-level intent survives
+  // the round-trip (the dual of astGrounding for the export surface; see
+  // `rules-grounding.ts`). Off by default — it changes artifact content.
+  rulesGrounding?: boolean;
   // Phase ε design §4.2 — per-rep cache-bypass token. When `--reps N`
   // re-runs the same focal N times to defang single-draw Jaccard
   // variance, every rep would otherwise hit the run-cache (computeRunId
@@ -637,13 +644,23 @@ function projectArtifactE(input: PostInput): EffectWithLog<string, never> {
       text: response.text,
       language: options.node.technical.language,
     });
+    // Rules-grounding: deterministically prepend a marked @ontology:rules
+    // block so rule-level intent round-trips (extractRulesBlock recovers it
+    // at ingest). Dual of ast-grounding; off unless rulesGrounding is set.
+    const rules = options.node.rules ?? [];
+    const content =
+      options.rulesGrounding === true && rules.length > 0
+        ? groundArtifactWithRules(projected.content, rules, options.node.technical.language)
+        : projected.content;
+    const groundedNote =
+      options.rulesGrounding === true && rules.length > 0 ? ` +rules-grounding(${rules.length})` : "";
     return {
-      value: ok(projected.content),
+      value: ok(content),
       logs: [{
         level: "info",
         message: projected.extracted
-          ? `projectArtifact: extracted ${projected.content.length} bytes from fence (info=${projected.fenceInfo ?? "none"})`
-          : "projectArtifact: no fence detected, pass-through",
+          ? `projectArtifact: extracted ${projected.content.length} bytes from fence (info=${projected.fenceInfo ?? "none"})${groundedNote}`
+          : `projectArtifact: no fence detected, pass-through${groundedNote}`,
       }],
     };
   };
@@ -772,11 +789,15 @@ function validateIntentE(
       );
       const fragments = assembled.nodes.map(buildFragment);
       const glued = glueFragments(fragments);
+      // Hide the rules-grounding annotation from the forbidden-phrase check:
+      // a FORBID rule's text names the forbidden thing, but the annotation is
+      // not the code *doing* it. Stripping leaves any real violation in the
+      // generated code still visible.
       const validation = validateIntent({
         assembled,
         glued,
         candidate: {
-          text: artifactContent,
+          text: stripRulesBlock(artifactContent),
           provider: input.response.provider,
           model: input.response.model,
         },

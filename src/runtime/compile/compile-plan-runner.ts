@@ -65,6 +65,9 @@ export interface CompilePlanRunOptions {
   // Phase ε Move 3α — AST grounding for code_sketch. Forwarded to each
   // compileNode step uniformly. See CompileNodeOptions.astGrounding.
   astGrounding?: boolean;
+  // Rules-grounding: forwarded to each compileNode step. See
+  // CompileNodeOptions.rulesGrounding and rules-grounding.ts.
+  rulesGrounding?: boolean;
   // Phase ε design §4.2 — per-rep cache-bypass token. Forwarded to each
   // compileNode step uniformly so a --reps N sweep can pass the rep
   // index (or any deterministic per-rep token) and obtain distinct
@@ -229,6 +232,7 @@ export async function runCompilePlan(options: CompilePlanRunOptions): Promise<Co
       maxTokens: options.maxTokens,
       thinking: options.thinking,
       astGrounding: options.astGrounding,
+      rulesGrounding: options.rulesGrounding,
       // Apply the per-rep cache-bypass token only at the focal step.
       // Upstream parents already share a cache across the sweep — they
       // never change per rep and re-dispatching them would waste tokens

@@ -93,3 +93,45 @@ the product:
 `results-local.json`, `results-frontier-get.json`, capture/replay prompts.
 Drivers: `scripts/lens-laws-2026-06-13-{edits,local}.mjs` (+ the bilateral
 `fakeollama` shim for the frontier GET).
+
+---
+
+## ADDENDUM 2026-06-13 — E2 closed by rules-grounding (post-experiment)
+
+> Registered after the experiment above, recording a *fix* the result
+> motivated. The original 0/6 stands as the dated measurement of the
+> ungrounded channel; this addendum records the grounded channel.
+
+The report named the cure for E2 (rule edits don't round-trip): "a
+rules-aware channel (emit rule-checks/asserts the extractor can
+recover), not a bigger model." That channel shipped same-day as
+**rules-grounding** — the deterministic dual of `--ast-grounding`:
+`onto regenerate --rules-grounding` (and `compile`) prepends a marked
+`@ontology:rules` comment block to the artifact, and `onto ingest`
+recovers it with a deterministic pre-pass (neither side trusts the LLM
+with rules). See `src/runtime/compile/rules-grounding.ts`.
+
+**Re-running the exact E2 arm** (same 6 nodes, same local 7B put / 3B
+get, $0) with `--rules-grounding` on:
+
+| | put emits block | rule survives round-trip |
+|---|---|---|
+| **E2 with rules-grounding** | 6/6 | **6/6** (was **0/6** ungrounded) |
+
+The gap closes completely and **model-independently** — the recovery is
+a deterministic block parse, so it does not depend on extractor capacity
+(the property that made GET the binding constraint for E1/E3 does not
+apply here). Rule-level intent is now bidirectional.
+
+**Honest scope of the fix.** This is **preservation**, not
+**enforcement**: the rule text round-trips as a versioned, visible
+artifact, but the block does not *verify the code obeys the rule*. A
+`FORBID`/`REQUIRE` that is assertable should additionally compile to a
+runtime check or a behaviour fixture (`onto probe`) — that enforcement
+layer is the next step. One interaction surfaced and fixed: a `FORBID:
+<phrase>` rule's text tripped the compile-time intent validator's
+forbidden-phrase check (the annotation *names* the forbidden thing); the
+validator now strips the rules block before that check, so a real
+violation in the generated code is still caught while the annotation is
+not. Tests: `tests/rules-grounding.test.ts` (9), end-to-end round-trip
+confirmed live (3B recovered both injected rules verbatim).

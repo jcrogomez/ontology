@@ -1101,6 +1101,7 @@ program
   .option("--no-open-world", "Enforce strict requires-satisfaction during compile-back (default open-world).")
   .option("--max-tokens <n>", "Override max-output-tokens for the compile-back.", (v) => parseInt(v, 10))
   .option("--no-ast-grounding", "Disable the MANDATORY EXPORTS grounding section (on by default — the calibrated F).")
+  .option("--rules-grounding", "Prepend a deterministic @ontology:rules block to the artifact so rule-level intent round-trips (closes the LENS_LAWS E2 gap). Off by default — it changes artifact content.")
   .option("--no-lock", "Skip the .ontology/.lock advisory lock.")
   .option("--json", "Output the result as JSON.")
   .action(async (nodeId, rawOptions) => {
