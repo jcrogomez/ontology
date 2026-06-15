@@ -13,7 +13,7 @@ compiler walks that graph in topological order to emit artifacts
 (the forward functor `F: Intent → Code`). **Project Legend** builds the
 inverse — lifting existing code back into intent (`G`), with the
 round-trip `F∘G ≈ id` measured empirically. See `README.md` for the
-full pitch and `docs/PROJECT_LEGEND.md` for the design.
+full pitch and `docs/design/inverse/PROJECT_LEGEND.md` for the design.
 
 ## Where to look (single-source-of-truth map)
 
@@ -21,9 +21,11 @@ full pitch and `docs/PROJECT_LEGEND.md` for the design.
 |---|---|---|
 | **Current phase state + open work** | [`docs/ROADMAP.md`](docs/ROADMAP.md) | **The single source of truth.** Daily-review findings roll in here. Start here. |
 | How literally a math claim holds | [`docs/MATHEMATICAL_CLAIMS.md`](docs/MATHEMATICAL_CLAIMS.md) | Every categorical term is graded **T1** (tested law) / **T2** (operational) / **T3** (analogy) / **T4** (aspirational). Read before asserting any "functor/topos/adjoint" claim. |
+| The destination / *why* | [`docs/VISION.md`](docs/VISION.md) | The asymmetry thesis. Direction only; status lives in ROADMAP. |
+| Component design (by F/G/laws role) | [`docs/design/README.md`](docs/design/README.md) | Index of the design docs, grouped **kernel / forward (F) / inverse (G) / laws / runtime / surfaces**. |
 | Phase ε self-ingestion experiment record | [`docs/legend/calibrations/CALIBRATION_LOG.md`](docs/legend/calibrations/CALIBRATION_LOG.md) | Hand-rolled index of the calibration corpus. These are **dated, pre-registered records — historical, do not rewrite.** |
-| Phase ζ workflow runtime | [`docs/legend/WORKFLOW_RUNTIME_SPEC.md`](docs/legend/WORKFLOW_RUNTIME_SPEC.md) | The `onto workflow run` verify-refine state machine, predicate DSL, artefact-slot dataflow. |
-| The governed sync loop (`onto sync` / `onto status`) | [`docs/SYNC_LOOP.md`](docs/SYNC_LOOP.md) (how-to), [`docs/SYNC_LOOP_SPEC.md`](docs/SYNC_LOOP_SPEC.md) (contract + acceptance) | One command closes intent→code: regen + 3 gates + per-node re-anchor. Honest number in §8. |
+| Phase ζ workflow runtime | [`docs/design/runtime/WORKFLOW_RUNTIME_SPEC.md`](docs/design/runtime/WORKFLOW_RUNTIME_SPEC.md) | The `onto workflow run` verify-refine state machine, predicate DSL, artefact-slot dataflow. |
+| The governed sync loop (`onto sync` / `onto status`) | [`docs/design/runtime/SYNC_LOOP.md`](docs/design/runtime/SYNC_LOOP.md) (how-to), [`docs/design/runtime/SYNC_LOOP_SPEC.md`](docs/design/runtime/SYNC_LOOP_SPEC.md) (contract + acceptance) | One command closes intent→code: regen + 3 gates + per-node re-anchor. Honest number in §8. |
 | Per-commit detail | [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md) | |
 | Onboarding / first run | [`README.md`](README.md), [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md) | |
 | CLI surface | [`docs/CLI_COMMANDS.md`](docs/CLI_COMMANDS.md) | |
@@ -105,7 +107,10 @@ src/
   commands/        CLI command implementations (onto <verb>)
   walker/          interactive TUI
 tests/             vitest suites (mirror src/ loosely)
-docs/              design docs; docs/legend/ = Project Legend; docs/legend/calibrations/ = ε records
+docs/              orientation at top level (ROADMAP, VISION, MATHEMATICAL_CLAIMS, CLI_COMMANDS, GETTING_STARTED)
+  design/          component design grouped by role — kernel/ forward/(F) inverse/(G) laws/ runtime/ surfaces/; index in design/README.md
+  meta/            contributor-facing (COMMENTING_GUIDE, POSITIONING, SELF_INGEST_RUNBOOK)
+  legend/          Project Legend records: legend/calibrations/ = ε records (immutable), legend/prompts/, legend/architecture/
 examples/          hello-world (compile demo), workflow-imo-verify-refine (Phase ζ demo)
 ```
 

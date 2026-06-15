@@ -10,7 +10,7 @@
 > `src/runtime/fibration/`, and `src/runtime/topos/` respectively.
 >
 > Every claim made here is also classified by rigor in
-> [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) (strictly implemented /
+> [`MATHEMATICAL_CLAIMS.md`](../../MATHEMATICAL_CLAIMS.md) (strictly implemented /
 > operationally implemented / useful analogy / aspirational). When this doc
 > says *"X is a Y"*, the claims map says *how literally* you should read it.
 
@@ -65,7 +65,7 @@ with the canonical chain `canon ≥ project ≥ … ≥ artifact`. Every node ca
   a rewrite system. `MATHEMATICAL_CLAIMS.md` §2.4 classifies this as T2
   (operational) for the AST and T3 (analogy) for the rewrite-rule framing.
 - The rewrite-rule framing remains T3 metadata today (verified
-  2026-06-10). [`PROMPT_GENERATORS.md`](PROMPT_GENERATORS.md) is the RFC
+  2026-06-10). [`PROMPT_GENERATORS.md`](../forward/PROMPT_GENERATORS.md) is the RFC
   that would lift it to T2 — for the generator domain only — and has not
   shipped.
 
@@ -113,7 +113,7 @@ so the functor refuses to step forward when the candidate $A_n$ would violate th
 - Framework choice must come from target/stack nodes, not from hardcoded compiler assumptions.
 - **Implemented (Bootstrap 0.8 + post-0.9 hardening).** `onto compile run <nodeId>` walks the topological plan and dispatches each step's prompt against the configured provider. The structure-preserving property is *derived* from the graph + Kahn's algorithm, not hand-coded.
 - The mock provider acts as the **identity functor** when `task: code_sketch` — it returns the prompt verbatim. This makes mock-driven compilation a degenerate but mathematically valid case of axiom 6, and is what powers the offline `npm run example:hello-world` demo.
-- **The inverse direction** $G\colon \mathcal{C} \to \mathcal{I}$ — extracting intent from existing code — is the subject of [Project Legend](PROJECT_LEGEND.md). It tests the operational adjunction $G \dashv F$ ($G$ the left adjoint) and measures the round-trip $F \circ G \approx \mathrm{id}$ on a quantified subcategory.
+- **The inverse direction** $G\colon \mathcal{C} \to \mathcal{I}$ — extracting intent from existing code — is the subject of [Project Legend](../inverse/PROJECT_LEGEND.md). It tests the operational adjunction $G \dashv F$ ($G$ the left adjoint) and measures the round-trip $F \circ G \approx \mathrm{id}$ on a quantified subcategory.
 
 ## 7. Code as Compiled Shadow
 

@@ -5,8 +5,8 @@
 
 **Created:** 2026-05-13.
 **Role:** durable strategy and pre-registration template.
-**Companions:** [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §3.10
-(the load-bearing T4 claim), [`PROJECT_LEGEND.md`](PROJECT_LEGEND.md)
+**Companions:** [`MATHEMATICAL_CLAIMS.md`](../MATHEMATICAL_CLAIMS.md) §3.10
+(the load-bearing T4 claim), [`PROJECT_LEGEND.md`](../design/inverse/PROJECT_LEGEND.md)
 (the engineering plan), and each concrete
 `docs/legend/calibrations/SELF_INGEST_HYPOTHESIS_<date>.md`
 (the frozen experiment plan for a specific run).
@@ -74,7 +74,7 @@ Ollama vs $0.12/file under Anthropic" says something a single percentage
 never does.
 
 **Axis-relative faithful subcategories.**
-[`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §3.10 names a single
+[`MATHEMATICAL_CLAIMS.md`](../MATHEMATICAL_CLAIMS.md) §3.10 names a single
 distance $d$ with threshold $\varepsilon \approx 0.3$; δ-2 already ships
 two distances (LoC + structural Jaccard). The matrix is the next
 refinement: every axis defines its own faithful subcategory
@@ -213,7 +213,7 @@ empirical T2 toward a stricter, reproducible claim.
   strategy changes.
 - §2 changes only when the verify report adds or retires a measurement
   axis. Any such change should update
-  [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §3.10 in the same
+  [`MATHEMATICAL_CLAIMS.md`](../MATHEMATICAL_CLAIMS.md) §3.10 in the same
   commit.
 - §3 is a template. Concrete predictions belong only in dated
   `SELF_INGEST_HYPOTHESIS_<date>.md` files.

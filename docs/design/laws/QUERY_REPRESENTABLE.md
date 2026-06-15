@@ -244,7 +244,7 @@ hand-rolling traversal.
 
 ## 8. Rigor classification
 
-[`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §3.7 classifies the
+[`MATHEMATICAL_CLAIMS.md`](../../MATHEMATICAL_CLAIMS.md) §3.7 classifies the
 Yoneda framing as T2 (operationally implemented). The matcher is a
 sound subset of the embedding — a partial Hom-profile under-determines
 the node — but the Yoneda lemma proper (*two nodes with equal

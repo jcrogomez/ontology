@@ -4,7 +4,7 @@
 
 **Status:** Draft
 **Bootstrap target:** post-0.9 / Phase ε+ (extension on top of Proposal System 0.5)
-**Depends on:** [`PROPOSAL_SYSTEM.md`](PROPOSAL_SYSTEM.md) (shipped), [`RUN_PERSISTENCE.md`](RUN_PERSISTENCE.md) (shipped)
+**Depends on:** [`PROPOSAL_SYSTEM.md`](../kernel/PROPOSAL_SYSTEM.md) (shipped), [`RUN_PERSISTENCE.md`](../kernel/RUN_PERSISTENCE.md) (shipped)
 **Prerequisite for LLM-using scanners:** Prompt Generators RFC (pending)
 **Date:** 2026-05-18
 
@@ -14,7 +14,7 @@
 
 Hoy toda propuesta en `.ontology/proposals/` se origina en el humano: `onto propose node`, `onto propose link`, o `run prompt --as-proposal`. El grafo no se mira a sí mismo. Las contradicciones detectables programáticamente —un nodo sin descendientes, dos nodos con la misma intención bajo distinto fraseo, una arista de dependencia implícita por contexto compartido— viven hasta que un humano las encuentra leyendo nodos uno por uno.
 
-**Wakeup** pone *scanners* encima del sistema de propuestas existente. Un scanner es una función del grafo que emite propuestas `pending` para que el humano las ratifique. Schema, lifecycle, eventos, y la primitiva `parentHash` son los de [`PROPOSAL_SYSTEM.md`](PROPOSAL_SYSTEM.md) — no se duplican ni se renombran.
+**Wakeup** pone *scanners* encima del sistema de propuestas existente. Un scanner es una función del grafo que emite propuestas `pending` para que el humano las ratifique. Schema, lifecycle, eventos, y la primitiva `parentHash` son los de [`PROPOSAL_SYSTEM.md`](../kernel/PROPOSAL_SYSTEM.md) — no se duplican ni se renombran.
 
 `onto ingest` y `onto wakeup` son dos stances epistemológicos distintos sobre quién origina la intención:
 
@@ -204,4 +204,4 @@ Misma razón que el sistema de propuestas existente: *"models may speak; only ex
 
 Toda la maquinaria de propuestas individuales (`proposal_<id>.json`, eventos `proposal_*`, `parentHash`, `proposal apply`, `proposal apply --dry-run`) se reutiliza sin cambios. Lo nuevo de este RFC es estrictamente: scanners, intents, bundles, el comando `onto wakeup`, y los eventos `wakeup_scanned` + `bundle_*`.
 
-**Si alguna decisión de implementación entra en conflicto con [`PROPOSAL_SYSTEM.md`](PROPOSAL_SYSTEM.md), [`RUN_PERSISTENCE.md`](RUN_PERSISTENCE.md), o el invariante *"models may speak; only explicit graph commands may mutate"*, gana el doc previo.**
+**Si alguna decisión de implementación entra en conflicto con [`PROPOSAL_SYSTEM.md`](../kernel/PROPOSAL_SYSTEM.md), [`RUN_PERSISTENCE.md`](../kernel/RUN_PERSISTENCE.md), o el invariante *"models may speak; only explicit graph commands may mutate"*, gana el doc previo.**

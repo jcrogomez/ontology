@@ -129,13 +129,13 @@ If a proposal is created from a run that was never persisted (`--persist` was of
 
 ### 7.1 Interaction with Prompt Generators (forthcoming)
 
-[`PROMPT_GENERATORS.md`](PROMPT_GENERATORS.md) (RFC) extends `PersistedRunInput` with an optional field:
+[`PROMPT_GENERATORS.md`](../forward/PROMPT_GENERATORS.md) (RFC) extends `PersistedRunInput` with an optional field:
 
 ```
 input.generator: { id, parameters, dependencyHash }
 ```
 
-When present, `input.promptHash` must equal the `materialHash` the generator produces when materialised against `parameters` and the current generator registry. `runs verify <runId>` additionally re-materialises the generator and compares both `materialHash` and `dependencyHash`. When absent, behaviour is unchanged — `run prompt --prompt "..."` and the proposal-driven flows continue to populate `promptHash` directly. The generator field closes the causal chain for programmatically dispatched runs (the scanners of [`WAKEUP_SCANNERS.md`](WAKEUP_SCANNERS.md) Fase 3+), where the prompt text is derived from a versioned template rather than typed inline by a human.
+When present, `input.promptHash` must equal the `materialHash` the generator produces when materialised against `parameters` and the current generator registry. `runs verify <runId>` additionally re-materialises the generator and compares both `materialHash` and `dependencyHash`. When absent, behaviour is unchanged — `run prompt --prompt "..."` and the proposal-driven flows continue to populate `promptHash` directly. The generator field closes the causal chain for programmatically dispatched runs (the scanners of [`WAKEUP_SCANNERS.md`](../runtime/WAKEUP_SCANNERS.md) Fase 3+), where the prompt text is derived from a versioned template rather than typed inline by a human.
 
 ## 8. Out of scope
 
@@ -151,4 +151,4 @@ When present, `input.promptHash` must equal the `materialHash` the generator pro
 2. Should runs include a back-reference to any proposal they generated? Probably yes, but it requires an update event (`run_proposal_attached`) to keep append-only purity.
 3. Should `runs list` support time-range filtering? Easy to add later; not in v0.
 4. Should the `outputHash` in the `run_persisted` event be the hash of the raw text or of the canonical-JSON-encoded `output` object? The latter is more robust to formatting changes; the former is simpler. Lean toward canonical JSON.
-5. Should runs dispatched by a [scanner](WAKEUP_SCANNERS.md) carry a back-reference to the bundle that will group their resulting proposals? Same shape as #2 (optional update event `run_bundle_attached`), same trade-off (append-only purity vs convenience of in-record back-reference). Lean: yes, via an event rather than mutating the run body.
+5. Should runs dispatched by a [scanner](../runtime/WAKEUP_SCANNERS.md) carry a back-reference to the bundle that will group their resulting proposals? Same shape as #2 (optional update event `run_bundle_attached`), same trade-off (append-only purity vs convenience of in-record back-reference). Lean: yes, via an event rather than mutating the run body.

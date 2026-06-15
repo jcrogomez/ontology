@@ -21,7 +21,7 @@ export interface GluingResult {
 
 export interface GluingOptions {
   // How to treat two DISTINCT nodes providing the same key (O2,
-  // docs/legend/CONTEXT_GLUING_REGIMES.md).
+  // docs/design/laws/CONTEXT_GLUING_REGIMES.md).
   //   "conflict" (default) — provider-uniqueness: always a
   //     `duplicate_provider` conflict. This is the separated-presheaf
   //     behaviour the Axiom 5 ledger pins; every existing caller uses it.

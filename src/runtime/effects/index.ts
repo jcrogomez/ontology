@@ -8,7 +8,7 @@
  * Note: this module is intentionally NOT yet wired into the compiler. The
  * compiler still uses try/catch + ad-hoc result fields. Adopting the
  * effect monad inside the compile pipeline is the next milestone — see
- * `docs/EFFECT_MONAD.md` for context.
+ * `docs/design/laws/EFFECT_MONAD.md` for context.
  */
 
 export {

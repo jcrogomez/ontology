@@ -5,7 +5,7 @@ import type { BehaviorState } from "./matrix.js";
 
 // Behaviour-axis checker — Phase ε prework, v0 implementation.
 //
-// See docs/legend/BEHAVIOUR_AXIS_CHECKER_SPEC.md for the design. This
+// See docs/design/inverse/BEHAVIOUR_AXIS_CHECKER_SPEC.md for the design. This
 // module owns the *measurement*: given a source artefact, its compile-
 // back regen, and a fixture of pre-registered call-sites, decide
 // whether the two artefacts compute the same function on the same

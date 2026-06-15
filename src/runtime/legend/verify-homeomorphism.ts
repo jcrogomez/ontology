@@ -326,7 +326,7 @@ export interface AggregateReport {
    * to import); nodes that ran without a fixture appear with
    * `verdict: "untested"` and `reason: "no_fixture"`. Undefined when
    * --behavior-check was not passed. See
-   * docs/legend/BEHAVIOUR_AXIS_CHECKER_SPEC.md §3.2.
+   * docs/design/inverse/BEHAVIOUR_AXIS_CHECKER_SPEC.md §3.2.
    */
   behaviorResults?: import("./behavior-checker.js").BehaviorCheckResult[];
   /**
@@ -334,7 +334,7 @@ export interface AggregateReport {
    * node's declared `context.provides` (keys + O1 signatures) vs the
    * regen's extracted exports, static and $0. Undefined when
    * --contract-check was not passed. See
-   * docs/legend/CONTRACT_AXIS_CHECKER_SPEC.md.
+   * docs/design/inverse/CONTRACT_AXIS_CHECKER_SPEC.md.
    */
   contractResults?: import("./contract-checker.js").ContractCheckResult[];
 }

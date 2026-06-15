@@ -13,7 +13,7 @@ PromptAST recognises three line-anchored markers and emits a
 deduplicated AST consumed by `compileNode` — but no module yet
 rewrites the body based on the markers (axiom 4 is structural, not
 yet a rewrite system; see
-[`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §2.4). The
+[`MATHEMATICAL_CLAIMS.md`](../../MATHEMATICAL_CLAIMS.md) §2.4). The
 compiler ships and produces auditable artifacts. The semantic linker
 is a programmatic API; an `onto link <id>` CLI is on the roadmap.
 
@@ -45,7 +45,7 @@ A speculative mode that attempts to assemble context even when explicit paths ar
 **Only `strict` mode is implemented.** `assembleContext` rejects any
 other mode (`src/runtime/context/assembler.ts:16`). `compare` and
 `propose` are aspirational — see
-[`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §4.5 — and remain
+[`MATHEMATICAL_CLAIMS.md`](../../MATHEMATICAL_CLAIMS.md) §4.5 — and remain
 on the roadmap.
 
 ## Failure Cases

@@ -30,7 +30,7 @@ export function removeIntegrityHash<T extends { integrity: { hash?: string } }>(
 
 // Run persistence hashing.
 // Each helper returns a self-describing prefixed hash so the kind is recoverable from the value.
-// See docs/RUN_PERSISTENCE.md.
+// See docs/design/kernel/RUN_PERSISTENCE.md.
 
 export function hashPrompt(text: string): string {
   // Normalize line endings and trim outer whitespace so trivial editing differences

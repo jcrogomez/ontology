@@ -25,7 +25,7 @@ import { z } from "zod";
 // ontology schema. Keeping them separate is the small-blast-radius
 // move; v1 can revisit if real use surfaces a need to unify.
 //
-// See docs/legend/WORKFLOW_RUNTIME_SPEC.md for the full design.
+// See docs/design/runtime/WORKFLOW_RUNTIME_SPEC.md for the full design.
 
 // ── Node kinds ──────────────────────────────────────────────────────────────
 

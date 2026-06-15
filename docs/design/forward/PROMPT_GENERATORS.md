@@ -3,9 +3,9 @@
 > **Status: RFC only — NOT IMPLEMENTED (verified 2026-06-10).** No `onto generator` commands exist; Phase 1 substrate has not shipped. Do not build against this spec without checking src/ first.
 
 **Status:** Draft
-**Bootstrap target:** post-0.9 (prerequisite of [`WAKEUP_SCANNERS.md`](WAKEUP_SCANNERS.md) Fase 3+)
-**Depends on:** [`RUN_PERSISTENCE.md`](RUN_PERSISTENCE.md) (shipped), `src/runtime/prompt/parse.ts` (existing AST parser)
-**Lifts:** [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) Axiom 4 from T3 → T2 (actual rewriting via `@expand:` substitution)
+**Bootstrap target:** post-0.9 (prerequisite of [`WAKEUP_SCANNERS.md`](../runtime/WAKEUP_SCANNERS.md) Fase 3+)
+**Depends on:** [`RUN_PERSISTENCE.md`](../kernel/RUN_PERSISTENCE.md) (shipped), `src/runtime/prompt/parse.ts` (existing AST parser)
+**Lifts:** [`MATHEMATICAL_CLAIMS.md`](../../MATHEMATICAL_CLAIMS.md) Axiom 4 from T3 → T2 (actual rewriting via `@expand:` substitution)
 **Date:** 2026-05-18
 
 ---
@@ -242,4 +242,4 @@ Cada migración es independiente y no bloquea ninguna otra fase. Es una buena v�
 
 Lo nuevo de este RFC es estrictamente: schema de generator, materializador puro con composición vía `@expand:`, hashing content-addressed, extensión opcional de `PersistedRunInput`, y comando `onto generator`. Todo lo demás (lifecycle de runs, lifecycle de proposals, validación, append-only log) se reusa sin cambios.
 
-**Si alguna decisión de implementación entra en conflicto con [`RUN_PERSISTENCE.md`](RUN_PERSISTENCE.md) o con el contrato de hash content-addressed de [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §4.1, gana el doc previo.**
+**Si alguna decisión de implementación entra en conflicto con [`RUN_PERSISTENCE.md`](../kernel/RUN_PERSISTENCE.md) o con el contrato de hash content-addressed de [`MATHEMATICAL_CLAIMS.md`](../../MATHEMATICAL_CLAIMS.md) §4.1, gana el doc previo.**

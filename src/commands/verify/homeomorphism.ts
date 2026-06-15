@@ -185,7 +185,7 @@ export interface VerifyHomeomorphismOptions {
   // fixtures/`), runs each fixture's cases against the source artefact
   // and the regen, and overrides the matrix cell's `behavior` axis
   // with the measured pass/fail/untested state. Requires --matrix;
-  // off by default. See docs/legend/BEHAVIOUR_AXIS_CHECKER_SPEC.md.
+  // off by default. See docs/design/inverse/BEHAVIOUR_AXIS_CHECKER_SPEC.md.
   behaviorCheck?: boolean;
   // Override the fixtures directory. Path is relative to cwd or
   // absolute. Useful for tests that want to point at an ad-hoc fixture
@@ -199,7 +199,7 @@ export interface VerifyHomeomorphismOptions {
   // signatures) against the regen artifact's extracted exports and
   // overrides the matrix cell's `contract` axis with the measured
   // pass/fail/unknown state. $0 — no LLM, no execution. Requires
-  // --matrix. See docs/legend/CONTRACT_AXIS_CHECKER_SPEC.md.
+  // --matrix. See docs/design/inverse/CONTRACT_AXIS_CHECKER_SPEC.md.
   contractCheck?: boolean;
   json?: boolean;
 }
@@ -1459,11 +1459,11 @@ export function renderReportMarkdown(
 
   lines.push(`## Methodology`);
   lines.push(``);
-  lines.push(`Each node's compile-back artifact is diffed against its source on disk using two distances: \`locDistance\` (line-count delta normalized into [0,1]) and \`structuralJaccard\` over top-level declaration names. The (LoC, Jaccard) pair folds into a five-label verdict per the thresholds above. See \`docs/PROJECT_LEGEND.md\` §6 Layer 6 for the formal model.`);
+  lines.push(`Each node's compile-back artifact is diffed against its source on disk using two distances: \`locDistance\` (line-count delta normalized into [0,1]) and \`structuralJaccard\` over top-level declaration names. The (LoC, Jaccard) pair folds into a five-label verdict per the thresholds above. See \`docs/design/inverse/PROJECT_LEGEND.md\` §6 Layer 6 for the formal model.`);
   if (report.matrix) {
     lines.push(``);
     lines.push(
-      `When \`--matrix\` is set, each node also carries the six-axis Phase ε matrix (contract / structural / behavior / intent / literalRequired / cost) defined in \`docs/POSITIONING.md\` §2. The verdict above maps onto the \`structural\` axis; the other axes are explicit not-measured / untested / not-reviewed in the pilot — see \`docs/legend/PREWORK_2026-05-13.md\` §C for the mapping table.`,
+      `When \`--matrix\` is set, each node also carries the six-axis Phase ε matrix (contract / structural / behavior / intent / literalRequired / cost) defined in \`docs/meta/POSITIONING.md\` §2. The verdict above maps onto the \`structural\` axis; the other axes are explicit not-measured / untested / not-reviewed in the pilot — see \`docs/legend/PREWORK_2026-05-13.md\` §C for the mapping table.`,
     );
     lines.push(``);
     lines.push(

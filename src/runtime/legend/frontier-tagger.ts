@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 //
 // Maps a source file path (and optionally its bytes) to the multi-label
 // set of frontier attributes declared in
-// `docs/POSITIONING.md` §4 and pre-registered in
+// `docs/meta/POSITIONING.md` §4 and pre-registered in
 // `docs/legend/calibrations/SELF_INGEST_HYPOTHESIS_2026-05-13.md` §6.
 //
 // The tagger answers two questions about a single file:

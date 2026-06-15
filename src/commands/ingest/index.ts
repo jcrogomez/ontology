@@ -154,7 +154,7 @@ export const ExtractionResultSchema = z.object({
   // O1 side channel (key → syntactic signature), parallel to `provides`.
   // Populated only by the static-summary extractor; the LLM extractor omits
   // it (not in the system prompt). Threaded to the proposal payload's
-  // `provideSignatures`. See docs/legend/CONTEXT_GLUING_REGIMES.md O1(c).
+  // `provideSignatures`. See docs/design/laws/CONTEXT_GLUING_REGIMES.md O1(c).
   provideSignatures: z.record(z.string(), z.string()).optional(),
 });
 
@@ -204,7 +204,7 @@ export interface IngestCommandOptions {
   // (acceptanceCriteria), deliberately lossy. Distinct from the
   // default contract extractor. Produces one manifestation=intent
   // node_create proposal (unless --dry-run). See
-  // docs/legend/INTENT_NARRATION_SPEC.md.
+  // docs/design/inverse/INTENT_NARRATION_SPEC.md.
   intent?: boolean;
   // Comma-separated file extensions to ingest in directory mode.
   // Default: "ts,tsx". For a Python project pass "--include py";

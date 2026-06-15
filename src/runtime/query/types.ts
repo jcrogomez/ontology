@@ -7,7 +7,7 @@
 // then returns every node whose actual Hom-profile is a superset of the
 // shape.
 //
-// Field semantics (also documented in docs/QUERY_REPRESENTABLE.md):
+// Field semantics (also documented in docs/design/laws/QUERY_REPRESENTABLE.md):
 //   - kind / abstraction / plane / manifestation / status: disjunctive sets
 //     ("the node's value must be in this set"). Empty/undefined means "no
 //     constraint on this dimension".

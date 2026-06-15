@@ -3,7 +3,7 @@
 > **Historical release note (0.4.0, 2026-05-13).** Preserved as written.
 > It predates the Phase ε close (2026-05-26) and Phase ζ (the workflow
 > runtime). For current phase state and open work see
-> [`ROADMAP.md`](ROADMAP.md); any "what's next" below is as-of-0.4.0.
+> [`ROADMAP.md`](../../ROADMAP.md); any "what's next" below is as-of-0.4.0.
 
 > *Legens* — "the one who reads." A legend, on a map, is the key that
 > tells you how to read the territory. This document is that key for
@@ -34,8 +34,8 @@ empirical data points anchor the round-trip claim:
 | γ-2 | `src/core/integrity/hash.ts` (one file) | Claude Opus 4.7 end-to-end | **5 / 5 functions ε-equivalent** under F ∘ G | ~$0.08 |
 | γ-7 | [Julius-Woo/Vibe-Reasoning](https://github.com/Julius-Woo/Vibe-Reasoning) (24 Python files) | Two-pass `onto verify-homeomorphism` with γ-7 prompt invariants | **36% → 65% ε-equivalent** (+29 pp); `divergent_both` fully eliminated (4 → 0) | ~$2.28 |
 
-Full reports: [`HASH_TS_2026-05-12.md`](legend/calibrations/HASH_TS_2026-05-12.md)
-and [`VIBE_REASONING_GAMMA_7_2026-05-12.md`](legend/calibrations/VIBE_REASONING_GAMMA_7_2026-05-12.md).
+Full reports: [`HASH_TS_2026-05-12.md`](../../legend/calibrations/HASH_TS_2026-05-12.md)
+and [`VIBE_REASONING_GAMMA_7_2026-05-12.md`](../../legend/calibrations/VIBE_REASONING_GAMMA_7_2026-05-12.md).
 
 ### Surfaces that landed
 
@@ -62,7 +62,7 @@ and [`VIBE_REASONING_GAMMA_7_2026-05-12.md`](legend/calibrations/VIBE_REASONING_
 
 Pre-foundation work (Bootstrap 0.1–0.9: kernel, context assembler,
 proposal system, walker v0/v1, categorical extensions, validator
-port onto the topos algebra) lives in [`RELEASE_NOTES.md`](RELEASE_NOTES.md).
+port onto the topos algebra) lives in [`RELEASE_NOTES.md`](../../RELEASE_NOTES.md).
 
 ---
 
@@ -115,7 +115,7 @@ inverse direction and the tooling around it.
 
 ## 3. Mathematical claims, tiered
 
-[`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) classifies every
+[`MATHEMATICAL_CLAIMS.md`](../../MATHEMATICAL_CLAIMS.md) classifies every
 formal claim in the project into four tiers:
 
 - **T1** strictly implemented and tested against a law (e.g. monad
@@ -140,7 +140,7 @@ with a non-trivial ε-faithful fraction over a meaningful n.
 ### Phase ε framework
 
 The framework for any Phase ε run lives in
-[`docs/POSITIONING.md`](POSITIONING.md): the devtools-first positioning,
+[`docs/POSITIONING.md`](../../meta/POSITIONING.md): the devtools-first positioning,
 the six-axis measurement matrix
 ($\mathcal{C}_{\text{faithful}}^{(\text{axis})}$ for contract,
 structural, behavior, intent, literal-required, and cost-per-provider),
@@ -149,12 +149,12 @@ the human-authorship boundary statement. Concrete run hypotheses live
 in dated `docs/legend/calibrations/SELF_INGEST_HYPOTHESIS_<date>.md`
 files; each one is committed before its run so `git log` proves the
 prediction predates the result. The first one,
-[`SELF_INGEST_HYPOTHESIS_2026-05-13.md`](legend/calibrations/SELF_INGEST_HYPOTHESIS_2026-05-13.md),
+[`SELF_INGEST_HYPOTHESIS_2026-05-13.md`](../../legend/calibrations/SELF_INGEST_HYPOTHESIS_2026-05-13.md),
 targets `src/runtime + src/core + src/commands + src/schemas` (~117
 TS/TSX files) and pre-registers the faithful/resistant frontier
 prediction. The $0 tooling that makes the matrix output meaningful is
 spec'd in
-[`docs/legend/PREWORK_2026-05-13.md`](archive/PREWORK_2026-05-13.md) and
+[`docs/legend/PREWORK_2026-05-13.md`](../../archive/PREWORK_2026-05-13.md) and
 ships under `src/runtime/legend/{frontier-tagger,matrix,matrix-intersections}.ts`,
 exposed through `onto ingest <paths…>` (multi-positional) and `onto
 verify-homeomorphism --matrix`.
@@ -169,7 +169,7 @@ distribution. A reviewer who reads §3.10 as anything stronger than
 into it than the data supports.
 
 **Not Phase ζ.** The Open-Prompt protocol (sign / verify-published
-/ replay) is specified in [`OPEN_PROMPT.md`](OPEN_PROMPT.md) but is
+/ replay) is specified in [`OPEN_PROMPT.md`](../surfaces/OPEN_PROMPT.md) but is
 not implemented in this release. The protocol design is stable
 enough to publish as a seed; the v1 implementation lands in the
 0.5.0 line after Phase ε ships the data the spec presumes.
@@ -210,30 +210,30 @@ enough to publish as a seed; the v1 implementation lands in the
 ## 6. What to read next
 
 If you want to **understand the math** before the code:
-- [`MATHEMATICAL_MODEL.md`](MATHEMATICAL_MODEL.md) — the seven
+- [`MATHEMATICAL_MODEL.md`](../laws/MATHEMATICAL_MODEL.md) — the seven
   axioms made formal.
-- [`CATEGORICAL_VISION.md`](CATEGORICAL_VISION.md) — the four
+- [`CATEGORICAL_VISION.md`](../laws/CATEGORICAL_VISION.md) — the four
   categorical extensions (Yoneda search, effect monad, Grothendieck
   fibration, topos predicate algebra) and where each lives in code.
-- [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) — the honest
+- [`MATHEMATICAL_CLAIMS.md`](../../MATHEMATICAL_CLAIMS.md) — the honest
   tier ledger.
 
 If you want to **start using the system**:
-- [`README.md`](../README.md) — quickstart.
-- [`GETTING_STARTED.md`](GETTING_STARTED.md) — walkthrough.
-- [`CLI_COMMANDS.md`](CLI_COMMANDS.md) — every command, every flag.
+- [`README.md`](../../../README.md) — quickstart.
+- [`GETTING_STARTED.md`](../../GETTING_STARTED.md) — walkthrough.
+- [`CLI_COMMANDS.md`](../../CLI_COMMANDS.md) — every command, every flag.
 
 If you want to **read Project Legend specifically**:
 - [`PROJECT_LEGEND.md`](PROJECT_LEGEND.md) — the design document.
-- [`OPEN_PROMPT.md`](OPEN_PROMPT.md) — the Phase ζ protocol spec.
-- [`legend/calibrations/`](legend/calibrations/) — the two empirical
+- [`OPEN_PROMPT.md`](../surfaces/OPEN_PROMPT.md) — the Phase ζ protocol spec.
+- [`legend/calibrations/`](../../legend/calibrations) — the two empirical
   data points (γ-2 + γ-7) and the Vibe-Reasoning runbook.
 
 If you want to **contribute**:
-- [`ROADMAP.md`](ROADMAP.md) — the open follow-ups.
-- [`POST_GAMMA_PLAN.md`](archive/POST_GAMMA_PLAN_2026-05-13.md) — the detailed plan
+- [`ROADMAP.md`](../../ROADMAP.md) — the open follow-ups.
+- [`POST_GAMMA_PLAN.md`](../../archive/POST_GAMMA_PLAN_2026-05-13.md) — the detailed plan
   for Phase ε / ζ / Hardening / Walker v2.
-- [`reviews/`](reviews/) — the daily milestone audits.
+- [`reviews/`](../../reviews) — the daily milestone audits.
 
 ---
 

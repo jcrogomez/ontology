@@ -2,7 +2,7 @@
 //
 // The 11 levels of AbstractionLevelSchema are projected to a hue progression so a user
 // looking at the cell border can identify the focal node's level without reading text.
-// See docs/WALKER_INTERFACE.md section 3.
+// See docs/design/surfaces/WALKER_INTERFACE.md section 3.
 
 import type { AbstractionLevelSchema } from "../../schemas/ontology.js";
 import type { z } from "zod";

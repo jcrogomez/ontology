@@ -3,7 +3,7 @@ import * as path from "node:path";
 import ts from "typescript";
 
 // Resolved-type signature extraction (Path to T1, gate #1 of
-// docs/legend/CONTEXT_GLUING_REGIMES.md / MATHEMATICAL_CLAIMS.md §Axiom 5).
+// docs/design/laws/CONTEXT_GLUING_REGIMES.md / MATHEMATICAL_CLAIMS.md §Axiom 5).
 //
 // O1's `parseTypeScriptFile` reads the *written* signature of an export with
 // `ts.createSourceFile` — a single-file, syntactic view: `a: Foo` stays

@@ -18,7 +18,7 @@ import { appendJsonl, ensureDir, writeJson } from "../fs/json.js";
 import { readState, writeState } from "../state/state-store.js";
 
 // Run persistence module.
-// See docs/RUN_PERSISTENCE.md for the full RFC.
+// See docs/design/kernel/RUN_PERSISTENCE.md for the full RFC.
 //
 // Identity contract:
 //   id        = "run_" + first 8 hex chars of hashRun(input, model)

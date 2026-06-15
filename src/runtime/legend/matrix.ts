@@ -227,7 +227,7 @@ export interface VerdictToCellInputs {
    * `untested`. Reserved guard: an unrecoverable verdict keeps the
    * `not-applicable` state regardless of override — the regen artifact
    * does not exist, so no runtime equivalence can have been measured.
-   * See docs/legend/BEHAVIOUR_AXIS_CHECKER_SPEC.md §3.3.
+   * See docs/design/inverse/BEHAVIOUR_AXIS_CHECKER_SPEC.md §3.3.
    */
   behaviorOverride?: BehaviorState;
   /**
@@ -235,7 +235,7 @@ export interface VerdictToCellInputs {
    * per node — declared provides/signatures vs the regen's extracted
    * exports, static. Same guard as behaviour: an unrecoverable verdict
    * keeps `not-measured` regardless (no regen artifact to check).
-   * See docs/legend/CONTRACT_AXIS_CHECKER_SPEC.md.
+   * See docs/design/inverse/CONTRACT_AXIS_CHECKER_SPEC.md.
    */
   contractOverride?: ContractState;
 }

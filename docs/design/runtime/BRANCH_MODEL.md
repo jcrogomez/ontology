@@ -6,7 +6,7 @@ commit body and the post-0.9 milestone reviews: before any `node_update`
 code lands in Bootstrap 0.10 we have to pick how branches *physically*
 relate to nodes on disk.
 
-Companion read: [`BRANCH_FIBRATION.md`](BRANCH_FIBRATION.md) (mathematical
+Companion read: [`BRANCH_FIBRATION.md`](../laws/BRANCH_FIBRATION.md) (mathematical
 model). This document is about the **runtime** consequences of that model.
 
 ## The open question

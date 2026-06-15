@@ -880,7 +880,7 @@ proposal
   .command("apply <id>")
   .description("Translate a pending proposal into a real graph mutation, after re-validating its parentHash. Stale proposals (parent changed since creation) are transitioned to staled and refused.")
   .option("--dry-run", "Validate the proposal without writing anything")
-  .option("--check-providers", "For a node_create/node_update proposal that declares `provides`: run the O2 identify-if-equal sheaf check against existing providers of the same keys (same branch). Compatible re-provisions (equal signature) are reported as identifications; drift (different/missing signature) as a warning. Opt-in, read-only; warns only unless --strict. See docs/legend/CONTEXT_GLUING_REGIMES.md.")
+  .option("--check-providers", "For a node_create/node_update proposal that declares `provides`: run the O2 identify-if-equal sheaf check against existing providers of the same keys (same branch). Compatible re-provisions (equal signature) are reported as identifications; drift (different/missing signature) as a warning. Opt-in, read-only; warns only unless --strict. See docs/design/laws/CONTEXT_GLUING_REGIMES.md.")
   .option("--strict", "With the provider check (implied if --check-providers is omitted): BLOCK the apply on provider drift instead of warning. The proposal stays pending — resolve the drift or re-run without --strict. A check that errors also blocks (cannot verify ⇒ do not apply).")
   .option("--json", "Output results in JSON format")
   .action(async (id, options) => {
@@ -988,12 +988,12 @@ program
   .option("--ensemble <mode>", "Phase ε E6 step 4: structured-extraction ensemble strategy. \"none\" (default) — single-run via the resolved model. \"high-confidence\" — run llama3.2:3b three times and select the most complete valid extraction. Use when 100% coverage on the perimeter matters more than per-file wall-clock. Currently honoured for semantic_parse (ingest extraction) only; other LlmTasks ignore the flag. Calibration: BAKEOFF_3B_FAMILY_2026-05-15.md §2.2.")
   .option("--static-classifier <mode>", "Structural Semantic Classifier integration. Two modes: \"report-only\" — classify every file with the deterministic AST-based classifier (src/runtime/legend/structural-classifier.ts) and surface aggregates in the INGEST report; does NOT change LLM routing. \"enabled\" — additionally consume those facts as ingest policy: files classified as `barrel` or `declaration_only` bypass the LLM entirely and receive a deterministic static summary (src/runtime/legend/static-summary.ts); every other shape — including `schema_module` — still dispatches via semantic_parse. Conservative on purpose: the v0 deflection set is intentionally small (smoke-test data showed ~5% of a typical perimeter deflects). The INGEST report's \"Classifier routing\" section surfaces the actual savings.")
   .option("--json", "Output results in JSON format.")
-  .option("--resolved-signatures", "Directory / multi-input mode only: attach RESOLVED-type signatures to ingested `provides` (a whole-program TypeChecker pass — alias expansion, inferred types) instead of the syntactic tier. Tier-tagged so resolved signatures never glue with syntactic ones. Heavier (builds one ts.Program over the swept TS/JS files); opt-in. Refines the O2 sheaf's equal-signature subcategory. See docs/legend/CONTEXT_GLUING_REGIMES.md.")
+  .option("--resolved-signatures", "Directory / multi-input mode only: attach RESOLVED-type signatures to ingested `provides` (a whole-program TypeChecker pass — alias expansion, inferred types) instead of the syntactic tier. Tier-tagged so resolved signatures never glue with syntactic ones. Heavier (builds one ts.Program over the swept TS/JS files); opt-in. Refines the O2 sheaf's equal-signature subcategory. See docs/design/laws/CONTEXT_GLUING_REGIMES.md.")
   .option("--from-pr <number>", "#2: ingest intent from a GitHub pull request (via `gh`) instead of source paths. Runs the prose extractor → one node_create proposal with manifestation=intent. Mutually exclusive with positional paths and --from-issue.")
   .option("--from-issue <number>", "#2: ingest intent from a GitHub issue (via `gh`) instead of source paths. Runs the prose extractor → one node_create proposal with manifestation=intent. Mutually exclusive with positional paths and --from-pr.")
   .option("--repo <owner/repo>", "Optional repository override for --from-pr/--from-issue (defaults to the gh-resolved repo of the current directory).")
   .option("--resolve-edges <nodeId>", "Post-apply edge mode (requires --from-pr): given the APPLIED node id of a previously ingested PR intent, re-fetch the PR's changed files and create `documents` edge_create proposals from that node to each matching existing code node. Edges can't be created at capture time because the PR node id is only assigned on apply (mirrors the γ-5 → γ-6 two-phase shape).")
-  .option("--intent", "Intent-narration mode (the WHY-as-prompt lift). Reads the positional file paths as ONE neighbourhood and narrates the code's PURPOSE as a generative prompt + a behaviour oracle (acceptance criteria) — deliberately lossy, distinct from the default contract extractor. Produces one manifestation=intent node_create proposal (unless --dry-run). Pass several files to narrate their composed subsystem intent. See docs/legend/INTENT_NARRATION_SPEC.md.")
+  .option("--intent", "Intent-narration mode (the WHY-as-prompt lift). Reads the positional file paths as ONE neighbourhood and narrates the code's PURPOSE as a generative prompt + a behaviour oracle (acceptance criteria) — deliberately lossy, distinct from the default contract extractor. Produces one manifestation=intent node_create proposal (unless --dry-run). Pass several files to narrate their composed subsystem intent. See docs/design/inverse/INTENT_NARRATION_SPEC.md.")
   .action(async (paths: string[], options) => {
     try {
       await ingestCommand(paths ?? [], options);
@@ -1066,10 +1066,10 @@ program
   .option("--ast-grounding", "Phase ε Move 3α: append a deterministic MANDATORY EXPORTS section (from the source AST) to the code_sketch system prompt for every compile-back dispatch, and fold the grounding identity into the run-cache contextHash. Off by default — opt in to test the AST-grounding lift independently of model swaps; pre-3α calibrations and Sonnet ceiling probes choose to include or exclude this independently.")
   .option("--reps <n>", "Phase ε design §4.2: run N compile-back dispatches per node and aggregate the per-rep metrics (default 1 — point estimate). N > 1 defangs single-draw Jaccard variance (γ observed 1.0 → 0.0 on the same node across two draws), at the cost of N× LLM spend. Use before any Opus 4.7 ceiling probe to make the verdict robust.", (v) => parseInt(v, 10))
   .option("--aggregator <mode>", "Aggregator over per-rep numeric metrics when --reps > 1: 'median' (default — variance-resistant for the H1 floor read) or 'mean'. Ignored when --reps is 1.")
-  .option("--behavior-check", "Phase ε behaviour-axis checker (v0): for each node, import the source file and the regen, run the registered fixture's call-sites against both, and override the matrix's `behavior` axis with the measured pass/fail/untested state. Requires --matrix. See docs/legend/BEHAVIOUR_AXIS_CHECKER_SPEC.md.")
+  .option("--behavior-check", "Phase ε behaviour-axis checker (v0): for each node, import the source file and the regen, run the registered fixture's call-sites against both, and override the matrix's `behavior` axis with the measured pass/fail/untested state. Requires --matrix. See docs/design/inverse/BEHAVIOUR_AXIS_CHECKER_SPEC.md.")
   .option("--behavior-fixtures-dir <path>", "Override the fixtures directory (default tests/behavior-fixtures/). Path is relative to cwd or absolute. Used with --behavior-check.")
   .option("--behavior-timeout-ms <n>", "Per-case wall-clock cap for the behaviour checker. Clamped to [100, 60000]. Default 5000.", (v) => parseInt(v, 10))
-  .option("--contract-check", "Contract-axis checker (v0): statically compare each node's declared context.provides (keys + O1 signatures) against the regen artifact's extracted exports and override the matrix's `contract` axis with the measured pass/fail/unknown state. $0 — no LLM, no execution. Requires --matrix. See docs/legend/CONTRACT_AXIS_CHECKER_SPEC.md.")
+  .option("--contract-check", "Contract-axis checker (v0): statically compare each node's declared context.provides (keys + O1 signatures) against the regen artifact's extracted exports and override the matrix's `contract` axis with the measured pass/fail/unknown state. $0 — no LLM, no execution. Requires --matrix. See docs/design/inverse/CONTRACT_AXIS_CHECKER_SPEC.md.")
   .option("--no-lock", "Skip the .ontology/.lock advisory lock — see compile run for semantics.")
   .option("--json", "Output results in JSON format.")
   .action(async (focal, rawOptions) => {
@@ -1131,7 +1131,7 @@ program
 
 program
   .command("status")
-  .description("Read-only graph health for the sync loop: how many nodes are syncable-with-confidence (code shadow + behaviour fixture + rules statically clean), how many are lower-confidence (no fixture) or blocked (rule violation), how many shadows drifted from the anchor, and the ficha-quality summary. A pure composition of shadow/fixture presence + `onto drift` + `onto ficha audit` — writes nothing, runs no fixtures. See docs/SYNC_LOOP_SPEC.md §4.")
+  .description("Read-only graph health for the sync loop: how many nodes are syncable-with-confidence (code shadow + behaviour fixture + rules statically clean), how many are lower-confidence (no fixture) or blocked (rule violation), how many shadows drifted from the anchor, and the ficha-quality summary. A pure composition of shadow/fixture presence + `onto drift` + `onto ficha audit` — writes nothing, runs no fixtures. See docs/design/runtime/SYNC_LOOP_SPEC.md §4.")
   .option("--list", "List the node ids in each syncability tier.")
   .option("--json", "Output the full report (incl. per-node detail) as JSON.")
   .action(async (options) => {
@@ -1145,7 +1145,7 @@ program
 
 program
   .command("sync <nodeId>")
-  .description("The governed intent→code loop in one command: regenerate the node's shadow from its intent (--draws 3 consensus), gate it through ALL three checks (structural verdict + behaviour fixture + declared rules), and only when every gate passes WRITE the shadow and re-anchor THIS node's drift; otherwise write nothing and report the precise blocking gate. A thin composition of `regenerate` + the gates + a per-node re-anchor (no new verification semantics). See docs/SYNC_LOOP_SPEC.md.")
+  .description("The governed intent→code loop in one command: regenerate the node's shadow from its intent (--draws 3 consensus), gate it through ALL three checks (structural verdict + behaviour fixture + declared rules), and only when every gate passes WRITE the shadow and re-anchor THIS node's drift; otherwise write nothing and report the precise blocking gate. A thin composition of `regenerate` + the gates + a per-node re-anchor (no new verification semantics). See docs/design/runtime/SYNC_LOOP_SPEC.md.")
   .option("--provider <provider>", "LLM provider override for the compile-back (mock|ollama|anthropic|gemini).")
   .option("--model <model>", "Model override (use with --provider).")
   .option("--ollama-host <host>", "Host for the Ollama provider.")
@@ -1257,7 +1257,7 @@ fichaCmd
 
 const workflowCmd = program
   .command("workflow")
-  .description("Phase ζ — workflow-runtime commands (load + execute typed-node workflow graphs with branches_on edges, structured verifier verdicts, and loop-with-stopping-criterion semantics). See docs/legend/WORKFLOW_RUNTIME_SPEC.md.");
+  .description("Phase ζ — workflow-runtime commands (load + execute typed-node workflow graphs with branches_on edges, structured verifier verdicts, and loop-with-stopping-criterion semantics). See docs/design/runtime/WORKFLOW_RUNTIME_SPEC.md.");
 
 workflowCmd
   .command("run <graph>")

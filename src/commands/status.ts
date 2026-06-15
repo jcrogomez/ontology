@@ -20,7 +20,7 @@ import { errorMessage } from "../core/errors.js";
 // violation. The fixture's actual green-against-source is confirmed at sync
 // time (the behaviour gate) — status does not execute fixture code, by design
 // (a read-only health check must not run arbitrary source). See
-// docs/SYNC_LOOP_SPEC.md §4.
+// docs/design/runtime/SYNC_LOOP_SPEC.md §4.
 
 export interface StatusCommandOptions {
   json?: boolean;

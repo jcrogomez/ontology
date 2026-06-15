@@ -6,7 +6,7 @@
 > compile to predicates that fold via `allOf` and evaluate against an
 > `EvaluationContext`). `gluing.ts` remains unchanged and continues to feed
 > the validator's `glued` input. Rigor classification:
-> [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §3.9 (T1 for the
+> [`MATHEMATICAL_CLAIMS.md`](../../MATHEMATICAL_CLAIMS.md) §3.9 (T1 for the
 > algebra, T2 for the validator port).
 
 ## 1. Why a topos?

@@ -3,7 +3,7 @@ import { RESOLVED_SIGNATURE_PREFIX } from "../static/typescript-resolved.js";
 import type { ContractState } from "./matrix.js";
 
 // Contract-axis checker v0 — cartography column 3.
-// Spec: docs/legend/CONTRACT_AXIS_CHECKER_SPEC.md. $0 by construction:
+// Spec: docs/design/inverse/CONTRACT_AXIS_CHECKER_SPEC.md. $0 by construction:
 // pure static comparison of the node's DECLARED contract
 // (context.provides keys + O1 signatures) against the regen artifact's
 // extracted exports (syntactic tier). No LLM, no execution.

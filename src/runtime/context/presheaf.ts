@@ -13,7 +13,7 @@ export interface ContextFragment {
   // today — keeping it off `provides` is what leaves the gluing token set,
   // §3.9 closed-world parity, and the Axiom 5 presheaf laws untouched. O2's
   // identify-if-equal policy is the first consumer. Absent when no provided
-  // symbol carries a signature. See docs/legend/CONTEXT_GLUING_REGIMES.md.
+  // symbol carries a signature. See docs/design/laws/CONTEXT_GLUING_REGIMES.md.
   provideSignatures?: Record<string, string>;
 }
 

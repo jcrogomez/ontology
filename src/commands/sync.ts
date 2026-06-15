@@ -15,7 +15,7 @@ import { reanchorNodeArtifacts, type ReanchorResult } from "../runtime/legend/re
 //     → ALL pass → write the shadow + re-anchor THIS node's drift
 //       ANY block → write nothing, exit non-zero, name the blocking gate
 //
-// See docs/SYNC_LOOP_SPEC.md for the acceptance contract.
+// See docs/design/runtime/SYNC_LOOP_SPEC.md for the acceptance contract.
 
 export interface SyncCommandOptions {
   provider?: string;

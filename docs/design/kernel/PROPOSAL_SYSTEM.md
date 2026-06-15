@@ -21,7 +21,7 @@ operations that without proposals would be conflated:
 > axiom 4 of the canon. That framing is generous — a rewrite rule has
 > form `LHS → RHS` with pattern matching; a proposal carries a typed
 > candidate mutation, not a rewrite pattern. See
-> [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §4.2 for the
+> [`MATHEMATICAL_CLAIMS.md`](../../MATHEMATICAL_CLAIMS.md) §4.2 for the
 > classification (T2 — operationally a typed-mutation pipeline with
 > provenance; not a rewrite system).
 
@@ -161,7 +161,7 @@ A proposal created from a non-persisted run carries the hashes inline but cannot
 
 ## 8. Out of scope
 
-- Multi-step proposal **chains** (a proposal that itself spawns further proposals at apply time). Each proposal is a single atomic mutation. Note: this does not preclude *external* orchestration of N atomic proposals as a transactional unit — see [`WAKEUP_SCANNERS.md`](WAKEUP_SCANNERS.md) §2.3 for the bundle design that groups atomic proposals all-or-nothing via dry-run pre-flight under the existing advisory lock, without touching the per-proposal contract.
+- Multi-step proposal **chains** (a proposal that itself spawns further proposals at apply time). Each proposal is a single atomic mutation. Note: this does not preclude *external* orchestration of N atomic proposals as a transactional unit — see [`WAKEUP_SCANNERS.md`](../runtime/WAKEUP_SCANNERS.md) §2.3 for the bundle design that groups atomic proposals all-or-nothing via dry-run pre-flight under the existing advisory lock, without touching the per-proposal contract.
 - Proposal merging. Not now.
 - Proposal templating. Not now.
 - Auto-apply policies ("apply if validation passes"). Explicitly forbidden — violates "models may speak; only explicit graph commands may mutate". Apply is always an explicit user action.

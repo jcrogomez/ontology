@@ -5,7 +5,7 @@
 > verify-refine pass 2026-06-09). §4 (Open-Prompt protocol: `onto sign`,
 > `verify-published`) is ASPIRATIONAL design — none of it has shipped and it
 > is NOT what "Phase ζ" means. Authoritative phase state:
-> [`docs/ROADMAP.md`](ROADMAP.md).
+> [`docs/ROADMAP.md`](../../ROADMAP.md).
 
 > *Legens* in Latin: "the one who reads". A legend (in maps) is the key that
 > tells you how to read the territory. Project Legend is exactly that — the
@@ -16,9 +16,9 @@
 
 Status: **Phases α–ε shipped; Phase ζ (workflow runtime) active.** Phase ε
 (self-ingestion) closed 2026-05-26; Phase ζ is the workflow runtime
-(`onto workflow run`, [`legend/WORKFLOW_RUNTIME_SPEC.md`](legend/WORKFLOW_RUNTIME_SPEC.md)),
+(`onto workflow run`, [`legend/WORKFLOW_RUNTIME_SPEC.md`](../runtime/WORKFLOW_RUNTIME_SPEC.md)),
 not the "release" placeholder the phase plan below still names. **Live phase
-state + open work: [`ROADMAP.md`](ROADMAP.md)** — the design narrative below
+state + open work: [`ROADMAP.md`](../../ROADMAP.md)** — the design narrative below
 is preserved as written and may lag. Original milestone:
 **Phases α + β + γ + δ shipped on `main` (2026-05-12, late).**
 Pre-foundation plasticity (§1–§6), Layer 1 (`compile run-batch` +
@@ -40,8 +40,8 @@ round-trip tolerance $\varepsilon$ measured per axis
 the active stream.
 
 Companion reads:
-[`BRANCH_FIBRATION.md`](BRANCH_FIBRATION.md) · [`BRANCH_MODEL.md`](BRANCH_MODEL.md) ·
-[`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) · [`COMPILER.md`](COMPILER.md).
+[`BRANCH_FIBRATION.md`](../laws/BRANCH_FIBRATION.md) · [`BRANCH_MODEL.md`](../runtime/BRANCH_MODEL.md) ·
+[`MATHEMATICAL_CLAIMS.md`](../../MATHEMATICAL_CLAIMS.md) · [`COMPILER.md`](../forward/COMPILER.md).
 
 ---
 
@@ -475,7 +475,7 @@ infrastructure stack sits on top:
 | 6 | Verification framework (`verify-homeomorphism`, dual-distance + verdict folder) | **shipped** δ-2 (`29b330c`) | ~150 |
 | 7 | The `onto ingest <path>` command itself | **shipped** γ-1 single-file (`b670ca3`) + γ-5 directory (`a25ade9`) | ~250 |
 | 8 | Open-Prompt signing + replay (out of scope for v1) | future | ~260 |
-| 9 | Self-maintaining intent network — wakeup scanners ([`WAKEUP_SCANNERS.md`](WAKEUP_SCANNERS.md)) + content-addressed prompt templates ([`PROMPT_GENERATORS.md`](PROMPT_GENERATORS.md)) | future (RFCs drafted) | see RFCs |
+| 9 | Self-maintaining intent network — wakeup scanners ([`WAKEUP_SCANNERS.md`](../runtime/WAKEUP_SCANNERS.md)) + content-addressed prompt templates ([`PROMPT_GENERATORS.md`](../forward/PROMPT_GENERATORS.md)) | future (RFCs drafted) | see RFCs |
 
 ### Per-layer detail
 
@@ -561,7 +561,7 @@ landed two follow-ups: review blockers (`fix(compile,node)`
 - γ-2: first end-to-end calibration on `src/core/integrity/hash.ts`
   with `claude-opus-4-7` end-to-end — 5/5 functions semantically
   equivalent, $0.08 per round-trip, 70s wall-clock. Full report:
-  [`docs/legend/calibrations/HASH_TS_2026-05-12.md`](legend/calibrations/HASH_TS_2026-05-12.md).
+  [`docs/legend/calibrations/HASH_TS_2026-05-12.md`](../../legend/calibrations/HASH_TS_2026-05-12.md).
 - γ-4: static-edge inference (Layer 3, TS-first, `feat(static)`
   `62d8c86`). New `src/runtime/static/typescript.ts` uses the
   TypeScript compiler API to parse `import` / `export` declarations
@@ -588,7 +588,7 @@ landed two follow-ups: review blockers (`fix(compile,node)`
 - `--include` flag + Vibe-Reasoning runbook (`feat(ingest)` `bc350ce`).
   Non-TS source extensions are now first-class for ingest; the
   Vibe-Reasoning Python repo is the documented out-of-tree calibration
-  pilot ([`docs/legend/calibrations/VIBE_REASONING_PROCEDURE.md`](legend/calibrations/VIBE_REASONING_PROCEDURE.md)).
+  pilot ([`docs/legend/calibrations/VIBE_REASONING_PROCEDURE.md`](../../legend/calibrations/VIBE_REASONING_PROCEDURE.md)).
 
 ### Phase δ — verification + inspector (~6–8 h)
 Layer 4 (inspector) + Layer 6 (verification). After δ, the user can
@@ -604,7 +604,7 @@ $\varepsilon$ on the divergent set.
 ### Phase ζ — release + Open-Prompt seed (~3–5 h)
 [`LEGEND.md`](LEGEND.md) is the 0.4.0 release note (authored
 2026-05-13; covers γ-0 through δ-2 + the post-γ-7 hardening sweep).
-[`OPEN_PROMPT.md`](OPEN_PROMPT.md) is the sibling protocol spec —
+[`OPEN_PROMPT.md`](../surfaces/OPEN_PROMPT.md) is the sibling protocol spec —
 spec-only in this release, v0 implementation targeted for 0.5.0
 after Phase ε ships the data the spec presumes.
 
@@ -638,7 +638,7 @@ and γ-3 (rich proposal payload) landed, we ran the first end-to-end
 round-trip on `src/core/integrity/hash.ts` — a small, pure, single-
 file utility module of the kind the design hypothesises lives in
 $\mathcal{C}_{\text{faithful}}$. Full report:
-[`docs/legend/calibrations/HASH_TS_2026-05-12.md`](legend/calibrations/HASH_TS_2026-05-12.md).
+[`docs/legend/calibrations/HASH_TS_2026-05-12.md`](../../legend/calibrations/HASH_TS_2026-05-12.md).
 
 | Metric | Value | Notes |
 |---|---|---|
@@ -737,7 +737,7 @@ Status as of 2026-05-12:
 6. **Phase ε** — self-ingestion. **Next active stream.** All
    infrastructure is in place; the moment of truth is the API
    spend. The Vibe-Reasoning runbook
-   ([`legend/calibrations/VIBE_REASONING_PROCEDURE.md`](legend/calibrations/VIBE_REASONING_PROCEDURE.md))
+   ([`legend/calibrations/VIBE_REASONING_PROCEDURE.md`](../../legend/calibrations/VIBE_REASONING_PROCEDURE.md))
    is the smaller out-of-tree pilot, and its remaining steps
    (re-run `verify-homeomorphism` over the 22 existing nodes; then
    re-ingest + measure) are the immediate next API spend before

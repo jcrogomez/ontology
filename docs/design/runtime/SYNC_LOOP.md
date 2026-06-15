@@ -3,7 +3,7 @@
 This is the **how-to** for the governed sync loop. For the design
 contract and acceptance criteria, see
 [`SYNC_LOOP_SPEC.md`](SYNC_LOOP_SPEC.md). For the per-command flag
-reference, see [`CLI_COMMANDS.md`](CLI_COMMANDS.md).
+reference, see [`CLI_COMMANDS.md`](../../CLI_COMMANDS.md).
 
 ## What the loop is
 
@@ -154,6 +154,6 @@ model quality and ficha determinacy, not the consensus knob.
 
 - The contract + acceptance criteria: [`SYNC_LOOP_SPEC.md`](SYNC_LOOP_SPEC.md).
 - Generate a behaviour fixture so a node graduates to **core**:
-  `onto probe <node>` (see [`CLI_COMMANDS.md`](CLI_COMMANDS.md)).
+  `onto probe <node>` (see [`CLI_COMMANDS.md`](../../CLI_COMMANDS.md)).
 - Improve a node's ficha so its draws agree:
   `onto ficha audit` → `onto ficha cleanup <node>`.

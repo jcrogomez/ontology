@@ -34,7 +34,7 @@ which is what makes mock-driven compilation a useful degenerate case
 of axiom 6 — the leaf node's `prompt.raw` becomes the artifact
 byte-for-byte. See [`COMPILER.md`](COMPILER.md) §"The mock provider as
 the identity functor (on one task)" and
-[`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §4.3 for the rigor
+[`MATHEMATICAL_CLAIMS.md`](../../MATHEMATICAL_CLAIMS.md) §4.3 for the rigor
 classification (T3 — the identity-functor framing is honest only on
 the `code_sketch` slice).
 

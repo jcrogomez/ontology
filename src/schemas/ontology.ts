@@ -132,7 +132,7 @@ export const ContextProvisionSchema = z.object({
   entity: z.string().optional(),
   description: z.string().optional(),
   // Optional syntactic interface signature of the provided symbol (O1,
-  // docs/legend/CONTEXT_GLUING_REGIMES.md). Populated by static ingest where
+  // docs/design/laws/CONTEXT_GLUING_REGIMES.md). Populated by static ingest where
   // the TS parser can read a written signature; absent for manually-declared
   // / LLM-extracted / untyped provisions. Gluing IGNORES this today — it is
   // future discriminator material for O2's identify-if-equal policy, never a
@@ -378,7 +378,7 @@ export const LlmProviderSchema = z.enum([
 
 // Persisted run records live under `.ontology/runs/run_<id>.json`.
 // Two structurally identical runs share the same id (content-addressed).
-// See docs/RUN_PERSISTENCE.md for the full RFC.
+// See docs/design/kernel/RUN_PERSISTENCE.md for the full RFC.
 export const PersistedRunInputSchema = z.object({
   promptHash: z.string().startsWith("prompt:hash:"),
   contextHash: z.string().startsWith("ctx:hash:").nullable().default(null),
@@ -506,7 +506,7 @@ export type WorkflowRunStep = z.infer<typeof WorkflowRunStepSchema>;
 // Proposal records live under `.ontology/proposals/proposal_<id>.json`.
 // A proposal is a typed candidate mutation that has not yet been applied to
 // the graph. Models may produce proposals; only an explicit `proposal apply`
-// command may translate one into a real graph mutation. See docs/PROPOSAL_SYSTEM.md.
+// command may translate one into a real graph mutation. See docs/design/kernel/PROPOSAL_SYSTEM.md.
 
 // Source pins a proposal to the model run that generated it. For manually
 // authored proposals (no LLM in the loop), source is null.
@@ -579,7 +579,7 @@ export const ProposalNodeCreatePayloadSchema = z.object({
   // carried PARALLEL to `provides` so the existing `string[]` contract and
   // proposal hash are unchanged when absent (manual / LLM proposals omit it).
   // Threaded verbatim to createNode, which merges it onto the provision
-  // objects. See docs/legend/CONTEXT_GLUING_REGIMES.md O1(c).
+  // objects. See docs/design/laws/CONTEXT_GLUING_REGIMES.md O1(c).
   provideSignatures: z.record(z.string(), z.string()).optional(),
   // The β-2 literal escape hatch can also be proposed: an ingest run
   // can flag a node as "pin verbatim" so apply creates it with

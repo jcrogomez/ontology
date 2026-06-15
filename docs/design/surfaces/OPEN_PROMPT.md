@@ -3,7 +3,7 @@
 **Status:** spec-only. No implementation ships in 0.4.0.
 **Target release:** 0.5.0 line, after Phase ε produces the empirical
 data the spec presumes.
-**Companion read:** [`PROJECT_LEGEND.md`](PROJECT_LEGEND.md) §4.
+**Companion read:** [`PROJECT_LEGEND.md`](../inverse/PROJECT_LEGEND.md) §4.
 
 > *The code is, often, an industrial secret. The intent — what the
 > code is supposed to do, what invariants it must preserve — can be

@@ -80,7 +80,7 @@ function shapeFromFlags(options: QueryCommandOptions): unknown {
 }
 
 // Resolves the QueryShape source per the precedence in
-// docs/QUERY_REPRESENTABLE.md: --shape > --shape-file > per-field flags.
+// docs/design/laws/QUERY_REPRESENTABLE.md: --shape > --shape-file > per-field flags.
 // Throws a clear Error when --shape and --shape-file are combined, when
 // --shape-file points at a missing or invalid file, or when the resulting
 // shape fails Zod validation.

@@ -7,8 +7,8 @@ invariants + the cross-provider per-task routing / advisory lock /
 Walker v2 PR-1 hardening sweep; Phase ζ — the workflow runtime — is
 active since 2026-05-30). It explains how the modules relate; for the
 mathematical interpretation, read this alongside
-[`CATEGORICAL_VISION.md`](CATEGORICAL_VISION.md) and
-[`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md).
+[`CATEGORICAL_VISION.md`](laws/CATEGORICAL_VISION.md) and
+[`MATHEMATICAL_CLAIMS.md`](../MATHEMATICAL_CLAIMS.md).
 
 ## Module map
 
@@ -72,15 +72,15 @@ src/
     prompt/                 — `parsePromptAST(raw)` (axiom 4 surface).
     effects/                — Result / Effect / EffectWithLog monad
                               library + async variant + monad-laws
-                              tests. See [`EFFECT_MONAD.md`](EFFECT_MONAD.md).
+                              tests. See [`EFFECT_MONAD.md`](laws/EFFECT_MONAD.md).
     query/                  — Yoneda-style Hom-profile matcher. See
-                              [`QUERY_REPRESENTABLE.md`](QUERY_REPRESENTABLE.md).
+                              [`QUERY_REPRESENTABLE.md`](laws/QUERY_REPRESENTABLE.md).
     fibration/              — `listBranches`, `computeBranchFiber`,
                               `describeCartesianLift`. Read-only
-                              library. See [`BRANCH_FIBRATION.md`](BRANCH_FIBRATION.md).
+                              library. See [`BRANCH_FIBRATION.md`](laws/BRANCH_FIBRATION.md).
     topos/                  — three-valued Ω predicate algebra
                               (`omega.ts`, `predicate.ts`, `rule-
-                              compiler.ts`). See [`RULES_TOPOS.md`](RULES_TOPOS.md).
+                              compiler.ts`). See [`RULES_TOPOS.md`](laws/RULES_TOPOS.md).
 ```
 
 ## Layer boundaries
@@ -148,7 +148,7 @@ verdict comes from `evaluatePredicate(predicate, ctx)` against an
 `EvaluationContext` synthesised by `buildEvaluationContext`. The
 two-valued `IntentValidationResult.{ok, score, violations, warnings}`
 contract is preserved; the new `verdict: Omega` field exposes the
-three-valued underlying result. See [`RULES_TOPOS.md`](RULES_TOPOS.md).
+three-valued underlying result. See [`RULES_TOPOS.md`](laws/RULES_TOPOS.md).
 
 ## State & persistence layout
 
@@ -179,12 +179,12 @@ projects registry (`~/.config/ontology/projects.json`) are direct
 truncate the file. The single-writer assumption (CLI single-shot, no
 multi-process locking) is unverified. Atomic writes + advisory lock
 are the highest-priority hardening item — see
-[`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md) §6 item 1.
+[`MATHEMATICAL_CLAIMS.md`](../MATHEMATICAL_CLAIMS.md) §6 item 1.
 
 ## What is *not* in the architecture
 
 - **No PromptAST rewriting today.** Markers are parsed; nothing
-  rewrites the body based on them. [`PROMPT_GENERATORS.md`](PROMPT_GENERATORS.md)
+  rewrites the body based on them. [`PROMPT_GENERATORS.md`](forward/PROMPT_GENERATORS.md)
   (RFC) introduces `@expand: gen_xxx` as real substitution in
   *generator bodies only*, leaving node-level `@expand:` as
   metadata until separate work picks it up.
@@ -192,7 +192,7 @@ are the highest-priority hardening item — see
   any mode other than `strict`.
 - **No `onto branch` CLI.** Branch fibration is a programmatic
   library + a single Walker action (`:branch list`).
-- **`onto link <nodeId> --candidate <text>`** is the read-only CLI surface for the semantic linker (gluing matrix + intent validation + edge proposal suggestions). Proposal staging stays manual via `onto propose link` — the linker never auto-mutates. See [`CLI_COMMANDS.md`](CLI_COMMANDS.md) `link <nodeId>`.
+- **`onto link <nodeId> --candidate <text>`** is the read-only CLI surface for the semantic linker (gluing matrix + intent validation + edge proposal suggestions). Proposal staging stays manual via `onto propose link` — the linker never auto-mutates. See [`CLI_COMMANDS.md`](../CLI_COMMANDS.md) `link <nodeId>`.
 - **No replay command.** Events are logged for audit; state is loaded
   from `state.json` directly, not reconstructed from the log.
 - **No web UI / Visual DAG Studio.** Long-term roadmap item only.
