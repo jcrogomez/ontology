@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   tagFailureModes,
   aggregateFailureModes,
-} from "../src/runtime/legend/failure-mode-tagger.js";
-import { computeExportRecovery } from "../src/runtime/legend/export-recovery.js";
+} from "../src/laws/failure-mode-tagger.js";
+import { computeExportRecovery } from "../src/laws/export-recovery.js";
 
 const emptyRecovery = computeExportRecovery([], []);
 

@@ -10,8 +10,8 @@
 import * as fs from "node:fs";
 import { assertOntologyProject, loadEdges, loadNodes } from "../../../kernel/core/project/load.js";
 import type { OntologyNode } from "../../../kernel/schemas/ontology.js";
-import { QueryShapeSchema, type QueryShape } from "../../../runtime/query/types.js";
-import { queryNodes } from "../../../runtime/query/representable.js";
+import { QueryShapeSchema, type QueryShape } from "../../../laws/query/types.js";
+import { queryNodes } from "../../../laws/query/representable.js";
 import {
   loadEmbeddingIndex,
   resolveEmbeddingAdapter,

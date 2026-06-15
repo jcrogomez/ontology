@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0095 — src/commands/ingest/static-classifier-policy.ts
 // Tested entry: decideStaticClassifierIngestAction(classification,

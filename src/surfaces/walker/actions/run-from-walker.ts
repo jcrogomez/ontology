@@ -11,12 +11,12 @@ import {
   ok,
   err,
   runWithLog,
-} from "../../../runtime/effects/index.js";
+} from "../../../laws/effects/index.js";
 import {
   type AsyncEffectWithLog,
   liftPromiseWithLog,
   runAsyncWithLog,
-} from "../../../runtime/effects/async.js";
+} from "../../../laws/effects/async.js";
 
 export interface RunFromWalkerOptions {
   focal: OntologyNode;

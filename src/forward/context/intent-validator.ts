@@ -35,7 +35,7 @@ import {
   atomForbids,
   atomRequires,
   evaluatePredicate,
-} from "../../runtime/topos/index.js";
+} from "../../laws/topos/index.js";
 
 // Synthetic tokens used to encode the validator's questions as atoms in the
 // predicate algebra. They are namespaced under `__validator__:` so they

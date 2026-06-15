@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0093 — src/commands/ingest/cost-estimate.ts
 // Tested entries: estimateInputTokens, resolveProviderRate,

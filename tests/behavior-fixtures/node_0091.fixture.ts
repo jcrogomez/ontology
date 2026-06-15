@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0091 — src/runtime/graph/poset.ts (second fixture from this file)
 // Tested entry: posetIndex — pure ordinal mapping from an abstraction-

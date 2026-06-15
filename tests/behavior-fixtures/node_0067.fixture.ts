@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0067 — src/core/nodes/node-id.ts
 // Tested entry: createSequentialNodeId(nodeCount) — formats a counter

@@ -6,7 +6,7 @@
 // flags are wired here; other dimensions (plane, manifestation, status,
 // branch, etc.) can be added without churning the action helper.
 
-import type { QueryShape } from "../../../runtime/query/types.js";
+import type { QueryShape } from "../../../laws/query/types.js";
 
 const FLAG_TO_FIELD: Record<string, "kind" | "abstraction" | "provides" | "requires" | "forbids" | "hasIncoming" | "hasOutgoing"> = {
   "--kind": "kind",

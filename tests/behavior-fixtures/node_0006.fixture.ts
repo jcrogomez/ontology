@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0006 — src/runtime/compile/post/runtime-check.ts
 // Tested entry: clamp(n, lo, hi) — pure numeric helper exported from

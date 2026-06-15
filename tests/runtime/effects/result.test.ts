@@ -12,7 +12,7 @@ import {
   sequenceResult,
   unwrapResult,
   type Result,
-} from "../../../src/runtime/effects/result.js";
+} from "../../../src/laws/effects/result.js";
 
 // Hand-picked representative values used to exercise the monad laws.
 const REP_VALUES: number[] = [0, 1, -3, 42];

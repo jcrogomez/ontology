@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0033 — src/runtime/legend/render-ascii.ts
 // Tested entry: bar — pure renderer mapping a fractional value into

@@ -8,14 +8,14 @@ import {
   liftEffectWithLog,
   liftPromiseWithLog,
   runAsyncWithLog,
-} from "../../../src/runtime/effects/async.js";
-import { ok, err } from "../../../src/runtime/effects/result.js";
+} from "../../../src/laws/effects/async.js";
+import { ok, err } from "../../../src/laws/effects/result.js";
 import {
   pureWithLog,
   failWithLog,
   logInfo,
   bindWithLog,
-} from "../../../src/runtime/effects/io.js";
+} from "../../../src/laws/effects/io.js";
 
 describe("AsyncEffectWithLog — basics", () => {
   it("pureAsyncWithLog yields an ok with no logs", async () => {

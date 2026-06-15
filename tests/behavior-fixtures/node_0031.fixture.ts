@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0031 — src/runtime/legend/pareto.ts
 // Tested entry: aggregateByTaskModel — pure group-by over the per-

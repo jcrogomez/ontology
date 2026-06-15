@@ -20,7 +20,7 @@ import {
   renderBakeoffSynthesisMarkdown,
   DEFAULT_H1_JACCARD_FLOOR,
   type BakeoffArm,
-} from "../../../runtime/legend/bakeoff-synthesis.js";
+} from "../../../laws/bakeoff-synthesis.js";
 import { errorMessage } from "../../../kernel/core/errors.js";
 
 export interface BakeoffCommandOptions {

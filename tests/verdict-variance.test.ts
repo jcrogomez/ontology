@@ -9,7 +9,7 @@
 // computed correctly when samples disagree.
 
 import { describe, it, expect } from "vitest";
-import { measureNodeVariance, aggregateVariance } from "../src/runtime/legend/verdict-variance.js";
+import { measureNodeVariance, aggregateVariance } from "../src/laws/verdict-variance.js";
 
 // Fixtures (python hint → regex declaration parser, fully deterministic).
 const ORIGINAL = ["def foo():", "    return 1", "", "def bar():", "    return 2"].join("\n");

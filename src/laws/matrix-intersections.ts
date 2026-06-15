@@ -1,4 +1,4 @@
-import type { FrontierAttribute } from "../../inverse/frontier-tagger.js";
+import type { FrontierAttribute } from "../inverse/frontier-tagger.js";
 import type {
   ContractState,
   StructuralState,

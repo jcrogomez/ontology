@@ -7,7 +7,7 @@ import {
   type DistanceMetrics,
   type HomeomorphismVerdict,
   type LanguageHint,
-} from "../../../runtime/legend/verify-homeomorphism.js";
+} from "../../../laws/verify-homeomorphism.js";
 
 // Walker v1.5 action: `:verify` — the focal node's round-trip verdict,
 // PURE and synchronous. It compares the node's ingested source

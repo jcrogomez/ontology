@@ -5,7 +5,7 @@ import {
   barOutOf,
   histogram,
   sparkline,
-} from "../src/runtime/legend/render-ascii.js";
+} from "../src/laws/render-ascii.js";
 
 describe("render-ascii — sparkline", () => {
   it("returns empty string for empty input", () => {

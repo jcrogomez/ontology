@@ -1,5 +1,5 @@
-import { parseTypeScriptFile } from "../../inverse/static/typescript.js";
-import { RESOLVED_SIGNATURE_PREFIX } from "../../inverse/static/typescript-resolved.js";
+import { parseTypeScriptFile } from "../inverse/static/typescript.js";
+import { RESOLVED_SIGNATURE_PREFIX } from "../inverse/static/typescript-resolved.js";
 import type { ContractState } from "./matrix.js";
 
 // Contract-axis checker v0 — cartography column 3.

@@ -10,7 +10,7 @@ import type { ContextFragment } from "../src/forward/context/presheaf.js";
 import {
   type EvaluationContext,
   evaluatePredicate,
-} from "../src/runtime/topos/index.js";
+} from "../src/laws/topos/index.js";
 
 describe("Intent Validator", () => {
   const baseAssembled: ContextAssemblyOutput = {

@@ -1,5 +1,5 @@
 import { runRegenerate, type RegenerateCommandOptions, type RegenerateResult } from "./regenerate.js";
-import { reanchorNodeArtifacts, type ReanchorResult } from "../../runtime/legend/reanchor-node.js";
+import { reanchorNodeArtifacts, type ReanchorResult } from "../../laws/reanchor-node.js";
 
 // `onto sync <node>` — the governed intent→code loop, in one command.
 //

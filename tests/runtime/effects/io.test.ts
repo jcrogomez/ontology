@@ -4,7 +4,7 @@ import {
   ok,
   err,
   type Result,
-} from "../../../src/runtime/effects/result.js";
+} from "../../../src/laws/effects/result.js";
 import {
   type Effect,
   pureEffect,
@@ -22,7 +22,7 @@ import {
   bindWithLog,
   mapWithLog,
   runWithLog,
-} from "../../../src/runtime/effects/io.js";
+} from "../../../src/laws/effects/io.js";
 
 // -----------------------------------------------------------------------------
 // Effect — basic behavior + monad laws (under runEffect-equivalence)

@@ -7,7 +7,7 @@ import {
   mapResult,
   bindResult,
   type Result,
-} from "../../../src/runtime/effects/result.js";
+} from "../../../src/laws/effects/result.js";
 import {
   bindEffect,
   runEffect,
@@ -18,13 +18,13 @@ import {
   type EffectWithLog,
   type LogEntry,
   type LogResult,
-} from "../../../src/runtime/effects/io.js";
+} from "../../../src/laws/effects/io.js";
 import {
   bindAsyncWithLog,
   liftEffectWithLog,
   runAsyncWithLog,
   type AsyncEffectWithLog,
-} from "../../../src/runtime/effects/async.js";
+} from "../../../src/laws/effects/async.js";
 
 // Property-based companions to result.test.ts / io.test.ts / async.test.ts.
 // Those files pin the monad laws at hand-picked representatives; here the

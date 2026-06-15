@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0019 — src/runtime/effects/result.ts
 // Tested entries: bindResult, traverseResult, sequenceResult — the monadic

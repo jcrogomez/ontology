@@ -4,14 +4,14 @@ import {
   entryMatchesIntersection,
   REQUIRED_INTERSECTIONS,
   type IntersectionSpec,
-} from "../src/runtime/legend/matrix-intersections.js";
+} from "../src/laws/matrix-intersections.js";
 import {
   buildPerNodeMatrix,
   type MatrixCost,
   type PerNodeMatrix,
-} from "../src/runtime/legend/matrix.js";
+} from "../src/laws/matrix.js";
 import type { FrontierAttribute } from "../src/inverse/frontier-tagger.js";
-import type { HomeomorphismVerdict } from "../src/runtime/legend/verify-homeomorphism.js";
+import type { HomeomorphismVerdict } from "../src/laws/verify-homeomorphism.js";
 
 const ZERO_COST: MatrixCost = {
   provider: "mock",

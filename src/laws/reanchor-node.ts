@@ -1,14 +1,14 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { randomBytes } from "node:crypto";
-import { getOntologyPaths } from "../../kernel/core/project/paths.js";
-import { loadNodeById } from "../../kernel/core/project/load.js";
-import { readState, writeState } from "../../kernel/core/state/state-store.js";
-import { ensureDir, writeJson, readJson, appendJsonl } from "../../kernel/core/fs/json.js";
-import { buildMerkleTree, hashFileContent, normalizeLeafPath } from "../../kernel/core/integrity/merkle.js";
-import { OntologyEventSchema } from "../../kernel/schemas/ontology.js";
-import { errorMessage } from "../../kernel/core/errors.js";
-import type { DriftSnapshot } from "../../surfaces/commands/drift.js";
+import { getOntologyPaths } from "../kernel/core/project/paths.js";
+import { loadNodeById } from "../kernel/core/project/load.js";
+import { readState, writeState } from "../kernel/core/state/state-store.js";
+import { ensureDir, writeJson, readJson, appendJsonl } from "../kernel/core/fs/json.js";
+import { buildMerkleTree, hashFileContent, normalizeLeafPath } from "../kernel/core/integrity/merkle.js";
+import { OntologyEventSchema } from "../kernel/schemas/ontology.js";
+import { errorMessage } from "../kernel/core/errors.js";
+import type { DriftSnapshot } from "../surfaces/commands/drift.js";
 
 // Per-node drift re-anchor — the write primitive `onto sync` needs after a
 // successful regeneration.

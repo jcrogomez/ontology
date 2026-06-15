@@ -11,7 +11,7 @@ import { loadNodes, loadEdges } from "../../../kernel/core/project/load.js";
 import {
   computeBranchFiber,
   listBranches,
-} from "../../../runtime/fibration/branch-fiber.js";
+} from "../../../laws/fibration/branch-fiber.js";
 
 export interface BranchFiberOptions {
   json?: boolean;

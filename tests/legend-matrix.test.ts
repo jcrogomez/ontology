@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { HomeomorphismVerdict } from "../src/runtime/legend/verify-homeomorphism.js";
+import type { HomeomorphismVerdict } from "../src/laws/verify-homeomorphism.js";
 import {
   aggregateByAxis,
   buildMatrixCost,
@@ -16,7 +16,7 @@ import {
   type AxisHonesty,
   type MatrixCell,
   type MatrixCost,
-} from "../src/runtime/legend/matrix.js";
+} from "../src/laws/matrix.js";
 
 const ZERO_COST: MatrixCost = {
   provider: "mock",

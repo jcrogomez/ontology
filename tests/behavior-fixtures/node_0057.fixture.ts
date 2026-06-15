@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0057 — src/runtime/topos/rule-compiler.ts
 // Tested entry: compileNodeRules(node, neighborhood) — lifts requires/forbids

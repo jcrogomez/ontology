@@ -28,7 +28,7 @@ import {
   atomRequires,
   atomForbids,
   evaluatePredicate,
-} from "../../../src/runtime/topos/predicate.js";
+} from "../../../src/laws/topos/predicate.js";
 
 // ── Oracle: a plain two-valued Boolean evaluator over a `provided` set. ──────
 // Mirrors the intended closed-world semantics: provides/requires hold iff the

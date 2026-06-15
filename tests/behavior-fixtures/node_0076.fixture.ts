@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0076 — src/core/render/table.ts
 // Tested entry: renderTable(rows, columns, options) — pure auto-

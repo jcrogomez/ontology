@@ -24,8 +24,8 @@ import {
   loadPersistedRun,
   verifyPersistedRun,
 } from "../../kernel/core/runs/persist.js";
-import { queryNodes } from "../../runtime/query/representable.js";
-import { QueryShapeSchema, type QueryShape } from "../../runtime/query/types.js";
+import { queryNodes } from "../../laws/query/representable.js";
+import { QueryShapeSchema, type QueryShape } from "../../laws/query/types.js";
 import {
   getNeighbors,
   findShortestPath,

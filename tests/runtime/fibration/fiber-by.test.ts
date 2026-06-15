@@ -4,8 +4,8 @@ import {
   computeBranchFiber,
   listBranches,
   pathProjection,
-} from "../../../src/runtime/fibration/index.js";
-import type { FiberInput } from "../../../src/runtime/fibration/index.js";
+} from "../../../src/laws/fibration/index.js";
+import type { FiberInput } from "../../../src/laws/fibration/index.js";
 import {
   OntologyNodeSchema,
   OntologyEdgeSchema,

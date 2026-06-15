@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0075 — src/core/render/style.ts
 // Tested entries: stripAnsi, visibleWidth, color, statusGlyph — pure

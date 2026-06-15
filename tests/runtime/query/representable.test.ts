@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { matchesShape, queryNodes } from "../../../src/runtime/query/representable";
+import { matchesShape, queryNodes } from "../../../src/laws/query/representable";
 import type { OntologyEdge, OntologyNode } from "../../../src/kernel/schemas/ontology";
-import type { QueryShape } from "../../../src/runtime/query/types";
+import type { QueryShape } from "../../../src/laws/query/types";
 
 // Builds a minimal OntologyNode that satisfies the schema typing without
 // the test having to spell out every default. Identical pattern to the one

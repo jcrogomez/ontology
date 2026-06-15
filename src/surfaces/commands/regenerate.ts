@@ -12,8 +12,8 @@ import {
   type HomeomorphismVerdict,
   type VerdictThresholds,
   type DistanceMetrics,
-} from "../../runtime/legend/verify-homeomorphism.js";
-import { loadFixture, runBehaviorCheck, type BehaviorVerdict } from "../../runtime/legend/behavior-checker.js";
+} from "../../laws/verify-homeomorphism.js";
+import { loadFixture, runBehaviorCheck, type BehaviorVerdict } from "../../laws/behavior-checker.js";
 import { checkRules } from "../../inverse/rule-checker.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
 

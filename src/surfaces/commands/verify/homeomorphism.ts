@@ -25,7 +25,7 @@ import {
   type VerificationResult,
   type VerificationUsage,
   type VerdictThresholds,
-} from "../../../runtime/legend/verify-homeomorphism.js";
+} from "../../../laws/verify-homeomorphism.js";
 import {
   computeCostEstimate,
   formatCostEstimateHuman,
@@ -41,30 +41,30 @@ import {
   type ByAxis,
   type ContractState,
   type PerNodeMatrix,
-} from "../../../runtime/legend/matrix.js";
+} from "../../../laws/matrix.js";
 import {
   aggregateByIntersection,
   REQUIRED_INTERSECTIONS,
-} from "../../../runtime/legend/matrix-intersections.js";
+} from "../../../laws/matrix-intersections.js";
 import { tagFileFromDisk } from "../../../inverse/frontier-tagger.js";
-import { aggregateByTaskModel } from "../../../runtime/legend/pareto.js";
+import { aggregateByTaskModel } from "../../../laws/pareto.js";
 import {
   barChart,
   histogram,
-} from "../../../runtime/legend/render-ascii.js";
+} from "../../../laws/render-ascii.js";
 import {
   aggregateVocabGaps,
   detectVocabGaps,
   hasVocabGap,
   type VocabGapAggregate,
   type VocabGapReport,
-} from "../../../runtime/legend/vocab-gap.js";
+} from "../../../laws/vocab-gap.js";
 import {
   computeExportRecovery,
   aggregateExportRecovery,
   type CompileBackExportIntegration,
   type ExportRecoveryAggregate,
-} from "../../../runtime/legend/export-recovery.js";
+} from "../../../laws/export-recovery.js";
 import { scanFileSymbols } from "../../../inverse/ast-symbol-scanner.js";
 import { inferManifestationFromSourcePath } from "../../../forward/compile/manifestation-mapper.js";
 import {
@@ -72,18 +72,18 @@ import {
   aggregateFailureModes,
   type FailureMode,
   type FailureModeAggregate,
-} from "../../../runtime/legend/failure-mode-tagger.js";
-import { aggregateRepResults } from "../../../runtime/legend/reps-aggregator.js";
+} from "../../../laws/failure-mode-tagger.js";
+import { aggregateRepResults } from "../../../laws/reps-aggregator.js";
 import {
   behaviorVerdictToMatrixState,
   loadFixture,
   runBehaviorCheck,
   type BehaviorCheckResult,
-} from "../../../runtime/legend/behavior-checker.js";
+} from "../../../laws/behavior-checker.js";
 import {
   checkContract,
   type ContractCheckResult,
-} from "../../../runtime/legend/contract-checker.js";
+} from "../../../laws/contract-checker.js";
 
 // `onto verify-homeomorphism` — Project Legend δ-2.
 //

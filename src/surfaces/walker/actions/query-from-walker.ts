@@ -7,8 +7,8 @@
 // profile without leaving the TUI.
 
 import { loadNodes, loadEdges } from "../../../kernel/core/project/load.js";
-import { queryNodes } from "../../../runtime/query/representable.js";
-import { QueryShapeSchema, type QueryShape } from "../../../runtime/query/types.js";
+import { queryNodes } from "../../../laws/query/representable.js";
+import { QueryShapeSchema, type QueryShape } from "../../../laws/query/types.js";
 import type { OntologyNode } from "../../../kernel/schemas/ontology.js";
 
 export interface QueryFromWalkerResult {

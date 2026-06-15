@@ -8,7 +8,7 @@ import {
   newRunId,
   renderCompileReport,
   writeProgressReport,
-} from "../../../runtime/legend/progress-report.js";
+} from "../../../laws/progress-report.js";
 
 export interface CompileRunOptions {
   provider?: string;        // "mock" (default) or "ollama"

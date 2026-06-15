@@ -4,7 +4,7 @@ import { renderReportMarkdown } from "../src/surfaces/commands/verify/homeomorph
 import type {
   AggregateReport,
   VerificationResult,
-} from "../src/runtime/legend/verify-homeomorphism.js";
+} from "../src/laws/verify-homeomorphism.js";
 import type {
   PersistedRunInput,
   PersistedRunModel,

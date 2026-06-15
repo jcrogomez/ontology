@@ -5,7 +5,7 @@ import {
   omegaOr,
   omegaNot,
   omegaImplies,
-} from "../../../src/runtime/topos/omega.js";
+} from "../../../src/laws/topos/omega.js";
 
 const VALUES: Omega[] = ["true", "false", "unknown"];
 

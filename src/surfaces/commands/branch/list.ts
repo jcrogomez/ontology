@@ -7,7 +7,7 @@
 // node carrying that branch label (see branch-fiber.ts).
 
 import { loadNodes } from "../../../kernel/core/project/load.js";
-import { listBranches } from "../../../runtime/fibration/branch-fiber.js";
+import { listBranches } from "../../../laws/fibration/branch-fiber.js";
 
 export interface BranchListOptions {
   json?: boolean;

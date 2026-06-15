@@ -4,7 +4,7 @@ import { glueFragments, type GluingConflict } from "./gluing.js";
 import { validateIntent } from "./intent-validator.js";
 import { OntologyRuntimeError } from "../../runtime/errors.js";
 import { LlmProviderSchema, type OntologyEdge } from "../../kernel/schemas/ontology.js";
-import type { Omega } from "../../runtime/topos/index.js";
+import type { Omega } from "../../laws/topos/index.js";
 
 // Semantic linker: the programmatic counterpart to `run context --validate`.
 // Walks the focal node's local neighborhood, glues the presheaf fragments,

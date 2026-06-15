@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   computeExportRecovery,
   aggregateExportRecovery,
-} from "../src/runtime/legend/export-recovery.js";
+} from "../src/laws/export-recovery.js";
 
 describe("computeExportRecovery", () => {
   it("returns 100% recovery when regen exactly matches AST", () => {

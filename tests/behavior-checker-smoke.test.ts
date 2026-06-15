@@ -5,7 +5,7 @@ import * as os from "node:os";
 import {
   loadFixture,
   runBehaviorCheck,
-} from "../src/runtime/legend/behavior-checker.js";
+} from "../src/laws/behavior-checker.js";
 
 // Smoke-test the v0 behaviour-axis checker end-to-end against the
 // project's REAL source files. Validates two paths the unit tests

@@ -11,7 +11,7 @@ import {
   behaviorVerdictToMatrixState,
   type BehaviorCase,
   type BehaviorFixture,
-} from "../src/runtime/legend/behavior-checker.js";
+} from "../src/laws/behavior-checker.js";
 
 // Tests for the Phase ε behaviour-axis checker (v0).
 //

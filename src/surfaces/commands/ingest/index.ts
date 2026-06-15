@@ -33,7 +33,7 @@ import {
   renderIngestReport,
   writeProgressReport,
   type IngestFileSummary,
-} from "../../../runtime/legend/progress-report.js";
+} from "../../../laws/progress-report.js";
 import {
   HIGH_CONFIDENCE_MODEL,
   HIGH_CONFIDENCE_REPS,

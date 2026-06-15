@@ -2,7 +2,7 @@ import { z } from "zod";
 import type {
   FrontierAttribute,
   TaggerAttribute,
-} from "../../inverse/frontier-tagger.js";
+} from "../inverse/frontier-tagger.js";
 import type {
   HomeomorphismVerdict,
   VerificationUsage,

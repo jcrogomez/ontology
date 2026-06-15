@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0062 — src/core/errors.ts
 // Tested entry: errorMessage — pure unknown-to-string normaliser used

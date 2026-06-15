@@ -3,7 +3,7 @@ import {
   computeNodeLoss,
   aggregateLoss,
   lossFromResults,
-} from "../src/runtime/legend/loss-breakdown.js";
+} from "../src/laws/loss-breakdown.js";
 
 describe("loss-breakdown / computeNodeLoss", () => {
   it("perfect round trip → jaccard/recall/precision all 1, nothing lost", () => {

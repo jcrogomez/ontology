@@ -46,15 +46,15 @@ import {
   failWithLog,
   bindWithLog,
   runWithLog,
-} from "../../runtime/effects/io.js";
-import { ok, err } from "../../runtime/effects/result.js";
+} from "../../laws/effects/io.js";
+import { ok, err } from "../../laws/effects/result.js";
 import {
   type AsyncEffectWithLog,
   bindAsyncWithLog,
   liftEffectWithLog,
   liftPromiseWithLog,
   runAsyncWithLog,
-} from "../../runtime/effects/async.js";
+} from "../../laws/effects/async.js";
 
 // Single-node compile primitive.
 //

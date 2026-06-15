@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   aggregateByTaskModel,
   TaskModelAggSchema,
-} from "../src/runtime/legend/pareto.js";
-import type { PerNodeMatrix } from "../src/runtime/legend/matrix.js";
+} from "../src/laws/pareto.js";
+import type { PerNodeMatrix } from "../src/laws/matrix.js";
 
 // Test fixtures: build PerNodeMatrix entries directly, varying the
 // cost.task, cost.provider, cost.model, cost.usd, and honesty.structural

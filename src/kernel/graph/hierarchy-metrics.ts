@@ -34,7 +34,7 @@ import type {
   OntologyNode,
 } from "../schemas/ontology.js";
 import type { z } from "zod";
-import { pathProjection } from "../../runtime/fibration/branch-fiber.js";
+import { pathProjection } from "../../laws/fibration/branch-fiber.js";
 
 // Schema version is bumped when the report shape changes. Historical
 // baselines diff cleanly within a major version; consumers reading the

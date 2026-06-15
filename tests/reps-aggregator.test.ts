@@ -6,13 +6,13 @@ import {
   aggregateUsage,
   aggregateRepResults,
   DEFAULT_AGGREGATOR,
-} from "../src/runtime/legend/reps-aggregator.js";
+} from "../src/laws/reps-aggregator.js";
 import {
   DEFAULT_THRESHOLDS,
   type DistanceMetrics,
   type HomeomorphismVerdict,
   type VerificationResult,
-} from "../src/runtime/legend/verify-homeomorphism.js";
+} from "../src/laws/verify-homeomorphism.js";
 
 // Coverage for the per-node multi-rep aggregator (design item §4.2).
 // All tests are pure — no LLM, no IO — so the suite runs in <100 ms

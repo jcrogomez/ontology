@@ -6,7 +6,7 @@ import {
 import type {
   HomeomorphismVerdict,
   VerificationResult,
-} from "../src/runtime/legend/verify-homeomorphism.js";
+} from "../src/laws/verify-homeomorphism.js";
 
 // Coverage for the `homeomorphism_verified` event audit fields
 // (milestone review §3.2 + design item §4.4): the actually-dispatched

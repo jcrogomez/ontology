@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0024 — src/runtime/graph/compile-plan.ts
 // Tested entry: computeCompilePlan(focalId, edges) — Kahn topological sort

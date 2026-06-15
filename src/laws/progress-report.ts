@@ -1,13 +1,13 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { randomBytes } from "node:crypto";
-import { tagFileFromDisk } from "../../inverse/frontier-tagger.js";
+import { tagFileFromDisk } from "../inverse/frontier-tagger.js";
 import { barChart, histogram, sparkline } from "./render-ascii.js";
 import type {
   SemanticRole,
   StructuralClassification,
   StructuralShape,
-} from "../../inverse/structural-classifier.js";
+} from "../inverse/structural-classifier.js";
 
 // Per-ingest / per-compile progress reports — Phase ε prework I.
 //

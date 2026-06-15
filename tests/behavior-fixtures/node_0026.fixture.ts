@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0026 — src/runtime/graph/poset.ts
 // Tested entry: validateEdgeDirection — pure check that an edge does

@@ -7,7 +7,7 @@ import {
   loadAggregateReport,
   synthesizeBakeoff,
   type BakeoffArm,
-} from "../src/runtime/legend/bakeoff-synthesis.js";
+} from "../src/laws/bakeoff-synthesis.js";
 
 // Deterministic, $0 regression guard over the COMMITTED ε arm corpus.
 //

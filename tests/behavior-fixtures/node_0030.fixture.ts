@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0030 — src/runtime/legend/matrix.ts
 // Tested entry: honestyForCell — pure fold from a matrix cell + raw

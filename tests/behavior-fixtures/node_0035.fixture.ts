@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0035 — src/runtime/legend/structural-classifier.ts
 // Tested entry: classifySourceFile — pure classifier from file content
