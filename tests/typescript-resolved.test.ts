@@ -5,8 +5,8 @@ import * as path from "node:path";
 import {
   extractResolvedSignatures,
   RESOLVED_SIGNATURE_PREFIX,
-} from "../src/runtime/static/typescript-resolved.js";
-import { parseTypeScriptFile } from "../src/runtime/static/typescript.js";
+} from "../src/inverse/static/typescript-resolved.js";
+import { parseTypeScriptFile } from "../src/inverse/static/typescript.js";
 
 // Path-to-T1 gate #1 — resolved-type signatures via the TypeChecker.
 // The compelling proof: resolved extraction captures what the syntactic

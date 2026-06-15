@@ -3,8 +3,8 @@ import {
   getNeighbors,
   findShortestPath,
   extractSubgraph,
-} from "../src/runtime/graph/traversal.js";
-import type { OntologyEdge } from "../src/schemas/ontology.js";
+} from "../src/kernel/graph/traversal.js";
+import type { OntologyEdge } from "../src/kernel/schemas/ontology.js";
 
 // Compact edge factory for fixtures.
 function edge(id: string, from: string, to: string, type: OntologyEdge["type"]): OntologyEdge {

@@ -132,7 +132,7 @@ In one line, the compiler implements a structure-preserving functor
 
 $$F\colon \text{Intent} \longrightarrow \text{Code}$$
 
-with a semantic gate ($\text{validateIntent} \to \Omega$, a three-valued predicate algebra) that refuses to emit an artifact whose declared contract is violated. The inverse lift is [Project Legend](docs/PROJECT_LEGEND.md): an operational adjunction $G \dashv F$ ($G$ the ingest lift, left adjoint), with the round-trip $F \circ G \approx \mathrm{id}$ **measured empirically** — per-axis distances and tolerances on a fidelity matrix, against pre-registered falsifiers, not asserted.
+with a semantic gate ($\text{validateIntent} \to \Omega$, a three-valued predicate algebra) that refuses to emit an artifact whose declared contract is violated. The inverse lift is [Project Legend](docs/design/inverse/PROJECT_LEGEND.md): an operational adjunction $G \dashv F$ ($G$ the ingest lift, left adjoint), with the round-trip $F \circ G \approx \mathrm{id}$ **measured empirically** — per-axis distances and tolerances on a fidelity matrix, against pre-registered falsifiers, not asserted.
 
 **Every load-bearing term in this README** — "functor", "presheaf", "Yoneda", "topos", "fibration", "adjoint" — is graded in [`MATHEMATICAL_CLAIMS.md`](docs/MATHEMATICAL_CLAIMS.md): **T1** (a law pinned by tests), **T2** (operational, no law test), **T3** (useful analogy), or **T4** (aspirational). Some of the most useful entries are *negative* results stated plainly: the default context gluing is a separated presheaf, **not** a sheaf (the opt-in `identify-if-equal` mode is a sheaf on the equal-signature subcategory, T1); the Ω algebra is Kleene, **not** a Heyting/topos implication; and $G$ is irreducibly probabilistic, so the adjunction is graded T2 with a measurement program, not claimed as a theorem. The intent is to neither hide the mathematical content nor oversell it.
 
@@ -145,27 +145,27 @@ with a semantic gate ($\text{validateIntent} \to \Omega$, a three-valued predica
 
 **The design:**
 
-- [**The Canon**](docs/ONTOLOGY_CANON.md) — the foundational definition.
-- [**The Mathematical Model**](docs/MATHEMATICAL_MODEL.md) — the seven axioms.
-- [**The Categorical Vision**](docs/CATEGORICAL_VISION.md) — the nine-concept map onto concrete modules.
+- [**The Canon**](docs/design/kernel/ONTOLOGY_CANON.md) — the foundational definition.
+- [**The Mathematical Model**](docs/design/laws/MATHEMATICAL_MODEL.md) — the seven axioms.
+- [**The Categorical Vision**](docs/design/laws/CATEGORICAL_VISION.md) — the nine-concept map onto concrete modules.
 - [**Mathematical Claims — Audit & Map**](docs/MATHEMATICAL_CLAIMS.md) — the rigor ledger (read alongside the two above).
-- [**The Architecture**](docs/ARCHITECTURE.md) — how Kernel, LLM Runtime, Context Assembler, Proposal System, and Compiler relate.
-- [**The Compiler**](docs/COMPILER.md) and [**The Walker**](docs/WALKER_INTERFACE.md).
+- [**The Architecture**](docs/design/ARCHITECTURE.md) — how Kernel, LLM Runtime, Context Assembler, Proposal System, and Compiler relate.
+- [**The Compiler**](docs/design/forward/COMPILER.md) and [**The Walker**](docs/design/surfaces/WALKER_INTERFACE.md).
 
-**The four categorical extensions:** [Yoneda Query](docs/QUERY_REPRESENTABLE.md) · [Effect Monad](docs/EFFECT_MONAD.md) · [Branch Fibration](docs/BRANCH_FIBRATION.md) · [Rules as Topos](docs/RULES_TOPOS.md).
+**The four categorical extensions:** [Yoneda Query](docs/design/laws/QUERY_REPRESENTABLE.md) · [Effect Monad](docs/design/laws/EFFECT_MONAD.md) · [Branch Fibration](docs/design/laws/BRANCH_FIBRATION.md) · [Rules as Topos](docs/design/laws/RULES_TOPOS.md).
 
 **Project Legend** (the inverse direction):
 
-- [**Project Legend**](docs/PROJECT_LEGEND.md) — design doc + phase plan. Phases α–ε closed (self-ingestion of this repo, 4-arm bake-off, fidelity matrix); **Phase ζ (the workflow runtime) is active** — see the [workflow runtime spec](docs/legend/WORKFLOW_RUNTIME_SPEC.md).
+- [**Project Legend**](docs/design/inverse/PROJECT_LEGEND.md) — design doc + phase plan. Phases α–ε closed (self-ingestion of this repo, 4-arm bake-off, fidelity matrix); **Phase ζ (the workflow runtime) is active** — see the [workflow runtime spec](docs/design/runtime/WORKFLOW_RUNTIME_SPEC.md).
 - [**Calibration log**](docs/legend/calibrations/CALIBRATION_LOG.md) — the dated, pre-registered experiment record (hypotheses committed *before* runs).
-- [**Open-Prompt protocol spec**](docs/OPEN_PROMPT.md) — signed intent + audit-chain replay as a third trust posture. Spec-only; the `onto mcp` read surface is its first tangible slice.
-- [**Branch Model**](docs/BRANCH_MODEL.md) — the Option-C design decision gating cross-branch propagation.
+- [**Open-Prompt protocol spec**](docs/design/surfaces/OPEN_PROMPT.md) — signed intent + audit-chain replay as a third trust posture. Spec-only; the `onto mcp` read surface is its first tangible slice.
+- [**Branch Model**](docs/design/runtime/BRANCH_MODEL.md) — the Option-C design decision gating cross-branch propagation.
 
 **Contributing / current state:**
 
 - [**Roadmap**](docs/ROADMAP.md) — **the single source of truth** for phase state and open work.
-- [**Release Notes**](docs/RELEASE_NOTES.md) — the running changelog; [**LEGEND**](docs/LEGEND.md) — the 0.4.0 release write-up (historical snapshot).
-- RFCs under [docs/](docs): `RUN_PERSISTENCE.md`, `PROPOSAL_SYSTEM.md`, `WALKER_INTERFACE.md`, `COMPILER.md`.
+- [**Release Notes**](docs/RELEASE_NOTES.md) — the running changelog; [**LEGEND**](docs/design/inverse/LEGEND.md) — the 0.4.0 release write-up (historical snapshot).
+- [**Design docs index**](docs/design/README.md) — every component design grouped by role: **kernel** (the category **C**), **forward** (F), **inverse** (G), **laws** (F∘G≈id), **runtime**, **surfaces**.
 
 ## Status
 

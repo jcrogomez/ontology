@@ -8,7 +8,7 @@ import {
   getIncomingEdges,
   getEdgesByType,
   getNeighbors
-} from "../src/runtime/graph/edges.js";
+} from "../src/kernel/graph/edges.js";
 
 const FIXTURE_EDGES = [
   {

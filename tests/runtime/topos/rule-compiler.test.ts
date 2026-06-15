@@ -22,11 +22,11 @@ import { describe, it, expect } from "vitest";
 import {
   compileNodeRules,
   type CompilableNode,
-} from "../../../src/runtime/topos/rule-compiler.js";
+} from "../../../src/laws/topos/rule-compiler.js";
 import {
   evaluatePredicate,
   type EvaluationContext,
-} from "../../../src/runtime/topos/predicate.js";
+} from "../../../src/laws/topos/predicate.js";
 
 /**
  * Re-implementation of the per-node subset of `glueFragments`. Returns true

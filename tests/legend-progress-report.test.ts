@@ -9,7 +9,7 @@ import {
   writeProgressReport,
   type CompileReportData,
   type IngestReportData,
-} from "../src/runtime/legend/progress-report.js";
+} from "../src/laws/progress-report.js";
 
 describe("progress-report — newRunId", () => {
   it("returns a string with the run_ prefix and hex suffix", () => {

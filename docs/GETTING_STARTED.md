@@ -285,7 +285,7 @@ In 5 minutes you exercised every axiom of the canon:
 You also exercised:
 
 - **Run persistence**: content-addressed records with deterministic ids; cache hits surface as `(cached)`.
-- **Proposal system**: drafts in the walker → `:propose` → `apply` → real graph mutation. See [PROPOSAL_SYSTEM.md](PROPOSAL_SYSTEM.md).
+- **Proposal system**: drafts in the walker → `:propose` → `apply` → real graph mutation. See [PROPOSAL_SYSTEM.md](design/kernel/PROPOSAL_SYSTEM.md).
 - **Audit chain**: every artifact ties back to events, runs, and node hashes. Use `onto runs verify <id>` to recompute hashes, `onto events tail` to see the temporal log.
 
 ---
@@ -293,12 +293,12 @@ You also exercised:
 ## Where to go from here
 
 - [**Hello World example**](../examples/hello-world/README.md) — the canonical demo, end-to-end in one command.
-- [**Compiler**](COMPILER.md) — how `onto compile` produces artifacts and why each step has full provenance.
-- [**The Canon**](ONTOLOGY_CANON.md) and [**Mathematical Model**](MATHEMATICAL_MODEL.md) for the formal foundation.
+- [**Compiler**](design/forward/COMPILER.md) — how `onto compile` produces artifacts and why each step has full provenance.
+- [**The Canon**](design/kernel/ONTOLOGY_CANON.md) and [**Mathematical Model**](design/laws/MATHEMATICAL_MODEL.md) for the formal foundation.
 - [**Mathematical Claims — Audit & Map**](MATHEMATICAL_CLAIMS.md) for the rigor classification of every math claim in the project.
-- [**Architecture**](ARCHITECTURE.md) for how the kernel, runtime, assembler, proposal system, compiler, and walker relate.
+- [**Architecture**](design/ARCHITECTURE.md) for how the kernel, runtime, assembler, proposal system, compiler, and walker relate.
 - [**CLI Commands**](CLI_COMMANDS.md) for the full surface.
 - [**Roadmap**](ROADMAP.md) for what is shipped and what is next.
-- [**Walker Interface RFC**](WALKER_INTERFACE.md) if you want to extend or skin the walker.
+- [**Walker Interface RFC**](design/surfaces/WALKER_INTERFACE.md) if you want to extend or skin the walker.
 
 Once the basics feel comfortable, see [CLI_COMMANDS.md](CLI_COMMANDS.md) §`drift` (Merkle change-detection over compiled artifacts) and §`semantic index` / `semantic links` (local embedding index + `query --semantic` hybrid retrieval).

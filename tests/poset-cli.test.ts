@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
 import { runCli } from "./helpers/run-cli.js";
-import { hashObject, removeIntegrityHash } from "../src/core/integrity/hash.js";
+import { hashObject, removeIntegrityHash } from "../src/kernel/core/integrity/hash.js";
 
 // Poset enforcement at the CLI boundary.
 // Two surfaces are exercised:

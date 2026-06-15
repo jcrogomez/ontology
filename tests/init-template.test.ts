@@ -8,8 +8,8 @@ import {
   listTemplates,
   loadTemplate,
   validateTemplateIntegrity,
-} from "../src/runtime/templates/load.js";
-import { TemplateSchema } from "../src/runtime/templates/schema.js";
+} from "../src/forward/templates/load.js";
+import { TemplateSchema } from "../src/forward/templates/schema.js";
 
 const CLI_PATH = path.resolve(__dirname, "../dist/cli.js");
 

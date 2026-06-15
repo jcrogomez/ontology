@@ -6,7 +6,7 @@ import {
   scanFileSymbols,
   diffExportsAgainstAST,
   patchProvidesWithAST,
-} from "../src/runtime/legend/ast-symbol-scanner.js";
+} from "../src/inverse/ast-symbol-scanner.js";
 
 function withTempFile(filename: string, source: string, fn: (filePath: string) => void): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ast-scanner-"));
@@ -85,7 +85,7 @@ describe("scanFileSymbols", () => {
     // `OntologyNode` / `OntologyEdge` requires from context/types.ts
     // and fibration/types.ts. The scanner is the deterministic fallback.
     const repoRoot = path.resolve(__dirname, "..");
-    const filePath = path.join(repoRoot, "src/schemas/ontology.ts");
+    const filePath = path.join(repoRoot, "src/kernel/schemas/ontology.ts");
     const r = scanFileSymbols(filePath);
     expect(r.ok).toBe(true);
     // Spot-check the type re-exports that the LLM dropped during δ'.
@@ -171,7 +171,7 @@ describe("patchProvidesWithAST (Move 1c safety net)", () => {
     // names; node became unrecoverable. With the safety net wired,
     // the rescue fires deterministically.
     const repoRoot = path.resolve(__dirname, "..");
-    const schemasPath = path.join(repoRoot, "src/schemas/ontology.ts");
+    const schemasPath = path.join(repoRoot, "src/kernel/schemas/ontology.ts");
     const scan = scanFileSymbols(schemasPath);
     expect(scan.ok).toBe(true);
     const rescued = patchProvidesWithAST([], scan.mandatoryExports);

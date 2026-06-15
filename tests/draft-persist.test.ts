@@ -9,7 +9,7 @@ import {
   clearDraft,
   listDrafts,
   draftPath,
-} from "../src/core/drafts/persist.js";
+} from "../src/kernel/core/drafts/persist.js";
 
 describe("drafts persistence", () => {
   let tempDir: string;

@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import fc from "fast-check";
 
-import { glueFragments, restrictSection } from "../src/runtime/context/gluing.js";
-import type { ContextFragment } from "../src/runtime/context/presheaf.js";
+import { glueFragments, restrictSection } from "../src/forward/context/gluing.js";
+import type { ContextFragment } from "../src/forward/context/presheaf.js";
 
 // Property-based companion to context-gluing.test.ts and
 // presheaf-sheaf-laws.test.ts. Those pin the separation / gluing axioms on a

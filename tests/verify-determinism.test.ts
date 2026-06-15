@@ -4,7 +4,7 @@ import {
   classifyVerdict,
   type DistanceMetrics,
   type HomeomorphismVerdict,
-} from "../src/runtime/legend/verify-homeomorphism.js";
+} from "../src/laws/verify-homeomorphism.js";
 
 // Verdict-map determinism evidence — MATHEMATICAL_CLAIMS.md §3.10 (T2).
 //

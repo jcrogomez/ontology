@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractCodeFence } from "../src/runtime/compile/post/extract-code-fence.js";
+import { extractCodeFence } from "../src/forward/compile/post/extract-code-fence.js";
 
 describe("extractCodeFence", () => {
   it("returns the input unchanged when there is no fence (mock identity case)", () => {

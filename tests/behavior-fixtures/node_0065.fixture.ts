@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0065 — src/core/integrity/hash.ts
 // Tested entry: hashPrompt — content-addressed hash used by the run

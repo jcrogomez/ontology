@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import React from "react";
 import { render } from "ink-testing-library";
-import { RunResultPanel } from "../src/walker/layout/run-result-panel.js";
+import { RunResultPanel } from "../src/surfaces/walker/layout/run-result-panel.js";
 
 describe("RunResultPanel", () => {
   it("renders nothing when state is idle", () => {

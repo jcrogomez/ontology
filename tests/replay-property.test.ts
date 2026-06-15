@@ -5,12 +5,12 @@ import {
   replayEvents,
   diffReplayedState,
   materializeReplayedState,
-} from "../src/core/state/replay.js";
+} from "../src/kernel/core/state/replay.js";
 import {
   OntologyEventSchema,
   type OntologyEvent,
   type OntologyState,
-} from "../src/schemas/ontology.js";
+} from "../src/kernel/schemas/ontology.js";
 
 // Property-based companion to replay-cli.test.ts. The CLI test pins the
 // replay law (§4.4, T1) over ONE real mutation history; here the fold runs

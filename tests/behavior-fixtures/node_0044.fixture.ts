@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0044 — src/runtime/llm/registry.ts
 // Tested entry: getDefaultModelForTask — pure lookup from

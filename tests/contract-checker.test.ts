@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { checkContract } from "../src/runtime/legend/contract-checker.js";
-import { RESOLVED_SIGNATURE_PREFIX } from "../src/runtime/static/typescript-resolved.js";
+import { checkContract } from "../src/laws/contract-checker.js";
+import { RESOLVED_SIGNATURE_PREFIX } from "../src/inverse/static/typescript-resolved.js";
 import {
   verdictToMatrixCell,
   honestyForCell,
   buildMatrixCost,
   verdictDerivedTags,
-} from "../src/runtime/legend/matrix.js";
+} from "../src/laws/matrix.js";
 
 // Contract-axis checker v0 — the spec §5 scenario table, pinned 1:1
 // (docs/legend/CONTRACT_AXIS_CHECKER_SPEC.md). The conservative law

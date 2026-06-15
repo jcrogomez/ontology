@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
-import { semanticLink } from "../src/runtime/context/semantic-linker.js";
-import type { OntologyNode, OntologyEdge } from "../src/schemas/ontology.js";
+import { semanticLink } from "../src/forward/context/semantic-linker.js";
+import type { OntologyNode, OntologyEdge } from "../src/kernel/schemas/ontology.js";
 
 // Build a minimal three-node project with an explicit edge between two of
 // the children. Used by the tests below to verify that edge-awareness lets

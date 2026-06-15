@@ -3,12 +3,12 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { runCli } from "./helpers/run-cli.js";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
-import { saveDraft } from "../src/core/drafts/persist.js";
-import { loadNodeById } from "../src/core/project/load.js";
-import { proposeUpdateFromDraft } from "../src/walker/actions/propose-from-draft.js";
-import { verifyFromWalker } from "../src/walker/actions/verify-from-walker.js";
-import { workflowFromWalker } from "../src/walker/actions/workflow-from-walker.js";
-import { parseWorkflowArgs } from "../src/walker/state/parse-workflow-args.js";
+import { saveDraft } from "../src/kernel/core/drafts/persist.js";
+import { loadNodeById } from "../src/kernel/core/project/load.js";
+import { proposeUpdateFromDraft } from "../src/surfaces/walker/actions/propose-from-draft.js";
+import { verifyFromWalker } from "../src/surfaces/walker/actions/verify-from-walker.js";
+import { workflowFromWalker } from "../src/surfaces/walker/actions/workflow-from-walker.js";
+import { parseWorkflowArgs } from "../src/surfaces/walker/state/parse-workflow-args.js";
 
 // Walker v1.5 — the three additions that close the TUI's scope gaps:
 // :propose-update (draft → node_update on the focal), :verify (round-trip

@@ -4,7 +4,7 @@ import {
   EDGE_DIRECTION_RULES,
   posetIndex,
   validateEdgeDirection,
-} from "../src/runtime/graph/poset.js";
+} from "../src/kernel/graph/poset.js";
 
 describe("ABSTRACTION_INDEX", () => {
   it("orders the 11 levels from canon (0) down to artifact (10)", () => {

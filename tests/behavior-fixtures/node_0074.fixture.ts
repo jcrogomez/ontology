@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0074 — src/core/render/box.ts
 // Tested entries: box(content, options) and kvLines(pairs, options) —

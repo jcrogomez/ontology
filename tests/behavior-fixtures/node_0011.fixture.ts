@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0011 — src/runtime/context/gluing.ts
 // Tested entry: glueFragments — pure merge over an array of context

@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { renderReportMarkdown } from "../src/commands/verify/homeomorphism.js";
+import { renderReportMarkdown } from "../src/surfaces/commands/verify/homeomorphism.js";
 import type {
   AggregateReport,
   HomeomorphismVerdict,
-} from "../src/runtime/legend/verify-homeomorphism.js";
+} from "../src/laws/verify-homeomorphism.js";
 import type {
   ByAxis,
   PerNodeMatrix,
-} from "../src/runtime/legend/matrix.js";
+} from "../src/laws/matrix.js";
 
 const BASE_THRESHOLDS = { loc: 0.3, jaccard: 0.5 };
 

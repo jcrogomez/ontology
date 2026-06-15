@@ -126,7 +126,7 @@ describe("onto workflow run --as-proposal (O3)", () => {
 
     // The record self-certifies: recompute-and-compare the body hash.
     const { verifyWorkflowRunRecord, loadWorkflowRunRecord } = await import(
-      "../src/core/runs/workflow-record.js"
+      "../src/kernel/core/runs/workflow-record.js"
     );
     const loaded = loadWorkflowRunRecord(parsed.workflowRun.id, tempDir);
     expect(loaded).not.toBeNull();

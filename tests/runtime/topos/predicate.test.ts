@@ -14,7 +14,7 @@ import {
   allOf,
   anyOf,
   evaluatePredicate,
-} from "../../../src/runtime/topos/predicate.js";
+} from "../../../src/laws/topos/predicate.js";
 
 function ctx(provided: string[], denied: string[] = []): EvaluationContext {
   return {

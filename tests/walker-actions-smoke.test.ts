@@ -5,10 +5,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
 import { runCli } from "./helpers/run-cli.js";
-import { validateFromWalker } from "../src/walker/actions/validate-from-walker.js";
-import { branchListFromWalker } from "../src/walker/actions/branch-list-from-walker.js";
-import { contextFromWalker } from "../src/walker/actions/context-from-walker.js";
-import { queryFromWalker } from "../src/walker/actions/query-from-walker.js";
+import { validateFromWalker } from "../src/surfaces/walker/actions/validate-from-walker.js";
+import { branchListFromWalker } from "../src/surfaces/walker/actions/branch-list-from-walker.js";
+import { contextFromWalker } from "../src/surfaces/walker/actions/context-from-walker.js";
+import { queryFromWalker } from "../src/surfaces/walker/actions/query-from-walker.js";
 
 describe("walker actions (PR-C wiring smoke)", () => {
   let tempDir: string;

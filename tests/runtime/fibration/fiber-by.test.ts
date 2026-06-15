@@ -4,14 +4,14 @@ import {
   computeBranchFiber,
   listBranches,
   pathProjection,
-} from "../../../src/runtime/fibration/index.js";
-import type { FiberInput } from "../../../src/runtime/fibration/index.js";
+} from "../../../src/laws/fibration/index.js";
+import type { FiberInput } from "../../../src/laws/fibration/index.js";
 import {
   OntologyNodeSchema,
   OntologyEdgeSchema,
   type OntologyNode,
   type OntologyEdge,
-} from "../../../src/schemas/ontology.js";
+} from "../../../src/kernel/schemas/ontology.js";
 
 // Build a minimal node by parsing through the schema. Same fixture style
 // as branch-fiber.test.ts so the two test files read consistently. Adds

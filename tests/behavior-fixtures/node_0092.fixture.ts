@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0092 — src/runtime/graph/traversal.ts (second fixture from this file)
 // Tested entry: findShortestPath — pure BFS over an edge list. A

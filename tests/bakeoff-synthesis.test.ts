@@ -7,13 +7,13 @@ import {
   FAILURE_MODE_ORDER,
   DEFAULT_H1_JACCARD_FLOOR,
   type BakeoffArm,
-} from "../src/runtime/legend/bakeoff-synthesis.js";
+} from "../src/laws/bakeoff-synthesis.js";
 import type {
   AggregateReport,
   HomeomorphismVerdict,
   VerificationResult,
-} from "../src/runtime/legend/verify-homeomorphism.js";
-import type { FailureMode } from "../src/runtime/legend/failure-mode-tagger.js";
+} from "../src/laws/verify-homeomorphism.js";
+import type { FailureMode } from "../src/laws/failure-mode-tagger.js";
 
 // ── Fixture builders ────────────────────────────────────────────────
 

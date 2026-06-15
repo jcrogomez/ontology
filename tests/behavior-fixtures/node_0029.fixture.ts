@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0029 — src/runtime/legend/matrix-intersections.ts
 // Tested entry: entryMatchesIntersection — pure predicate. Given a

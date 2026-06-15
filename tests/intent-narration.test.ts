@@ -9,7 +9,7 @@ import {
   buildIntentNeighborhoodPrompt,
   INTENT_NARRATION_PROMPT,
   type NeighborhoodFile,
-} from "../src/runtime/legend/intent-narration.js";
+} from "../src/inverse/intent-narration.js";
 
 const file = (path: string, content = "x"): NeighborhoodFile => ({ path, content });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseQueryArgs } from "../src/walker/state/parse-query-args.js";
+import { parseQueryArgs } from "../src/surfaces/walker/state/parse-query-args.js";
 
 describe("parseQueryArgs", () => {
   it("returns an empty shape for an empty input", () => {

@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0027 — src/runtime/graph/traversal.ts
 // Tested entry: getNeighbors — pure edge filter. Given a focal id, a

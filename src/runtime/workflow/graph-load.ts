@@ -4,7 +4,7 @@ import {
   type WorkflowGraph,
   type WorkflowNode,
   type WorkflowEdge,
-} from "../../schemas/workflow.js";
+} from "../../kernel/schemas/workflow.js";
 import {
   parsePredicate,
   predicateCanMatchPoint,

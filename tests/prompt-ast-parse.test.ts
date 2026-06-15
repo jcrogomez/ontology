@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parsePromptAST, hasMarkers } from "../src/runtime/prompt/parse.js";
+import { parsePromptAST, hasMarkers } from "../src/forward/prompt/parse.js";
 
 describe("parsePromptAST", () => {
   it("returns the raw prompt unchanged", () => {

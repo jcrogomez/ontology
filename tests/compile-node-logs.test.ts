@@ -6,8 +6,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
 import { runCli } from "./helpers/run-cli.js";
-import { compileNode } from "../src/runtime/compile/compile-node.js";
-import { loadNodeById, loadModelsRegistry } from "../src/core/project/load.js";
+import { compileNode } from "../src/forward/compile/compile-node.js";
+import { loadNodeById, loadModelsRegistry } from "../src/kernel/core/project/load.js";
 
 function buildHelloWorldFixture(tempDir: string) {
   expect(runCli(tempDir, ["init"]).status).toBe(0);

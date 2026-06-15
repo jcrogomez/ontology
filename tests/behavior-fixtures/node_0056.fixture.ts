@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0056 — src/runtime/topos/predicate.ts
 // Tested entries: evaluatePredicate(p, ctx) and the pNot smart constructor.

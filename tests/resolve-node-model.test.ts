@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { resolveNodeModel } from "../src/runtime/llm/resolve-node-model.js";
-import type { OntologyModel } from "../src/schemas/ontology.js";
+import type { OntologyModel } from "../src/kernel/schemas/ontology.js";
 
 const mockEntry: OntologyModel = {
   id: "mock_default",

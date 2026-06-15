@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { detectAiProvider } from "../src/walker/layout/ai-status-bar.js";
+import { detectAiProvider } from "../src/surfaces/walker/layout/ai-status-bar.js";
 
 // Pure detection-logic coverage for the walker's AI status indicator.
 // Render-level tests would require ink-testing-library plumbing for a

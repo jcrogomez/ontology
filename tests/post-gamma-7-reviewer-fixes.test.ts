@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { extractTopLevelDeclarations } from "../src/runtime/legend/verify-homeomorphism.js";
-import { computeTranslatorSourceHash } from "../src/runtime/legend/translator.js";
-import { OntologyEventSchema } from "../src/schemas/ontology.js";
-import type { OntologyNode } from "../src/schemas/ontology.js";
+import { extractTopLevelDeclarations } from "../src/laws/verify-homeomorphism.js";
+import { computeTranslatorSourceHash } from "../src/inverse/translator.js";
+import { OntologyEventSchema } from "../src/kernel/schemas/ontology.js";
+import type { OntologyNode } from "../src/kernel/schemas/ontology.js";
 
 // Tests for the five reviewer-flagged fixes after the γ-7 calibration
 // (MILESTONE_REVIEW-style audit forwarded 2026-05-13):

@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0038 — src/runtime/legend/vocab-gap.ts
 // Tested entry: detectVocabGaps — pure word-token overlap between

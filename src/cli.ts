@@ -2,69 +2,69 @@
 
 import { createRequire } from "node:module";
 import { Command } from "commander";
-import { initCommand } from "./commands/init.js";
-import { doctorCommand } from "./commands/doctor.js";
-import { validateCommand } from "./commands/validate.js";
-import { replayCommand } from "./commands/replay.js";
-import { driftCommand } from "./commands/drift.js";
-import { semanticIndexCommand, semanticLinksCommand } from "./commands/semantic/index.js";
-import { inspectCommand } from "./commands/inspect.js";
-import { createNodeCommand } from "./commands/node/create.js";
-import { nodeListCommand } from "./commands/node/list.js";
-import { nodeShowCommand } from "./commands/node/show.js";
-import { nodeLinkCommand } from "./commands/node/link.js";
-import { nodeUpdateCommand } from "./commands/node/update.js";
-import { nodeInspectCommand } from "./commands/node/inspect.js";
-import { nodeRemoveCommand } from "./commands/node/remove.js";
-import { edgeRemoveCommand } from "./commands/edge/remove.js";
-import { edgeUpdateCommand } from "./commands/edge/update.js";
-import { eventsTailCommand } from "./commands/events/tail.js";
-import { contextAssembleCommand } from "./commands/context/assemble.js";
-import { runPromptCommand } from "./commands/run/prompt.js";
-import { runContextCommand } from "./commands/run/context.js";
-import { runsListCommand } from "./commands/runs/list.js";
-import { runsShowCommand } from "./commands/runs/show.js";
-import { runsVerifyCommand } from "./commands/runs/verify.js";
-import { walkCommand } from "./commands/walk.js";
-import { graphNeighborsCommand } from "./commands/graph/neighbors.js";
-import { graphPathCommand } from "./commands/graph/path.js";
-import { graphSubgraphCommand } from "./commands/graph/subgraph.js";
-import { graphInferEdgesCommand } from "./commands/graph/infer-edges.js";
-import { graphMetricsCommand } from "./commands/graph/metrics.js";
-import { graphHierarchizeCommand } from "./commands/graph/hierarchize.js";
-import { graphReadinessCommand } from "./commands/graph/readiness.js";
-import { graphMaterializeEdgesCommand } from "./commands/graph/materialize-edges.js";
-import { branchListCommand } from "./commands/branch/list.js";
-import { branchFiberCommand } from "./commands/branch/fiber.js";
-import { linkCommand } from "./commands/link/index.js";
-import { proposeNodeCommand } from "./commands/proposal/propose-node.js";
-import { proposeLinkCommand } from "./commands/proposal/propose-link.js";
-import { compilePlanCommand } from "./commands/compile/plan.js";
-import { compileRunCommand } from "./commands/compile/run.js";
-import { compileRunBatchCommand } from "./commands/compile/run-batch.js";
-import { ingestCommand } from "./commands/ingest/index.js";
-import { frontierCommand } from "./commands/frontier/index.js";
-import { proposalListCommand } from "./commands/proposal/list.js";
-import { proposalShowCommand } from "./commands/proposal/show.js";
-import { proposalRejectCommand } from "./commands/proposal/reject.js";
-import { proposalApplyCommand } from "./commands/proposal/apply.js";
-import { modelDoctorCommand } from "./commands/model/doctor.js";
-import { modelListCommand } from "./commands/model/list.js";
-import { registerQueryCommand } from "./commands/query/index.js";
-import { verifyHomeomorphismCommand } from "./commands/verify/homeomorphism.js";
-import { regenerateCommand } from "./commands/regenerate.js";
-import { syncCommand } from "./commands/sync.js";
-import { statusCommand } from "./commands/status.js";
-import { probeCommand } from "./commands/probe.js";
-import { rulesCheckCommand, rulesAuditCommand } from "./commands/rules.js";
-import { fichaAuditCommand, fichaCleanupCommand } from "./commands/ficha.js";
-import { workflowRunCommand } from "./commands/workflow/run.js";
-import { openCommand } from "./commands/open.js";
-import { ontoMcpCommand } from "./commands/mcp/index.js";
-import { runBakeoffCommand } from "./commands/bakeoff/index.js";
-import { projectsListCommand } from "./commands/projects/list.js";
-import { projectsForgetCommand } from "./commands/projects/forget.js";
-import { errorMessage } from "./core/errors.js";
+import { initCommand } from "./surfaces/commands/init.js";
+import { doctorCommand } from "./surfaces/commands/doctor.js";
+import { validateCommand } from "./surfaces/commands/validate.js";
+import { replayCommand } from "./surfaces/commands/replay.js";
+import { driftCommand } from "./surfaces/commands/drift.js";
+import { semanticIndexCommand, semanticLinksCommand } from "./surfaces/commands/semantic/index.js";
+import { inspectCommand } from "./surfaces/commands/inspect.js";
+import { createNodeCommand } from "./surfaces/commands/node/create.js";
+import { nodeListCommand } from "./surfaces/commands/node/list.js";
+import { nodeShowCommand } from "./surfaces/commands/node/show.js";
+import { nodeLinkCommand } from "./surfaces/commands/node/link.js";
+import { nodeUpdateCommand } from "./surfaces/commands/node/update.js";
+import { nodeInspectCommand } from "./surfaces/commands/node/inspect.js";
+import { nodeRemoveCommand } from "./surfaces/commands/node/remove.js";
+import { edgeRemoveCommand } from "./surfaces/commands/edge/remove.js";
+import { edgeUpdateCommand } from "./surfaces/commands/edge/update.js";
+import { eventsTailCommand } from "./surfaces/commands/events/tail.js";
+import { contextAssembleCommand } from "./surfaces/commands/context/assemble.js";
+import { runPromptCommand } from "./surfaces/commands/run/prompt.js";
+import { runContextCommand } from "./surfaces/commands/run/context.js";
+import { runsListCommand } from "./surfaces/commands/runs/list.js";
+import { runsShowCommand } from "./surfaces/commands/runs/show.js";
+import { runsVerifyCommand } from "./surfaces/commands/runs/verify.js";
+import { walkCommand } from "./surfaces/commands/walk.js";
+import { graphNeighborsCommand } from "./surfaces/commands/graph/neighbors.js";
+import { graphPathCommand } from "./surfaces/commands/graph/path.js";
+import { graphSubgraphCommand } from "./surfaces/commands/graph/subgraph.js";
+import { graphInferEdgesCommand } from "./surfaces/commands/graph/infer-edges.js";
+import { graphMetricsCommand } from "./surfaces/commands/graph/metrics.js";
+import { graphHierarchizeCommand } from "./surfaces/commands/graph/hierarchize.js";
+import { graphReadinessCommand } from "./surfaces/commands/graph/readiness.js";
+import { graphMaterializeEdgesCommand } from "./surfaces/commands/graph/materialize-edges.js";
+import { branchListCommand } from "./surfaces/commands/branch/list.js";
+import { branchFiberCommand } from "./surfaces/commands/branch/fiber.js";
+import { linkCommand } from "./surfaces/commands/link/index.js";
+import { proposeNodeCommand } from "./surfaces/commands/proposal/propose-node.js";
+import { proposeLinkCommand } from "./surfaces/commands/proposal/propose-link.js";
+import { compilePlanCommand } from "./surfaces/commands/compile/plan.js";
+import { compileRunCommand } from "./surfaces/commands/compile/run.js";
+import { compileRunBatchCommand } from "./surfaces/commands/compile/run-batch.js";
+import { ingestCommand } from "./surfaces/commands/ingest/index.js";
+import { frontierCommand } from "./surfaces/commands/frontier/index.js";
+import { proposalListCommand } from "./surfaces/commands/proposal/list.js";
+import { proposalShowCommand } from "./surfaces/commands/proposal/show.js";
+import { proposalRejectCommand } from "./surfaces/commands/proposal/reject.js";
+import { proposalApplyCommand } from "./surfaces/commands/proposal/apply.js";
+import { modelDoctorCommand } from "./surfaces/commands/model/doctor.js";
+import { modelListCommand } from "./surfaces/commands/model/list.js";
+import { registerQueryCommand } from "./surfaces/commands/query/index.js";
+import { verifyHomeomorphismCommand } from "./surfaces/commands/verify/homeomorphism.js";
+import { regenerateCommand } from "./surfaces/commands/regenerate.js";
+import { syncCommand } from "./surfaces/commands/sync.js";
+import { statusCommand } from "./surfaces/commands/status.js";
+import { probeCommand } from "./surfaces/commands/probe.js";
+import { rulesCheckCommand, rulesAuditCommand } from "./surfaces/commands/rules.js";
+import { fichaAuditCommand, fichaCleanupCommand } from "./surfaces/commands/ficha.js";
+import { workflowRunCommand } from "./surfaces/commands/workflow/run.js";
+import { openCommand } from "./surfaces/commands/open.js";
+import { ontoMcpCommand } from "./surfaces/commands/mcp/index.js";
+import { runBakeoffCommand } from "./surfaces/commands/bakeoff/index.js";
+import { projectsListCommand } from "./surfaces/commands/projects/list.js";
+import { projectsForgetCommand } from "./surfaces/commands/projects/forget.js";
+import { errorMessage } from "./kernel/core/errors.js";
 
 // Single source of truth for the version: package.json. Resolved relative to
 // this module so it works both from src/ (tsx dev) and dist/ (built binary) —
@@ -880,7 +880,7 @@ proposal
   .command("apply <id>")
   .description("Translate a pending proposal into a real graph mutation, after re-validating its parentHash. Stale proposals (parent changed since creation) are transitioned to staled and refused.")
   .option("--dry-run", "Validate the proposal without writing anything")
-  .option("--check-providers", "For a node_create/node_update proposal that declares `provides`: run the O2 identify-if-equal sheaf check against existing providers of the same keys (same branch). Compatible re-provisions (equal signature) are reported as identifications; drift (different/missing signature) as a warning. Opt-in, read-only; warns only unless --strict. See docs/legend/CONTEXT_GLUING_REGIMES.md.")
+  .option("--check-providers", "For a node_create/node_update proposal that declares `provides`: run the O2 identify-if-equal sheaf check against existing providers of the same keys (same branch). Compatible re-provisions (equal signature) are reported as identifications; drift (different/missing signature) as a warning. Opt-in, read-only; warns only unless --strict. See docs/design/laws/CONTEXT_GLUING_REGIMES.md.")
   .option("--strict", "With the provider check (implied if --check-providers is omitted): BLOCK the apply on provider drift instead of warning. The proposal stays pending — resolve the drift or re-run without --strict. A check that errors also blocks (cannot verify ⇒ do not apply).")
   .option("--json", "Output results in JSON format")
   .action(async (id, options) => {
@@ -986,14 +986,14 @@ program
   .option("--cost-estimate", "Pre-flight cost guard: walk the inputs, count file sizes, multiply by published rates for the resolved provider, print the breakdown (per-input when multiple paths), and exit WITHOUT dispatching the LLM. Run this before any anthropic ingest on a large tree to confirm the cost. Unlike --dry-run, --cost-estimate makes ZERO API calls.")
   .option("--include <exts>", "Directory mode only: comma-separated file extensions to ingest (default: ts,tsx). Use --include py for a Python project, --include py,ts,tsx for a mixed repo. Has no effect on a single explicit file path. Static-edge inference (γ-4) stays TS-only — non-TS ingests skip the cross-file edge report.")
   .option("--ensemble <mode>", "Phase ε E6 step 4: structured-extraction ensemble strategy. \"none\" (default) — single-run via the resolved model. \"high-confidence\" — run llama3.2:3b three times and select the most complete valid extraction. Use when 100% coverage on the perimeter matters more than per-file wall-clock. Currently honoured for semantic_parse (ingest extraction) only; other LlmTasks ignore the flag. Calibration: BAKEOFF_3B_FAMILY_2026-05-15.md §2.2.")
-  .option("--static-classifier <mode>", "Structural Semantic Classifier integration. Two modes: \"report-only\" — classify every file with the deterministic AST-based classifier (src/runtime/legend/structural-classifier.ts) and surface aggregates in the INGEST report; does NOT change LLM routing. \"enabled\" — additionally consume those facts as ingest policy: files classified as `barrel` or `declaration_only` bypass the LLM entirely and receive a deterministic static summary (src/runtime/legend/static-summary.ts); every other shape — including `schema_module` — still dispatches via semantic_parse. Conservative on purpose: the v0 deflection set is intentionally small (smoke-test data showed ~5% of a typical perimeter deflects). The INGEST report's \"Classifier routing\" section surfaces the actual savings.")
+  .option("--static-classifier <mode>", "Structural Semantic Classifier integration. Two modes: \"report-only\" — classify every file with the deterministic AST-based classifier (src/inverse/structural-classifier.ts) and surface aggregates in the INGEST report; does NOT change LLM routing. \"enabled\" — additionally consume those facts as ingest policy: files classified as `barrel` or `declaration_only` bypass the LLM entirely and receive a deterministic static summary (src/inverse/static-summary.ts); every other shape — including `schema_module` — still dispatches via semantic_parse. Conservative on purpose: the v0 deflection set is intentionally small (smoke-test data showed ~5% of a typical perimeter deflects). The INGEST report's \"Classifier routing\" section surfaces the actual savings.")
   .option("--json", "Output results in JSON format.")
-  .option("--resolved-signatures", "Directory / multi-input mode only: attach RESOLVED-type signatures to ingested `provides` (a whole-program TypeChecker pass — alias expansion, inferred types) instead of the syntactic tier. Tier-tagged so resolved signatures never glue with syntactic ones. Heavier (builds one ts.Program over the swept TS/JS files); opt-in. Refines the O2 sheaf's equal-signature subcategory. See docs/legend/CONTEXT_GLUING_REGIMES.md.")
+  .option("--resolved-signatures", "Directory / multi-input mode only: attach RESOLVED-type signatures to ingested `provides` (a whole-program TypeChecker pass — alias expansion, inferred types) instead of the syntactic tier. Tier-tagged so resolved signatures never glue with syntactic ones. Heavier (builds one ts.Program over the swept TS/JS files); opt-in. Refines the O2 sheaf's equal-signature subcategory. See docs/design/laws/CONTEXT_GLUING_REGIMES.md.")
   .option("--from-pr <number>", "#2: ingest intent from a GitHub pull request (via `gh`) instead of source paths. Runs the prose extractor → one node_create proposal with manifestation=intent. Mutually exclusive with positional paths and --from-issue.")
   .option("--from-issue <number>", "#2: ingest intent from a GitHub issue (via `gh`) instead of source paths. Runs the prose extractor → one node_create proposal with manifestation=intent. Mutually exclusive with positional paths and --from-pr.")
   .option("--repo <owner/repo>", "Optional repository override for --from-pr/--from-issue (defaults to the gh-resolved repo of the current directory).")
   .option("--resolve-edges <nodeId>", "Post-apply edge mode (requires --from-pr): given the APPLIED node id of a previously ingested PR intent, re-fetch the PR's changed files and create `documents` edge_create proposals from that node to each matching existing code node. Edges can't be created at capture time because the PR node id is only assigned on apply (mirrors the γ-5 → γ-6 two-phase shape).")
-  .option("--intent", "Intent-narration mode (the WHY-as-prompt lift). Reads the positional file paths as ONE neighbourhood and narrates the code's PURPOSE as a generative prompt + a behaviour oracle (acceptance criteria) — deliberately lossy, distinct from the default contract extractor. Produces one manifestation=intent node_create proposal (unless --dry-run). Pass several files to narrate their composed subsystem intent. See docs/legend/INTENT_NARRATION_SPEC.md.")
+  .option("--intent", "Intent-narration mode (the WHY-as-prompt lift). Reads the positional file paths as ONE neighbourhood and narrates the code's PURPOSE as a generative prompt + a behaviour oracle (acceptance criteria) — deliberately lossy, distinct from the default contract extractor. Produces one manifestation=intent node_create proposal (unless --dry-run). Pass several files to narrate their composed subsystem intent. See docs/design/inverse/INTENT_NARRATION_SPEC.md.")
   .action(async (paths: string[], options) => {
     try {
       await ingestCommand(paths ?? [], options);
@@ -1005,7 +1005,7 @@ program
 
 program
   .command("frontier <paths...>")
-  .description("Phase ε pre-flight diagnostic: runs the frontier tagger (src/runtime/legend/frontier-tagger.ts) over every TS/TSX file in the given paths and reports the multi-label tag distribution. Pure $0, no LLM, no project state mutation. Use to confirm the tagger assigns sensible attributes to a perimeter before paying for ingest — catches rule gaps that would otherwise surface only after a paid run. Same multi-positional contract as `onto ingest`.")
+  .description("Phase ε pre-flight diagnostic: runs the frontier tagger (src/inverse/frontier-tagger.ts) over every TS/TSX file in the given paths and reports the multi-label tag distribution. Pure $0, no LLM, no project state mutation. Use to confirm the tagger assigns sensible attributes to a perimeter before paying for ingest — catches rule gaps that would otherwise surface only after a paid run. Same multi-positional contract as `onto ingest`.")
   .option("--include <exts>", "Comma-separated file extensions to walk (default: ts,tsx).")
   .option("--totals-only", "Suppress the per-file listing; print only aggregate totals (distribution + diagnostic counts).")
   .option("--json", "Output results in JSON format.")
@@ -1066,10 +1066,10 @@ program
   .option("--ast-grounding", "Phase ε Move 3α: append a deterministic MANDATORY EXPORTS section (from the source AST) to the code_sketch system prompt for every compile-back dispatch, and fold the grounding identity into the run-cache contextHash. Off by default — opt in to test the AST-grounding lift independently of model swaps; pre-3α calibrations and Sonnet ceiling probes choose to include or exclude this independently.")
   .option("--reps <n>", "Phase ε design §4.2: run N compile-back dispatches per node and aggregate the per-rep metrics (default 1 — point estimate). N > 1 defangs single-draw Jaccard variance (γ observed 1.0 → 0.0 on the same node across two draws), at the cost of N× LLM spend. Use before any Opus 4.7 ceiling probe to make the verdict robust.", (v) => parseInt(v, 10))
   .option("--aggregator <mode>", "Aggregator over per-rep numeric metrics when --reps > 1: 'median' (default — variance-resistant for the H1 floor read) or 'mean'. Ignored when --reps is 1.")
-  .option("--behavior-check", "Phase ε behaviour-axis checker (v0): for each node, import the source file and the regen, run the registered fixture's call-sites against both, and override the matrix's `behavior` axis with the measured pass/fail/untested state. Requires --matrix. See docs/legend/BEHAVIOUR_AXIS_CHECKER_SPEC.md.")
+  .option("--behavior-check", "Phase ε behaviour-axis checker (v0): for each node, import the source file and the regen, run the registered fixture's call-sites against both, and override the matrix's `behavior` axis with the measured pass/fail/untested state. Requires --matrix. See docs/design/inverse/BEHAVIOUR_AXIS_CHECKER_SPEC.md.")
   .option("--behavior-fixtures-dir <path>", "Override the fixtures directory (default tests/behavior-fixtures/). Path is relative to cwd or absolute. Used with --behavior-check.")
   .option("--behavior-timeout-ms <n>", "Per-case wall-clock cap for the behaviour checker. Clamped to [100, 60000]. Default 5000.", (v) => parseInt(v, 10))
-  .option("--contract-check", "Contract-axis checker (v0): statically compare each node's declared context.provides (keys + O1 signatures) against the regen artifact's extracted exports and override the matrix's `contract` axis with the measured pass/fail/unknown state. $0 — no LLM, no execution. Requires --matrix. See docs/legend/CONTRACT_AXIS_CHECKER_SPEC.md.")
+  .option("--contract-check", "Contract-axis checker (v0): statically compare each node's declared context.provides (keys + O1 signatures) against the regen artifact's extracted exports and override the matrix's `contract` axis with the measured pass/fail/unknown state. $0 — no LLM, no execution. Requires --matrix. See docs/design/inverse/CONTRACT_AXIS_CHECKER_SPEC.md.")
   .option("--no-lock", "Skip the .ontology/.lock advisory lock — see compile run for semantics.")
   .option("--json", "Output results in JSON format.")
   .action(async (focal, rawOptions) => {
@@ -1131,7 +1131,7 @@ program
 
 program
   .command("status")
-  .description("Read-only graph health for the sync loop: how many nodes are syncable-with-confidence (code shadow + behaviour fixture + rules statically clean), how many are lower-confidence (no fixture) or blocked (rule violation), how many shadows drifted from the anchor, and the ficha-quality summary. A pure composition of shadow/fixture presence + `onto drift` + `onto ficha audit` — writes nothing, runs no fixtures. See docs/SYNC_LOOP_SPEC.md §4.")
+  .description("Read-only graph health for the sync loop: how many nodes are syncable-with-confidence (code shadow + behaviour fixture + rules statically clean), how many are lower-confidence (no fixture) or blocked (rule violation), how many shadows drifted from the anchor, and the ficha-quality summary. A pure composition of shadow/fixture presence + `onto drift` + `onto ficha audit` — writes nothing, runs no fixtures. See docs/design/runtime/SYNC_LOOP_SPEC.md §4.")
   .option("--list", "List the node ids in each syncability tier.")
   .option("--json", "Output the full report (incl. per-node detail) as JSON.")
   .action(async (options) => {
@@ -1145,7 +1145,7 @@ program
 
 program
   .command("sync <nodeId>")
-  .description("The governed intent→code loop in one command: regenerate the node's shadow from its intent (--draws 3 consensus), gate it through ALL three checks (structural verdict + behaviour fixture + declared rules), and only when every gate passes WRITE the shadow and re-anchor THIS node's drift; otherwise write nothing and report the precise blocking gate. A thin composition of `regenerate` + the gates + a per-node re-anchor (no new verification semantics). See docs/SYNC_LOOP_SPEC.md.")
+  .description("The governed intent→code loop in one command: regenerate the node's shadow from its intent (--draws 3 consensus), gate it through ALL three checks (structural verdict + behaviour fixture + declared rules), and only when every gate passes WRITE the shadow and re-anchor THIS node's drift; otherwise write nothing and report the precise blocking gate. A thin composition of `regenerate` + the gates + a per-node re-anchor (no new verification semantics). See docs/design/runtime/SYNC_LOOP_SPEC.md.")
   .option("--provider <provider>", "LLM provider override for the compile-back (mock|ollama|anthropic|gemini).")
   .option("--model <model>", "Model override (use with --provider).")
   .option("--ollama-host <host>", "Host for the Ollama provider.")
@@ -1242,8 +1242,9 @@ fichaCmd
 
 fichaCmd
   .command("cleanup <nodeId>")
-  .description("Complete a node's contract with the export surface its source actually has (the deterministic, AST-derived fix for the recall-bound thinness the bilateral round-trip measured). Preview by default; --apply mutates the node's provides. Prose-rule noise is reported, never auto-removed.")
-  .option("--apply", "Add the AST-missing exports to the node's provides (governed mutation via updateNode).")
+  .description("Reconcile a node's contract with the export surface its source actually has (the deterministic, AST-derived fix for the thinness the bilateral round-trip measured). Completes the contract (adds AST exports the ficha under-declares) and, with --prune, removes phantom provides (imports/private symbols the ficha over-declares — the determinacy killer the sync-loop acceptance found). Preview by default; --apply mutates the node's provides. Prose-rule noise is reported, never auto-removed.")
+  .option("--apply", "Apply the reconciliation to the node's provides (governed mutation via updateNode).")
+  .option("--prune", "Also remove phantom provides — declared keys the source does NOT export (imported helpers or private symbols mislabelled as provides). Raises compile-back determinacy: phantom provides make draws disagree on the module surface, so consensus never forms.")
   .option("--json", "Output the result as JSON.")
   .action(async (nodeId, options) => {
     try {
@@ -1256,7 +1257,7 @@ fichaCmd
 
 const workflowCmd = program
   .command("workflow")
-  .description("Phase ζ — workflow-runtime commands (load + execute typed-node workflow graphs with branches_on edges, structured verifier verdicts, and loop-with-stopping-criterion semantics). See docs/legend/WORKFLOW_RUNTIME_SPEC.md.");
+  .description("Phase ζ — workflow-runtime commands (load + execute typed-node workflow graphs with branches_on edges, structured verifier verdicts, and loop-with-stopping-criterion semantics). See docs/design/runtime/WORKFLOW_RUNTIME_SPEC.md.");
 
 workflowCmd
   .command("run <graph>")

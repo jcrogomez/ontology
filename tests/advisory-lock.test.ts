@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { acquireLock, withLock, LockAcquireError } from "../src/core/fs/lock.js";
+import { acquireLock, withLock, LockAcquireError } from "../src/kernel/core/fs/lock.js";
 
 // Advisory lock under `.ontology/.lock` — see POST_GAMMA_PLAN §5.1
 // and src/core/fs/lock.ts for the spec.

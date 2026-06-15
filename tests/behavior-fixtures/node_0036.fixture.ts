@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0036 — src/runtime/legend/translator.ts
 // Tested entry: computeTranslatorSourceHash — pure sha256 over a

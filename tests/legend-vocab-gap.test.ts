@@ -7,7 +7,7 @@ import {
   wordTokens,
   VocabGapAggregateSchema,
   VocabGapReportSchema,
-} from "../src/runtime/legend/vocab-gap.js";
+} from "../src/laws/vocab-gap.js";
 
 describe("vocab-gap — wordTokens", () => {
   it("splits camelCase boundaries", () => {

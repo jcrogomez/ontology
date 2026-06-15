@@ -5,7 +5,7 @@ import {
   hashAstGrounding,
   hashRepCacheBypass,
   composeContextHash,
-} from "../src/runtime/compile/ast-grounding.js";
+} from "../src/forward/compile/ast-grounding.js";
 
 describe("buildAstGroundingSystemSection", () => {
   it("returns null when no exports are provided", () => {

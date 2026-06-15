@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import React from "react";
 import { render } from "ink-testing-library";
-import { App } from "../src/walker/app.js";
+import { App } from "../src/surfaces/walker/app.js";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
 import { runCli } from "./helpers/run-cli.js";
-import { loadDraft } from "../src/core/drafts/persist.js";
+import { loadDraft } from "../src/kernel/core/drafts/persist.js";
 
 // Keyboard-FLOW tests for the walker: multi-key sequences delivered through
 // ink-testing-library's fake stdin, asserting on the rendered frame and on

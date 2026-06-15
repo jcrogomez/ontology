@@ -32,10 +32,10 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
-import { assembleContext } from "../src/runtime/context/assembler.js";
-import { glueFragments, restrictSection } from "../src/runtime/context/gluing.js";
-import type { ContextFragment } from "../src/runtime/context/presheaf.js";
-import type { OntologyNode, OntologyEdge } from "../src/schemas/ontology.js";
+import { assembleContext } from "../src/forward/context/assembler.js";
+import { glueFragments, restrictSection } from "../src/forward/context/gluing.js";
+import type { ContextFragment } from "../src/forward/context/presheaf.js";
+import type { OntologyNode, OntologyEdge } from "../src/kernel/schemas/ontology.js";
 
 // ---------------------------------------------------------------------------
 // Part 1 — Restriction law on assembleContext

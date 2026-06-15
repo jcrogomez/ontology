@@ -5,8 +5,8 @@ import * as os from "node:os";
 import {
   parsePythonFile,
   inferPythonEdgesFromDirectory,
-} from "../../../src/runtime/static/python.js";
-import { inferEdgesAutoFromDirectory } from "../../../src/runtime/static/edges.js";
+} from "../../../src/inverse/static/python.js";
+import { inferEdgesAutoFromDirectory } from "../../../src/inverse/static/edges.js";
 
 // Coverage for the Python static-edge parser (Project Legend γ-4
 // Python variant). The contract is identical to the TS-side

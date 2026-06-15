@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0007 — src/runtime/compile/post/validate-language.ts
 // Tested entry: validateLanguage({absolutePath, language}) — only its pure

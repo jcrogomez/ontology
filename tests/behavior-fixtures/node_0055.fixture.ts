@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0055 — src/runtime/topos/omega.ts
 // Tested entry: omegaAnd — pure three-valued logic conjunction over

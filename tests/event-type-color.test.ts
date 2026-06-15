@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { eventTypeColor } from "../src/commands/events/tail.js";
+import { eventTypeColor } from "../src/surfaces/commands/events/tail.js";
 
 // The colour helpers gate on colorsEnabled(), which inspects process.env
 // and stdout.isTTY. Under vitest stdout is not a TTY, so we set

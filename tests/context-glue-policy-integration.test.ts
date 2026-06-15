@@ -11,10 +11,10 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
-import { assembleContext } from "../src/runtime/context/assembler.js";
-import { buildFragment } from "../src/runtime/context/presheaf.js";
-import { glueFragments } from "../src/runtime/context/gluing.js";
-import type { OntologyNode, OntologyEdge } from "../src/schemas/ontology.js";
+import { assembleContext } from "../src/forward/context/assembler.js";
+import { buildFragment } from "../src/forward/context/presheaf.js";
+import { glueFragments } from "../src/forward/context/gluing.js";
+import type { OntologyNode, OntologyEdge } from "../src/kernel/schemas/ontology.js";
 
 describe("identify-if-equal gluing over assembled context (O2 consumer)", () => {
   let cwd: string;

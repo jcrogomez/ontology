@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 import {
   dominantDispatchModel,
   computePerimeterHash,
-} from "../src/commands/verify/homeomorphism.js";
+} from "../src/surfaces/commands/verify/homeomorphism.js";
 import type {
   HomeomorphismVerdict,
   VerificationResult,
-} from "../src/runtime/legend/verify-homeomorphism.js";
+} from "../src/laws/verify-homeomorphism.js";
 
 // Coverage for the `homeomorphism_verified` event audit fields
 // (milestone review §3.2 + design item §4.4): the actually-dispatched

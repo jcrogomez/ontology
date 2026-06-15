@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   ensembleCountsOnFatal,
   scoreExtractionCompleteness,
-} from "../src/commands/ingest/index.js";
+} from "../src/surfaces/commands/ingest/index.js";
 
 // Phase ε E6 step 4 — score-by-completeness is the function that
 // picks among multiple valid ensemble candidates. Required fields

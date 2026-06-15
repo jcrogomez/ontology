@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   classifySourceFile,
   type StructuralClassification,
-} from "../src/runtime/legend/structural-classifier.js";
+} from "../src/inverse/structural-classifier.js";
 
 // Structural Semantic Classifier v0 — focused unit tests covering
 // the spec's required cases plus a few edge defenses.

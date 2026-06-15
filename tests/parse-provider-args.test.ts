@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseProviderArgs } from "../src/walker/state/parse-provider-args.js";
+import { parseProviderArgs } from "../src/surfaces/walker/state/parse-provider-args.js";
 
 describe("parseProviderArgs", () => {
   describe("happy paths", () => {

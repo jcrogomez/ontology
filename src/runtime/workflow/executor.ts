@@ -4,7 +4,7 @@ import type {
   WorkflowNode,
   WorkflowEdge,
   TerminalVerdict,
-} from "../../schemas/workflow.js";
+} from "../../kernel/schemas/workflow.js";
 import {
   evaluatePredicate,
   type VerifierVisit,

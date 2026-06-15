@@ -13,7 +13,7 @@ import {
   partitionByLiveness,
   getProjectRegistryPath,
   ProjectRegistrySchema,
-} from "../src/core/projects/registry.js";
+} from "../src/kernel/core/projects/registry.js";
 
 // All tests redirect XDG_CONFIG_HOME to a tmp dir so they never touch the
 // real ~/.config/ontology/projects.json.

@@ -1,4 +1,4 @@
-import type { OntologyModel } from "../../schemas/ontology.js";
+import type { OntologyModel } from "../../kernel/schemas/ontology.js";
 import type { LlmProvider } from "./types.js";
 
 // Per-node model routing: each OntologyNode has `model.ref` (a string handle

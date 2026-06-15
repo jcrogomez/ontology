@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0028 — src/runtime/legend/frontier-tagger.ts
 // Tested entry: tagFile — pure path-and-content classifier. A schemas/

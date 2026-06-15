@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0047 — src/runtime/prompt/parse.ts
 // Tested entries: parsePromptAST(raw), hasMarkers(ast) — the pure prompt

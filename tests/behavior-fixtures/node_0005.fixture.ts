@@ -1,4 +1,4 @@
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../../src/laws/behavior-checker.js";
 
 // node_0005 — src/runtime/compile/post/extract-code-fence.ts
 // Tested entry: extractCodeFence({text, language}) — pure projection of the

@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
-import { semanticLink } from "../src/runtime/context/semantic-linker.js";
-import { OntologyNode } from "../src/schemas/ontology.js";
+import { semanticLink } from "../src/forward/context/semantic-linker.js";
+import { OntologyNode } from "../src/kernel/schemas/ontology.js";
 
 describe("Semantic Linker", () => {
   let cwd: string;

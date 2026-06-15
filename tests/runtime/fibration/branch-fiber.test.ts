@@ -5,14 +5,14 @@ import {
   computeBranchFiberFromArrays,
   computeAllFibers,
   describeCartesianLift,
-} from "../../../src/runtime/fibration/index.js";
-import type { FiberInput } from "../../../src/runtime/fibration/index.js";
+} from "../../../src/laws/fibration/index.js";
+import type { FiberInput } from "../../../src/laws/fibration/index.js";
 import {
   OntologyNodeSchema,
   OntologyEdgeSchema,
   type OntologyNode,
   type OntologyEdge,
-} from "../../../src/schemas/ontology.js";
+} from "../../../src/kernel/schemas/ontology.js";
 
 // Build a minimal node by parsing through the schema. Using the parser keeps
 // these fixtures honest: any future change to the schema (new required field,

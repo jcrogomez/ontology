@@ -3,8 +3,8 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
 import { runCli } from "./helpers/run-cli.js";
-import { runFromWalker } from "../src/walker/actions/run-from-walker.js";
-import { loadNodeById } from "../src/core/project/load.js";
+import { runFromWalker } from "../src/surfaces/walker/actions/run-from-walker.js";
+import { loadNodeById } from "../src/kernel/core/project/load.js";
 
 // Tests the pure walker action — same approach as tests for proposeFromDraft.
 // Spawning the actual TUI is out of scope (ink-testing-library does not

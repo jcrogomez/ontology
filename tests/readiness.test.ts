@@ -5,12 +5,12 @@ import {
   READINESS_REPORT_SCHEMA_VERSION,
   READINESS_THRESHOLDS,
   type ReadinessRuleId,
-} from "../src/runtime/graph/readiness.js";
-import { computeHierarchyMetrics } from "../src/runtime/graph/hierarchy-metrics.js";
+} from "../src/kernel/graph/readiness.js";
+import { computeHierarchyMetrics } from "../src/kernel/graph/hierarchy-metrics.js";
 import type {
   OntologyEdge,
   OntologyNode,
-} from "../src/schemas/ontology.js";
+} from "../src/kernel/schemas/ontology.js";
 
 interface NodeOverrides {
   id: string;

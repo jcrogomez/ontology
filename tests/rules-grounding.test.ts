@@ -4,7 +4,7 @@ import {
   extractRulesBlock,
   groundArtifactWithRules,
   commentStyle,
-} from "../src/runtime/compile/rules-grounding.js";
+} from "../src/forward/compile/rules-grounding.js";
 
 // Rules-grounding: the deterministic dual of ast-grounding that round-trips a
 // node's `rules` through compile→code→ingest (closes the LENS_LAWS_2026-06-13

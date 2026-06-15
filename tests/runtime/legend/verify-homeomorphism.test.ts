@@ -6,7 +6,7 @@ import {
   inferLanguageHint,
   DEFAULT_THRESHOLDS,
   emptyVerdictCounts,
-} from "../../../src/runtime/legend/verify-homeomorphism.js";
+} from "../../../src/laws/verify-homeomorphism.js";
 
 // Coverage for the pure δ-2 (verify-homeomorphism) comparison library.
 // Three groups:

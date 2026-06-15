@@ -3,14 +3,14 @@ import {
   buildEvaluationContext,
   compileValidationPredicate,
   validateIntent,
-} from "../src/runtime/context/intent-validator.js";
-import type { ContextAssemblyOutput } from "../src/runtime/context/types.js";
-import { glueFragments, type GluingResult } from "../src/runtime/context/gluing.js";
-import type { ContextFragment } from "../src/runtime/context/presheaf.js";
+} from "../src/forward/context/intent-validator.js";
+import type { ContextAssemblyOutput } from "../src/forward/context/types.js";
+import { glueFragments, type GluingResult } from "../src/forward/context/gluing.js";
+import type { ContextFragment } from "../src/forward/context/presheaf.js";
 import {
   type EvaluationContext,
   evaluatePredicate,
-} from "../src/runtime/topos/index.js";
+} from "../src/laws/topos/index.js";
 
 describe("Intent Validator", () => {
   const baseAssembled: ContextAssemblyOutput = {
