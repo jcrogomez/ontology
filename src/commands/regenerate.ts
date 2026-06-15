@@ -72,7 +72,7 @@ export interface RegenerateCommandOptions {
   json?: boolean;
 }
 
-interface RegenerateResult {
+export interface RegenerateResult {
   ok: boolean;
   nodeId: string;
   sourceFile?: string;
@@ -81,6 +81,9 @@ interface RegenerateResult {
   verdict?: HomeomorphismVerdict;
   metrics?: DistanceMetrics;
   behaviorVerdict?: BehaviorVerdict | "no_fixture";
+  /** Statically-decidable declared-rule violations in the chosen candidate
+   *  (only meaningful when --check-rules ran; undefined otherwise). */
+  ruleViolations?: number;
   written: boolean;
   writeBlockedReason?: string;
   failure?: string;
@@ -145,19 +148,23 @@ function emit(result: RegenerateResult, json: boolean | undefined): void {
   }
 }
 
-export async function regenerateCommand(
+// The pure core: runs the whole regenerate pipeline and RETURNS the result
+// (never calls `emit` or `process.exit`). `regenerateCommand` wraps it for the
+// CLI; `onto sync` reuses it to compose the governed loop. Throws only on
+// genuinely exceptional failures (a non-lock error from the compile lock); all
+// expected outcomes — refusals, missing nodes, blocked writes — come back as a
+// `RegenerateResult` with `ok`/`failure`/`writeBlockedReason` set.
+export async function runRegenerate(
   nodeId: string,
   options: RegenerateCommandOptions,
-): Promise<void> {
-  const cwd = process.cwd();
-
+  cwd: string = process.cwd(),
+): Promise<RegenerateResult> {
   // 1. Validate provider override.
   let provider: LlmProvider | undefined;
   if (options.provider !== undefined) {
     const allowed = ["mock", "ollama", "anthropic", "gemini"];
     if (!allowed.includes(options.provider)) {
-      emit({ ok: false, nodeId, written: false, failure: `unsupported provider: ${options.provider}` }, options.json);
-      process.exit(1);
+      return { ok: false, nodeId, written: false, failure: `unsupported provider: ${options.provider}` };
     }
     provider = options.provider as LlmProvider;
   }
@@ -165,23 +172,17 @@ export async function regenerateCommand(
   // 2. Load the node.
   const node = loadNodeById(nodeId, cwd);
   if (!node) {
-    emit({ ok: false, nodeId, written: false, failure: `node not found: ${nodeId}` }, options.json);
-    process.exit(1);
-    return;
+    return { ok: false, nodeId, written: false, failure: `node not found: ${nodeId}` };
   }
 
   // 3. Precondition: a shadow to regenerate.
   const sourceRel = node.outputs?.files?.[0];
   if (!sourceRel) {
-    emit({ ok: false, nodeId, written: false, failure: "node has no outputs.files[0] — no shadow to regenerate" }, options.json);
-    process.exit(1);
-    return;
+    return { ok: false, nodeId, written: false, failure: "node has no outputs.files[0] — no shadow to regenerate" };
   }
   const sourcePath = path.isAbsolute(sourceRel) ? sourceRel : path.join(cwd, sourceRel);
   if (!fs.existsSync(sourcePath)) {
-    emit({ ok: false, nodeId, sourceFile: sourceRel, written: false, failure: `shadow source not found on disk: ${sourceRel}` }, options.json);
-    process.exit(1);
-    return;
+    return { ok: false, nodeId, sourceFile: sourceRel, written: false, failure: `shadow source not found on disk: ${sourceRel}` };
   }
   const shadow = shadowReport(node, cwd);
   const thresholds: VerdictThresholds = {
@@ -232,17 +233,13 @@ export async function regenerateCommand(
     );
   } catch (err: unknown) {
     if (err instanceof LockAcquireError) {
-      emit({ ok: false, nodeId, written: false, failure: err.message }, options.json);
-      process.exit(1);
-      return;
+      return { ok: false, nodeId, written: false, failure: err.message };
     }
     throw err;
   }
 
   if (compiled.every((c) => !c.ok)) {
-    emit({ ok: false, nodeId, sourceFile: sourceRel, written: false, failure: `compile-back failed: ${compiled[0]?.message ?? "no draft compiled"}` }, options.json);
-    process.exit(1);
-    return;
+    return { ok: false, nodeId, sourceFile: sourceRel, written: false, failure: `compile-back failed: ${compiled[0]?.message ?? "no draft compiled"}` };
   }
 
   // 5. Evaluate each compiled draft: structural verdict + behaviour.
@@ -288,35 +285,26 @@ export async function regenerateCommand(
       verdict: e.verdict,
       metrics: e.metrics,
       behaviorVerdict: e.behaviorVerdict,
+      ruleViolations: e.ruleViolations,
       written: false,
     };
     if (e.metrics === undefined) {
-      emit({ ...base, ok: false, failure: "could not read source or regen for comparison" }, options.json);
-      process.exit(1);
-      return;
+      return { ...base, ok: false, failure: "could not read source or regen for comparison" };
     }
     if (!options.write) {
-      emit(base, options.json);
-      return;
+      return base;
     }
     if (!WRITE_SAFE_VERDICTS.has(e.verdict!)) {
-      emit({ ...base, writeBlockedReason: `verdict ${e.verdict} is not structure-preserving — refusing to overwrite working source` }, options.json);
-      process.exit(1);
-      return;
+      return { ...base, writeBlockedReason: `verdict ${e.verdict} is not structure-preserving — refusing to overwrite working source` };
     }
     if (e.behaviorVerdict === "fail") {
-      emit({ ...base, writeBlockedReason: "behaviour check failed — refusing to overwrite working source" }, options.json);
-      process.exit(1);
-      return;
+      return { ...base, writeBlockedReason: "behaviour check failed — refusing to overwrite working source" };
     }
     if ((e.ruleViolations ?? 0) > 0) {
-      emit({ ...base, writeBlockedReason: `${e.ruleViolations} declared rule(s) violated — refusing to overwrite working source` }, options.json);
-      process.exit(1);
-      return;
+      return { ...base, writeBlockedReason: `${e.ruleViolations} declared rule(s) violated — refusing to overwrite working source` };
     }
     writeShadow(node, e.regenPath, sourcePath, cwd);
-    emit({ ...base, written: true }, options.json);
-    return;
+    return { ...base, written: true };
   }
 
   // ── Multi-draw consensus path (draws > 1). ──
@@ -341,6 +329,7 @@ export async function regenerateCommand(
     verdict: rep?.verdict,
     metrics: rep?.metrics,
     behaviorVerdict: rep?.behaviorVerdict ?? "no_fixture",
+    ruleViolations: rep?.ruleViolations,
     written: false,
     draws,
     acceptableDraws: acceptable.length,
@@ -351,19 +340,25 @@ export async function regenerateCommand(
   };
 
   if (!options.write) {
-    emit(base, options.json);
-    return;
+    return base;
   }
   if (consensusClass.length < consensusK || !rep) {
-    emit(
-      { ...base, writeBlockedReason: `consensus not reached: largest agreeing class is ${consensusClass.length}/${draws} (need ${consensusK}) — refusing to write an unstable regeneration` },
-      options.json,
-    );
-    process.exit(1);
-    return;
+    return { ...base, writeBlockedReason: `consensus not reached: largest agreeing class is ${consensusClass.length}/${draws} (need ${consensusK}) — refusing to write an unstable regeneration` };
   }
   writeShadow(node, rep.regenPath, sourcePath, cwd);
-  emit({ ...base, written: true }, options.json);
+  return { ...base, written: true };
+}
+
+// CLI wrapper: run the core, render it, and map the outcome to an exit code.
+// A non-ok result (error) or a blocked write exits 1; preview and successful
+// writes exit 0 — preserving the exact observable contract the CLI tests pin.
+export async function regenerateCommand(
+  nodeId: string,
+  options: RegenerateCommandOptions,
+): Promise<void> {
+  const result = await runRegenerate(nodeId, options, process.cwd());
+  emit(result, options.json);
+  if (!result.ok || result.writeBlockedReason) process.exitCode = 1;
 }
 
 // Overwrite the shadow source via the artifact writer's force gate.
