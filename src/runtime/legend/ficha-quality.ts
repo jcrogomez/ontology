@@ -32,11 +32,27 @@ export interface FichaQuality {
   // export (imported helpers or private symbols mislabelled as provides by
   // the extractor). Over-declaration; the determinacy killer measured in the
   // sync-loop acceptance — phantom provides make compile-back drafts disagree
-  // on the module surface, so consensus never forms. Only populated when the
-  // AST parsed and has a positive export surface to compare against (we never
-  // call a provide phantom on a file we couldn't read).
+  // on the module surface, so consensus never forms.
+  //
+  // `phantom` is ONLY populated when the node's full export surface is
+  // determinable from its source AST (`surfaceDeterminable`). We refuse to
+  // call any provide phantom unless we can see the WHOLE surface, because a
+  // false phantom feeds `--prune` and silently deletes a real contract key.
+  // Three things break determinability and force `phantom: []`:
+  //   1. an unreadable / unparseable source file (can't see exports at all);
+  //   2. a bare wildcard re-export (`export * from "./x.js"`) — surfaces names
+  //      with no local AST identifier, so an undeclared-looking provide may be
+  //      legitimately re-exported through the star;
+  //   3. an empty AST export surface (presence-only / side-effect modules).
+  // Multi-file nodes are handled by unioning every `outputs.files` entry's
+  // export surface (a provide satisfied by file[1] must not look phantom
+  // because we only read file[0]).
   contractOverflow: {
     phantom: string[];
+    // False when phantom detection was suppressed for safety (see above). A
+    // consumer that prunes MUST check this: `phantom: []` with
+    // `surfaceDeterminable: false` means "unknown", not "none".
+    surfaceDeterminable: boolean;
   };
   ruleNoise: {
     total: number;
@@ -52,27 +68,41 @@ export interface FichaQuality {
 }
 
 export function fichaQuality(node: OntologyNode, cwd: string = process.cwd()): FichaQuality {
-  const srcRel = node.outputs?.files?.[0] ?? null;
+  const srcFiles = node.outputs?.files ?? [];
+  const srcRel = srcFiles[0] ?? null;
   const declaredKeys = new Set(
     (node.context?.provides ?? []).map((p) => (typeof p === "string" ? p : p.key)),
   );
-  let astExports: string[] = [];
-  let parseOk = false;
-  if (srcRel) {
-    const abs = path.isAbsolute(srcRel) ? srcRel : path.join(cwd, srcRel);
+  // Union the export surface across EVERY source file the node maps to. Reading
+  // only file[0] (the previous behaviour) made any provide satisfied by a
+  // second file look phantom — a silent-data-loss trap under `--prune`.
+  const exportSet = new Set<string>();
+  let allParsed = srcFiles.length > 0;
+  let anyWildcard = false;
+  for (const rel of srcFiles) {
+    const abs = path.isAbsolute(rel) ? rel : path.join(cwd, rel);
     const scan = scanFileSymbols(abs);
-    parseOk = scan.ok;
-    astExports = scan.mandatoryExports;
+    if (!scan.ok) {
+      allParsed = false;
+      continue;
+    }
+    for (const e of scan.mandatoryExports) exportSet.add(e);
+    if (scan.hasWildcardReExport) anyWildcard = true;
   }
+  const astExports = [...exportSet];
+  const parseOk = allParsed;
   const missing = astExports.filter((e) => !declaredKeys.has(e));
-  // Phantom = declared provides absent from the AST export surface. Conservative:
-  // only when the file parsed AND exposes a positive export surface, so a node
-  // whose source we couldn't read never has its provides judged phantom.
+  // Phantom = declared provides absent from the AST export surface. We only
+  // judge phantom when the WHOLE surface is determinable: every file parsed,
+  // no bare `export *` (which surfaces names with no local AST identifier),
+  // and a positive export surface to compare against. Otherwise `phantom: []`
+  // means "unknown", and `surfaceDeterminable` says so — `--prune` must not
+  // delete a key we cannot prove is absent.
+  const surfaceDeterminable = parseOk && !anyWildcard && astExports.length > 0;
   const astSet = new Set(astExports);
-  const phantom =
-    parseOk && astExports.length > 0
-      ? [...declaredKeys].filter((k) => !astSet.has(k))
-      : [];
+  const phantom = surfaceDeterminable
+    ? [...declaredKeys].filter((k) => !astSet.has(k))
+    : [];
 
   const rules = node.rules ?? [];
   const classes = rules.map((r) => classifyRule(r).ruleClass);
@@ -94,7 +124,7 @@ export function fichaQuality(node: OntologyNode, cwd: string = process.cwd()): F
     srcFile: srcRel,
     parseOk,
     contractGap: { declared: declaredKeys.size, astExports: astExports.length, missing },
-    contractOverflow: { phantom },
+    contractOverflow: { phantom, surfaceDeterminable },
     ruleNoise,
     promptChars: (node.prompt?.raw ?? "").length,
     cleanupScore,

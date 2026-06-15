@@ -167,3 +167,103 @@ describe("onto ficha audit/cleanup — phantom provides (over-declaration)", () 
     expect(fs.readFileSync(path.join(tempDir, ".ontology/nodes/node_0002.json"), "utf-8")).toBe(before);
   });
 });
+
+// ── Safety: --prune must NOT delete a legitimately-surfaced provide when the
+//    full export surface isn't AST-determinable. Two silent-data-loss traps
+//    the original phantom check had: (1) reading only outputs.files[0] of a
+//    multi-file node, (2) bare `export *` barrels whose re-exported names have
+//    no local AST identifier.
+
+// A node mapped to TWO files: mod_a exports alpha, mod_b exports beta. The
+// ficha legitimately declares both. Reading only file[0] would call beta
+// phantom; unioning both files' surfaces must not.
+function multiFileNode(tempDir: string): string {
+  expect(runCli(tempDir, ["init"]).status).toBe(0);
+  expect(runCli(tempDir, ["node", "create", "--level", "domain", "--kind", "entity", "--prompt", "d"]).status).toBe(0);
+  expect(runCli(tempDir, ["node", "create", "--level", "artifact", "--kind", "artifact", "--manifestation", "code", "--language", "typescript", "--prompt", "x"]).status).toBe(0);
+  fs.writeFileSync(path.join(tempDir, "mod_a.ts"), "export const alpha = 1;\n");
+  fs.writeFileSync(path.join(tempDir, "mod_b.ts"), "export function beta() { return 2; }\n");
+  const nodePath = path.join(tempDir, ".ontology/nodes/node_0002.json");
+  const node = JSON.parse(fs.readFileSync(nodePath, "utf-8"));
+  node.outputs = { ...(node.outputs ?? {}), files: ["mod_a.ts", "mod_b.ts"] };
+  node.context = {
+    ...(node.context ?? {}),
+    provides: [
+      { key: "alpha", nodeType: "declared", signature: "resolved:1" },
+      { key: "beta", nodeType: "declared" }, // exported by file[1], not file[0]
+    ],
+  };
+  fs.writeFileSync(nodePath, JSON.stringify(node, null, 2));
+  return "node_0002";
+}
+
+// A barrel: index.ts has one real export (`own`) plus `export * from "./impl"`.
+// The ficha declares `own` and `fromImpl` (surfaced through the wildcard).
+// `fromImpl` has no local identifier in index.ts's AST, so the old check would
+// call it phantom and prune it.
+function barrelNode(tempDir: string): string {
+  expect(runCli(tempDir, ["init"]).status).toBe(0);
+  expect(runCli(tempDir, ["node", "create", "--level", "domain", "--kind", "entity", "--prompt", "d"]).status).toBe(0);
+  expect(runCli(tempDir, ["node", "create", "--level", "artifact", "--kind", "artifact", "--manifestation", "code", "--language", "typescript", "--prompt", "x"]).status).toBe(0);
+  fs.writeFileSync(path.join(tempDir, "impl.ts"), "export const fromImpl = 1;\n");
+  fs.writeFileSync(path.join(tempDir, "index.ts"), "export const own = 1;\nexport * from \"./impl.js\";\n");
+  const nodePath = path.join(tempDir, ".ontology/nodes/node_0002.json");
+  const node = JSON.parse(fs.readFileSync(nodePath, "utf-8"));
+  node.outputs = { ...(node.outputs ?? {}), files: ["index.ts"] };
+  node.context = {
+    ...(node.context ?? {}),
+    provides: [
+      { key: "own", nodeType: "declared" },
+      { key: "fromImpl", nodeType: "declared" }, // re-exported via `export *`
+    ],
+  };
+  fs.writeFileSync(nodePath, JSON.stringify(node, null, 2));
+  return "node_0002";
+}
+
+describe("onto ficha cleanup --prune — surface-determinability safety", () => {
+  let tempDir: string;
+  beforeEach(() => { tempDir = createTempProject(); });
+  afterEach(() => cleanupTempProject(tempDir));
+
+  it("multi-file node: a provide exported by file[1] is NOT phantom", () => {
+    multiFileNode(tempDir);
+    const audit = JSON.parse(runCli(tempDir, ["ficha", "audit", "--json"]).stdout);
+    expect(audit.totalPhantomProvides).toBe(0); // beta lives in mod_b.ts, union sees it
+    expect(audit.totalMissingExports).toBe(0);
+    expect(audit.worklist[0]?.contractOverflow?.surfaceDeterminable ?? true).toBe(true);
+  });
+
+  it("multi-file node: --prune --apply keeps the second file's export", () => {
+    const id = multiFileNode(tempDir);
+    runCli(tempDir, ["ficha", "cleanup", id, "--prune", "--apply"]);
+    const provides = JSON.parse(fs.readFileSync(path.join(tempDir, ".ontology/nodes/node_0002.json"), "utf-8")).context.provides;
+    const keys = provides.map((p: { key: string }) => p.key).sort();
+    expect(keys).toEqual(["alpha", "beta"]); // nothing pruned
+  });
+
+  it("barrel (export *): phantom detection is suppressed, surface not determinable", () => {
+    barrelNode(tempDir);
+    const audit = JSON.parse(runCli(tempDir, ["ficha", "audit", "--json"]).stdout);
+    expect(audit.totalPhantomProvides).toBe(0); // fromImpl NOT called phantom
+    const q = audit.worklist.find((w: { nodeId: string }) => w.nodeId === "node_0002")
+      ?? JSON.parse(runCli(tempDir, ["ficha", "cleanup", "node_0002", "--prune", "--json"]).stdout);
+    // Whether it lands in the worklist or not, the cleanup view reports it:
+    const view = JSON.parse(runCli(tempDir, ["ficha", "cleanup", "node_0002", "--prune", "--json"]).stdout);
+    expect(view.pruneSuppressed).toBe(true);
+    expect(view.phantomProvides).toEqual([]);
+    void q;
+  });
+
+  it("barrel (export *): --prune --apply deletes nothing", () => {
+    const id = barrelNode(tempDir);
+    const before = fs.readFileSync(path.join(tempDir, ".ontology/nodes/node_0002.json"), "utf-8");
+    const r = runCli(tempDir, ["ficha", "cleanup", id, "--prune", "--apply", "--json"]);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.applied).toBe(false); // nothing to add, prune suppressed
+    expect(out.pruneSuppressed).toBe(true);
+    // The phantom-looking `fromImpl` is still there.
+    expect(fs.readFileSync(path.join(tempDir, ".ontology/nodes/node_0002.json"), "utf-8")).toBe(before);
+  });
+});

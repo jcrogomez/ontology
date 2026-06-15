@@ -57,24 +57,34 @@ export async function fichaCleanupCommand(nodeId: string, options: FichaCleanupO
     return;
   }
   const missing = q.contractGap.missing;
-  // Phantom only enters the picture under --prune. fichaQuality already gates
-  // it on a successful parse with a positive export surface.
+  // Phantom only enters the picture under --prune. fichaQuality gates it on a
+  // FULLY determinable export surface (every file parsed, no bare `export *`,
+  // positive surface) — when that fails, phantom is [] and surfaceDeterminable
+  // is false. `--prune` must respect that: a non-determinable surface means we
+  // cannot prove any provide is absent, so pruning is skipped, not silent.
   const phantom = options.prune ? q.contractOverflow.phantom : [];
+  const pruneSuppressed = options.prune === true && !q.contractOverflow.surfaceDeterminable;
   const result = {
     ok: true,
     nodeId,
     srcFile: q.srcFile,
     missingExports: missing,
     phantomProvides: phantom,
+    pruneSuppressed,
     proseRules: q.ruleNoise.prose,
     applied: false as boolean,
   };
 
   if (missing.length === 0 && phantom.length === 0) {
-    const note = options.prune
-      ? "contract already reconciled (no missing exports, no phantom provides)"
-      : "contract already complete (no AST exports missing from provides)";
+    const note = pruneSuppressed
+      ? "no missing exports; phantom pruning SKIPPED — export surface not fully AST-determinable (wildcard re-export or unreadable file), so no provide can be safely called phantom"
+      : options.prune
+        ? "contract already reconciled (no missing exports, no phantom provides)"
+        : "contract already complete (no AST exports missing from provides)";
     out({ ...result, note }, options.json);
+    if (pruneSuppressed && !options.json) {
+      console.log(`  ⚠ --prune did nothing here on purpose: this node's full export surface can't be determined from its AST, so pruning could delete a legitimately re-exported provide.`);
+    }
     if (q.ruleNoise.prose > 0 && !options.json) {
       console.log(`  note: ${q.ruleNoise.prose} prose/extraction-noise rule(s) — review manually (not auto-removed).`);
     }
@@ -89,6 +99,7 @@ export async function fichaCleanupCommand(nodeId: string, options: FichaCleanupO
     if (!options.json) {
       if (missing.length) console.log(`  would add to provides: ${missing.join(", ")}`);
       if (phantom.length) console.log(`  would prune (not in AST exports): ${phantom.join(", ")}`);
+      if (pruneSuppressed) console.log(`  ⚠ --prune suppressed: export surface not fully AST-determinable (wildcard re-export or unreadable file); no provide pruned.`);
     }
     return;
   }
@@ -122,6 +133,7 @@ export async function fichaCleanupCommand(nodeId: string, options: FichaCleanupO
   if (!options.json) {
     if (missing.length) console.log(`  ✔ contract completed: +${missing.join(", ")}`);
     if (phantom.length) console.log(`  ✔ pruned (not real exports): -${phantom.join(", ")}`);
+    if (pruneSuppressed) console.log(`  ⚠ --prune suppressed: export surface not fully AST-determinable (wildcard re-export or unreadable file); no provide pruned.`);
     if (q.ruleNoise.prose > 0) console.log(`  note: ${q.ruleNoise.prose} prose-rule(s) remain — review manually.`);
   }
 }

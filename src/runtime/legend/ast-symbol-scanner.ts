@@ -52,6 +52,15 @@ export interface ASTSymbolScanResult {
    * Callers must guard: an ok=false result has an empty mandatoryExports
    * which is indistinguishable from a legitimately empty file. */
   ok: boolean;
+  /** True when the source has at least one bare wildcard re-export
+   * (`export * from "./x.js"`). Those re-export the upstream module's named
+   * symbols under THIS module's surface but carry no local name here, so they
+   * are absent from `mandatoryExports`. Consumers reasoning about export
+   * *completeness* (the ficha phantom-provides check) must treat a true value
+   * as "export surface NOT fully determinable from this file's AST" and refuse
+   * to call any declared name phantom — the name may be legitimately surfaced
+   * through the wildcard. */
+  hasWildcardReExport: boolean;
 }
 
 /**
@@ -64,7 +73,7 @@ export function scanFileSymbols(filePath: string): ASTSymbolScanResult {
   try {
     source = fs.readFileSync(filePath, "utf-8");
   } catch {
-    return { filePath, mandatoryExports: [], reExportedNames: [], ok: false };
+    return { filePath, mandatoryExports: [], reExportedNames: [], ok: false, hasWildcardReExport: false };
   }
   try {
     const parsed = parseTypeScriptFile(filePath, source);
@@ -84,9 +93,15 @@ export function scanFileSymbols(filePath: string): ASTSymbolScanResult {
         reExportedNames.push(ref.name);
       }
     }
-    return { filePath, mandatoryExports, reExportedNames, ok: true };
+    return {
+      filePath,
+      mandatoryExports,
+      reExportedNames,
+      ok: true,
+      hasWildcardReExport: parsed.wildcardReExports.length > 0,
+    };
   } catch {
-    return { filePath, mandatoryExports: [], reExportedNames: [], ok: false };
+    return { filePath, mandatoryExports: [], reExportedNames: [], ok: false, hasWildcardReExport: false };
   }
 }
 

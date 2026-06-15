@@ -78,7 +78,7 @@ export interface ExportRef {
   // of the export (param + annotation + return for functions; the RHS for
   // type aliases; the public member shape for interfaces/classes/enums; the
   // annotation for typed consts). This is the syntactic tier (O1 of
-  // docs/legend/CONTEXT_GLUING_REGIMES.md): it reads source text, it does
+  // docs/design/laws/CONTEXT_GLUING_REGIMES.md): it reads source text, it does
   // NOT resolve types (no TypeChecker), so inferred returns, un-annotated
   // consts, cross-file re-exports and aliased types yield `undefined`
   // ("unknown" — downstream gluing must fall back to the conservative path,
@@ -91,6 +91,16 @@ export interface ParsedTSFile {
   filePath: string;
   imports: ImportRef[];
   exports: ExportRef[];
+  // Module specifiers of bare wildcard re-exports (`export * from "./x.js"`).
+  // These surface every named export of the upstream module under THIS
+  // module's public name, but carry no local identifier at this file's AST
+  // surface — so they contribute nothing to `exports[]`. Recorded separately
+  // so consumers that reason about export *completeness* (e.g. the ficha
+  // phantom-provides check) know this file's export surface is NOT fully
+  // determinable from its own AST and must not treat unseen names as absent.
+  // Named re-exports (`export { a } from "./x.js"`) keep their name and DO
+  // appear in `exports[]`, so they are not listed here.
+  wildcardReExports: string[];
 }
 
 /**
@@ -136,6 +146,7 @@ export function parseTypeScriptFile(
 
   const imports: ImportRef[] = [];
   const exports: ExportRef[] = [];
+  const wildcardReExports: string[] = [];
 
   ts.forEachChild(sourceFile, (node) => {
     if (ts.isImportDeclaration(node)) {
@@ -144,6 +155,18 @@ export function parseTypeScriptFile(
       return;
     }
     if (ts.isExportDeclaration(node)) {
+      // Bare `export * from "./x.js"`: a moduleSpecifier with no exportClause
+      // and no namespace name. It re-exports every named symbol of the
+      // upstream module but binds no local identifier here, so it produces no
+      // `exports[]` entry — record the specifier so completeness consumers can
+      // tell this file's export surface is not fully AST-determinable.
+      if (
+        !node.exportClause &&
+        node.moduleSpecifier &&
+        ts.isStringLiteral(node.moduleSpecifier)
+      ) {
+        wildcardReExports.push(node.moduleSpecifier.text);
+      }
       const { exportEntries, reExportImport } = readExportDeclaration(
         node,
         filePath,
@@ -181,7 +204,7 @@ export function parseTypeScriptFile(
     }
   });
 
-  return { filePath, imports, exports };
+  return { filePath, imports, exports, wildcardReExports };
 }
 
 // ── Edge inference ──────────────────────────────────────────────────────────
