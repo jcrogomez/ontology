@@ -1242,8 +1242,9 @@ fichaCmd
 
 fichaCmd
   .command("cleanup <nodeId>")
-  .description("Complete a node's contract with the export surface its source actually has (the deterministic, AST-derived fix for the recall-bound thinness the bilateral round-trip measured). Preview by default; --apply mutates the node's provides. Prose-rule noise is reported, never auto-removed.")
-  .option("--apply", "Add the AST-missing exports to the node's provides (governed mutation via updateNode).")
+  .description("Reconcile a node's contract with the export surface its source actually has (the deterministic, AST-derived fix for the thinness the bilateral round-trip measured). Completes the contract (adds AST exports the ficha under-declares) and, with --prune, removes phantom provides (imports/private symbols the ficha over-declares — the determinacy killer the sync-loop acceptance found). Preview by default; --apply mutates the node's provides. Prose-rule noise is reported, never auto-removed.")
+  .option("--apply", "Apply the reconciliation to the node's provides (governed mutation via updateNode).")
+  .option("--prune", "Also remove phantom provides — declared keys the source does NOT export (imported helpers or private symbols mislabelled as provides). Raises compile-back determinacy: phantom provides make draws disagree on the module surface, so consensus never forms.")
   .option("--json", "Output the result as JSON.")
   .action(async (nodeId, options) => {
     try {

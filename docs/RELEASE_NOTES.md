@@ -200,3 +200,18 @@ Still pending:
   behaviour gate caught real regressions (structurally-safe but `fail`).
   Full record: `docs/SYNC_LOOP_SPEC.md` §8; data in `outputs/`; harness
   `scripts/sync-acceptance.mjs`.
+- **Ficha determinacy probe + `ficha cleanup --prune` (2026-06-15).** The
+  sync-loop acceptance pointed at ficha determinacy as a lever. Diagnosis:
+  76/221 code nodes (34%) **over-declare** — `provides` lists keys the source
+  doesn't export (imports/private symbols the 3B extractor mislabelled), which
+  makes compile-back drafts disagree on the module surface so consensus never
+  forms. Shipped the deterministic fix: `onto ficha cleanup --prune` (dual of
+  contract completion) + `ficha audit` now measures over-declaration. Honest
+  result: reconciling a single node (node_0029) moved it from consensus 1/3 →
+  3/3, BUT applying `--prune` across the 6-node acceptance sample left the
+  headline 1/6 ≈ 17% UNCHANGED — only 2/6 nodes had phantom provides and both
+  sit at the consensus floor where 7B run-to-run variance swamps the effect.
+  Conclusion: the prune is correct (honest fichas) but on 7B-local the
+  dominant phenomenon is variance — the next real lever is a stronger/less-
+  variable model, not more determinacy edits. The live graph was not mutated.
+  Full record: `docs/SYNC_LOOP_SPEC.md` §8.1.

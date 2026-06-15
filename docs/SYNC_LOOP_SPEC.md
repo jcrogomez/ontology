@@ -217,3 +217,47 @@ the core round-trips cleanly through local F today."
 and/or ficha determinacy (does the ficha pin enough structure to make
 draws agree), NOT the consensus knob. A frontier-model arm on the same
 6 nodes is the cheapest next measurement.
+
+## 8.1 Determinacy probe — 2026-06-14/15 (dated; honest null)
+
+Tested the "ficha determinacy" lever from §8 before reaching for a
+frontier model. Tier **T2** (operational, same setup as §8).
+
+**Diagnosis (real).** 76 of 221 code nodes (34%) **over-declare**: their
+`provides` list keys the source does NOT export — imported helpers or
+private symbols the 3B extractor mislabelled (e.g. `node_0029` lists
+`ensureDir, writeJson, readState, writeState`, all imports). This makes
+compile-back drafts each invent their own local definitions of those
+symbols → drafts disagree on the module surface → consensus never forms.
+This is a deterministic, $0-detectable defect (the AST knows the real
+export surface). Shipped the fix: `onto ficha cleanup --prune` (the dual
+of contract completion) + `ficha audit` now measures over-declaration.
+
+**Single-node confirmation (positive).** Reconciling `node_0029`'s ficha
+(prune 4 phantom provides + real TS signatures) moved it from consensus
+1/3 (clusters [1,1,1], all draws disagree) to 3/3 (clusters [3]).
+Provides-prune ALONE (prompt.raw untouched) also crossed the floor (2/3).
+The lever is real on the nodes it touches.
+
+**Aggregate re-measurement (NULL).** Applied `--prune` to the 6-node core
+sample and re-ran acceptance: **1/6 → 1/6. The number did not move.**
+Why, honestly:
+- Only **2 of the 6** nodes had phantom provides (0026, 0029); the other
+  four fail for unrelated reasons (LoC variance, behaviour, signature
+  notation), so prune cannot touch them.
+- Both pruned nodes sit **exactly at the consensus floor** (2/3). Across
+  isolated re-runs each reaches consensus, but run-to-run **variance flips
+  them above/below** the floor. The batch caught 0026 on a transient
+  Ollama error and 0029 on a low sample; even `node_0022` (no phantom,
+  prune = no-op) drifted 1/3 → 0/3 by pure chance.
+
+**Conclusion.** At 7B-local with n=3 draws, **run-to-run variance (±1-2
+nodes) exceeds the effect size of the determinacy fix** — you cannot
+detect a 1-2-node improvement against that noise on a 6-node sample. The
+prune is correct and makes fichas honest (an import is not something the
+module *provides*), and it plausibly helps under a stronger model, but on
+7B-local it does not move the headline number. This **reinforces** §8:
+the dominant phenomenon is variance, so the next real lever is a
+**less-variable / stronger model**, not more determinacy edits. Order:
+model first, determinacy second. The `--prune` tool shipped; the live
+graph was NOT mutated (the 6 experiment nodes were restored).
