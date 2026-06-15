@@ -4,7 +4,7 @@ import {
   buildInspectorPrompt,
   checkTranslatorCache,
   computeTranslatorSourceHash,
-} from "../../../src/runtime/legend/translator.js";
+} from "../../../src/inverse/translator.js";
 import type { OntologyNode } from "../../../src/kernel/schemas/ontology.js";
 
 // Coverage for the pure δ-1 translator library. The CLI command is

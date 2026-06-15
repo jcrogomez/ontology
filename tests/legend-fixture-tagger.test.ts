@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 import {
   tagFileFromDisk,
   type FrontierAttribute,
-} from "../src/runtime/legend/frontier-tagger.js";
+} from "../src/inverse/frontier-tagger.js";
 
 const FIXTURE_ROOT = path.resolve(
   __dirname,

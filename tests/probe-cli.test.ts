@@ -9,7 +9,7 @@ import {
   renderValidatedFixture,
   isGeneratedFixture,
   selfValidateFixture,
-} from "../src/runtime/legend/probe-generator.js";
+} from "../src/inverse/probe-generator.js";
 
 // Coverage for `onto probe` — the generator that produces SELF-VALIDATED
 // behavioural fixtures. The LLM dispatch is the non-deterministic seam, so the
@@ -138,7 +138,7 @@ describe("onto probe — governance guards (mock provider, no real generation)",
 
 describe("probe rule-targeting — the executable enforcement layer", () => {
   it("buildProbeUserPrompt embeds numbered behavioural rules as targets", async () => {
-    const { buildProbeUserPrompt } = await import("../src/runtime/legend/probe-generator.js");
+    const { buildProbeUserPrompt } = await import("../src/inverse/probe-generator.js");
     const node = { outputs: { files: ["src/x.ts"] }, prompt: { raw: "x" }, context: { provides: [] } } as any;
     const prompt = buildProbeUserPrompt(node, "export const x = 1;", ["returns undefined when empty", "throws on negative"]);
     expect(prompt).toContain("Behavioural rules to verify");
@@ -147,7 +147,7 @@ describe("probe rule-targeting — the executable enforcement layer", () => {
   });
 
   it("ruleCoverage maps rule:N cases to enforced / violated / uncovered", async () => {
-    const { ruleCoverage } = await import("../src/runtime/legend/probe-generator.js");
+    const { ruleCoverage } = await import("../src/inverse/probe-generator.js");
     const rules = ["returns undefined when empty", "throws on negative", "is monotonic"];
     const caseResults = [
       { index: 0, name: "rule:1 — empty -> undefined", kept: true, outcome: "match" },

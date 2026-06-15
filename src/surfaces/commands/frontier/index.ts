@@ -1,10 +1,10 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { collectSourceFiles } from "../../../runtime/static/typescript.js";
+import { collectSourceFiles } from "../../../inverse/static/typescript.js";
 import {
   tagFileFromDisk,
   type TaggerAttribute,
-} from "../../../runtime/legend/frontier-tagger.js";
+} from "../../../inverse/frontier-tagger.js";
 import { errorMessage } from "../../../kernel/core/errors.js";
 
 // `onto frontier <paths...>` — Phase ε pre-flight diagnostic.

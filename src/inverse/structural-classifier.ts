@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import * as ts from "typescript";
-import { parseTypeScriptFile, type ParsedTSFile } from "../static/typescript.js";
+import { parseTypeScriptFile, type ParsedTSFile } from "./static/typescript.js";
 
 // Structural Semantic Classifier v0 — Ontology's first layer of
 // structural perception over source code.
@@ -108,26 +108,26 @@ export interface StaticSignals {
  */
 export interface ClassificationVocabulary {
   /** Top-level exports: declarations + named re-exports. Wildcard
-   * re-exports (`export * from "./x.js"`) produce no entries here —
+   * re-exports (`export * from "../runtime/legend/x.js"`) produce no entries here —
    * they have no local name. See `imports` for the module surface. */
   exports: ReadonlyArray<{
     name: string;
     kind: "value" | "type";
     /** Set when this export passes through from another module
-     * (`export { X } from "./y.js"`). */
+     * (`export { X } from "../runtime/legend/y.js"`). */
     reExportedFrom?: string;
     /** Syntactic interface signature (O1), when the parser could read one.
      * Carried so static-summary can attach it to the provided symbol. */
     signature?: string;
   }>;
   /** Every module specifier this file consumes — including the
-   * synthetic specifiers from `export * from "./x.js"` (which look
+   * synthetic specifiers from `export * from "../runtime/legend/x.js"` (which look
    * like imports at the AST level and ARE structural dependencies). */
   imports: ReadonlyArray<{
     modulePath: string;
     kind: "value" | "type" | "namespace";
     /** Specific named symbols brought in by `import { … } from …`.
-     * Empty for `import "./side-effect.js"`, for namespace imports,
+     * Empty for `import "../runtime/legend/side-effect.js"`, for namespace imports,
      * and for the synthetic ImportRefs produced by `export *`. */
     symbols: ReadonlyArray<string>;
   }>;
@@ -743,7 +743,7 @@ function buildVocabulary(parsed: ParsedTSFile): ClassificationVocabulary {
     // Build the "symbols this import brings into scope" set. For
     // named imports `{ a, b }` it is [a, b]; for default imports it
     // is [defaultImport]; for namespace imports it is [namespace];
-    // for wildcard re-exports (`export * from "./x.js"`) and
+    // for wildcard re-exports (`export * from "../runtime/legend/x.js"`) and
     // side-effect imports it is the empty array.
     const symbols: string[] = [];
     for (const s of i.imports) symbols.push(s);

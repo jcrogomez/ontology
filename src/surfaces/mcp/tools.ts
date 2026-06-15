@@ -33,7 +33,7 @@ import {
   type EdgeDirection,
 } from "../../kernel/graph/traversal.js";
 import { assembleContext } from "../../forward/context/assembler.js";
-import { checkTranslatorCache } from "../../runtime/legend/translator.js";
+import { checkTranslatorCache } from "../../inverse/translator.js";
 import { EdgeTypeSchema, type OntologyNode, type OntologyEdge } from "../../kernel/schemas/ontology.js";
 
 // A registrable tool definition. `inputShape` is a Zod raw shape (object of

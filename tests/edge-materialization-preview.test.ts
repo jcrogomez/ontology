@@ -8,7 +8,7 @@ import type {
   OntologyEdge,
   OntologyNode,
 } from "../src/kernel/schemas/ontology.js";
-import type { InferredEdge } from "../src/runtime/static/edges.js";
+import type { InferredEdge } from "../src/inverse/static/edges.js";
 
 interface NodeOverrides {
   id: string;

@@ -4,7 +4,7 @@ import { z } from "zod";
 import {
   inferEdgesAutoFromDirectoryAsync,
   type InferredEdge,
-} from "../../../runtime/static/edges.js";
+} from "../../../inverse/static/edges.js";
 import { loadEdges, loadNodes, loadState } from "../../../kernel/core/project/load.js";
 import { createProposal } from "../../../kernel/core/proposals/persist.js";
 import {

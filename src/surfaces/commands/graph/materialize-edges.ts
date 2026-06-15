@@ -5,7 +5,7 @@ import { z } from "zod";
 import {
   inferEdgesAutoFromDirectoryAsync,
   type InferredEdge,
-} from "../../../runtime/static/edges.js";
+} from "../../../inverse/static/edges.js";
 import {
   planEdgeMaterialization,
 } from "../../../kernel/graph/edge-materialization-preview.js";

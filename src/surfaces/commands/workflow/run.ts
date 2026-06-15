@@ -21,7 +21,7 @@ import {
   type ProposalWorkflowSource,
 } from "../../../kernel/schemas/ontology.js";
 import { validateEdgeDirection } from "../../../kernel/graph/poset.js";
-import { parseTypeScriptFile } from "../../../runtime/static/typescript.js";
+import { parseTypeScriptFile } from "../../../inverse/static/typescript.js";
 import { extractCodeFence } from "../../../forward/compile/post/extract-code-fence.js";
 import type { WorkflowProposedEdge, WorkflowProvision } from "../../../kernel/schemas/workflow.js";
 

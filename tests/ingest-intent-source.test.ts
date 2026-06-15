@@ -9,7 +9,7 @@ import {
   matchChangedFilesToNodes,
 } from "../src/surfaces/commands/ingest/index.js";
 import { loadState, loadNodeById } from "../src/kernel/core/project/load.js";
-import type { IntentSource } from "../src/runtime/ingest/github.js";
+import type { IntentSource } from "../src/inverse/ingest/github.js";
 import type { LlmProvider } from "../src/runtime/llm/types.js";
 
 const CLI_PATH = path.resolve(__dirname, "../dist/cli.js");

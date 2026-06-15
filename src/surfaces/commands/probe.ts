@@ -13,8 +13,8 @@ import {
   isGeneratedFixture,
   ruleCoverage,
   type RuleCoverageStatus,
-} from "../../runtime/legend/probe-generator.js";
-import { classifyRule } from "../../runtime/legend/rule-checker.js";
+} from "../../inverse/probe-generator.js";
+import { classifyRule } from "../../inverse/rule-checker.js";
 
 // `onto probe <nodeId>` — generate a SELF-VALIDATED behavioural fixture for a
 // node, the safety net that gives `onto regenerate --write` teeth. An LLM

@@ -14,7 +14,7 @@ import {
   type DistanceMetrics,
 } from "../../runtime/legend/verify-homeomorphism.js";
 import { loadFixture, runBehaviorCheck, type BehaviorVerdict } from "../../runtime/legend/behavior-checker.js";
-import { checkRules } from "../../runtime/legend/rule-checker.js";
+import { checkRules } from "../../inverse/rule-checker.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
 
 // `onto regenerate <nodeId>` — the governed lever that turns the

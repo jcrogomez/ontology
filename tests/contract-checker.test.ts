@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { checkContract } from "../src/runtime/legend/contract-checker.js";
-import { RESOLVED_SIGNATURE_PREFIX } from "../src/runtime/static/typescript-resolved.js";
+import { RESOLVED_SIGNATURE_PREFIX } from "../src/inverse/static/typescript-resolved.js";
 import {
   verdictToMatrixCell,
   honestyForCell,

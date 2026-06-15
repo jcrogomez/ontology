@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { parseTypeScriptFile } from "../static/typescript.js";
+import { parseTypeScriptFile } from "../../inverse/static/typescript.js";
 
 // Pure comparison library for Project Legend δ-2 (verify-homeomorphism).
 //

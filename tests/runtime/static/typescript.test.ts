@@ -5,7 +5,7 @@ import * as path from "node:path";
 import {
   parseTypeScriptFile,
   inferEdgesFromDirectory,
-} from "../../../src/runtime/static/typescript.js";
+} from "../../../src/inverse/static/typescript.js";
 
 // Coverage for Project Legend γ-4 — static-edge inference for
 // TypeScript. Pure parsing, no network, no LLM. Fixtures live in

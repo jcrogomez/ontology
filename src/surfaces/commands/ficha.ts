@@ -1,6 +1,6 @@
 import { loadNodeById, loadNodes } from "../../kernel/core/project/load.js";
 import { updateNode } from "../../kernel/core/nodes/update-node.js";
-import { fichaQuality, auditFichas } from "../../runtime/legend/ficha-quality.js";
+import { fichaQuality, auditFichas } from "../../inverse/ficha-quality.js";
 
 // `onto ficha audit` / `onto ficha cleanup <node>` — measure and fix the
 // quality of a node's intent record (its "ficha": prompt + contract + rules).

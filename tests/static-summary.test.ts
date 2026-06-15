@@ -5,15 +5,15 @@ import {
   ManifestationSchema,
   NodeKindSchema,
 } from "../src/kernel/schemas/ontology.js";
-import { buildStaticSummary } from "../src/runtime/legend/static-summary.js";
+import { buildStaticSummary } from "../src/inverse/static-summary.js";
 import { decideStaticClassifierIngestAction } from "../src/surfaces/commands/ingest/static-classifier-policy.js";
-import { classifySourceFile } from "../src/runtime/legend/structural-classifier.js";
+import { classifySourceFile } from "../src/inverse/structural-classifier.js";
 import type {
   StructuralClassification,
   StructuralShape,
   SemanticRole,
   ClassificationVocabulary,
-} from "../src/runtime/legend/structural-classifier.js";
+} from "../src/inverse/structural-classifier.js";
 
 // Mirror of ExtractionResultSchema from src/commands/ingest/index.ts.
 // Imported separately here (rather than from the commands module) to

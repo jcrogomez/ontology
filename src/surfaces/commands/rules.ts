@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { loadNodeById, loadNodes } from "../../kernel/core/project/load.js";
-import { checkRules, classifyRule, type RuleVerdict } from "../../runtime/legend/rule-checker.js";
+import { checkRules, classifyRule, type RuleVerdict } from "../../inverse/rule-checker.js";
 
 // `onto rules check <node>` / `onto rules audit` — the enforcement + triage
 // surface for a node's `rules`. rules-grounding (LENS_LAWS_2026-06-13 E2) made

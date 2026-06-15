@@ -4,7 +4,7 @@ import {
   AbstractionLevelSchema,
   ManifestationSchema,
   NodeKindSchema,
-} from "../../kernel/schemas/ontology.js";
+} from "../kernel/schemas/ontology.js";
 import type {
   ClassificationVocabulary,
   StructuralClassification,
@@ -132,13 +132,13 @@ function buildBarrelSummary(
   language: string,
   vocabulary: ClassificationVocabulary | undefined,
 ): StaticExtractionResult {
-  // Named re-exports (`export { Foo } from "./foo.js"`) — the file's
+  // Named re-exports (`export { Foo } from "../runtime/legend/foo.js"`) — the file's
   // public surface. Each appears in vocabulary.exports with a
   // reExportedFrom field set.
   const namedReExports = (vocabulary?.exports ?? []).filter(
     (e) => e.reExportedFrom !== undefined,
   );
-  // Wildcard re-exports (`export * from "./foo.js"`) — at the AST
+  // Wildcard re-exports (`export * from "../runtime/legend/foo.js"`) — at the AST
   // level the parser surfaces them only as synthetic imports with
   // EMPTY `symbols` arrays. We dedupe against the modules already
   // covered by named re-exports so we don't double-count when both

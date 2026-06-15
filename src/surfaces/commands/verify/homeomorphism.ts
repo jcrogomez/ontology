@@ -46,7 +46,7 @@ import {
   aggregateByIntersection,
   REQUIRED_INTERSECTIONS,
 } from "../../../runtime/legend/matrix-intersections.js";
-import { tagFileFromDisk } from "../../../runtime/legend/frontier-tagger.js";
+import { tagFileFromDisk } from "../../../inverse/frontier-tagger.js";
 import { aggregateByTaskModel } from "../../../runtime/legend/pareto.js";
 import {
   barChart,
@@ -65,7 +65,7 @@ import {
   type CompileBackExportIntegration,
   type ExportRecoveryAggregate,
 } from "../../../runtime/legend/export-recovery.js";
-import { scanFileSymbols } from "../../../runtime/legend/ast-symbol-scanner.js";
+import { scanFileSymbols } from "../../../inverse/ast-symbol-scanner.js";
 import { inferManifestationFromSourcePath } from "../../../forward/compile/manifestation-mapper.js";
 import {
   tagFailureModes,

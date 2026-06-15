@@ -10,7 +10,7 @@ import {
   type MatrixCost,
   type PerNodeMatrix,
 } from "../src/runtime/legend/matrix.js";
-import type { FrontierAttribute } from "../src/runtime/legend/frontier-tagger.js";
+import type { FrontierAttribute } from "../src/inverse/frontier-tagger.js";
 import type { HomeomorphismVerdict } from "../src/runtime/legend/verify-homeomorphism.js";
 
 const ZERO_COST: MatrixCost = {

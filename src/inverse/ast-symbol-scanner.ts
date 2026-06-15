@@ -1,5 +1,5 @@
 import * as fs from "node:fs";
-import { parseTypeScriptFile } from "../static/typescript.js";
+import { parseTypeScriptFile } from "./static/typescript.js";
 
 // AST symbol scanner (Phase ε Move 3α — grounding determinista).
 //
@@ -23,7 +23,7 @@ import { parseTypeScriptFile } from "../static/typescript.js";
 //     mandatoryExports inject the truth a second time, at the codegen
 //     stage.
 //
-// Wildcard re-exports (`export * from "./x.js"`) produce no entries
+// Wildcard re-exports (`export * from "../runtime/legend/x.js"`) produce no entries
 // because they have no local name at the AST surface. Default exports
 // are excluded from mandatoryExports because "default" is a position,
 // not a symbol identifier — downstream provides/requires arrays match
@@ -34,7 +34,7 @@ export interface ASTSymbolScanResult {
   /** All exported identifiers from the source file's AST. Includes
    * value exports (`export const X`, `export function X`, exported
    * classes/enums), type-only exports (`export interface X`,
-   * `export type X`), and named re-exports (`export { X } from "./y.js"`).
+   * `export type X`), and named re-exports (`export { X } from "../runtime/legend/y.js"`).
    * Excludes wildcard re-exports (no local name) and the bare
    * `default` position (not a matchable identifier).
    *
@@ -42,7 +42,7 @@ export interface ASTSymbolScanResult {
    * code_sketch grounding constraints. */
   mandatoryExports: string[];
   /** Subset of mandatoryExports that pass through from another module
-   * (`export { X } from "./y.js"`). Surfaced so consumers can be lenient
+   * (`export { X } from "../runtime/legend/y.js"`). Surfaced so consumers can be lenient
    * when matching upstream provides — the canonical source of a
    * re-export may live in the re-exported-from module, not in this
    * file. */
@@ -53,7 +53,7 @@ export interface ASTSymbolScanResult {
    * which is indistinguishable from a legitimately empty file. */
   ok: boolean;
   /** True when the source has at least one bare wildcard re-export
-   * (`export * from "./x.js"`). Those re-export the upstream module's named
+   * (`export * from "../runtime/legend/x.js"`). Those re-export the upstream module's named
    * symbols under THIS module's surface but carry no local name here, so they
    * are absent from `mandatoryExports`. Consumers reasoning about export
    * *completeness* (the ficha phantom-provides check) must treat a true value

@@ -13,15 +13,15 @@ import {
   fetchPullRequest,
   fetchIssue,
   type IntentSource,
-} from "../../../runtime/ingest/github.js";
+} from "../../../inverse/ingest/github.js";
 import { dispatchLlmRequest } from "../../../runtime/llm/dispatcher.js";
 import type { LlmProvider, LlmResponse } from "../../../runtime/llm/types.js";
-import { collectSourceFiles } from "../../../runtime/static/typescript.js";
+import { collectSourceFiles } from "../../../inverse/static/typescript.js";
 import {
   extractResolvedSignatures,
   type ResolvedExport,
-} from "../../../runtime/static/typescript-resolved.js";
-import { inferEdgesAutoFromDirectoryAsync } from "../../../runtime/static/edges.js";
+} from "../../../inverse/static/typescript-resolved.js";
+import { inferEdgesAutoFromDirectoryAsync } from "../../../inverse/static/edges.js";
 import { errorMessage } from "../../../kernel/core/errors.js";
 import {
   computeCostEstimate,
@@ -45,19 +45,19 @@ import {
 import {
   classifySourceFile,
   type StructuralClassification,
-} from "../../../runtime/legend/structural-classifier.js";
-import { buildStaticSummary } from "../../../runtime/legend/static-summary.js";
+} from "../../../inverse/structural-classifier.js";
+import { buildStaticSummary } from "../../../inverse/static-summary.js";
 import {
   INTENT_NARRATION_PROMPT,
   IntentNarrationSchema,
   buildIntentNeighborhoodPrompt,
   type IntentNarration,
   type NeighborhoodFile,
-} from "../../../runtime/legend/intent-narration.js";
+} from "../../../inverse/intent-narration.js";
 import {
   scanFileSymbols,
   patchProvidesWithAST,
-} from "../../../runtime/legend/ast-symbol-scanner.js";
+} from "../../../inverse/ast-symbol-scanner.js";
 import { extractRulesBlock } from "../../../forward/compile/rules-grounding.js";
 import {
   decideStaticClassifierIngestAction,

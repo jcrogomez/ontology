@@ -7,8 +7,8 @@ import {
   parseRustFile,
   inferRustEdgesFromDirectory,
   rustBackendAvailable,
-} from "../src/runtime/static/rust.js";
-import { inferEdgesAutoFromDirectoryAsync } from "../src/runtime/static/edges.js";
+} from "../src/inverse/static/rust.js";
+import { inferEdgesAutoFromDirectoryAsync } from "../src/inverse/static/edges.js";
 
 // γ-4-rust — the tree-sitter backend behind the same two-function contract
 // as typescript.ts / python.ts. The fixture is a miniature crate exercising

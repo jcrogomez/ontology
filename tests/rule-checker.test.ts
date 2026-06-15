@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { classifyRule, extractStaticSymbol, checkRules } from "../src/runtime/legend/rule-checker.js";
+import { classifyRule, extractStaticSymbol, checkRules } from "../src/inverse/rule-checker.js";
 
 // Rule enforcement: classify a node's rules and statically check the decidable
 // ones. The live graph has ~0 statically-decidable rules (they're behavioural

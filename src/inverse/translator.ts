@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { OntologyNode } from "../../kernel/schemas/ontology.js";
+import type { OntologyNode } from "../kernel/schemas/ontology.js";
 
 // Project Legend δ-1 — the Inspector / Lupa primitive.
 //

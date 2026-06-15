@@ -6,7 +6,7 @@ import {
   scanFileSymbols,
   diffExportsAgainstAST,
   patchProvidesWithAST,
-} from "../src/runtime/legend/ast-symbol-scanner.js";
+} from "../src/inverse/ast-symbol-scanner.js";
 
 function withTempFile(filename: string, source: string, fn: (filePath: string) => void): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ast-scanner-"));

@@ -1,4 +1,4 @@
-import type { StructuralClassification } from "../../../runtime/legend/structural-classifier.js";
+import type { StructuralClassification } from "../../../inverse/structural-classifier.js";
 
 // Ingest-policy adapter for the Structural Semantic Classifier — the
 // "ingest policy consumes facts" side of Project Legend's separation

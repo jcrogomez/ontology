@@ -34,7 +34,7 @@ import {
   joinSystemSections,
   composeContextHash,
 } from "./ast-grounding.js";
-import { scanFileSymbols } from "../../runtime/legend/ast-symbol-scanner.js";
+import { scanFileSymbols } from "../../inverse/ast-symbol-scanner.js";
 import * as path from "node:path";
 import { getOntologyPaths } from "../../kernel/core/project/paths.js";
 import { appendJsonl } from "../../kernel/core/fs/json.js";

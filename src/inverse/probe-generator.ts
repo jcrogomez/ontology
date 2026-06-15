@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { OntologyNode } from "../../kernel/schemas/ontology.js";
-import { loadFixture, runBehaviorCheck } from "./behavior-checker.js";
+import type { OntologyNode } from "../kernel/schemas/ontology.js";
+import { loadFixture, runBehaviorCheck } from "../runtime/legend/behavior-checker.js";
 
 // Probe generator — turns a node's intent + source into a SELF-VALIDATED
 // behavioural fixture, the missing safety net for `onto regenerate --write`.
@@ -25,7 +25,7 @@ export const PROBE_SYSTEM_PROMPT = `You write behavioural test fixtures for a co
 
 You are given one TypeScript source module and its declared exports. Output ONLY a TypeScript fixture module of this exact shape (no prose, no markdown fences):
 
-import type { BehaviorCase } from "../../src/runtime/legend/behavior-checker.js";
+import type { BehaviorCase } from "../src/runtime/legend/behavior-checker.js";
 
 export const cases: BehaviorCase[] = [
   {

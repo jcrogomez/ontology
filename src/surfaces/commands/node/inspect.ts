@@ -13,7 +13,7 @@ import {
   buildInspectorPrompt,
   checkTranslatorCache,
   computeTranslatorSourceHash,
-} from "../../../runtime/legend/translator.js";
+} from "../../../inverse/translator.js";
 
 // `onto node inspect <nodeId>` — Project Legend δ-1 (Inspector / Lupa).
 //

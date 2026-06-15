@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { extractTopLevelDeclarations } from "../src/runtime/legend/verify-homeomorphism.js";
-import { computeTranslatorSourceHash } from "../src/runtime/legend/translator.js";
+import { computeTranslatorSourceHash } from "../src/inverse/translator.js";
 import { OntologyEventSchema } from "../src/kernel/schemas/ontology.js";
 import type { OntologyNode } from "../src/kernel/schemas/ontology.js";
 

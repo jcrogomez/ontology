@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { OntologyNode } from "../../kernel/schemas/ontology.js";
+import type { OntologyNode } from "../kernel/schemas/ontology.js";
 import { scanFileSymbols } from "./ast-symbol-scanner.js";
 import { classifyRule } from "./rule-checker.js";
 
@@ -40,7 +40,7 @@ export interface FichaQuality {
   // false phantom feeds `--prune` and silently deletes a real contract key.
   // Three things break determinability and force `phantom: []`:
   //   1. an unreadable / unparseable source file (can't see exports at all);
-  //   2. a bare wildcard re-export (`export * from "./x.js"`) — surfaces names
+  //   2. a bare wildcard re-export (`export * from "../runtime/legend/x.js"`) — surfaces names
   //      with no local AST identifier, so an undeclared-looking provide may be
   //      legitimately re-exported through the star;
   //   3. an empty AST export surface (presence-only / side-effect modules).

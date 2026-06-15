@@ -6,8 +6,8 @@ import {
   tagFile,
   tagFileFromDisk,
   type TaggerAttribute,
-} from "../src/runtime/legend/frontier-tagger.js";
-import { collectSourceFiles } from "../src/runtime/static/typescript.js";
+} from "../src/inverse/frontier-tagger.js";
+import { collectSourceFiles } from "../src/inverse/static/typescript.js";
 
 const REPO_ROOT = path.resolve(__dirname, "..");
 
