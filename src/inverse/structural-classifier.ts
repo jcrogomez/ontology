@@ -579,7 +579,7 @@ function applyRules(args: {
   }
 
   // 7. CLI — commander import OR commands/ path + cli-like content
-  const onCommandsPath = /(^|\/)src\/commands\//.test(filePath.replace(/\\/g, "/"));
+  const onCommandsPath = /(^|\/)src\/(?:surfaces\/)?commands\//.test(filePath.replace(/\\/g, "/"));
   const isCliFile = base === "cli.ts" || base === "cli.js";
   if (signals.hasCliEntrypoint || isCliFile) {
     return {

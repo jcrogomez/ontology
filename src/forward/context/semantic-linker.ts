@@ -2,7 +2,7 @@ import { assembleContext } from "./assembler.js";
 import { buildFragment, type ContextFragment } from "./presheaf.js";
 import { glueFragments, type GluingConflict } from "./gluing.js";
 import { validateIntent } from "./intent-validator.js";
-import { OntologyRuntimeError } from "../../runtime/errors.js";
+import { OntologyRuntimeError } from "../../kernel/errors.js";
 import { LlmProviderSchema, type OntologyEdge } from "../../kernel/schemas/ontology.js";
 import type { Omega } from "../../laws/topos/index.js";
 

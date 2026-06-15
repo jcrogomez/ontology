@@ -1467,7 +1467,7 @@ export function renderReportMarkdown(
     );
     lines.push(``);
     lines.push(
-      `Frontier tags come from the path/content tagger (\`src/runtime/legend/frontier-tagger.ts\`) unioned with verdict-derived tags. Required intersections are pre-registered in \`SELF_INGEST_HYPOTHESIS_<date>.md\` §6.`,
+      `Frontier tags come from the path/content tagger (\`src/inverse/frontier-tagger.ts\`) unioned with verdict-derived tags. Required intersections are pre-registered in \`SELF_INGEST_HYPOTHESIS_<date>.md\` §6.`,
     );
   }
   lines.push(``);

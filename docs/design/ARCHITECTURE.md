@@ -12,93 +12,86 @@ mathematical interpretation, read this alongside
 
 ## Module map
 
+Since the source reorg (RESTRUCTURE_PROPOSAL.md Part B), `src/` is grouped
+by *role in the math* — the tree reads as `C, F, G, F∘G`:
+
 ```
 src/
-  cli.ts                    — entry point + command registration
+  cli.ts                    — entry point + command registration (→ dist/cli.js)
 
-  schemas/                  — Zod schemas: nodes, edges, events, runs,
+  kernel/                   — the category C of intent (pure primitives)
+    core/                   — hashing, fs abstraction, project paths,
+                              drafts/proposals/runs persistence, render
+                              helpers, projects registry, integrity/merkle.
+    schemas/                — Zod schemas: nodes, edges, events, runs,
                               proposals, prompt AST, error envelope.
-                              Every entry point parses through here.
-  core/                     — pure kernel primitives (no IO outside
-                              .ontology/). Hashing, file-system
-                              abstraction, project paths, drafts /
-                              proposals / runs persistence, render
-                              helpers, projects registry.
-  commands/                 — CLI surface. Each command is a thin
-                              translator from CLI args → kernel calls
-                              → render. Includes `init`, `validate`,
-                              `inspect`, `node {create,list,show}`,
-                              `node link`, `events tail`, `context
-                              assemble`, `run prompt|context`, `runs
-                              {list,show,verify}`, `graph
-                              {neighbors,path,subgraph}`, `propose
-                              {node,link}`, `proposal
-                              {list,show,apply,reject}`, `compile
-                              {plan,run}`, `query` (incl.
-                              `--semantic` hybrid retrieval),
-                              `replay`, `drift`, `semantic
-                              {index,links}`, `walk`, `open`,
-                              `projects {list,forget}`, `model
-                              {doctor,list}`, `doctor`.
-  walker/                   — Ink-based interactive TUI (`onto walk`).
-                              Actions in `walker/actions/`; key handling
-                              and state in `walker/state/`.
-  runtime/
-    llm/                    — adapter boundary (mock + ollama),
-                              dispatcher, model registry, model
-                              resolution.
-    context/                — assembleContext (parent path + edge
-                              neighbors); presheaf `buildFragment`;
-                              gluing; semantic linker; intent
-                              validator (now built on the topos
-                              predicate algebra — see §"Validator").
-    semantic/               — local embedding index over node intent
-                              text (`embedding-index.ts`, 2026-06-10);
-                              backs `semantic index|links` and
-                              `query --semantic`. Sibling:
-                              `core/integrity/merkle.ts` (2026-06-10)
-                              — Merkle tree over compiled artifacts
-                              backing `onto drift` change-detection.
-    graph/                  — pure helpers: traversal, edges helper,
-                              poset, compile-plan (Kahn's algorithm
-                              over hard-dependency edges).
-    compile/                — compile-node (one step), compile-plan-
-                              runner (outer loop), artifact-writer,
-                              manifestation-mapper, upstream-context
-                              threading, post-write checks
-                              (`extract-code-fence`, `validate-
-                              language`, optional `runtime-check`).
+    graph/                  — pure helpers: traversal, edges, poset,
+                              compile-plan (Kahn over hard-dependency edges).
+    semantic/               — local embedding index over node intent text;
+                              backs `semantic index|links`, `query --semantic`.
+    errors.ts               — OntologyRuntimeError envelope.
+
+  forward/                  — F : Intent → Code
+    compile/                — compile-node (one step), compile-plan-runner
+                              (outer loop), artifact-writer, manifestation-
+                              mapper, upstream-context, post-write checks.
                               Built on `EffectWithLog`.
+    context/                — assembleContext (parent path + edge neighbors),
+                              presheaf `buildFragment`, gluing, semantic
+                              linker, intent validator (topos predicate algebra).
     prompt/                 — `parsePromptAST(raw)` (axiom 4 surface).
-    effects/                — Result / Effect / EffectWithLog monad
-                              library + async variant + monad-laws
-                              tests. See [`EFFECT_MONAD.md`](laws/EFFECT_MONAD.md).
-    query/                  — Yoneda-style Hom-profile matcher. See
-                              [`QUERY_REPRESENTABLE.md`](laws/QUERY_REPRESENTABLE.md).
-    fibration/              — `listBranches`, `computeBranchFiber`,
-                              `describeCartesianLift`. Read-only
-                              library. See [`BRANCH_FIBRATION.md`](laws/BRANCH_FIBRATION.md).
-    topos/                  — three-valued Ω predicate algebra
-                              (`omega.ts`, `predicate.ts`, `rule-
-                              compiler.ts`). See [`RULES_TOPOS.md`](laws/RULES_TOPOS.md).
+    templates/              — artifact templates + loader.
+
+  inverse/                  — G : Code → Intent (Project Legend extraction)
+    ast-symbol-scanner, ficha-quality, intent-narration, structural-
+    classifier, static-summary, frontier-tagger, rule-checker, probe-
+    generator, translator      — extraction / lift of code into intent
+    static/                 — TS/Rust syntactic + resolved analysis.
+    ingest/                 — ingest helpers.
+
+  laws/                     — F∘G ≈ id (round-trip measured) + extensions
+    verify-homeomorphism, matrix(+intersections), behavior-checker,
+    contract-checker, verdict-variance, pareto, loss-breakdown,
+    vocab-gap, failure-mode-tagger, reps-aggregator, export-recovery,
+    bakeoff-synthesis, reanchor-node, render-ascii, progress-report
+    effects/                — Result/Effect/EffectWithLog monad. See [`EFFECT_MONAD.md`](laws/EFFECT_MONAD.md).
+    query/                  — Yoneda Hom-profile matcher. See [`QUERY_REPRESENTABLE.md`](laws/QUERY_REPRESENTABLE.md).
+    fibration/              — branch fibers, cartesian lift (read-only). See [`BRANCH_FIBRATION.md`](laws/BRANCH_FIBRATION.md).
+    topos/                  — three-valued Ω predicate algebra. See [`RULES_TOPOS.md`](laws/RULES_TOPOS.md).
+
+  runtime/                  — the live engines
+    llm/                    — adapter boundary (mock/ollama/anthropic),
+                              dispatcher, model registry, model resolution.
+    workflow/               — Phase ζ: executor, graph-load, predicate-parser,
+                              verifier-schemas.
+
+  surfaces/                 — what a user/agent touches
+    commands/               — CLI surface; each command a thin translator
+                              (argv → kernel calls → render). Never imports
+                              sibling commands.
+    walker/                 — Ink TUI (`onto walk`); actions/ + state/.
+    mcp/                    — read-only `onto mcp` server.
 ```
 
 ## Layer boundaries
 
 1. **`src/cli.ts`** — pure router. Translates `argv` to a command call
    and exits with a status code. Never does work.
-2. **`src/commands/`** — CLI surface. Each command is the *only* place
-   that touches stdout / stderr in its flow. Commands compose pure
-   helpers from `runtime/` and persistence helpers from `core/`. They
-   never import sibling commands.
-3. **`src/runtime/`** — pure libraries. No filesystem effects except
-   through helpers from `core/project/load.ts`. No process exits, no
-   stdout. Anything that *can* be a pure function in `runtime/` is.
-4. **`src/core/`** — kernel primitives. Hashes, schemas, on-disk
+2. **`src/surfaces/commands/`** — CLI surface. Each command is the *only*
+   place that touches stdout / stderr in its flow. Commands compose pure
+   helpers from `forward/` / `inverse/` / `laws/` and persistence helpers
+   from `kernel/`. They never import sibling commands.
+3. **`src/forward/` · `src/inverse/` · `src/laws/`** — pure libraries
+   (F, G, and the F∘G≈id measurement). No filesystem effects except
+   through helpers from `kernel/core/project/load.ts`. No process exits,
+   no stdout. Anything that *can* be a pure function here is.
+   (**`src/runtime/`** holds the live engines instead: LLM dispatch and
+   the Phase-ζ workflow machine.)
+4. **`src/kernel/`** — kernel primitives. Hashes, schemas, on-disk
    layout, append-only writes. Owns the contract with `.ontology/`.
-5. **`src/walker/`** — Ink TUI. Renders react components against a
-   focal cell; calls into `runtime/` and `core/` exactly the same way
-   the CLI does. The walker never owns its own kernel state.
+5. **`src/surfaces/walker/`** — Ink TUI. Renders react components against
+   a focal cell; calls into the libraries and `kernel/` exactly the same
+   way the CLI does. The walker never owns its own kernel state.
 
 The boundary that matters most: **mutation is gated.** Only commands
 that explicitly intend to mutate (`init`, `node create`, `node link`,

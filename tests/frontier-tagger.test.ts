@@ -206,10 +206,12 @@ describe("frontier-tagger — tagFile returns reasons", () => {
 describe("frontier-tagger — perimeter coverage (SELF_INGEST_HYPOTHESIS_2026-05-13 §6)", () => {
   it("every file in the canonical Phase ε perimeter has at least one attribute", () => {
     const perimeter = [
+      path.join(REPO_ROOT, "src", "kernel"),
+      path.join(REPO_ROOT, "src", "forward"),
+      path.join(REPO_ROOT, "src", "inverse"),
+      path.join(REPO_ROOT, "src", "laws"),
       path.join(REPO_ROOT, "src", "runtime"),
-      path.join(REPO_ROOT, "src", "core"),
-      path.join(REPO_ROOT, "src", "commands"),
-      path.join(REPO_ROOT, "src", "schemas"),
+      path.join(REPO_ROOT, "src", "surfaces"),
     ];
     const files: string[] = [];
     for (const dir of perimeter) {
@@ -227,10 +229,12 @@ describe("frontier-tagger — perimeter coverage (SELF_INGEST_HYPOTHESIS_2026-05
 
   it("the canonical perimeter hits every faithful-prediction tag at least once", () => {
     const perimeter = [
+      path.join(REPO_ROOT, "src", "kernel"),
+      path.join(REPO_ROOT, "src", "forward"),
+      path.join(REPO_ROOT, "src", "inverse"),
+      path.join(REPO_ROOT, "src", "laws"),
       path.join(REPO_ROOT, "src", "runtime"),
-      path.join(REPO_ROOT, "src", "core"),
-      path.join(REPO_ROOT, "src", "commands"),
-      path.join(REPO_ROOT, "src", "schemas"),
+      path.join(REPO_ROOT, "src", "surfaces"),
     ];
     const files: string[] = [];
     for (const dir of perimeter) {
@@ -254,10 +258,12 @@ describe("frontier-tagger — perimeter coverage (SELF_INGEST_HYPOTHESIS_2026-05
 
   it("the canonical perimeter hits every resistant-prediction tag at least once", () => {
     const perimeter = [
+      path.join(REPO_ROOT, "src", "kernel"),
+      path.join(REPO_ROOT, "src", "forward"),
+      path.join(REPO_ROOT, "src", "inverse"),
+      path.join(REPO_ROOT, "src", "laws"),
       path.join(REPO_ROOT, "src", "runtime"),
-      path.join(REPO_ROOT, "src", "core"),
-      path.join(REPO_ROOT, "src", "commands"),
-      path.join(REPO_ROOT, "src", "schemas"),
+      path.join(REPO_ROOT, "src", "surfaces"),
     ];
     const files: string[] = [];
     for (const dir of perimeter) {
@@ -284,7 +290,7 @@ describe("frontier-tagger — perimeter coverage (SELF_INGEST_HYPOTHESIS_2026-05
 
 describe("frontier-tagger — tagFileFromDisk", () => {
   it("reads a real file and runs both path and content rules", () => {
-    const target = path.join(REPO_ROOT, "src", "core", "integrity", "hash.ts");
+    const target = path.join(REPO_ROOT, "src", "kernel", "core", "integrity", "hash.ts");
     const result = tagFileFromDisk(target);
     expect(result.attrs).toContain("pure-transform");
   });

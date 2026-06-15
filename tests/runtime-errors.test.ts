@@ -5,7 +5,7 @@ import {
   OntologyTopologyError,
   OntologyBranchError,
   OntologyInvariantError,
-} from '../src/runtime/errors.js';
+} from '../src/kernel/errors.js';
 
 describe('Ontology Runtime Errors', () => {
   const errorClasses = [

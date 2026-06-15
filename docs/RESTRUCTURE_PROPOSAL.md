@@ -1,7 +1,27 @@
 # RESTRUCTURE PROPOSAL — docs + source, grounded in the F/G/laws structure
 
-> **Status (2026-06-15): Part A (docs) EXECUTED. Part B (source) not yet
-> executed.** The 32 design docs were `git mv`'d into
+> **Status (2026-06-15): Part A (docs) and Part B (source) BOTH EXECUTED.**
+> Part B collapsed `src/` into the six role buckets — `kernel/ forward/
+> inverse/ laws/ runtime/ surfaces/` (+ `cli.ts`) — in per-bucket commits,
+> each tsc-green; ~860 relative import specifiers across src + tests
+> recomputed by an extension-agnostic resolver; the `runtime/legend/` split
+> (the one judgement call) sent 9 extraction files → `inverse/`, 16
+> verification files → `laws/`; `errors.ts` → `kernel/`. The path-heuristic
+> instruments coupled to the old layout (`frontier-tagger.ts`,
+> `structural-classifier.ts`) were **augmented, not replaced** — their rules
+> now match BOTH the conventional layout (so external-project ingest +
+> `examples/legend-fixture/` still work) AND the new self-layout (so the
+> Phase-ε self-perimeter coverage holds). The dated `SELF_INGEST_HYPOTHESIS
+> §6` record is untouched; a re-ingest reconciles the live `.ontology` graph
+> against the new tree (run separately). CLI help-text pointers,
+> `scripts/bakeoff.sh`, the CLAUDE.md repo-layout tree and this doc's
+> ARCHITECTURE module map were realigned.
+>
+> *(A first Part-B attempt was reverted when a naive "repoint rules at the
+> new buckets" broke the general/conventional tagger; the augment approach
+> above is the fix.)*
+>
+> **Original Part A status:** the 32 design docs were `git mv`'d into
 > `docs/design/{kernel,forward,inverse,laws,runtime,surfaces}/` +
 > `docs/meta/`, every relative link in the living docs + the `docs/…`
 > pointers in `src/**.ts` comments were rewritten, and `docs/design/README.md`

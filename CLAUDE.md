@@ -94,18 +94,18 @@ the `.ts` sources).
 ## Repo layout (orientation)
 
 ```
-src/
-  core/            kernel: nodes, edges, events, fs (atomic writes), integrity/hash
-  schemas/         Zod schemas (ontology.ts, workflow.ts)
-  runtime/
-    llm/           dispatcher, adapters (mock/ollama/anthropic), registry, model-capabilities
-    compile/       the forward functor F (compile-node, plan runner, ast-grounding)
-    context/       presheaf context assembly + gluing
-    workflow/      Phase ζ: executor, graph-load, predicate-parser, verifier-schemas
-    legend/        Phase ε: verify-homeomorphism, matrix, behavior-checker, export-recovery
-    topos/ fibration/ effects/ query/   the four categorical extensions
-  commands/        CLI command implementations (onto <verb>)
-  walker/          interactive TUI
+src/                 grouped by role in F : Intent→Code, G : Code→Intent (see docs/RESTRUCTURE_PROPOSAL.md Part B)
+  cli.ts             entry point + command registration (stays at root → dist/cli.js)
+  kernel/            the category C of intent: core/ (nodes, edges, events, fs, integrity/hash),
+                     schemas/ (Zod), graph/, semantic/, errors.ts
+  forward/           F : Intent→Code — compile/ (the forward functor), context/ (presheaf
+                     assembly + gluing), prompt/, templates/
+  inverse/           G : Code→Intent — extraction: ast-symbol-scanner, ficha-quality,
+                     intent-narration, structural-classifier, frontier-tagger, … + static/, ingest/
+  laws/              F∘G≈id + extensions: verify-homeomorphism, matrix, behavior/contract
+                     checkers, … + topos/ fibration/ effects/ query/
+  runtime/           the live engines: llm/ (dispatcher, adapters, registry), workflow/ (Phase ζ)
+  surfaces/          what a user/agent touches: commands/ (onto <verb>), walker/ (TUI), mcp/
 tests/             vitest suites (mirror src/ loosely)
 docs/              orientation at top level (ROADMAP, VISION, MATHEMATICAL_CLAIMS, CLI_COMMANDS, GETTING_STARTED)
   design/          component design grouped by role — kernel/ forward/(F) inverse/(G) laws/ runtime/ surfaces/; index in design/README.md

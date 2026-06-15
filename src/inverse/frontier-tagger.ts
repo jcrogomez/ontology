@@ -107,47 +107,47 @@ interface PathRule {
 const PATH_RULES: readonly PathRule[] = [
   // ── Faithful predictions (specific files first, then regions) ──
   {
-    match: /\/src\/runtime\/context\/intent-validator\.ts$/,
+    match: /\/src\/(?:runtime|forward)\/context\/intent-validator\.ts$/,
     attrs: ["declarative-validator", "schema-driven"],
     why: "Explicit predicate evaluator on the topos Ω algebra; closest to schema-driven declarative validation in the codebase.",
   },
   {
-    match: /\/src\/runtime\/topos\/rule-compiler\.ts$/,
+    match: /\/src\/(?:runtime|laws)\/topos\/rule-compiler\.ts$/,
     attrs: ["declarative-validator", "schema-driven"],
     why: "Compiles node `rules` into Ω predicates; declarative by construction.",
   },
   {
-    match: /\/src\/schemas\//,
+    match: /\/src\/(?:kernel\/)?schemas\//,
     attrs: ["schema-driven"],
     why: "Pure Zod schemas: the closest the codebase comes to a flat declarative surface.",
   },
   {
-    match: /\/src\/runtime\/effects\//,
+    match: /\/src\/(?:runtime|laws)\/effects\//,
     attrs: ["algebraic-lawful", "pure-transform"],
     why: "Monad library with the three laws tested (T1 in MATHEMATICAL_CLAIMS §3.6).",
   },
   {
-    match: /\/src\/runtime\/topos\//,
+    match: /\/src\/(?:runtime|laws)\/topos\//,
     attrs: ["algebraic-lawful", "pure-transform"],
     why: "Three-valued Ω algebra (truth tables, monotonicity, parity) — T1 in MATHEMATICAL_CLAIMS §3.9.",
   },
   {
-    match: /\/src\/core\/integrity\//,
+    match: /\/src\/(?:kernel\/)?core\/integrity\//,
     attrs: ["pure-transform"],
     why: "Content-addressed hashing primitives over canonical JSON; the γ-2 calibration sample.",
   },
   {
-    match: /\/src\/runtime\/graph\//,
+    match: /\/src\/(?:runtime|kernel)\/graph\//,
     attrs: ["pure-transform"],
     why: "Compile-plan Kahn sort, poset enforcement, hard-dependency graph math — algorithmic, no IO.",
   },
   {
-    match: /\/src\/runtime\/fibration\//,
+    match: /\/src\/(?:runtime|laws)\/fibration\//,
     attrs: ["pure-transform"],
     why: "Branch-fiber computation and cartesian-lift description; structural graph operations.",
   },
   {
-    match: /\/src\/runtime\/query\//,
+    match: /\/src\/(?:runtime|laws)\/query\//,
     attrs: ["pure-transform"],
     why: "Representable functor / Yoneda search: pattern matching over node Hom-profiles.",
   },
@@ -157,17 +157,17 @@ const PATH_RULES: readonly PathRule[] = [
     why: "Verify-homeomorphism distance helpers (LoC + structural Jaccard); pure math.",
   },
   {
-    match: /\/src\/runtime\/legend\/verify-homeomorphism\.ts$/,
+    match: /\/src\/(?:runtime\/legend|laws)\/verify-homeomorphism\.ts$/,
     attrs: ["pure-transform"],
     why: "δ-2 distance + verdict classifier; comparison library with no LLM, no IO beyond two file reads.",
   },
   {
-    match: /\/src\/runtime\/static\//,
+    match: /\/src\/(?:runtime|inverse)\/static\//,
     attrs: ["pure-transform"],
     why: "TypeScript-compiler-API and regex-based static-edge inference; deterministic.",
   },
   {
-    match: /\/src\/runtime\/prompt\//,
+    match: /\/src\/(?:runtime|forward)\/prompt\//,
     attrs: ["schema-driven"],
     why: "Marker-anchored prompt parser (@requires:/@provides:/@expand:); structured AST extraction.",
   },
@@ -177,7 +177,21 @@ const PATH_RULES: readonly PathRule[] = [
     why: "Algorithmic Legend helpers (distance metrics, frontier classification, structural comparison). Specific files inside legend/ may add more attributes via narrower rules.",
   },
   {
-    match: /\/src\/core\/render\//,
+    // Former runtime/legend/ files relocated flat into src/laws/ and
+    // src/inverse/ (the categorical subdirs effects/topos/fibration/query
+    // and static/ carry their own rules above). Matches files DIRECTLY in
+    // the bucket, not its subdirs.
+    match: /\/src\/laws\/[^/]+\.ts$/,
+    attrs: ["pure-transform"],
+    why: "Relocated Legend verification helper (verify-homeomorphism, matrix, variance, …).",
+  },
+  {
+    match: /\/src\/inverse\/[^/]+\.ts$/,
+    attrs: ["pure-transform"],
+    why: "Relocated Legend extraction helper (ast-symbol-scanner, structural-classifier, …).",
+  },
+  {
+    match: /\/src\/(?:kernel\/)?core\/render\//,
     attrs: ["pure-transform"],
     why: "Pure text formatting (box, style, table) — no IO, no state.",
   },
@@ -189,62 +203,62 @@ const PATH_RULES: readonly PathRule[] = [
     why: "External LLM provider adapter: network call, retry semantics, cost telemetry, prompt caching.",
   },
   {
-    match: /\/src\/runtime\/compile\/artifact-writer\.ts$/,
+    match: /\/src\/(?:runtime|forward)\/compile\/artifact-writer\.ts$/,
     attrs: ["io-bound", "operational-glue"],
     why: "Writes compiled artifacts to disk under .ontology; filesystem boundary.",
   },
   {
-    match: /\/src\/core\/fs\/lock\.ts$/,
+    match: /\/src\/(?:kernel\/)?core\/fs\/lock\.ts$/,
     attrs: ["operational-glue", "io-bound"],
     why: "Advisory lock under .ontology/.lock; locking + crash-recovery details that resist intent extraction.",
   },
   {
-    match: /\/src\/core\/fs\//,
+    match: /\/src\/(?:kernel\/)?core\/fs\//,
     attrs: ["io-bound", "operational-glue"],
     why: "Filesystem primitives (atomic write, lock, JSON read/write).",
   },
   {
-    match: /\/src\/core\/state\//,
+    match: /\/src\/(?:kernel\/)?core\/state\//,
     attrs: ["io-bound", "operational-glue"],
     why: "State-store: append-only event log, state.json persistence.",
   },
   {
-    match: /\/src\/core\/proposals\//,
+    match: /\/src\/(?:kernel\/)?core\/proposals\//,
     attrs: ["io-bound", "operational-glue"],
     why: "Proposal persistence under .ontology/proposals + event chain integration.",
   },
   {
-    match: /\/src\/core\/project\//,
+    match: /\/src\/(?:kernel\/)?core\/project\//,
     attrs: ["io-bound", "operational-glue"],
     why: "Project init + state loading; filesystem-driven bootstrap.",
   },
   {
-    match: /\/src\/core\/runs\//,
+    match: /\/src\/(?:kernel\/)?core\/runs\//,
     attrs: ["io-bound", "operational-glue"],
     why: "Content-addressed run records under .ontology/runs; hashing + persistence.",
   },
   {
-    match: /\/src\/core\/nodes\//,
+    match: /\/src\/(?:kernel\/)?core\/nodes\//,
     attrs: ["io-bound", "operational-glue"],
     why: "Node CRUD against the .ontology/nodes store; touches state and integrity hashes.",
   },
   {
-    match: /\/src\/core\/edges\//,
+    match: /\/src\/(?:kernel\/)?core\/edges\//,
     attrs: ["io-bound", "operational-glue"],
     why: "Edge CRUD against the .ontology/edges store; touches state and integrity hashes.",
   },
   {
-    match: /\/src\/core\/drafts\//,
+    match: /\/src\/(?:kernel\/)?core\/drafts\//,
     attrs: ["io-bound", "operational-glue"],
     why: "Draft persistence under .ontology/drafts.",
   },
   {
-    match: /\/src\/core\/projects\//,
+    match: /\/src\/(?:kernel\/)?core\/projects\//,
     attrs: ["io-bound", "operational-glue"],
     why: "Multi-project registry persistence.",
   },
   {
-    match: /\/src\/(?:core|runtime)\/errors\.ts$/,
+    match: /\/src\/(?:core|runtime|kernel)\/errors\.ts$/,
     attrs: ["operational-glue"],
     why: "Error-message helpers; small glue surface.",
   },
@@ -254,32 +268,32 @@ const PATH_RULES: readonly PathRule[] = [
     why: "LLM dispatcher / registry / type wrappers; orchestration around providers.",
   },
   {
-    match: /\/src\/runtime\/compile\//,
+    match: /\/src\/(?:runtime|forward)\/compile\//,
     attrs: ["operational-glue"],
     why: "Compile orchestration: plan runner, cache lookup, post-compile checks.",
   },
   {
-    match: /\/src\/runtime\/context\//,
+    match: /\/src\/(?:runtime|forward)\/context\//,
     attrs: ["operational-glue"],
     why: "Context assembler / presheaf glue; orchestrates schema-driven validators but is itself orchestration.",
   },
   {
-    match: /\/src\/runtime\/legend\/translator\.ts$/,
+    match: /\/src\/(?:runtime\/legend|inverse)\/translator\.ts$/,
     attrs: ["operational-glue", "prompt-sensitive"],
     why: "δ-1 Inspector translator: caches an LLM call per node; prompt template is load-bearing.",
   },
   {
-    match: /\/src\/commands\/[^/]+\/.*\/index\.ts$/,
+    match: /\/src\/(?:surfaces\/)?commands\/[^/]+\/.*\/index\.ts$/,
     attrs: ["cli-parsing", "operational-glue"],
     why: "CLI sub-command entry point: argument parsing + dispatch.",
   },
   {
-    match: /\/src\/commands\/[^/]+\/index\.ts$/,
+    match: /\/src\/(?:surfaces\/)?commands\/[^/]+\/index\.ts$/,
     attrs: ["cli-parsing", "operational-glue"],
     why: "CLI command entry point: argument parsing + dispatch.",
   },
   {
-    match: /\/src\/commands\//,
+    match: /\/src\/(?:surfaces\/)?commands\//,
     attrs: ["operational-glue"],
     why: "CLI command sub-module (helpers, types, cost-estimate, sub-handlers).",
   },
@@ -289,7 +303,7 @@ const PATH_RULES: readonly PathRule[] = [
     why: "Top-level CLI dispatcher built on commander.",
   },
   {
-    match: /\/src\/walker\//,
+    match: /\/src\/(?:surfaces\/)?walker\//,
     attrs: ["tui-rendering", "operational-glue"],
     why: "Terminal UI: rendering, key handling, focal-cell management. Out of perimeter for the 2026-05-13 run; tagger handles it for later sweeps.",
   },
