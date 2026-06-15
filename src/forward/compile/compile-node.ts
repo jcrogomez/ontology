@@ -1,9 +1,9 @@
 import { randomBytes } from "node:crypto";
 import type { OntologyNode, OntologyEvent, OntologyModel, PersistedRunInput, PersistedRunModel } from "../../kernel/schemas/ontology.js";
 import { OntologyEventSchema } from "../../kernel/schemas/ontology.js";
-import { dispatchLlmRequest } from "../llm/dispatcher.js";
-import { resolveNodeModel } from "../llm/resolve-node-model.js";
-import type { LlmProvider, LlmTask } from "../llm/types.js";
+import { dispatchLlmRequest } from "../../runtime/llm/dispatcher.js";
+import { resolveNodeModel } from "../../runtime/llm/resolve-node-model.js";
+import type { LlmProvider, LlmTask } from "../../runtime/llm/types.js";
 import { hashPrompt, hashContext } from "../../kernel/core/integrity/hash.js";
 import type { ContextAssemblyOutput } from "../context/types.js";
 import { createPersistedRun, computeRunId, loadPersistedRun } from "../../kernel/core/runs/persist.js";
@@ -34,7 +34,7 @@ import {
   joinSystemSections,
   composeContextHash,
 } from "./ast-grounding.js";
-import { scanFileSymbols } from "../legend/ast-symbol-scanner.js";
+import { scanFileSymbols } from "../../runtime/legend/ast-symbol-scanner.js";
 import * as path from "node:path";
 import { getOntologyPaths } from "../../kernel/core/project/paths.js";
 import { appendJsonl } from "../../kernel/core/fs/json.js";
@@ -46,15 +46,15 @@ import {
   failWithLog,
   bindWithLog,
   runWithLog,
-} from "../effects/io.js";
-import { ok, err } from "../effects/result.js";
+} from "../../runtime/effects/io.js";
+import { ok, err } from "../../runtime/effects/result.js";
 import {
   type AsyncEffectWithLog,
   bindAsyncWithLog,
   liftEffectWithLog,
   liftPromiseWithLog,
   runAsyncWithLog,
-} from "../effects/async.js";
+} from "../../runtime/effects/async.js";
 
 // Single-node compile primitive.
 //

@@ -1,5 +1,5 @@
 import { loadNodes } from "../../kernel/core/project/load.js";
-import { runCompilePlan } from "../../runtime/compile/compile-plan-runner.js";
+import { runCompilePlan } from "../../forward/compile/compile-plan-runner.js";
 import { withLock, LockAcquireError } from "../../kernel/core/fs/lock.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
 import type { OntologyNode } from "../../kernel/schemas/ontology.js";

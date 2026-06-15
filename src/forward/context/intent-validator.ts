@@ -26,7 +26,7 @@
 
 import type { ContextAssemblyOutput } from "./types.js";
 import type { GluingResult } from "./gluing.js";
-import type { LlmProvider } from "../llm/types.js";
+import type { LlmProvider } from "../../runtime/llm/types.js";
 import {
   type EvaluationContext,
   type Omega,
@@ -35,7 +35,7 @@ import {
   atomForbids,
   atomRequires,
   evaluatePredicate,
-} from "../topos/index.js";
+} from "../../runtime/topos/index.js";
 
 // Synthetic tokens used to encode the validator's questions as atoms in the
 // predicate algebra. They are namespaced under `__validator__:` so they

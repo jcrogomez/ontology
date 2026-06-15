@@ -18,11 +18,11 @@ import * as path from "node:path";
 import {
   semanticLink,
   type SemanticLinkResult,
-} from "../../runtime/context/semantic-linker.js";
+} from "../../forward/context/semantic-linker.js";
 import {
   suggestEdgeProposals,
   type EdgeSuggestion,
-} from "../../runtime/context/edge-suggester.js";
+} from "../../forward/context/edge-suggester.js";
 import { loadEdges, loadNodeById, loadNodes, loadState } from "../../kernel/core/project/load.js";
 import { EdgeTypeSchema, type OntologyEdge } from "../../kernel/schemas/ontology.js";
 import { errorMessage } from "../../kernel/core/errors.js";

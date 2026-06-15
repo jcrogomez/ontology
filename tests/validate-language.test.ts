@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { spawnSync } from "node:child_process";
-import { validateLanguage } from "../src/runtime/compile/post/validate-language.js";
+import { validateLanguage } from "../src/forward/compile/post/validate-language.js";
 
 function pythonAvailable(): boolean {
   const r = spawnSync("python3", ["--version"], { encoding: "utf-8" });

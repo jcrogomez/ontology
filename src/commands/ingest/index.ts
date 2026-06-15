@@ -58,13 +58,13 @@ import {
   scanFileSymbols,
   patchProvidesWithAST,
 } from "../../runtime/legend/ast-symbol-scanner.js";
-import { extractRulesBlock } from "../../runtime/compile/rules-grounding.js";
+import { extractRulesBlock } from "../../forward/compile/rules-grounding.js";
 import {
   decideStaticClassifierIngestAction,
   type IngestAction,
   type StaticClassifierMode,
 } from "./static-classifier-policy.js";
-import { inferManifestationFromSourcePath } from "../../runtime/compile/manifestation-mapper.js";
+import { inferManifestationFromSourcePath } from "../../forward/compile/manifestation-mapper.js";
 
 // `onto ingest <paths...>` — Project Legend Phase γ-1 + γ-5 + Phase ε prework A.
 //

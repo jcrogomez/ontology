@@ -1,8 +1,8 @@
-import { assembleContext } from "../../runtime/context/assembler.js";
+import { assembleContext } from "../../forward/context/assembler.js";
 import { dispatchLlmRequest } from "../../runtime/llm/dispatcher.js";
-import { buildFragment } from "../../runtime/context/presheaf.js";
-import { glueFragments } from "../../runtime/context/gluing.js";
-import { validateIntent, type IntentValidationResult } from "../../runtime/context/intent-validator.js";
+import { buildFragment } from "../../forward/context/presheaf.js";
+import { glueFragments } from "../../forward/context/gluing.js";
+import { validateIntent, type IntentValidationResult } from "../../forward/context/intent-validator.js";
 import type { LlmTask, LlmProvider } from "../../runtime/llm/types.js";
 import { hashPrompt, hashContext } from "../../kernel/core/integrity/hash.js";
 import { createPersistedRun, computeRunId, loadPersistedRun } from "../../kernel/core/runs/persist.js";

@@ -4,7 +4,7 @@ import type {
   PersistedRunInput,
   PersistedRunModel,
 } from "../../schemas/ontology.js";
-import type { ContextAssemblyOutput } from "../../../runtime/context/types.js";
+import type { ContextAssemblyOutput } from "../../../forward/context/types.js";
 
 // Ontology invariant:
 // Hashing must be strictly deterministic across environments to guarantee network validation.

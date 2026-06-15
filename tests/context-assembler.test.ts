@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
-import { assembleContext } from "../src/runtime/context/assembler.js";
+import { assembleContext } from "../src/forward/context/assembler.js";
 import { OntologyNode, OntologyEdge } from "../src/kernel/schemas/ontology.js";
 
 describe("Context Assembler", () => {

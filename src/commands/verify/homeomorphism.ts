@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { randomBytes, createHash } from "node:crypto";
 import { loadNodes, loadNodeById } from "../../kernel/core/project/load.js";
-import { runCompilePlan } from "../../runtime/compile/compile-plan-runner.js";
+import { runCompilePlan } from "../../forward/compile/compile-plan-runner.js";
 import { loadPersistedRun } from "../../kernel/core/runs/persist.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
 import { errorMessage } from "../../kernel/core/errors.js";
@@ -66,7 +66,7 @@ import {
   type ExportRecoveryAggregate,
 } from "../../runtime/legend/export-recovery.js";
 import { scanFileSymbols } from "../../runtime/legend/ast-symbol-scanner.js";
-import { inferManifestationFromSourcePath } from "../../runtime/compile/manifestation-mapper.js";
+import { inferManifestationFromSourcePath } from "../../forward/compile/manifestation-mapper.js";
 import {
   tagFailureModes,
   aggregateFailureModes,

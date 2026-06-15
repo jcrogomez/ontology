@@ -13,11 +13,11 @@
 // and the surrounding presheaf), and the user can always run the CLI
 // for a different candidate.
 
-import { semanticLink, type SemanticLinkResult } from "../../runtime/context/semantic-linker.js";
+import { semanticLink, type SemanticLinkResult } from "../../forward/context/semantic-linker.js";
 import {
   suggestEdgeProposals,
   type EdgeSuggestion,
-} from "../../runtime/context/edge-suggester.js";
+} from "../../forward/context/edge-suggester.js";
 import { loadEdges, loadNodeById, loadNodes } from "../../kernel/core/project/load.js";
 import type { OntologyNode } from "../../kernel/schemas/ontology.js";
 

@@ -3,7 +3,7 @@ import {
   resolveArtifactExtension,
   defaultExtensionForManifestation,
   inferManifestationFromSourcePath,
-} from "../src/runtime/compile/manifestation-mapper.js";
+} from "../src/forward/compile/manifestation-mapper.js";
 
 describe("manifestation-mapper", () => {
   it("returns the per-manifestation default extension", () => {

@@ -1,4 +1,4 @@
-import { stripRulesBlock } from "../compile/rules-grounding.js";
+import { stripRulesBlock } from "../../forward/compile/rules-grounding.js";
 
 // Rule enforcement — turn a node's `rules` from preserved text (rules-grounding
 // closed that, LENS_LAWS_2026-06-13 E2) into VERIFIED invariants where it can,

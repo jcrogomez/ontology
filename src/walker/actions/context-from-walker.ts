@@ -7,8 +7,8 @@
 // so a future hardening pass can compare the walker's preview directly
 // with the run record's contextHash for free.
 
-import { assembleContext } from "../../runtime/context/assembler.js";
-import type { ContextAssemblyOutput } from "../../runtime/context/types.js";
+import { assembleContext } from "../../forward/context/assembler.js";
+import type { ContextAssemblyOutput } from "../../forward/context/types.js";
 
 export interface ContextFromWalkerResult {
   ok: boolean;

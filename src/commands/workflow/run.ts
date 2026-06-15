@@ -22,7 +22,7 @@ import {
 } from "../../kernel/schemas/ontology.js";
 import { validateEdgeDirection } from "../../kernel/graph/poset.js";
 import { parseTypeScriptFile } from "../../runtime/static/typescript.js";
-import { extractCodeFence } from "../../runtime/compile/post/extract-code-fence.js";
+import { extractCodeFence } from "../../forward/compile/post/extract-code-fence.js";
 import type { WorkflowProposedEdge, WorkflowProvision } from "../../kernel/schemas/workflow.js";
 
 // `onto workflow run` — Phase ζ v0.

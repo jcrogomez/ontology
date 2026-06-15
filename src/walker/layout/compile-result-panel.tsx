@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-import type { CompilePlanRunResult } from "../../runtime/compile/compile-plan-runner.js";
+import type { CompilePlanRunResult } from "../../forward/compile/compile-plan-runner.js";
 
 export interface CompileResultPanelProps {
   state:

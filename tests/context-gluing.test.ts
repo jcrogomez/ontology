@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { glueFragments } from "../src/runtime/context/gluing";
-import type { ContextFragment } from "../src/runtime/context/presheaf";
+import { glueFragments } from "../src/forward/context/gluing";
+import type { ContextFragment } from "../src/forward/context/presheaf";
 
 describe("context gluing", () => {
   const createFragment = (overrides: Partial<ContextFragment> = {}): ContextFragment => ({

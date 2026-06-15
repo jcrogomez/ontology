@@ -1,4 +1,4 @@
-import { runCompilePlan, type CompilePlanRunResult } from "../../runtime/compile/compile-plan-runner.js";
+import { runCompilePlan, type CompilePlanRunResult } from "../../forward/compile/compile-plan-runner.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
 
 export interface CompileFromWalkerOptions {

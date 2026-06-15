@@ -3,7 +3,7 @@ import {
   buildUpstreamSystemPrompt,
   hashUpstreamContext,
   type UpstreamContextItem,
-} from "../src/runtime/compile/upstream-context.js";
+} from "../src/forward/compile/upstream-context.js";
 
 describe("buildUpstreamSystemPrompt", () => {
   it("returns null when there are no upstreams (so callers omit `system`)", () => {

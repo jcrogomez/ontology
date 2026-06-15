@@ -19,7 +19,7 @@ import type {
   PersistedRunInput,
   PersistedRunModel,
 } from "../src/kernel/schemas/ontology.js";
-import type { ContextAssemblyOutput } from "../src/runtime/context/types.js";
+import type { ContextAssemblyOutput } from "../src/forward/context/types.js";
 
 const PROMPT_HASH_PREFIX = "prompt:hash:";
 const CTX_HASH_PREFIX = "ctx:hash:";

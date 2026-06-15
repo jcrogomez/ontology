@@ -6,7 +6,7 @@ import {
   writeArtifact,
   writeArtifactPending,
   TargetExistsError,
-} from "../../../src/runtime/compile/artifact-writer.js";
+} from "../../../src/forward/compile/artifact-writer.js";
 import {
   OntologyNodeSchema,
   type OntologyNode,

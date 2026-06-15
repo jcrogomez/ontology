@@ -14,7 +14,7 @@ import {
   suggestEdgeProposals,
   type EdgeSuggestion,
   type SuggestableEdgeType,
-} from "../../../src/runtime/context/edge-suggester.js";
+} from "../../../src/forward/context/edge-suggester.js";
 import type { OntologyEdge, OntologyNode } from "../../../src/kernel/schemas/ontology.js";
 
 function mkNode(id: string, opts: { branch?: string; provides?: string[]; abstraction?: OntologyNode["coordinates"]["abstraction"] } = {}): OntologyNode {

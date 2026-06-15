@@ -14,9 +14,9 @@ import {
 } from "../kernel/schemas/ontology.js";
 import { hashObject } from "../kernel/core/integrity/hash.js";
 import { registerProject } from "../kernel/core/projects/registry.js";
-import { loadTemplate, listTemplates } from "../runtime/templates/load.js";
-import { applyTemplate } from "../runtime/templates/apply.js";
-import type { Template } from "../runtime/templates/schema.js";
+import { loadTemplate, listTemplates } from "../forward/templates/load.js";
+import { applyTemplate } from "../forward/templates/apply.js";
+import type { Template } from "../forward/templates/schema.js";
 
 export interface InitOptions {
   // Friendly name for the global project registry. Defaults to the basename

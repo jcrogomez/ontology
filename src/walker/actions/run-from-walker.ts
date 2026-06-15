@@ -1,6 +1,6 @@
 import type { OntologyNode, PersistedRun, PersistedRunInput, PersistedRunModel } from "../../kernel/schemas/ontology.js";
-import { assembleContext } from "../../runtime/context/assembler.js";
-import type { ContextAssemblyOutput } from "../../runtime/context/types.js";
+import { assembleContext } from "../../forward/context/assembler.js";
+import type { ContextAssemblyOutput } from "../../forward/context/types.js";
 import { dispatchLlmRequest } from "../../runtime/llm/dispatcher.js";
 import type { LlmProvider, LlmResponse, LlmTask } from "../../runtime/llm/types.js";
 import { hashPrompt, hashContext } from "../../kernel/core/integrity/hash.js";

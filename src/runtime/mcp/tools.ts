@@ -32,7 +32,7 @@ import {
   extractSubgraph,
   type EdgeDirection,
 } from "../../kernel/graph/traversal.js";
-import { assembleContext } from "../context/assembler.js";
+import { assembleContext } from "../../forward/context/assembler.js";
 import { checkTranslatorCache } from "../legend/translator.js";
 import { EdgeTypeSchema, type OntologyNode, type OntologyEdge } from "../../kernel/schemas/ontology.js";
 

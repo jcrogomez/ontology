@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildFragment } from "../src/runtime/context/presheaf";
+import { buildFragment } from "../src/forward/context/presheaf";
 import type { OntologyNode } from "../src/kernel/schemas/ontology";
 
 describe("context presheaf", () => {

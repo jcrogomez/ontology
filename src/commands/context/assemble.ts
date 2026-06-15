@@ -1,4 +1,4 @@
-import { assembleContext } from "../../runtime/context/assembler.js";
+import { assembleContext } from "../../forward/context/assembler.js";
 import { EdgeTypeSchema } from "../../kernel/schemas/ontology.js";
 
 export async function contextAssembleCommand(

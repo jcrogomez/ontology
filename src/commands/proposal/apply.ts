@@ -2,8 +2,8 @@ import { applyProposal, loadProposal } from "../../kernel/core/proposals/persist
 import { errorMessage } from "../../kernel/core/errors.js";
 import { loadNodes } from "../../kernel/core/project/load.js";
 import { readState } from "../../kernel/core/state/state-store.js";
-import { glueFragments } from "../../runtime/context/gluing.js";
-import type { ContextFragment } from "../../runtime/context/presheaf.js";
+import { glueFragments } from "../../forward/context/gluing.js";
+import type { ContextFragment } from "../../forward/context/presheaf.js";
 
 export interface ProposalApplyOptions {
   dryRun?: boolean;
