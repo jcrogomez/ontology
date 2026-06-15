@@ -171,3 +171,32 @@ Still pending:
 - γ-5 directory ingest is sequential per file (one LLM call each). No batching, no rate-limiter. Cost on a 100-file repo with `claude-opus-4-7` is ≈ $5 — verify with `--cost-estimate` first.
 - γ-7 prompt invariants are shipped **and measured** on the Vibe-Reasoning external corpus: ε-equivalent fraction moved 36% → 65% across a re-ingest, `divergent_both` fully eliminated (4 → 0). Full report: [`docs/legend/calibrations/VIBE_REASONING_GAMMA_7_2026-05-12.md`](legend/calibrations/VIBE_REASONING_GAMMA_7_2026-05-12.md). This is the **second empirical data point** for `MATHEMATICAL_CLAIMS.md` §3.10 after γ-2's `HASH_TS_2026-05-12.md`; the §3.10 entry now cites both.
 - Self-ingestion on the Ontology codebase itself (Phase ε) is the gating step for upgrading the §3.10 adjoint claim from T4 → T2. Has not been run.
+
+## Phase ζ — the governed sync loop (`onto sync`) — 2026-06-14
+
+- **`onto sync <node>`** — the intent→code loop in one command: regenerate
+  the node's shadow (`--draws 3` consensus) → gate through ALL three checks
+  (structural verdict + behaviour fixture + declared rules, ON by default) →
+  write + per-node drift re-anchor only when every gate passes, else write
+  nothing and report the precise blocking gate. A thin composition of
+  `regenerate` + the gates + a new **path-scoped re-anchor**
+  (`runtime/legend/reanchor-node.ts`) that refreshes only the synced node's
+  drift leaves — a bare `drift --update` would re-anchor the whole graph and
+  silently mask other nodes' drift. `--explain` renders the full reasoning;
+  `--dry-run` previews without writing. Core extracted as `runRegenerate`
+  (regenerate's CLI behaviour unchanged).
+- **`onto status`** — read-only graph health for the loop: syncable-core
+  (shadow + fixture + rules statically clean) vs lower-confidence (no fixture)
+  vs blocked (rule violation), drift count, ficha-quality summary. Pure
+  composition of shadow/fixture presence + `onto drift` (extracted
+  `readDriftState`) + `onto ficha audit`. On the live graph: 228 nodes, 43
+  core, 178 lower-confidence, 5 drifted. Writes nothing, runs no fixtures.
+- **Acceptance / the honest number (T2, dated).** First end-to-end run over 6
+  core nodes with `qwen2.5-coder:7b` (local, $0, dry-run): **1/6 ≈ 17% would
+  sync clean on unchanged intent — robust to draw count** (single-draw and
+  3-draw consensus both land at 1/6). The confirmation run REFUTED an earlier
+  "consensus is the bottleneck" read: per-node verdicts are highly variable
+  across runs, so 7B-local F is both low-yield and high-variance here. The
+  behaviour gate caught real regressions (structurally-safe but `fail`).
+  Full record: `docs/SYNC_LOOP_SPEC.md` §8; data in `outputs/`; harness
+  `scripts/sync-acceptance.mjs`.

@@ -39,7 +39,9 @@ export interface DriftOptions {
   cwd?: string;
 }
 
-interface DriftSnapshot {
+// The on-disk drift baseline (version:1). Owned here; the per-node re-anchor in
+// runtime/legend/reanchor-node.ts reads/writes the same format.
+export interface DriftSnapshot {
   version: 1;
   createdAt: string;
   branch: string;
@@ -99,21 +101,27 @@ function nodeIdsForPaths(
   return Array.from(ids).sort();
 }
 
-export async function driftCommand(options: DriftOptions): Promise<void> {
-  const cwd = options.cwd ?? process.cwd();
-  const paths = getOntologyPaths(cwd);
+// The read-only core of `onto drift`: build the current Merkle tree, compare it
+// against the persisted anchor, and report exactly which nodes' shadows moved.
+// Extracted so `onto status` can read drift without printing or anchoring.
+// Throws (with the command's exact messages) on unreadable nodes/snapshot.
+export interface DriftState {
+  leafSet: DriftLeafSet;
+  tree: MerkleTree;
+  snapshot: DriftSnapshot | null;
+  diff: { added: string[]; removed: string[]; changed: string[] };
+  drifted: boolean;
+  changedNodeIds: string[];
+}
 
-  if (!fs.existsSync(paths.ontologyDir)) {
-    failWith("no .ontology/ found — run `onto init` first", options.json);
-    return;
-  }
+export function readDriftState(cwd: string): DriftState {
+  const paths = getOntologyPaths(cwd);
 
   let leafSet: DriftLeafSet;
   try {
     leafSet = collectLeafSet(cwd);
   } catch (err: unknown) {
-    failWith(`failed to read nodes/artifacts: ${errorMessage(err)}`, options.json);
-    return;
+    throw new Error(`failed to read nodes/artifacts: ${errorMessage(err)}`);
   }
   const tree = buildMerkleTree(leafSet.leaves);
 
@@ -122,8 +130,7 @@ export async function driftCommand(options: DriftOptions): Promise<void> {
     try {
       snapshot = readJson<DriftSnapshot>(paths.driftSnapshotPath);
     } catch (err: unknown) {
-      failWith(`drift snapshot unreadable: ${errorMessage(err)}`, options.json);
-      return;
+      throw new Error(`drift snapshot unreadable: ${errorMessage(err)}`);
     }
   }
 
@@ -141,6 +148,27 @@ export async function driftCommand(options: DriftOptions): Promise<void> {
         previousIdsByPath,
       )
     : [];
+
+  return { leafSet, tree, snapshot, diff, drifted, changedNodeIds };
+}
+
+export async function driftCommand(options: DriftOptions): Promise<void> {
+  const cwd = options.cwd ?? process.cwd();
+  const paths = getOntologyPaths(cwd);
+
+  if (!fs.existsSync(paths.ontologyDir)) {
+    failWith("no .ontology/ found — run `onto init` first", options.json);
+    return;
+  }
+
+  let state: DriftState;
+  try {
+    state = readDriftState(cwd);
+  } catch (err: unknown) {
+    failWith(errorMessage(err), options.json);
+    return;
+  }
+  const { leafSet, tree, snapshot, diff, drifted, changedNodeIds } = state;
 
   let anchored = false;
   if (options.update) {

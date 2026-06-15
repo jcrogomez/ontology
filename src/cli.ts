@@ -53,6 +53,8 @@ import { modelListCommand } from "./commands/model/list.js";
 import { registerQueryCommand } from "./commands/query/index.js";
 import { verifyHomeomorphismCommand } from "./commands/verify/homeomorphism.js";
 import { regenerateCommand } from "./commands/regenerate.js";
+import { syncCommand } from "./commands/sync.js";
+import { statusCommand } from "./commands/status.js";
 import { probeCommand } from "./commands/probe.js";
 import { rulesCheckCommand, rulesAuditCommand } from "./commands/rules.js";
 import { fichaAuditCommand, fichaCleanupCommand } from "./commands/ficha.js";
@@ -1123,6 +1125,49 @@ program
       await regenerateCommand(nodeId, options);
     } catch (err: unknown) {
       console.error(`✖ Error during regenerate: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("status")
+  .description("Read-only graph health for the sync loop: how many nodes are syncable-with-confidence (code shadow + behaviour fixture + rules statically clean), how many are lower-confidence (no fixture) or blocked (rule violation), how many shadows drifted from the anchor, and the ficha-quality summary. A pure composition of shadow/fixture presence + `onto drift` + `onto ficha audit` — writes nothing, runs no fixtures. See docs/SYNC_LOOP_SPEC.md §4.")
+  .option("--list", "List the node ids in each syncability tier.")
+  .option("--json", "Output the full report (incl. per-node detail) as JSON.")
+  .action(async (options) => {
+    try {
+      await statusCommand(options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during status: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("sync <nodeId>")
+  .description("The governed intent→code loop in one command: regenerate the node's shadow from its intent (--draws 3 consensus), gate it through ALL three checks (structural verdict + behaviour fixture + declared rules), and only when every gate passes WRITE the shadow and re-anchor THIS node's drift; otherwise write nothing and report the precise blocking gate. A thin composition of `regenerate` + the gates + a per-node re-anchor (no new verification semantics). See docs/SYNC_LOOP_SPEC.md.")
+  .option("--provider <provider>", "LLM provider override for the compile-back (mock|ollama|anthropic|gemini).")
+  .option("--model <model>", "Model override (use with --provider).")
+  .option("--ollama-host <host>", "Host for the Ollama provider.")
+  .option("--draws <n>", "Multi-draw consensus: compile N independent drafts and write only the majority structural-agreement class. Default 3.", (v) => parseInt(v, 10))
+  .option("--consensus <k>", "Consensus floor: write only when at least K of N draws agree (default strict majority, floor(N/2)+1).", (v) => parseInt(v, 10))
+  .option("--loc-threshold <n>", "LoC distance threshold for the structural verdict (default 0.3).", (v) => parseFloat(v))
+  .option("--jaccard-threshold <n>", "Structural Jaccard threshold for the verdict (default 0.5).", (v) => parseFloat(v))
+  .option("--behavior-fixtures-dir <path>", "Override the behaviour-fixtures directory (default tests/behavior-fixtures).")
+  .option("--dry-run", "Run the whole loop (regen + all gates) but write nothing and do not re-anchor — preview the decision.")
+  .option("--explain", "Show the full reasoning behind the decision: draws/consensus, structural verdict + metrics, behaviour, rules.")
+  .option("--no-lock", "Skip the .ontology/.lock advisory lock.")
+  .option("--json", "Output the result as JSON.")
+  .action(async (nodeId, rawOptions) => {
+    try {
+      const { lock, ...rest } = rawOptions as Record<string, unknown> & { lock?: boolean };
+      const options = {
+        ...rest,
+        ...(lock === false ? { noLock: true } : {}),
+      };
+      await syncCommand(nodeId, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during sync: ${errorMessage(err)}`);
       process.exit(1);
     }
   });

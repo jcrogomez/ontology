@@ -23,6 +23,7 @@ full pitch and `docs/PROJECT_LEGEND.md` for the design.
 | How literally a math claim holds | [`docs/MATHEMATICAL_CLAIMS.md`](docs/MATHEMATICAL_CLAIMS.md) | Every categorical term is graded **T1** (tested law) / **T2** (operational) / **T3** (analogy) / **T4** (aspirational). Read before asserting any "functor/topos/adjoint" claim. |
 | Phase ε self-ingestion experiment record | [`docs/legend/calibrations/CALIBRATION_LOG.md`](docs/legend/calibrations/CALIBRATION_LOG.md) | Hand-rolled index of the calibration corpus. These are **dated, pre-registered records — historical, do not rewrite.** |
 | Phase ζ workflow runtime | [`docs/legend/WORKFLOW_RUNTIME_SPEC.md`](docs/legend/WORKFLOW_RUNTIME_SPEC.md) | The `onto workflow run` verify-refine state machine, predicate DSL, artefact-slot dataflow. |
+| The governed sync loop (`onto sync` / `onto status`) | [`docs/SYNC_LOOP.md`](docs/SYNC_LOOP.md) (how-to), [`docs/SYNC_LOOP_SPEC.md`](docs/SYNC_LOOP_SPEC.md) (contract + acceptance) | One command closes intent→code: regen + 3 gates + per-node re-anchor. Honest number in §8. |
 | Per-commit detail | [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md) | |
 | Onboarding / first run | [`README.md`](README.md), [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md) | |
 | CLI surface | [`docs/CLI_COMMANDS.md`](docs/CLI_COMMANDS.md) | |

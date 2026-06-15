@@ -25,6 +25,8 @@ covering everything through Phase ζ (the workflow runtime).
 | Ingest code into intent | `onto ingest <paths...>` |
 | Verify the round-trip (F∘G ≈ id) | `onto verify-homeomorphism [focal]` |
 | Regenerate a node's code from intent | `onto regenerate <nodeId>` (preview; `--write` to apply, gated) |
+| Close the intent→code loop in one command | `onto sync <nodeId>` (regen + all gates + re-anchor; `--explain`, `--dry-run`) |
+| See graph health for the sync loop | `onto status` (syncable-core / drifted / fixtures / ficha) |
 | Generate a behavioural fixture for a node | `onto probe <nodeId>` (self-validated; gates `regenerate --write`) |
 | Verify / triage a node's rules | `onto rules check <nodeId>` · `onto rules audit` |
 | Measure / fix ficha (intent record) quality | `onto ficha audit` · `onto ficha cleanup <nodeId>` |
@@ -658,7 +660,62 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
   - `onto regenerate node_0017 --provider ollama --model qwen2.5-coder:7b` (preview)
   - `onto regenerate node_0017 --provider anthropic --behavior-check --write`
   - `onto regenerate node_0017 --provider ollama --model qwen2.5-coder:7b --rules-grounding` (round-trip rules)
-- **Output (JSON):** `{ ok, nodeId, sourceFile?, regenPath?, shadowStatus?, verdict?, metrics?, behaviorVerdict?, written, writeBlockedReason?, failure? }`.
+- **Output (JSON):** `{ ok, nodeId, sourceFile?, regenPath?, shadowStatus?, verdict?, metrics?, behaviorVerdict?, ruleViolations?, written, writeBlockedReason?, failure? }`.
+
+### `sync <nodeId>` *(2026-06-14 — the governed loop in one command)*
+
+- **Purpose:** the intent→code loop you can run, observe, and understand
+  in a single move. A **thin composition** of `regenerate` + the three
+  verification gates + a per-node drift re-anchor — it introduces **no new
+  verification semantics**, it just flips the gates ON by default and
+  unifies the decision. Edit a node's intent, run `onto sync <node>`, and
+  the loop closes: regenerate (3-draw consensus) → gate (structural verdict
+  + behaviour fixture + declared rules) → **write the shadow + re-anchor
+  THIS node's drift** if every gate passes, else **write nothing and report
+  the precise blocking gate**. See `docs/SYNC_LOOP.md` (walkthrough) and
+  `docs/SYNC_LOOP_SPEC.md` (contract + acceptance).
+- **Difference from `regenerate`:** raw `regenerate --write` needs
+  `--behavior-check` / `--check-rules` opt-ins and leaves drift re-anchoring
+  manual. `sync` turns **all** gates on by default, defaults to `--draws 3`,
+  and re-anchors automatically — but **path-scoped** (only the synced node),
+  because a bare `drift --update` rewrites the whole-graph snapshot and would
+  silently mask other nodes' drift.
+- **`--explain`:** renders the full reasoning without reading code — the
+  draws/consensus, the structural verdict + metrics, the behaviour result,
+  the rules result, and the decision line (`WROTE` / `REFUSED` + reason).
+- **`--dry-run`:** runs the whole loop (regen + all gates) but writes
+  nothing and does not re-anchor — preview the decision safely.
+- **Flags:** `--provider`, `--model`, `--ollama-host`, `--draws <n>` (default
+  3), `--consensus <k>` (default strict majority), `--loc-threshold`,
+  `--jaccard-threshold`, `--behavior-fixtures-dir <path>`, `--dry-run`,
+  `--explain`, `--no-lock`, `--json`.
+- **Examples:**
+  - `onto sync node_0225 --provider ollama --model qwen2.5-coder:7b --explain`
+  - `onto sync node_0225 --dry-run` (preview the decision, no write)
+- **Output (JSON):** `{ ok, nodeId, decision: "wrote"|"refused"|"preview"|"error", regen: {…RegenerateResult}, reanchor?: { anchored, paths, reason? }, reason? }`.
+- **Honest scope:** on 7B-local F the clean-sync rate is a minority
+  (acceptance 2026-06-14: ~17% of a 6-node core sample, robust to draw
+  count — `SYNC_LOOP_SPEC.md` §8). The lever is model quality / ficha
+  determinacy, not the consensus knob.
+
+### `status` *(2026-06-14 — graph health for the sync loop)*
+
+- **Purpose:** read-only "can I sync, and what's in the way" view. A pure
+  composition of shadow/fixture presence + static rule cleanliness +
+  `drift` + `ficha audit`. **Writes nothing, runs no fixtures.**
+- **Tiers reported:** **core** (code shadow + behaviour fixture + rules
+  statically clean — syncable with confidence), **lower confidence** (shadow
+  + clean rules but no fixture), **blocked** (a static rule violation to
+  resolve first), **no-shadow** (not syncable). Plus drift count vs the
+  anchor and the ficha-quality summary.
+- **"Core" is presence-based:** status does not execute fixture code (a
+  health check must not run arbitrary source); a fixture's actual
+  green-against-source is confirmed at sync time by the behaviour gate.
+- **Flags:** `--list` (node ids per tier), `--json` (full per-node detail).
+- **Example:** `onto status` · `onto status --list`
+- **Live graph (2026-06-14):** 228 nodes, 221 with a shadow → 43 core, 178
+  lower-confidence, 0 blocked; 43/221 have fixtures; 5 shadows drifted.
+- **Output (JSON):** `{ ok, report: { totalNodes, trackable, core, lowerConfidence, blocked, withFixture, drift: { hasAnchor, drifted }, ficha: { underDeclared, missingExports, proseRules }, nodes: [...] } }`.
 
 ### `rules check <nodeId>` / `rules audit` *(2026-06-14 — rule enforcement + triage)*
 
