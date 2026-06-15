@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-import type { Proposal } from "../../schemas/ontology.js";
+import type { Proposal } from "../../kernel/schemas/ontology.js";
 import {
   summarizeProposalRow,
   type ProposalApplyOutcome,

@@ -17,8 +17,8 @@ import {
   listProposals,
   applyProposal,
   rejectProposal,
-} from "../../core/proposals/persist.js";
-import type { Proposal } from "../../schemas/ontology.js";
+} from "../../kernel/core/proposals/persist.js";
+import type { Proposal } from "../../kernel/schemas/ontology.js";
 
 export interface ProposalsLoadResult {
   ok: boolean;

@@ -10,10 +10,10 @@ import {
   statusGlyph,
   stripAnsi,
   visibleWidth,
-} from "../src/core/render/style.js";
-import { box, kvLines } from "../src/core/render/box.js";
-import { renderTable } from "../src/core/render/table.js";
-import { resetColorCache, resetUnicodeCache, unicodeEnabled } from "../src/core/render/style.js";
+} from "../src/kernel/core/render/style.js";
+import { box, kvLines } from "../src/kernel/core/render/box.js";
+import { renderTable } from "../src/kernel/core/render/table.js";
+import { resetColorCache, resetUnicodeCache, unicodeEnabled } from "../src/kernel/core/render/style.js";
 
 let originalNoColor: string | undefined;
 let originalForceColor: string | undefined;

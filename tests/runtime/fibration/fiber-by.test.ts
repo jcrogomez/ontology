@@ -11,7 +11,7 @@ import {
   OntologyEdgeSchema,
   type OntologyNode,
   type OntologyEdge,
-} from "../../../src/schemas/ontology.js";
+} from "../../../src/kernel/schemas/ontology.js";
 
 // Build a minimal node by parsing through the schema. Same fixture style
 // as branch-fiber.test.ts so the two test files read consistently. Adds

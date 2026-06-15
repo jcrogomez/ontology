@@ -1,7 +1,7 @@
-import { listProposals } from "../../core/proposals/persist.js";
-import { ProposalStatusSchema, type Proposal } from "../../schemas/ontology.js";
-import { renderTable } from "../../core/render/table.js";
-import { bold, dim, byStatus, statusGlyph, color } from "../../core/render/style.js";
+import { listProposals } from "../../kernel/core/proposals/persist.js";
+import { ProposalStatusSchema, type Proposal } from "../../kernel/schemas/ontology.js";
+import { renderTable } from "../../kernel/core/render/table.js";
+import { bold, dim, byStatus, statusGlyph, color } from "../../kernel/core/render/style.js";
 
 export interface ProposalListOptions {
   status?: string;

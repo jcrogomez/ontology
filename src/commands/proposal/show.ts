@@ -1,4 +1,4 @@
-import { loadProposal } from "../../core/proposals/persist.js";
+import { loadProposal } from "../../kernel/core/proposals/persist.js";
 
 export interface ProposalShowOptions {
   json?: boolean;

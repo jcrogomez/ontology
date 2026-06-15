@@ -1,10 +1,10 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getOntologyPaths } from "../core/project/paths.js";
-import { loadState, loadNodeById, loadEvents, loadEdges, loadModelsRegistry, loadProcessorsRegistry } from "../core/project/load.js";
-import type { OntologyNode } from "../schemas/ontology.js";
-import { box, kvLines } from "../core/render/box.js";
-import { bold, dim, byLevel, color } from "../core/render/style.js";
+import { getOntologyPaths } from "../kernel/core/project/paths.js";
+import { loadState, loadNodeById, loadEvents, loadEdges, loadModelsRegistry, loadProcessorsRegistry } from "../kernel/core/project/load.js";
+import type { OntologyNode } from "../kernel/schemas/ontology.js";
+import { box, kvLines } from "../kernel/core/render/box.js";
+import { bold, dim, byLevel, color } from "../kernel/core/render/style.js";
 
 // Inspect is observational only. It must never mutate the network.
 

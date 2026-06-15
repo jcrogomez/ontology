@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { AbstractionLevelSchema, NodeKindSchema } from "../../schemas/ontology.js";
-import { loadNodeById, loadState } from "../../core/project/load.js";
-import { createProposal } from "../../core/proposals/persist.js";
-import { errorMessage } from "../../core/errors.js";
+import { AbstractionLevelSchema, NodeKindSchema } from "../../kernel/schemas/ontology.js";
+import { loadNodeById, loadState } from "../../kernel/core/project/load.js";
+import { createProposal } from "../../kernel/core/proposals/persist.js";
+import { errorMessage } from "../../kernel/core/errors.js";
 
 export interface ProposeNodeOptions {
   level: string;

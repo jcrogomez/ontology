@@ -14,8 +14,8 @@
 
 import * as fs from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { getOntologyPaths } from "../../core/project/paths.js";
-import { loadState, loadNodeById } from "../../core/project/load.js";
+import { getOntologyPaths } from "../../kernel/core/project/paths.js";
+import { loadState, loadNodeById } from "../../kernel/core/project/load.js";
 import { ontologyTools } from "./tools.js";
 
 export const ONTOLOGY_MCP_NAME = "ontology";

@@ -9,7 +9,7 @@
 // `CartesianLift` shape *describes* the proposed projection of a node from
 // one branch to another; it does not actually create the lifted node.
 
-import type { OntologyNode, OntologyEdge } from "../../schemas/ontology.js";
+import type { OntologyNode, OntologyEdge } from "../../kernel/schemas/ontology.js";
 
 // A FiberInput is the read-only payload required to compute fibers. It does
 // not depend on `OntologyState` because the canonical state object is just

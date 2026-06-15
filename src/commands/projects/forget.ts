@@ -1,4 +1,4 @@
-import { AmbiguousProjectNameError, forgetProject } from "../../core/projects/registry.js";
+import { AmbiguousProjectNameError, forgetProject } from "../../kernel/core/projects/registry.js";
 
 export interface ProjectsForgetOptions {
   json?: boolean;

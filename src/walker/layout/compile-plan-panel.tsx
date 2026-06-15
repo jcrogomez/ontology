@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-import type { CompilePlan } from "../../runtime/graph/compile-plan.js";
+import type { CompilePlan } from "../../kernel/graph/compile-plan.js";
 
 export interface CompilePlanPanelProps {
   state:

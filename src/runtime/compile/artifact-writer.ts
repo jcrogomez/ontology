@@ -1,9 +1,9 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getOntologyPaths } from "../../core/project/paths.js";
-import { ensureDir } from "../../core/fs/json.js";
+import { getOntologyPaths } from "../../kernel/core/project/paths.js";
+import { ensureDir } from "../../kernel/core/fs/json.js";
 import { resolveArtifactExtension } from "./manifestation-mapper.js";
-import type { OntologyNode } from "../../schemas/ontology.js";
+import type { OntologyNode } from "../../kernel/schemas/ontology.js";
 
 // Writes a compiled artifact to .ontology/artifacts/generated/<nodeId>.<ext>
 // or, when `targetPath` is set, to the user-pinned absolute path.

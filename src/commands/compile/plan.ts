@@ -1,5 +1,5 @@
-import { loadEdges, loadNodeById } from "../../core/project/load.js";
-import { computeCompilePlan } from "../../runtime/graph/compile-plan.js";
+import { loadEdges, loadNodeById } from "../../kernel/core/project/load.js";
+import { computeCompilePlan } from "../../kernel/graph/compile-plan.js";
 
 export interface CompilePlanOptions {
   json?: boolean;

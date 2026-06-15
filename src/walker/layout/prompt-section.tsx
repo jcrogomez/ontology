@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-import type { OntologyNode } from "../../schemas/ontology.js";
+import type { OntologyNode } from "../../kernel/schemas/ontology.js";
 
 export interface PromptSectionProps {
   node: OntologyNode;

@@ -1,7 +1,7 @@
-import { assertOntologyProject, loadEvents } from "../../core/project/load.js";
-import type { OntologyEvent } from "../../schemas/ontology.js";
-import { renderTable } from "../../core/render/table.js";
-import { bold, dim, color } from "../../core/render/style.js";
+import { assertOntologyProject, loadEvents } from "../../kernel/core/project/load.js";
+import type { OntologyEvent } from "../../kernel/schemas/ontology.js";
+import { renderTable } from "../../kernel/core/render/table.js";
+import { bold, dim, color } from "../../kernel/core/render/style.js";
 
 // Map common event types to a colour family. Negative-outcome patterns are
 // checked first so they win against broader prefixes (e.g. a future

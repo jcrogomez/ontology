@@ -1,10 +1,10 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getOntologyPaths } from "../core/project/paths.js";
-import { readJson, readJsonl } from "../core/fs/json.js";
-import { hashObject, removeIntegrityHash } from "../core/integrity/hash.js";
-import { errorMessage } from "../core/errors.js";
-import { validateEdgeDirection } from "../runtime/graph/poset.js";
+import { getOntologyPaths } from "../kernel/core/project/paths.js";
+import { readJson, readJsonl } from "../kernel/core/fs/json.js";
+import { hashObject, removeIntegrityHash } from "../kernel/core/integrity/hash.js";
+import { errorMessage } from "../kernel/core/errors.js";
+import { validateEdgeDirection } from "../kernel/graph/poset.js";
 import {
   OntologyStateSchema,
   OntologyNodeSchema,
@@ -16,7 +16,7 @@ import {
   type OntologyEvent,
   type OntologyEdge,
   type OntologyState
-} from "../schemas/ontology.js";
+} from "../kernel/schemas/ontology.js";
 import { z } from "zod";
 
 function summarizeError(error: unknown): string {

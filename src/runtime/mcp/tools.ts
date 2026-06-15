@@ -18,12 +18,12 @@ import {
   loadNodeById,
   loadEdges,
   loadEvents,
-} from "../../core/project/load.js";
+} from "../../kernel/core/project/load.js";
 import {
   listPersistedRuns,
   loadPersistedRun,
   verifyPersistedRun,
-} from "../../core/runs/persist.js";
+} from "../../kernel/core/runs/persist.js";
 import { queryNodes } from "../query/representable.js";
 import { QueryShapeSchema, type QueryShape } from "../query/types.js";
 import {
@@ -31,10 +31,10 @@ import {
   findShortestPath,
   extractSubgraph,
   type EdgeDirection,
-} from "../graph/traversal.js";
+} from "../../kernel/graph/traversal.js";
 import { assembleContext } from "../context/assembler.js";
 import { checkTranslatorCache } from "../legend/translator.js";
-import { EdgeTypeSchema, type OntologyNode, type OntologyEdge } from "../../schemas/ontology.js";
+import { EdgeTypeSchema, type OntologyNode, type OntologyEdge } from "../../kernel/schemas/ontology.js";
 
 // A registrable tool definition. `inputShape` is a Zod raw shape (object of
 // field schemas) consumed directly by McpServer.registerTool; the SDK builds

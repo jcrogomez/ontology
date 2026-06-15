@@ -1,4 +1,4 @@
-import { verifyPersistedRun, loadPersistedRun } from "../../core/runs/persist.js";
+import { verifyPersistedRun, loadPersistedRun } from "../../kernel/core/runs/persist.js";
 
 export interface RunsVerifyOptions {
   json?: boolean;

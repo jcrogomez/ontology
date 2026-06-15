@@ -2,7 +2,7 @@
 // multigraph. Wired into the top-level commander program in src/cli.ts.
 
 import type { Command } from "commander";
-import { errorMessage } from "../../core/errors.js";
+import { errorMessage } from "../../kernel/core/errors.js";
 import { runQueryCommand } from "./run-query.js";
 
 // Registers the `onto query` verb. Kept as a single registrar function so

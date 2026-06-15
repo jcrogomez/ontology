@@ -5,20 +5,20 @@ import {
   inferEdgesAutoFromDirectoryAsync,
   type InferredEdge,
 } from "../../runtime/static/edges.js";
-import { loadEdges, loadNodes, loadState } from "../../core/project/load.js";
-import { createProposal } from "../../core/proposals/persist.js";
+import { loadEdges, loadNodes, loadState } from "../../kernel/core/project/load.js";
+import { createProposal } from "../../kernel/core/proposals/persist.js";
 import {
   OntologyEdgeSchema,
   OntologyNodeSchema,
   OntologyStateSchema,
   type OntologyEdge,
   type OntologyNode,
-} from "../../schemas/ontology.js";
-import { errorMessage } from "../../core/errors.js";
+} from "../../kernel/schemas/ontology.js";
+import { errorMessage } from "../../kernel/core/errors.js";
 import {
   planEdgeMaterialization,
   type EdgeMaterializationPreview,
-} from "../../runtime/graph/edge-materialization-preview.js";
+} from "../../kernel/graph/edge-materialization-preview.js";
 
 // `onto graph infer-edges <dir>` — Project Legend γ-4 (preview) + γ-6
 // (create proposals).

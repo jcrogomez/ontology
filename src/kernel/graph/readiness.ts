@@ -34,7 +34,7 @@
 import type {
   OntologyEdge,
   OntologyNode,
-} from "../../schemas/ontology.js";
+} from "../schemas/ontology.js";
 import {
   computeHierarchyMetrics,
   type HierarchyMetrics,

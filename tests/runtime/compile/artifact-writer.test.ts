@@ -10,7 +10,7 @@ import {
 import {
   OntologyNodeSchema,
   type OntologyNode,
-} from "../../../src/schemas/ontology.js";
+} from "../../../src/kernel/schemas/ontology.js";
 
 // Unit-level coverage for the artifact-writer safety properties. The
 // end-to-end behaviour is exercised in tests/compile-cli-target-safety.test.ts;

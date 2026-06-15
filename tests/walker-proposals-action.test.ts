@@ -17,7 +17,7 @@ import {
   rejectProposalFromWalker,
   summarizeProposalRow,
 } from "../src/walker/actions/proposals-from-walker.js";
-import { listProposals, loadProposal } from "../src/core/proposals/persist.js";
+import { listProposals, loadProposal } from "../src/kernel/core/proposals/persist.js";
 
 describe("walker proposal-review actions (Walker v2 PR-1)", () => {
   let tempDir: string;

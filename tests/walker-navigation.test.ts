@@ -5,7 +5,7 @@ import {
   navigateSiblingPrevious,
   navigateSiblingNext,
 } from "../src/walker/state/navigation.js";
-import type { OntologyNode } from "../src/schemas/ontology.js";
+import type { OntologyNode } from "../src/kernel/schemas/ontology.js";
 import type { FocalNeighborhood } from "../src/walker/state/neighborhood.js";
 
 // Minimal node factory: only the fields navigation actually reads.

@@ -1,17 +1,17 @@
 import { dispatchLlmRequest } from "../../runtime/llm/dispatcher.js";
 import type { LlmTask, LlmProvider } from "../../runtime/llm/types.js";
-import { hashPrompt } from "../../core/integrity/hash.js";
-import { createPersistedRun, computeRunId, loadPersistedRun } from "../../core/runs/persist.js";
-import { createProposal } from "../../core/proposals/persist.js";
-import { loadNodeById, loadState } from "../../core/project/load.js";
+import { hashPrompt } from "../../kernel/core/integrity/hash.js";
+import { createPersistedRun, computeRunId, loadPersistedRun } from "../../kernel/core/runs/persist.js";
+import { createProposal } from "../../kernel/core/proposals/persist.js";
+import { loadNodeById, loadState } from "../../kernel/core/project/load.js";
 import {
   AbstractionLevelSchema,
   NodeKindSchema,
   type PersistedRunInput,
   type PersistedRunModel,
   type Proposal,
-} from "../../schemas/ontology.js";
-import { errorMessage } from "../../core/errors.js";
+} from "../../kernel/schemas/ontology.js";
+import { errorMessage } from "../../kernel/core/errors.js";
 
 export interface RunPromptOptions {
   task?: string;

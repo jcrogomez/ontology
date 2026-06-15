@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   composeEdgeApplication,
   type ResolvedEdgeSpec,
-} from "../src/runtime/graph/apply-edges-to-copy.js";
-import type { OntologyState } from "../src/schemas/ontology.js";
+} from "../src/kernel/graph/apply-edges-to-copy.js";
+import type { OntologyState } from "../src/kernel/schemas/ontology.js";
 
 function baseState(overrides?: Partial<OntologyState>): OntologyState {
   return {

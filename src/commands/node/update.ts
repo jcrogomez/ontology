@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
-import { CLEAR_LITERAL, updateNode } from "../../core/nodes/update-node.js";
-import { errorMessage } from "../../core/errors.js";
+import { CLEAR_LITERAL, updateNode } from "../../kernel/core/nodes/update-node.js";
+import { errorMessage } from "../../kernel/core/errors.js";
 
 export interface NodeUpdateCommandOptions {
   prompt?: string;

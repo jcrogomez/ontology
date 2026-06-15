@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { VerifierSchemaName } from "../../schemas/workflow.js";
+import type { VerifierSchemaName } from "../../kernel/schemas/workflow.js";
 
 // Verifier output schemas registry (Phase ζ v0).
 //

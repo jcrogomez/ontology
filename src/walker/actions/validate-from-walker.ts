@@ -8,9 +8,9 @@
 // removeIntegrityHash, validateEdgeDirection) so the walker check agrees
 // with the CLI on the cases it covers; full coverage stays at the CLI.
 
-import { loadNodes, loadEdges } from "../../core/project/load.js";
-import { hashObject, removeIntegrityHash } from "../../core/integrity/hash.js";
-import { validateEdgeDirection } from "../../runtime/graph/poset.js";
+import { loadNodes, loadEdges } from "../../kernel/core/project/load.js";
+import { hashObject, removeIntegrityHash } from "../../kernel/core/integrity/hash.js";
+import { validateEdgeDirection } from "../../kernel/graph/poset.js";
 
 export interface ValidationViolation {
   // What kind of invariant failed. Useful for grouping in the UI.

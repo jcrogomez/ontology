@@ -12,7 +12,7 @@ import {
   OntologyEdgeSchema,
   type OntologyNode,
   type OntologyEdge,
-} from "../../../src/schemas/ontology.js";
+} from "../../../src/kernel/schemas/ontology.js";
 
 // Build a minimal node by parsing through the schema. Using the parser keeps
 // these fixtures honest: any future change to the schema (new required field,

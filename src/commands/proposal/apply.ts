@@ -1,7 +1,7 @@
-import { applyProposal, loadProposal } from "../../core/proposals/persist.js";
-import { errorMessage } from "../../core/errors.js";
-import { loadNodes } from "../../core/project/load.js";
-import { readState } from "../../core/state/state-store.js";
+import { applyProposal, loadProposal } from "../../kernel/core/proposals/persist.js";
+import { errorMessage } from "../../kernel/core/errors.js";
+import { loadNodes } from "../../kernel/core/project/load.js";
+import { readState } from "../../kernel/core/state/state-store.js";
 import { glueFragments } from "../../runtime/context/gluing.js";
 import type { ContextFragment } from "../../runtime/context/presheaf.js";
 

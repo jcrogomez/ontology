@@ -4,8 +4,8 @@ import { buildFragment } from "../../runtime/context/presheaf.js";
 import { glueFragments } from "../../runtime/context/gluing.js";
 import { validateIntent, type IntentValidationResult } from "../../runtime/context/intent-validator.js";
 import type { LlmTask, LlmProvider } from "../../runtime/llm/types.js";
-import { hashPrompt, hashContext } from "../../core/integrity/hash.js";
-import { createPersistedRun, computeRunId, loadPersistedRun } from "../../core/runs/persist.js";
+import { hashPrompt, hashContext } from "../../kernel/core/integrity/hash.js";
+import { createPersistedRun, computeRunId, loadPersistedRun } from "../../kernel/core/runs/persist.js";
 import {
   AbstractionLevelSchema,
   NodeKindSchema,
@@ -13,8 +13,8 @@ import {
   type PersistedRunModel,
   type OntologyEdge,
   type Proposal,
-} from "../../schemas/ontology.js";
-import { EdgeTypeSchema } from "../../schemas/ontology.js";
+} from "../../kernel/schemas/ontology.js";
+import { EdgeTypeSchema } from "../../kernel/schemas/ontology.js";
 import { buildProposalFromRun } from "./prompt.js";
 
 export interface RunContextOptions {

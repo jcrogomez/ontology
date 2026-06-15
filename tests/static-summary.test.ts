@@ -4,7 +4,7 @@ import {
   AbstractionLevelSchema,
   ManifestationSchema,
   NodeKindSchema,
-} from "../src/schemas/ontology.js";
+} from "../src/kernel/schemas/ontology.js";
 import { buildStaticSummary } from "../src/runtime/legend/static-summary.js";
 import { decideStaticClassifierIngestAction } from "../src/commands/ingest/static-classifier-policy.js";
 import { classifySourceFile } from "../src/runtime/legend/structural-classifier.js";

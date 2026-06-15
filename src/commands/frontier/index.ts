@@ -5,7 +5,7 @@ import {
   tagFileFromDisk,
   type TaggerAttribute,
 } from "../../runtime/legend/frontier-tagger.js";
-import { errorMessage } from "../../core/errors.js";
+import { errorMessage } from "../../kernel/core/errors.js";
 
 // `onto frontier <paths...>` — Phase ε pre-flight diagnostic.
 //

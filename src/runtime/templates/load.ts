@@ -15,7 +15,7 @@ import {
   type Template,
   type TemplateNode,
 } from "./schema.js";
-import { validateEdgeDirection, type AbstractionLevel } from "../graph/poset.js";
+import { validateEdgeDirection, type AbstractionLevel } from "../../kernel/graph/poset.js";
 
 export function templatesDir(): string {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../templates");

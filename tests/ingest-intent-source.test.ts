@@ -8,7 +8,7 @@ import {
   ingestFromIntentSource,
   matchChangedFilesToNodes,
 } from "../src/commands/ingest/index.js";
-import { loadState, loadNodeById } from "../src/core/project/load.js";
+import { loadState, loadNodeById } from "../src/kernel/core/project/load.js";
 import type { IntentSource } from "../src/runtime/ingest/github.js";
 import type { LlmProvider } from "../src/runtime/llm/types.js";
 

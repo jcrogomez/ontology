@@ -1,11 +1,11 @@
-import { readState, writeState } from "../core/state/state-store.js";
+import { readState, writeState } from "../kernel/core/state/state-store.js";
 import {
   diffReplayedState,
   materializeReplayedState,
   readEventLog,
   replayEvents,
-} from "../core/state/replay.js";
-import { errorMessage } from "../core/errors.js";
+} from "../kernel/core/state/replay.js";
+import { errorMessage } from "../kernel/core/errors.js";
 
 // `onto replay` — rebuild the state summary from events.jsonl alone and
 // compare it to state.json (MATHEMATICAL_CLAIMS.md §4.4). Default is

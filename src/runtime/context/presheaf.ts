@@ -1,4 +1,4 @@
-import type { OntologyNode } from "../../schemas/ontology.js";
+import type { OntologyNode } from "../../kernel/schemas/ontology.js";
 
 export interface ContextFragment {
   nodeId: string;

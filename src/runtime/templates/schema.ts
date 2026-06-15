@@ -15,7 +15,7 @@ import {
   NodeKindSchema,
   ManifestationSchema,
   EdgeTypeSchema,
-} from "../../schemas/ontology.js";
+} from "../../kernel/schemas/ontology.js";
 
 // Reserved key referencing the project root canon node.
 export const CANON_KEY = "canon";

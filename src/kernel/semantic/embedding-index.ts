@@ -1,12 +1,12 @@
 import * as fs from "node:fs";
 import { createHash } from "node:crypto";
-import { getOntologyPaths } from "../../core/project/paths.js";
-import { loadNodes } from "../../core/project/load.js";
-import { ensureDir, writeJson, readJson } from "../../core/fs/json.js";
-import { createMockLlmAdapter } from "../llm/mock.js";
-import { createOllamaAdapter } from "../llm/ollama/adapter.js";
-import type { LlmAdapter } from "../llm/types.js";
-import type { OntologyEdge, OntologyNode } from "../../schemas/ontology.js";
+import { getOntologyPaths } from "../core/project/paths.js";
+import { loadNodes } from "../core/project/load.js";
+import { ensureDir, writeJson, readJson } from "../core/fs/json.js";
+import { createMockLlmAdapter } from "../../runtime/llm/mock.js";
+import { createOllamaAdapter } from "../../runtime/llm/ollama/adapter.js";
+import type { LlmAdapter } from "../../runtime/llm/types.js";
+import type { OntologyEdge, OntologyNode } from "../schemas/ontology.js";
 
 // Local semantic index over the intent graph — the Cursor-inspired piece,
 // with the thesis inverted. Cursor embeds CODE because code is its source

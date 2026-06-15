@@ -30,7 +30,7 @@ import * as path from "node:path";
 import type {
   OntologyEdge,
   OntologyNode,
-} from "../../schemas/ontology.js";
+} from "../schemas/ontology.js";
 import {
   computeHierarchyMetrics,
   type AbstractionLevel,

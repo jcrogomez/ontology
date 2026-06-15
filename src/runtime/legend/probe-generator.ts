@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { OntologyNode } from "../../schemas/ontology.js";
+import type { OntologyNode } from "../../kernel/schemas/ontology.js";
 import { loadFixture, runBehaviorCheck } from "./behavior-checker.js";
 
 // Probe generator — turns a node's intent + source into a SELF-VALIDATED

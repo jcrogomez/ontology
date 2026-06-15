@@ -1,6 +1,6 @@
-import { loadEdges, loadNodeById } from "../../core/project/load.js";
-import { findShortestPath } from "../../runtime/graph/traversal.js";
-import type { OntologyEdge } from "../../schemas/ontology.js";
+import { loadEdges, loadNodeById } from "../../kernel/core/project/load.js";
+import { findShortestPath } from "../../kernel/graph/traversal.js";
+import type { OntologyEdge } from "../../kernel/schemas/ontology.js";
 import { parseEdgeTypes } from "./neighbors.js";
 
 export interface GraphPathOptions {

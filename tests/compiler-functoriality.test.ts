@@ -13,9 +13,9 @@ import { describe, it, expect } from "vitest";
 import {
   verifyFunctoriality,
   buildArtifactCategory,
-} from "../src/runtime/graph/artifact-category.js";
-import { computeCompilePlan } from "../src/runtime/graph/compile-plan.js";
-import type { OntologyEdge } from "../src/schemas/ontology.js";
+} from "../src/kernel/graph/artifact-category.js";
+import { computeCompilePlan } from "../src/kernel/graph/compile-plan.js";
+import type { OntologyEdge } from "../src/kernel/schemas/ontology.js";
 
 function edge(id: string, from: string, to: string, type: OntologyEdge["type"] = "depends_on"): OntologyEdge {
   return {

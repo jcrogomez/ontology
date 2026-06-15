@@ -3,11 +3,11 @@ import {
   planEdgeMaterialization,
   EDGE_MATERIALIZATION_SCHEMA_VERSION,
   type EdgeMaterializationPreviewInput,
-} from "../src/runtime/graph/edge-materialization-preview.js";
+} from "../src/kernel/graph/edge-materialization-preview.js";
 import type {
   OntologyEdge,
   OntologyNode,
-} from "../src/schemas/ontology.js";
+} from "../src/kernel/schemas/ontology.js";
 import type { InferredEdge } from "../src/runtime/static/edges.js";
 
 interface NodeOverrides {

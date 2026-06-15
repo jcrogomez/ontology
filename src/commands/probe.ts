@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { loadNodeById } from "../core/project/load.js";
+import { loadNodeById } from "../kernel/core/project/load.js";
 import { dispatchLlmRequest } from "../runtime/llm/dispatcher.js";
 import type { LlmProvider } from "../runtime/llm/types.js";
 import {

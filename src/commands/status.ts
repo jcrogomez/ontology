@@ -1,11 +1,11 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { loadNodes } from "../core/project/load.js";
-import { getOntologyPaths } from "../core/project/paths.js";
+import { loadNodes } from "../kernel/core/project/load.js";
+import { getOntologyPaths } from "../kernel/core/project/paths.js";
 import { auditFichas } from "../runtime/legend/ficha-quality.js";
 import { checkRules } from "../runtime/legend/rule-checker.js";
 import { readDriftState } from "./drift.js";
-import { errorMessage } from "../core/errors.js";
+import { errorMessage } from "../kernel/core/errors.js";
 
 // `onto status` — graph health at a glance, read-only. The "can I sync, and
 // what's in the way" view that the governed loop (`onto sync`) needs.

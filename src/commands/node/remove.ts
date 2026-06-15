@@ -1,5 +1,5 @@
-import { removeNode, NodeHasEdgesError } from "../../core/nodes/remove-node.js";
-import { errorMessage } from "../../core/errors.js";
+import { removeNode, NodeHasEdgesError } from "../../kernel/core/nodes/remove-node.js";
+import { errorMessage } from "../../kernel/core/errors.js";
 
 export interface NodeRemoveCommandOptions {
   json?: boolean;

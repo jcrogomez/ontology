@@ -2,8 +2,8 @@
 // Pure: takes a cwd and a focalId, returns nodes / edges / siblings / children.
 // No graphical concerns here.
 
-import type { OntologyNode, OntologyEdge } from "../../schemas/ontology.js";
-import { loadNodeById, loadNodes, loadEdges } from "../../core/project/load.js";
+import type { OntologyNode, OntologyEdge } from "../../kernel/schemas/ontology.js";
+import { loadNodeById, loadNodes, loadEdges } from "../../kernel/core/project/load.js";
 
 export interface FocalNeighborhood {
   focal: OntologyNode;

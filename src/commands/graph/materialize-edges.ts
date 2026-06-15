@@ -8,11 +8,11 @@ import {
 } from "../../runtime/static/edges.js";
 import {
   planEdgeMaterialization,
-} from "../../runtime/graph/edge-materialization-preview.js";
+} from "../../kernel/graph/edge-materialization-preview.js";
 import {
   composeEdgeApplication,
   type ResolvedEdgeSpec,
-} from "../../runtime/graph/apply-edges-to-copy.js";
+} from "../../kernel/graph/apply-edges-to-copy.js";
 import {
   OntologyEdgeSchema,
   OntologyEventSchema,
@@ -22,7 +22,7 @@ import {
   type OntologyEvent,
   type OntologyNode,
   type OntologyState,
-} from "../../schemas/ontology.js";
+} from "../../kernel/schemas/ontology.js";
 
 export interface GraphMaterializeEdgesOptions {
   json?: boolean;

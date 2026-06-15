@@ -28,7 +28,7 @@
 //      (axiom 8: contradictions must surface as failures, not be papered
 //      over).
 
-import type { OntologyEdge } from "../../schemas/ontology.js";
+import type { OntologyEdge } from "../schemas/ontology.js";
 
 export const HARD_DEPENDENCY_EDGE_TYPES = [
   "depends_on",

@@ -7,7 +7,7 @@
 // and no node is materialised. For the design of fibers and cartesian
 // lifts see runtime/fibration/branch-fiber.ts.
 
-import { loadNodes, loadEdges } from "../../core/project/load.js";
+import { loadNodes, loadEdges } from "../../kernel/core/project/load.js";
 import {
   computeBranchFiber,
   listBranches,

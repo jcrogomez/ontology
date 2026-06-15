@@ -1,8 +1,8 @@
 import * as path from "node:path";
-import { loadNodeById } from "../../core/project/load.js";
+import { loadNodeById } from "../../kernel/core/project/load.js";
 import { runCompilePlan } from "../../runtime/compile/compile-plan-runner.js";
-import { withLock, LockAcquireError } from "../../core/fs/lock.js";
-import { errorMessage } from "../../core/errors.js";
+import { withLock, LockAcquireError } from "../../kernel/core/fs/lock.js";
+import { errorMessage } from "../../kernel/core/errors.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
 import {
   newRunId,

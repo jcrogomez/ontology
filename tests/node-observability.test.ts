@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { createTempProject, cleanupTempProject } from './helpers/temp-project.js';
 import { nodeListCommand } from '../src/commands/node/list.js';
 import { nodeShowCommand } from '../src/commands/node/show.js';
-import { OntologyNode } from '../src/schemas/ontology.js';
+import { OntologyNode } from '../src/kernel/schemas/ontology.js';
 
 describe('Node Observability Commands', () => {
   let tmpDir: string;

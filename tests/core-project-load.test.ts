@@ -5,7 +5,7 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 
 // Import core load functions directly for unit testing
-import { loadState, loadEvents, loadEdges, loadModelsRegistry, loadProcessorsRegistry } from "../src/core/project/load.js";
+import { loadState, loadEvents, loadEdges, loadModelsRegistry, loadProcessorsRegistry } from "../src/kernel/core/project/load.js";
 
 describe("Core Project Loaders", () => {
   let tmpDir: string;

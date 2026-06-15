@@ -29,8 +29,8 @@ import {
   type OntologyEdge,
   type OntologyEvent,
   type OntologyState,
-} from "../../schemas/ontology.js";
-import { hashObject } from "../../core/integrity/hash.js";
+} from "../schemas/ontology.js";
+import { hashObject } from "../core/integrity/hash.js";
 import type { z } from "zod";
 
 export interface ResolvedEdgeSpec {

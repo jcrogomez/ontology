@@ -1,7 +1,7 @@
-import { loadNodeById, assertOntologyProject } from "../../core/project/load.js";
-import { EdgeTypeSchema } from "../../schemas/ontology.js";
-import { validateEdgeDirection } from "../../runtime/graph/poset.js";
-import { createEdge } from "../../core/edges/create-edge.js";
+import { loadNodeById, assertOntologyProject } from "../../kernel/core/project/load.js";
+import { EdgeTypeSchema } from "../../kernel/schemas/ontology.js";
+import { validateEdgeDirection } from "../../kernel/graph/poset.js";
+import { createEdge } from "../../kernel/core/edges/create-edge.js";
 import { z } from "zod";
 
 export interface NodeLinkCommandOptions {

@@ -4,10 +4,10 @@ import { runCli } from "./helpers/run-cli.js";
 import {
   updateNodeParent,
   wouldCreateCycle,
-} from "../src/core/nodes/update-parent.js";
-import { createNode } from "../src/core/nodes/create-node.js";
-import { loadNodeById } from "../src/core/project/load.js";
-import { readState } from "../src/core/state/state-store.js";
+} from "../src/kernel/core/nodes/update-parent.js";
+import { createNode } from "../src/kernel/core/nodes/create-node.js";
+import { loadNodeById } from "../src/kernel/core/project/load.js";
+import { readState } from "../src/kernel/core/state/state-store.js";
 
 // Kernel-level coverage for the `node_update_parent` plasticity primitive
 // (Hierarchizer §10 item 3). Sets up a small parent/child/grandchild

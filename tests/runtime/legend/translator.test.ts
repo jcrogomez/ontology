@@ -5,7 +5,7 @@ import {
   checkTranslatorCache,
   computeTranslatorSourceHash,
 } from "../../../src/runtime/legend/translator.js";
-import type { OntologyNode } from "../../../src/schemas/ontology.js";
+import type { OntologyNode } from "../../../src/kernel/schemas/ontology.js";
 
 // Coverage for the pure δ-1 translator library. The CLI command is
 // tested at the integration level; this file pins the cache-validity

@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { errorMessage } from "../../core/errors.js";
+import { errorMessage } from "../../kernel/core/errors.js";
 import { loadWorkflowGraphFromFile } from "../../runtime/workflow/graph-load.js";
 import {
   runWorkflow,
@@ -8,10 +8,10 @@ import {
   type WorkflowResult,
 } from "../../runtime/workflow/executor.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
-import { createProposal } from "../../core/proposals/persist.js";
-import { createWorkflowRunRecord } from "../../core/runs/workflow-record.js";
-import { readState } from "../../core/state/state-store.js";
-import { loadNodeById } from "../../core/project/load.js";
+import { createProposal } from "../../kernel/core/proposals/persist.js";
+import { createWorkflowRunRecord } from "../../kernel/core/runs/workflow-record.js";
+import { readState } from "../../kernel/core/state/state-store.js";
+import { loadNodeById } from "../../kernel/core/project/load.js";
 import {
   AbstractionLevelSchema,
   EdgeTypeSchema,
@@ -19,11 +19,11 @@ import {
   type OntologyNode,
   type Proposal,
   type ProposalWorkflowSource,
-} from "../../schemas/ontology.js";
-import { validateEdgeDirection } from "../../runtime/graph/poset.js";
+} from "../../kernel/schemas/ontology.js";
+import { validateEdgeDirection } from "../../kernel/graph/poset.js";
 import { parseTypeScriptFile } from "../../runtime/static/typescript.js";
 import { extractCodeFence } from "../../runtime/compile/post/extract-code-fence.js";
-import type { WorkflowProposedEdge, WorkflowProvision } from "../../schemas/workflow.js";
+import type { WorkflowProposedEdge, WorkflowProvision } from "../../kernel/schemas/workflow.js";
 
 // `onto workflow run` — Phase ζ v0.
 //

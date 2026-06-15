@@ -6,10 +6,10 @@
 // action lets the user enumerate the set of nodes that share a structural
 // profile without leaving the TUI.
 
-import { loadNodes, loadEdges } from "../../core/project/load.js";
+import { loadNodes, loadEdges } from "../../kernel/core/project/load.js";
 import { queryNodes } from "../../runtime/query/representable.js";
 import { QueryShapeSchema, type QueryShape } from "../../runtime/query/types.js";
-import type { OntologyNode } from "../../schemas/ontology.js";
+import type { OntologyNode } from "../../kernel/schemas/ontology.js";
 
 export interface QueryFromWalkerResult {
   ok: boolean;

@@ -1,6 +1,6 @@
-import { updateEdge } from "../../core/edges/update-edge.js";
-import { EdgeTypeSchema } from "../../schemas/ontology.js";
-import { errorMessage } from "../../core/errors.js";
+import { updateEdge } from "../../kernel/core/edges/update-edge.js";
+import { EdgeTypeSchema } from "../../kernel/schemas/ontology.js";
+import { errorMessage } from "../../kernel/core/errors.js";
 
 export interface EdgeUpdateCommandOptions {
   type?: string;

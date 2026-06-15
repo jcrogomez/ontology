@@ -1,13 +1,13 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { randomBytes } from "node:crypto";
-import { getOntologyPaths } from "../../core/project/paths.js";
-import { loadNodeById } from "../../core/project/load.js";
-import { readState, writeState } from "../../core/state/state-store.js";
-import { ensureDir, writeJson, readJson, appendJsonl } from "../../core/fs/json.js";
-import { buildMerkleTree, hashFileContent, normalizeLeafPath } from "../../core/integrity/merkle.js";
-import { OntologyEventSchema } from "../../schemas/ontology.js";
-import { errorMessage } from "../../core/errors.js";
+import { getOntologyPaths } from "../../kernel/core/project/paths.js";
+import { loadNodeById } from "../../kernel/core/project/load.js";
+import { readState, writeState } from "../../kernel/core/state/state-store.js";
+import { ensureDir, writeJson, readJson, appendJsonl } from "../../kernel/core/fs/json.js";
+import { buildMerkleTree, hashFileContent, normalizeLeafPath } from "../../kernel/core/integrity/merkle.js";
+import { OntologyEventSchema } from "../../kernel/schemas/ontology.js";
+import { errorMessage } from "../../kernel/core/errors.js";
 import type { DriftSnapshot } from "../../commands/drift.js";
 
 // Per-node drift re-anchor — the write primitive `onto sync` needs after a

@@ -1,5 +1,5 @@
-import { removeEdge } from "../../core/edges/remove-edge.js";
-import { errorMessage } from "../../core/errors.js";
+import { removeEdge } from "../../kernel/core/edges/remove-edge.js";
+import { errorMessage } from "../../kernel/core/errors.js";
 
 export interface EdgeRemoveCommandOptions {
   json?: boolean;

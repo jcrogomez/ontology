@@ -1,5 +1,5 @@
 import { assembleContext } from "../../runtime/context/assembler.js";
-import { EdgeTypeSchema } from "../../schemas/ontology.js";
+import { EdgeTypeSchema } from "../../kernel/schemas/ontology.js";
 
 export async function contextAssembleCommand(
   nodeId: string,

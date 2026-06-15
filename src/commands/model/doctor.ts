@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
-import { getOntologyPaths } from "../../core/project/paths.js";
-import { loadModelsRegistry } from "../../core/project/load.js";
+import { getOntologyPaths } from "../../kernel/core/project/paths.js";
+import { loadModelsRegistry } from "../../kernel/core/project/load.js";
 import { createMockLlmAdapter } from "../../runtime/llm/mock.js";
 import { createOllamaAdapter } from "../../runtime/llm/ollama/adapter.js";
 import { createAnthropicAdapter } from "../../runtime/llm/anthropic/adapter.js";

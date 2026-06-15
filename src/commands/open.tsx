@@ -10,10 +10,10 @@ import {
   registerProject,
   touchProject,
   type ProjectRegistryEntry,
-} from "../core/projects/registry.js";
+} from "../kernel/core/projects/registry.js";
 import { runWalker } from "../walker/index.js";
 import { initCommand } from "./init.js";
-import { loadState } from "../core/project/load.js";
+import { loadState } from "../kernel/core/project/load.js";
 
 export interface OpenOptions {
   // Bypass the picker and open a specific project path directly. Useful for

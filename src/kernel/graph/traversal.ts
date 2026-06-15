@@ -6,7 +6,7 @@
 // Edge orientation: edges are directed (axiom 1). A traversal can walk along
 // edges in either direction; we surface this distinction explicitly.
 
-import type { OntologyEdge } from "../../schemas/ontology.js";
+import type { OntologyEdge } from "../schemas/ontology.js";
 
 export type EdgeDirection = "in" | "out" | "both";
 

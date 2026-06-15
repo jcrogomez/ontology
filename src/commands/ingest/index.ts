@@ -6,9 +6,9 @@ import {
   ManifestationSchema,
   NodeKindSchema,
   type OntologyNode,
-} from "../../schemas/ontology.js";
-import { loadNodeById, loadNodes, loadEdges, loadState } from "../../core/project/load.js";
-import { createProposal } from "../../core/proposals/persist.js";
+} from "../../kernel/schemas/ontology.js";
+import { loadNodeById, loadNodes, loadEdges, loadState } from "../../kernel/core/project/load.js";
+import { createProposal } from "../../kernel/core/proposals/persist.js";
 import {
   fetchPullRequest,
   fetchIssue,
@@ -22,7 +22,7 @@ import {
   type ResolvedExport,
 } from "../../runtime/static/typescript-resolved.js";
 import { inferEdgesAutoFromDirectoryAsync } from "../../runtime/static/edges.js";
-import { errorMessage } from "../../core/errors.js";
+import { errorMessage } from "../../kernel/core/errors.js";
 import {
   computeCostEstimate,
   formatCostEstimateHuman,

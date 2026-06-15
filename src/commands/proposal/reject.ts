@@ -1,5 +1,5 @@
-import { rejectProposal, loadProposal } from "../../core/proposals/persist.js";
-import { errorMessage } from "../../core/errors.js";
+import { rejectProposal, loadProposal } from "../../kernel/core/proposals/persist.js";
+import { errorMessage } from "../../kernel/core/errors.js";
 
 export interface ProposalRejectOptions {
   reason?: string;

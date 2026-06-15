@@ -1,6 +1,6 @@
-import { assertOntologyProject, loadNodeById } from "../../core/project/load.js";
-import { box, kvLines } from "../../core/render/box.js";
-import { bold, dim, byKind, byLevel, byStatus, byManifestation, color } from "../../core/render/style.js";
+import { assertOntologyProject, loadNodeById } from "../../kernel/core/project/load.js";
+import { box, kvLines } from "../../kernel/core/render/box.js";
+import { bold, dim, byKind, byLevel, byStatus, byManifestation, color } from "../../kernel/core/render/style.js";
 
 export async function nodeShowCommand(id: string, options: { json?: boolean } = {}): Promise<void> {
   assertOntologyProject();

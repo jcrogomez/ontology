@@ -13,7 +13,7 @@
 import type {
   OntologyEdge,
   OntologyNode,
-} from "../../schemas/ontology.js";
+} from "../../kernel/schemas/ontology.js";
 import type { QueryShape } from "./types.js";
 
 // Loads the (incoming, outgoing) edge type sets for a node id. We pre-build

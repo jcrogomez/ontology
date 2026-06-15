@@ -1,7 +1,7 @@
-import { assertOntologyProject, loadNodes } from "../../core/project/load.js";
-import type { OntologyNode } from "../../schemas/ontology.js";
-import { renderTable } from "../../core/render/table.js";
-import { byKind, byLevel, byManifestation, byStatus, statusGlyph, dim, bold } from "../../core/render/style.js";
+import { assertOntologyProject, loadNodes } from "../../kernel/core/project/load.js";
+import type { OntologyNode } from "../../kernel/schemas/ontology.js";
+import { renderTable } from "../../kernel/core/render/table.js";
+import { byKind, byLevel, byManifestation, byStatus, statusGlyph, dim, bold } from "../../kernel/core/render/style.js";
 
 export async function nodeListCommand(options: { json?: boolean } = {}): Promise<void> {
   assertOntologyProject();

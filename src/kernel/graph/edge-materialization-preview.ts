@@ -26,8 +26,8 @@
 import type {
   OntologyEdge,
   OntologyNode,
-} from "../../schemas/ontology.js";
-import type { InferredEdge } from "../static/edges.js";
+} from "../schemas/ontology.js";
+import type { InferredEdge } from "../../runtime/static/edges.js";
 import {
   computeHierarchyMetrics,
   type HierarchyMetrics,

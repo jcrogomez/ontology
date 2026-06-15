@@ -1,4 +1,4 @@
-import { OntologyEdge, OntologyNode } from "../../schemas/ontology.js";
+import { OntologyEdge, OntologyNode } from "../../kernel/schemas/ontology.js";
 
 export interface ContextAssemblyInput {
   targetNodeId: string;

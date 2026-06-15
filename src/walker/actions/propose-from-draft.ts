@@ -1,6 +1,6 @@
-import { loadDraft, clearDraft } from "../../core/drafts/persist.js";
-import { createProposal } from "../../core/proposals/persist.js";
-import type { OntologyNode } from "../../schemas/ontology.js";
+import { loadDraft, clearDraft } from "../../kernel/core/drafts/persist.js";
+import { createProposal } from "../../kernel/core/proposals/persist.js";
+import type { OntologyNode } from "../../kernel/schemas/ontology.js";
 
 export interface ProposeFromDraftOptions {
   focal: OntologyNode;

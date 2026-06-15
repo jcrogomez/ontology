@@ -29,7 +29,7 @@ import {
   NodeKindSchema,
   NodeStatusSchema,
   PlaneSchema,
-} from "../../schemas/ontology.js";
+} from "../../kernel/schemas/ontology.js";
 
 export const QueryShapeSchema = z.object({
   // Node-level filters (disjunctive sets).

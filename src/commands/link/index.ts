@@ -23,11 +23,11 @@ import {
   suggestEdgeProposals,
   type EdgeSuggestion,
 } from "../../runtime/context/edge-suggester.js";
-import { loadEdges, loadNodeById, loadNodes, loadState } from "../../core/project/load.js";
-import { EdgeTypeSchema, type OntologyEdge } from "../../schemas/ontology.js";
-import { errorMessage } from "../../core/errors.js";
-import { box, kvLines } from "../../core/render/box.js";
-import { bold, color, dim } from "../../core/render/style.js";
+import { loadEdges, loadNodeById, loadNodes, loadState } from "../../kernel/core/project/load.js";
+import { EdgeTypeSchema, type OntologyEdge } from "../../kernel/schemas/ontology.js";
+import { errorMessage } from "../../kernel/core/errors.js";
+import { box, kvLines } from "../../kernel/core/render/box.js";
+import { bold, color, dim } from "../../kernel/core/render/style.js";
 
 export interface LinkCommandOptions {
   candidate?: string;

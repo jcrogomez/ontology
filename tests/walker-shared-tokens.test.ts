@@ -3,7 +3,7 @@ import {
   focalRequiresShared,
   focalProvidesShared,
 } from "../src/walker/state/shared-tokens.js";
-import type { OntologyNode } from "../src/schemas/ontology.js";
+import type { OntologyNode } from "../src/kernel/schemas/ontology.js";
 import type { FocalNeighborhood } from "../src/walker/state/neighborhood.js";
 
 function nodeWithContext(id: string, ctx: { requires?: string[]; provides?: string[] }): OntologyNode {

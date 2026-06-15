@@ -3,9 +3,9 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
 import { runCli } from "./helpers/run-cli.js";
-import { saveDraft, loadDraft } from "../src/core/drafts/persist.js";
+import { saveDraft, loadDraft } from "../src/kernel/core/drafts/persist.js";
 import { proposeFromDraft } from "../src/walker/actions/propose-from-draft.js";
-import { loadNodeById } from "../src/core/project/load.js";
+import { loadNodeById } from "../src/kernel/core/project/load.js";
 
 // Tests the pure walker action — not the keystroke wiring. The walker
 // surfaces the same action via `:propose`; verifying the action directly

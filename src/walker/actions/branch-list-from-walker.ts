@@ -5,7 +5,7 @@
 // loader. The CLI surface for branches is still future work; until then
 // this is the only entry point users have to the `BranchProjection` view.
 
-import { loadNodes } from "../../core/project/load.js";
+import { loadNodes } from "../../kernel/core/project/load.js";
 import { listBranches } from "../../runtime/fibration/branch-fiber.js";
 
 export interface BranchListResult {

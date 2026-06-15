@@ -32,8 +32,8 @@
 // (generic dependency vs token-bearing edge) without having to think
 // twice.
 
-import type { OntologyEdge, OntologyNode } from "../../schemas/ontology.js";
-import { validateEdgeDirection } from "../graph/poset.js";
+import type { OntologyEdge, OntologyNode } from "../../kernel/schemas/ontology.js";
+import { validateEdgeDirection } from "../../kernel/graph/poset.js";
 
 export type SuggestableEdgeType = "depends_on" | "uses_token";
 

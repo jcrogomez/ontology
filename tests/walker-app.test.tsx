@@ -4,7 +4,7 @@ import { render } from "ink-testing-library";
 import { App } from "../src/walker/app.js";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
 import { runCli } from "./helpers/run-cli.js";
-import { saveDraft } from "../src/core/drafts/persist.js";
+import { saveDraft } from "../src/kernel/core/drafts/persist.js";
 
 // Render-mounting tests for the walker App.
 //

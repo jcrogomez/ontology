@@ -1,6 +1,6 @@
-import { loadPersistedRun } from "../../core/runs/persist.js";
-import { box, kvLines } from "../../core/render/box.js";
-import { bold, dim, color } from "../../core/render/style.js";
+import { loadPersistedRun } from "../../kernel/core/runs/persist.js";
+import { box, kvLines } from "../../kernel/core/render/box.js";
+import { bold, dim, color } from "../../kernel/core/render/style.js";
 
 export interface RunsShowOptions {
   json?: boolean;

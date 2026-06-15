@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeRunId } from "../src/core/runs/persist.js";
+import { computeRunId } from "../src/kernel/core/runs/persist.js";
 import { renderReportMarkdown } from "../src/commands/verify/homeomorphism.js";
 import type {
   AggregateReport,
@@ -8,7 +8,7 @@ import type {
 import type {
   PersistedRunInput,
   PersistedRunModel,
-} from "../src/schemas/ontology.js";
+} from "../src/kernel/schemas/ontology.js";
 
 // Tests for the 5 tooling gaps surfaced by the Vibe-Reasoning γ-7
 // calibration (docs/legend/calibrations/VIBE_REASONING_GAMMA_7_2026-05-12.md).

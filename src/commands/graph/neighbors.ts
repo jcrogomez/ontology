@@ -1,6 +1,6 @@
-import { loadEdges, loadNodeById } from "../../core/project/load.js";
-import { EdgeTypeSchema, type OntologyEdge } from "../../schemas/ontology.js";
-import { getNeighbors, type EdgeDirection } from "../../runtime/graph/traversal.js";
+import { loadEdges, loadNodeById } from "../../kernel/core/project/load.js";
+import { EdgeTypeSchema, type OntologyEdge } from "../../kernel/schemas/ontology.js";
+import { getNeighbors, type EdgeDirection } from "../../kernel/graph/traversal.js";
 
 export interface GraphNeighborsOptions {
   type?: string;          // comma-separated edge types

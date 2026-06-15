@@ -18,8 +18,8 @@ import {
   suggestEdgeProposals,
   type EdgeSuggestion,
 } from "../../runtime/context/edge-suggester.js";
-import { loadEdges, loadNodeById, loadNodes } from "../../core/project/load.js";
-import type { OntologyNode } from "../../schemas/ontology.js";
+import { loadEdges, loadNodeById, loadNodes } from "../../kernel/core/project/load.js";
+import type { OntologyNode } from "../../kernel/schemas/ontology.js";
 
 export interface LinkAnalysisRow {
   token: string;

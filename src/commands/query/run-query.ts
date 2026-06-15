@@ -8,17 +8,17 @@
 // to .ontology/.
 
 import * as fs from "node:fs";
-import { assertOntologyProject, loadEdges, loadNodes } from "../../core/project/load.js";
-import type { OntologyNode } from "../../schemas/ontology.js";
+import { assertOntologyProject, loadEdges, loadNodes } from "../../kernel/core/project/load.js";
+import type { OntologyNode } from "../../kernel/schemas/ontology.js";
 import { QueryShapeSchema, type QueryShape } from "../../runtime/query/types.js";
 import { queryNodes } from "../../runtime/query/representable.js";
 import {
   loadEmbeddingIndex,
   resolveEmbeddingAdapter,
   staleIndexNodeIds,
-} from "../../runtime/semantic/embedding-index.js";
-import { renderTable } from "../../core/render/table.js";
-import { bold, dim, byKind, byLevel, byStatus, statusGlyph } from "../../core/render/style.js";
+} from "../../kernel/semantic/embedding-index.js";
+import { renderTable } from "../../kernel/core/render/table.js";
+import { bold, dim, byKind, byLevel, byStatus, statusGlyph } from "../../kernel/core/render/style.js";
 
 export interface QueryCommandOptions {
   shape?: string;

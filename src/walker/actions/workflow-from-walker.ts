@@ -2,13 +2,13 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { loadWorkflowGraphFromFile } from "../../runtime/workflow/graph-load.js";
 import { runWorkflow, type RunWorkflowOptions } from "../../runtime/workflow/executor.js";
-import { createWorkflowRunRecord } from "../../core/runs/workflow-record.js";
+import { createWorkflowRunRecord } from "../../kernel/core/runs/workflow-record.js";
 import {
   resolveContract,
   buildUpdateProposalsFromWorkflow,
   projectWorkflowArtefact,
 } from "../../commands/workflow/run.js";
-import type { OntologyNode, ProposalWorkflowSource } from "../../schemas/ontology.js";
+import type { OntologyNode, ProposalWorkflowSource } from "../../kernel/schemas/ontology.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
 
 // Walker v1.5 action: `:workflow <graph> --input <file> [provider]

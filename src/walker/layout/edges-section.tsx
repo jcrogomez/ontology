@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-import type { OntologyEdge, OntologyNode } from "../../schemas/ontology.js";
+import type { OntologyEdge, OntologyNode } from "../../kernel/schemas/ontology.js";
 
 export interface EdgesSectionProps {
   edgesOut: OntologyEdge[];

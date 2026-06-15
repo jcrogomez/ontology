@@ -7,9 +7,9 @@ import {
   rankBySimilarity,
   suggestSemanticPairs,
   type EmbeddingIndex,
-} from "../src/runtime/semantic/embedding-index.js";
+} from "../src/kernel/semantic/embedding-index.js";
 import { mockEmbedText, MOCK_EMBED_DIM } from "../src/runtime/llm/mock.js";
-import type { OntologyEdge, OntologyNode } from "../src/schemas/ontology.js";
+import type { OntologyEdge, OntologyNode } from "../src/kernel/schemas/ontology.js";
 
 // Unit coverage for the semantic-index primitives. The mock embedder is
 // bag-of-words feature hashing, so similarity assertions can be MEANINGFUL:

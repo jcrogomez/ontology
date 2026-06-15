@@ -30,7 +30,7 @@
 // particular state-loading strategy.
 
 import * as path from "node:path";
-import type { OntologyNode, OntologyEdge } from "../../schemas/ontology.js";
+import type { OntologyNode, OntologyEdge } from "../../kernel/schemas/ontology.js";
 import type {
   BranchFiber,
   BranchProjection,

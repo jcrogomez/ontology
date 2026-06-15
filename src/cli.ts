@@ -64,7 +64,7 @@ import { ontoMcpCommand } from "./commands/mcp/index.js";
 import { runBakeoffCommand } from "./commands/bakeoff/index.js";
 import { projectsListCommand } from "./commands/projects/list.js";
 import { projectsForgetCommand } from "./commands/projects/forget.js";
-import { errorMessage } from "./core/errors.js";
+import { errorMessage } from "./kernel/core/errors.js";
 
 // Single source of truth for the version: package.json. Resolved relative to
 // this module so it works both from src/ (tsx dev) and dist/ (built binary) —

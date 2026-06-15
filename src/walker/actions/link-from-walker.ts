@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { EdgeTypeSchema, type OntologyNode } from "../../schemas/ontology.js";
-import { loadNodeById } from "../../core/project/load.js";
-import { validateEdgeDirection } from "../../runtime/graph/poset.js";
-import { createProposal } from "../../core/proposals/persist.js";
+import { EdgeTypeSchema, type OntologyNode } from "../../kernel/schemas/ontology.js";
+import { loadNodeById } from "../../kernel/core/project/load.js";
+import { validateEdgeDirection } from "../../kernel/graph/poset.js";
+import { createProposal } from "../../kernel/core/proposals/persist.js";
 
 export interface LinkFromWalkerOptions {
   // Source endpoint of the proposed edge. Always the focal node when the

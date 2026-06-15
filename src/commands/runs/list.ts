@@ -1,7 +1,7 @@
-import { listPersistedRuns } from "../../core/runs/persist.js";
-import { renderTable } from "../../core/render/table.js";
-import { bold, dim, color } from "../../core/render/style.js";
-import type { PersistedRun } from "../../schemas/ontology.js";
+import { listPersistedRuns } from "../../kernel/core/runs/persist.js";
+import { renderTable } from "../../kernel/core/render/table.js";
+import { bold, dim, color } from "../../kernel/core/render/style.js";
+import type { PersistedRun } from "../../kernel/schemas/ontology.js";
 
 export interface RunsListOptions {
   kind?: string;

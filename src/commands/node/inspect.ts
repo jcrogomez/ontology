@@ -1,13 +1,13 @@
 import * as path from "node:path";
 import { randomBytes } from "node:crypto";
-import { loadNodeById } from "../../core/project/load.js";
-import { writeJson, appendJsonl } from "../../core/fs/json.js";
-import { readState, writeState } from "../../core/state/state-store.js";
-import { getOntologyPaths } from "../../core/project/paths.js";
+import { loadNodeById } from "../../kernel/core/project/load.js";
+import { writeJson, appendJsonl } from "../../kernel/core/fs/json.js";
+import { readState, writeState } from "../../kernel/core/state/state-store.js";
+import { getOntologyPaths } from "../../kernel/core/project/paths.js";
 import { dispatchLlmRequest } from "../../runtime/llm/dispatcher.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
-import { errorMessage } from "../../core/errors.js";
-import { OntologyEventSchema } from "../../schemas/ontology.js";
+import { errorMessage } from "../../kernel/core/errors.js";
+import { OntologyEventSchema } from "../../kernel/schemas/ontology.js";
 import {
   INSPECTOR_SYSTEM_PROMPT,
   buildInspectorPrompt,

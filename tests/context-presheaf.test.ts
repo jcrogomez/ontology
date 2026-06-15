@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildFragment } from "../src/runtime/context/presheaf";
-import type { OntologyNode } from "../src/schemas/ontology";
+import type { OntologyNode } from "../src/kernel/schemas/ontology";
 
 describe("context presheaf", () => {
   const createMockNode = (overrides: Partial<OntologyNode> = {}): OntologyNode => {

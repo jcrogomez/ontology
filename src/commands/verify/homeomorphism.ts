@@ -1,17 +1,17 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { randomBytes, createHash } from "node:crypto";
-import { loadNodes, loadNodeById } from "../../core/project/load.js";
+import { loadNodes, loadNodeById } from "../../kernel/core/project/load.js";
 import { runCompilePlan } from "../../runtime/compile/compile-plan-runner.js";
-import { loadPersistedRun } from "../../core/runs/persist.js";
+import { loadPersistedRun } from "../../kernel/core/runs/persist.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
-import { errorMessage } from "../../core/errors.js";
-import { OntologyEventSchema } from "../../schemas/ontology.js";
-import type { OntologyNode } from "../../schemas/ontology.js";
-import { readState, writeState } from "../../core/state/state-store.js";
-import { getOntologyPaths } from "../../core/project/paths.js";
-import { appendJsonl } from "../../core/fs/json.js";
-import { withLock, LockAcquireError } from "../../core/fs/lock.js";
+import { errorMessage } from "../../kernel/core/errors.js";
+import { OntologyEventSchema } from "../../kernel/schemas/ontology.js";
+import type { OntologyNode } from "../../kernel/schemas/ontology.js";
+import { readState, writeState } from "../../kernel/core/state/state-store.js";
+import { getOntologyPaths } from "../../kernel/core/project/paths.js";
+import { appendJsonl } from "../../kernel/core/fs/json.js";
+import { withLock, LockAcquireError } from "../../kernel/core/fs/lock.js";
 import {
   compareFiles,
   classifyVerdict,

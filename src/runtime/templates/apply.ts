@@ -8,9 +8,9 @@
 // and poset integrity, so this function does not re-check; it trusts the
 // shape and focuses on resolving template-local keys to assigned node ids.
 
-import { createNode } from "../../core/nodes/create-node.js";
-import { createEdge } from "../../core/edges/create-edge.js";
-import { loadState } from "../../core/project/load.js";
+import { createNode } from "../../kernel/core/nodes/create-node.js";
+import { createEdge } from "../../kernel/core/edges/create-edge.js";
+import { loadState } from "../../kernel/core/project/load.js";
 import { CANON_KEY, type Template } from "./schema.js";
 
 export interface ApplyTemplateResult {

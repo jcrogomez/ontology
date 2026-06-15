@@ -1,8 +1,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getOntologyPaths } from "../../core/project/paths.js";
-import { hashFileContent, normalizeLeafPath } from "../../core/integrity/merkle.js";
-import type { OntologyNode } from "../../schemas/ontology.js";
+import { getOntologyPaths } from "../../kernel/core/project/paths.js";
+import { hashFileContent, normalizeLeafPath } from "../../kernel/core/integrity/merkle.js";
+import type { OntologyNode } from "../../kernel/schemas/ontology.js";
 
 // Shadow status of a focal node — the walker-side consumer of `onto drift`.
 // "Shadow" = the file(s) in node.outputs.files, per the thesis (code is the

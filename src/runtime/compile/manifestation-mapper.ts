@@ -17,7 +17,7 @@
 // to `.py`. The language-aware override is handled by the artifact-writer,
 // which consults `node.technical.language` first and falls back to this map.
 
-import type { ManifestationSchema } from "../../schemas/ontology.js";
+import type { ManifestationSchema } from "../../kernel/schemas/ontology.js";
 import type { z } from "zod";
 
 export type Manifestation = z.infer<typeof ManifestationSchema>;

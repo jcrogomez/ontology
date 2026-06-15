@@ -9,7 +9,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 
 import { ontologyTools, type OntologyTool } from "../src/runtime/mcp/tools.js";
 import { createOntologyMcpServer } from "../src/runtime/mcp/server.js";
-import { listPersistedRuns } from "../src/core/runs/persist.js";
+import { listPersistedRuns } from "../src/kernel/core/runs/persist.js";
 
 const CLI_PATH = path.resolve(__dirname, "../dist/cli.js");
 

@@ -3,7 +3,7 @@ import { buildFragment, type ContextFragment } from "./presheaf.js";
 import { glueFragments, type GluingConflict } from "./gluing.js";
 import { validateIntent } from "./intent-validator.js";
 import { OntologyRuntimeError } from "../errors.js";
-import { LlmProviderSchema, type OntologyEdge } from "../../schemas/ontology.js";
+import { LlmProviderSchema, type OntologyEdge } from "../../kernel/schemas/ontology.js";
 import type { Omega } from "../topos/index.js";
 
 // Semantic linker: the programmatic counterpart to `run context --validate`.

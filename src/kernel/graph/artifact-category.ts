@@ -28,7 +28,7 @@
 //                    C→A edge) is sent to the *composite* of the images, i.e.
 //                    F(g∘f) = F(g)∘F(f).
 
-import type { OntologyEdge } from "../../schemas/ontology.js";
+import type { OntologyEdge } from "../schemas/ontology.js";
 import { computeCompilePlan, HARD_DEPENDENCY_EDGE_TYPES, type CompilePlan } from "./compile-plan.js";
 
 type HardEdgeType = (typeof HARD_DEPENDENCY_EDGE_TYPES)[number];

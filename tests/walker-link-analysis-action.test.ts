@@ -11,7 +11,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
 import { linkAnalysisFromWalker } from "../src/walker/actions/link-analysis-from-walker.js";
-import type { OntologyNode } from "../src/schemas/ontology.js";
+import type { OntologyNode } from "../src/kernel/schemas/ontology.js";
 
 function bootstrapState(cwd: string, opts: { nodeCount: number }): void {
   fs.mkdirSync(path.join(cwd, ".ontology", "nodes"), { recursive: true });

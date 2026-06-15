@@ -4,7 +4,7 @@ import {
   AbstractionLevelSchema,
   ManifestationSchema,
   NodeKindSchema,
-} from "../../schemas/ontology.js";
+} from "../../kernel/schemas/ontology.js";
 import type {
   ClassificationVocabulary,
   StructuralClassification,

@@ -4,7 +4,7 @@
 // looking at the cell border can identify the focal node's level without reading text.
 // See docs/design/surfaces/WALKER_INTERFACE.md section 3.
 
-import type { AbstractionLevelSchema } from "../../schemas/ontology.js";
+import type { AbstractionLevelSchema } from "../../kernel/schemas/ontology.js";
 import type { z } from "zod";
 
 export type AbstractionLevel = z.infer<typeof AbstractionLevelSchema>;

@@ -1,8 +1,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { loadNodeById } from "../core/project/load.js";
+import { loadNodeById } from "../kernel/core/project/load.js";
 import { runCompilePlan } from "../runtime/compile/compile-plan-runner.js";
-import { withLock, LockAcquireError } from "../core/fs/lock.js";
+import { withLock, LockAcquireError } from "../kernel/core/fs/lock.js";
 import { writeArtifact, TargetExistsError } from "../runtime/compile/artifact-writer.js";
 import { shadowReport } from "../walker/state/shadow-status.js";
 import {

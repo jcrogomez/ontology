@@ -5,11 +5,11 @@ import {
   DEFAULT_CONTEXT_EDGE_TYPES,
   HIERARCHY_METRICS_SCHEMA_VERSION,
   type HierarchyMetricsInput,
-} from "../src/runtime/graph/hierarchy-metrics.js";
+} from "../src/kernel/graph/hierarchy-metrics.js";
 import type {
   OntologyEdge,
   OntologyNode,
-} from "../src/schemas/ontology.js";
+} from "../src/kernel/schemas/ontology.js";
 
 // Lightweight node factory tailored to metric tests. Builds a valid
 // OntologyNode with sensible defaults; callers override only the fields the

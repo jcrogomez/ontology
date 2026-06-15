@@ -8,7 +8,7 @@ import {
   OntologyEventSchema,
   OntologyNodeSchema,
   OntologyStateSchema,
-} from "../src/schemas/ontology.js";
+} from "../src/kernel/schemas/ontology.js";
 
 const CLI = path.resolve(__dirname, "..", "dist", "cli.js");
 const REPO_ROOT = path.resolve(__dirname, "..");

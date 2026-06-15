@@ -5,15 +5,15 @@ import {
   computeHierarchyMetrics,
   summariseFlatness,
   type HierarchyMetrics,
-} from "../../runtime/graph/hierarchy-metrics.js";
-import { loadEdges, loadNodes, loadState } from "../../core/project/load.js";
+} from "../../kernel/graph/hierarchy-metrics.js";
+import { loadEdges, loadNodes, loadState } from "../../kernel/core/project/load.js";
 import {
   OntologyEdgeSchema,
   OntologyNodeSchema,
   OntologyStateSchema,
   type OntologyEdge,
   type OntologyNode,
-} from "../../schemas/ontology.js";
+} from "../../kernel/schemas/ontology.js";
 
 export interface GraphMetricsOptions {
   json?: boolean;

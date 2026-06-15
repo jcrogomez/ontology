@@ -21,7 +21,7 @@ import {
   DEFAULT_H1_JACCARD_FLOOR,
   type BakeoffArm,
 } from "../../runtime/legend/bakeoff-synthesis.js";
-import { errorMessage } from "../../core/errors.js";
+import { errorMessage } from "../../kernel/core/errors.js";
 
 export interface BakeoffCommandOptions {
   minJaccard?: number;

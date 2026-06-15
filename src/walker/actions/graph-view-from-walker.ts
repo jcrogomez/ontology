@@ -24,9 +24,9 @@
 // the directional split is computed here so the renderer can show
 // upstream-above / downstream-below without having to re-traverse.
 
-import type { OntologyEdge, OntologyNode } from "../../schemas/ontology.js";
-import { loadEdges, loadNodeById, loadNodes } from "../../core/project/load.js";
-import { extractSubgraph } from "../../runtime/graph/traversal.js";
+import type { OntologyEdge, OntologyNode } from "../../kernel/schemas/ontology.js";
+import { loadEdges, loadNodeById, loadNodes } from "../../kernel/core/project/load.js";
+import { extractSubgraph } from "../../kernel/graph/traversal.js";
 
 export interface GraphViewNodeRow {
   id: string;

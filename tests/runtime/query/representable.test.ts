@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { matchesShape, queryNodes } from "../../../src/runtime/query/representable";
-import type { OntologyEdge, OntologyNode } from "../../../src/schemas/ontology";
+import type { OntologyEdge, OntologyNode } from "../../../src/kernel/schemas/ontology";
 import type { QueryShape } from "../../../src/runtime/query/types";
 
 // Builds a minimal OntologyNode that satisfies the schema typing without

@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
-import { createNode } from "../../core/nodes/create-node.js";
-import { AbstractionLevelSchema, ManifestationSchema, NodeKindSchema } from "../../schemas/ontology.js";
-import { errorMessage } from "../../core/errors.js";
+import { createNode } from "../../kernel/core/nodes/create-node.js";
+import { AbstractionLevelSchema, ManifestationSchema, NodeKindSchema } from "../../kernel/schemas/ontology.js";
+import { errorMessage } from "../../kernel/core/errors.js";
 import { z } from "zod";
 
 export interface NodeCreateCommandOptions {

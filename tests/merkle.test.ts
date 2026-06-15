@@ -7,7 +7,7 @@ import {
   hashFileContent,
   normalizeLeafPath,
   type MerkleLeafInput,
-} from "../src/core/integrity/merkle.js";
+} from "../src/kernel/core/integrity/merkle.js";
 
 // Unit + property coverage for the Merkle module behind `onto drift`.
 // The properties are the load-bearing part: the drift report is only

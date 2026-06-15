@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { writeJson, readJson, appendJsonl, readJsonl } from "../src/core/fs/json.js";
+import { writeJson, readJson, appendJsonl, readJsonl } from "../src/kernel/core/fs/json.js";
 
 let tmpDir: string;
 

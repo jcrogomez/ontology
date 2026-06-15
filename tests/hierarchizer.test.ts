@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   planHierarchization,
   HIERARCHIZER_PLAN_SCHEMA_VERSION,
-} from "../src/runtime/graph/hierarchizer.js";
-import type { OntologyEdge, OntologyNode } from "../src/schemas/ontology.js";
+} from "../src/kernel/graph/hierarchizer.js";
+import type { OntologyEdge, OntologyNode } from "../src/kernel/schemas/ontology.js";
 
 interface NodeOverrides {
   id: string;

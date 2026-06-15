@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-import type { OntologyNode } from "../../schemas/ontology.js";
+import type { OntologyNode } from "../../kernel/schemas/ontology.js";
 import { POSET_COLORS, levelTag, colorsEnabled } from "../theme/colors.js";
 
 export interface IdentityBarProps {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { computeCompilePlan } from "../src/runtime/graph/compile-plan.js";
-import type { OntologyEdge } from "../src/schemas/ontology.js";
+import { computeCompilePlan } from "../src/kernel/graph/compile-plan.js";
+import type { OntologyEdge } from "../src/kernel/schemas/ontology.js";
 
 function edge(id: string, from: string, to: string, type: OntologyEdge["type"] = "depends_on"): OntologyEdge {
   return {

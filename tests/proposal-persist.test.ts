@@ -9,11 +9,11 @@ import {
   listProposals,
   nextProposalId,
   proposalPath,
-} from "../src/core/proposals/persist.js";
+} from "../src/kernel/core/proposals/persist.js";
 import {
   ProposalSchema,
   type ProposalMutation,
-} from "../src/schemas/ontology.js";
+} from "../src/kernel/schemas/ontology.js";
 
 // Build a minimal node_create proposal mutation. Uses a fake parentHash so
 // these tests do not depend on a specific canon hash.

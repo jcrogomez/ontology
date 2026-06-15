@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import { execFileSync } from "node:child_process";
-import { getOntologyPaths } from "../core/project/paths.js";
+import { getOntologyPaths } from "../kernel/core/project/paths.js";
 
 // Doctor checks physical layout and minimal state sanity
 // It must work both before and after init.

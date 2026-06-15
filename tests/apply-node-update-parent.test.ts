@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
 import { runCli } from "./helpers/run-cli.js";
-import { createNode } from "../src/core/nodes/create-node.js";
-import { updateNode } from "../src/core/nodes/update-node.js";
+import { createNode } from "../src/kernel/core/nodes/create-node.js";
+import { updateNode } from "../src/kernel/core/nodes/update-node.js";
 import {
   applyProposal,
   createProposal,
-} from "../src/core/proposals/persist.js";
-import { loadNodeById } from "../src/core/project/load.js";
-import type { Proposal } from "../src/schemas/ontology.js";
+} from "../src/kernel/core/proposals/persist.js";
+import { loadNodeById } from "../src/kernel/core/project/load.js";
+import type { Proposal } from "../src/kernel/schemas/ontology.js";
 
 // End-to-end coverage for the node_update_parent proposal lifecycle
 // (Hierarchizer §10 item 3 — apply path). Mirrors the apply-edge-create

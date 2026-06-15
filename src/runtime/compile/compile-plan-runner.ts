@@ -1,7 +1,7 @@
-import type { OntologyNode, OntologyEdge } from "../../schemas/ontology.js";
+import type { OntologyNode, OntologyEdge } from "../../kernel/schemas/ontology.js";
 import type { LlmProvider } from "../llm/types.js";
-import { loadEdges, loadNodes, loadModelsRegistry } from "../../core/project/load.js";
-import { computeCompilePlan, type CompilePlan } from "../graph/compile-plan.js";
+import { loadEdges, loadNodes, loadModelsRegistry } from "../../kernel/core/project/load.js";
+import { computeCompilePlan, type CompilePlan } from "../../kernel/graph/compile-plan.js";
 import { computeBranchFiber, listBranches } from "../fibration/branch-fiber.js";
 import { compileNode, type CompileNodeResult } from "./compile-node.js";
 import type { WriteArtifactResult } from "./artifact-writer.js";

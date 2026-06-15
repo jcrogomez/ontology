@@ -1,5 +1,5 @@
-import { loadEdges } from "../../core/project/load.js";
-import { computeCompilePlan, type CompilePlan } from "../../runtime/graph/compile-plan.js";
+import { loadEdges } from "../../kernel/core/project/load.js";
+import { computeCompilePlan, type CompilePlan } from "../../kernel/graph/compile-plan.js";
 
 export interface PlanFromWalkerOptions {
   focalId: string;

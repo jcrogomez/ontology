@@ -8,7 +8,7 @@
 // v0 uses exact-token matching. Future v1+ may add case-insensitive / lemmatized matching
 // behind an explicit opt-in.
 
-import type { OntologyNode } from "../../schemas/ontology.js";
+import type { OntologyNode } from "../../kernel/schemas/ontology.js";
 import type { FocalNeighborhood } from "./neighborhood.js";
 
 export interface SharedTokenInfo {

@@ -4,15 +4,15 @@ import { z } from "zod";
 import {
   planHierarchization,
   type HierarchizerPlan,
-} from "../../runtime/graph/hierarchizer.js";
-import { loadEdges, loadNodes, loadState } from "../../core/project/load.js";
+} from "../../kernel/graph/hierarchizer.js";
+import { loadEdges, loadNodes, loadState } from "../../kernel/core/project/load.js";
 import {
   OntologyEdgeSchema,
   OntologyNodeSchema,
   OntologyStateSchema,
   type OntologyEdge,
   type OntologyNode,
-} from "../../schemas/ontology.js";
+} from "../../kernel/schemas/ontology.js";
 
 export interface GraphHierarchizeOptions {
   json?: boolean;

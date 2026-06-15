@@ -1,12 +1,12 @@
 import { randomBytes } from "node:crypto";
-import type { OntologyNode, OntologyEvent, OntologyModel, PersistedRunInput, PersistedRunModel } from "../../schemas/ontology.js";
-import { OntologyEventSchema } from "../../schemas/ontology.js";
+import type { OntologyNode, OntologyEvent, OntologyModel, PersistedRunInput, PersistedRunModel } from "../../kernel/schemas/ontology.js";
+import { OntologyEventSchema } from "../../kernel/schemas/ontology.js";
 import { dispatchLlmRequest } from "../llm/dispatcher.js";
 import { resolveNodeModel } from "../llm/resolve-node-model.js";
 import type { LlmProvider, LlmTask } from "../llm/types.js";
-import { hashPrompt, hashContext } from "../../core/integrity/hash.js";
+import { hashPrompt, hashContext } from "../../kernel/core/integrity/hash.js";
 import type { ContextAssemblyOutput } from "../context/types.js";
-import { createPersistedRun, computeRunId, loadPersistedRun } from "../../core/runs/persist.js";
+import { createPersistedRun, computeRunId, loadPersistedRun } from "../../kernel/core/runs/persist.js";
 import {
   writeArtifactPending,
   TargetExistsError,
@@ -36,9 +36,9 @@ import {
 } from "./ast-grounding.js";
 import { scanFileSymbols } from "../legend/ast-symbol-scanner.js";
 import * as path from "node:path";
-import { getOntologyPaths } from "../../core/project/paths.js";
-import { appendJsonl } from "../../core/fs/json.js";
-import { readState, writeState } from "../../core/state/state-store.js";
+import { getOntologyPaths } from "../../kernel/core/project/paths.js";
+import { appendJsonl } from "../../kernel/core/fs/json.js";
+import { readState, writeState } from "../../kernel/core/state/state-store.js";
 import {
   type EffectWithLog,
   type LogEntry,

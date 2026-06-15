@@ -1,5 +1,5 @@
 import * as fs from "node:fs";
-import { assertOntologyProject, loadModelsRegistry } from "../../core/project/load.js";
+import { assertOntologyProject, loadModelsRegistry } from "../../kernel/core/project/load.js";
 import { createMockLlmAdapter } from "../../runtime/llm/mock.js";
 import { createOllamaAdapter } from "../../runtime/llm/ollama/adapter.js";
 

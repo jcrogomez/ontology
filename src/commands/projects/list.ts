@@ -2,7 +2,7 @@ import {
   loadProjectRegistry,
   partitionByLiveness,
   projectsByRecency,
-} from "../../core/projects/registry.js";
+} from "../../kernel/core/projects/registry.js";
 
 export interface ProjectsListOptions {
   json?: boolean;

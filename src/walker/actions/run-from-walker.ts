@@ -1,10 +1,10 @@
-import type { OntologyNode, PersistedRun, PersistedRunInput, PersistedRunModel } from "../../schemas/ontology.js";
+import type { OntologyNode, PersistedRun, PersistedRunInput, PersistedRunModel } from "../../kernel/schemas/ontology.js";
 import { assembleContext } from "../../runtime/context/assembler.js";
 import type { ContextAssemblyOutput } from "../../runtime/context/types.js";
 import { dispatchLlmRequest } from "../../runtime/llm/dispatcher.js";
 import type { LlmProvider, LlmResponse, LlmTask } from "../../runtime/llm/types.js";
-import { hashPrompt, hashContext } from "../../core/integrity/hash.js";
-import { createPersistedRun, computeRunId, loadPersistedRun } from "../../core/runs/persist.js";
+import { hashPrompt, hashContext } from "../../kernel/core/integrity/hash.js";
+import { createPersistedRun, computeRunId, loadPersistedRun } from "../../kernel/core/runs/persist.js";
 import {
   type EffectWithLog,
   type LogEntry,

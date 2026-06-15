@@ -10,8 +10,8 @@
 // carry refinement semantics, we reject inversions at link time. Other edge
 // types remain direction-agnostic in this bootstrap.
 
-import type { OntologyEdge } from "../../schemas/ontology.js";
-import { AbstractionLevelSchema } from "../../schemas/ontology.js";
+import type { OntologyEdge } from "../schemas/ontology.js";
+import { AbstractionLevelSchema } from "../schemas/ontology.js";
 import type { z } from "zod";
 
 export type AbstractionLevel = z.infer<typeof AbstractionLevelSchema>;

@@ -6,7 +6,7 @@
 // are not consulted: a branch is defined by the existence of at least one
 // node carrying that branch label (see branch-fiber.ts).
 
-import { loadNodes } from "../../core/project/load.js";
+import { loadNodes } from "../../kernel/core/project/load.js";
 import { listBranches } from "../../runtime/fibration/branch-fiber.js";
 
 export interface BranchListOptions {

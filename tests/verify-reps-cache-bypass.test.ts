@@ -3,9 +3,9 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
 import { runCli } from "./helpers/run-cli.js";
-import { createNode } from "../src/core/nodes/create-node.js";
+import { createNode } from "../src/kernel/core/nodes/create-node.js";
 import { verifyHomeomorphismCommand } from "../src/commands/verify/homeomorphism.js";
-import { getOntologyPaths } from "../src/core/project/paths.js";
+import { getOntologyPaths } from "../src/kernel/core/project/paths.js";
 
 // End-to-end integration test for the `--reps` cache-bypass fix
 // (review §3 / commit 5d70f3b). The bug this test guards against:

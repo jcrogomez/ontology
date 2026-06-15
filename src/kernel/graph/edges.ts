@@ -1,5 +1,5 @@
-import { loadEdges } from "../../core/project/load.js";
-import type { OntologyEdge } from "../../schemas/ontology.js";
+import { loadEdges } from "../core/project/load.js";
+import type { OntologyEdge } from "../schemas/ontology.js";
 
 /**
  * Ensures deterministic ordering of edges by createdAt, then edgeId.

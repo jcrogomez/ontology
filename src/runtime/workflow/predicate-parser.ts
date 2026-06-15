@@ -24,7 +24,7 @@
 // evaluator are split so the graph loader can parse + statically
 // validate predicates at load time without needing a runtime state.
 
-import type { VerifierSchemaName } from "../../schemas/workflow.js";
+import type { VerifierSchemaName } from "../../kernel/schemas/workflow.js";
 import { verifierSchemaFields } from "./verifier-schemas.js";
 
 // ── AST ─────────────────────────────────────────────────────────────────────

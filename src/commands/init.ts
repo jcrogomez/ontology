@@ -1,8 +1,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { randomBytes } from "node:crypto";
-import { getOntologyPaths } from "../core/project/paths.js";
-import { ensureDir, writeJson, appendJsonl } from "../core/fs/json.js";
+import { getOntologyPaths } from "../kernel/core/project/paths.js";
+import { ensureDir, writeJson, appendJsonl } from "../kernel/core/fs/json.js";
 import {
   OntologyEventSchema,
   OntologySchemaVersion,
@@ -11,9 +11,9 @@ import {
   OntologyProcessorSchema,
   OntologyStateSchema,
   type OntologyNode,
-} from "../schemas/ontology.js";
-import { hashObject } from "../core/integrity/hash.js";
-import { registerProject } from "../core/projects/registry.js";
+} from "../kernel/schemas/ontology.js";
+import { hashObject } from "../kernel/core/integrity/hash.js";
+import { registerProject } from "../kernel/core/projects/registry.js";
 import { loadTemplate, listTemplates } from "../runtime/templates/load.js";
 import { applyTemplate } from "../runtime/templates/apply.js";
 import type { Template } from "../runtime/templates/schema.js";

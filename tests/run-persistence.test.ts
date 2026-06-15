@@ -7,18 +7,18 @@ import {
   hashPrompt,
   hashContext,
   hashRun,
-} from "../src/core/integrity/hash.js";
+} from "../src/kernel/core/integrity/hash.js";
 import {
   computeRunId,
   createPersistedRun,
   loadPersistedRun,
   listPersistedRuns,
   verifyPersistedRun,
-} from "../src/core/runs/persist.js";
+} from "../src/kernel/core/runs/persist.js";
 import type {
   PersistedRunInput,
   PersistedRunModel,
-} from "../src/schemas/ontology.js";
+} from "../src/kernel/schemas/ontology.js";
 import type { ContextAssemblyOutput } from "../src/runtime/context/types.js";
 
 const PROMPT_HASH_PREFIX = "prompt:hash:";

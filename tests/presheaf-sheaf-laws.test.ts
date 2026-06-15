@@ -35,7 +35,7 @@ import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js
 import { assembleContext } from "../src/runtime/context/assembler.js";
 import { glueFragments, restrictSection } from "../src/runtime/context/gluing.js";
 import type { ContextFragment } from "../src/runtime/context/presheaf.js";
-import type { OntologyNode, OntologyEdge } from "../src/schemas/ontology.js";
+import type { OntologyNode, OntologyEdge } from "../src/kernel/schemas/ontology.js";
 
 // ---------------------------------------------------------------------------
 // Part 1 — Restriction law on assembleContext

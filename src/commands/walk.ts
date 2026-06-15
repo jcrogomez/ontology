@@ -1,5 +1,5 @@
 import { runWalker } from "../walker/index.js";
-import { loadNodeById } from "../core/project/load.js";
+import { loadNodeById } from "../kernel/core/project/load.js";
 
 export interface WalkOptions {
   cwd?: string;

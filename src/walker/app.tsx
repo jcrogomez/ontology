@@ -27,7 +27,7 @@ import { DraftEditor } from "./layout/draft-editor.js";
 import { RunResultPanel, type RunResultPanelProps } from "./layout/run-result-panel.js";
 import { CompilePlanPanel, type CompilePlanPanelProps } from "./layout/compile-plan-panel.js";
 import { CompileResultPanel, type CompileResultPanelProps } from "./layout/compile-result-panel.js";
-import { loadDraft, saveDraft, clearDraft } from "../core/drafts/persist.js";
+import { loadDraft, saveDraft, clearDraft } from "../kernel/core/drafts/persist.js";
 import { proposeFromDraft, proposeUpdateFromDraft } from "./actions/propose-from-draft.js";
 import { verifyFromWalker } from "./actions/verify-from-walker.js";
 import { workflowFromWalker } from "./actions/workflow-from-walker.js";
@@ -60,8 +60,8 @@ import { parseProviderArgs } from "./state/parse-provider-args.js";
 import { parseQueryArgs } from "./state/parse-query-args.js";
 import { parseLinkArgs } from "./state/parse-link-args.js";
 import type { LlmProvider } from "../runtime/llm/types.js";
-import { loadModelsRegistry, loadNodes } from "../core/project/load.js";
-import { updateNode } from "../core/nodes/update-node.js";
+import { loadModelsRegistry, loadNodes } from "../kernel/core/project/load.js";
+import { updateNode } from "../kernel/core/nodes/update-node.js";
 import { modelTags } from "../runtime/llm/model-tags.js";
 
 export interface AppProps {

@@ -1,10 +1,10 @@
 import * as fs from "node:fs";
 import { z } from "zod";
-import { getOntologyPaths } from "../../core/project/paths.js";
-import { loadNodes, loadEdges, loadNodeById } from "../../core/project/load.js";
-import { EdgeTypeSchema } from "../../schemas/ontology.js";
-import { validateEdgeDirection } from "../../runtime/graph/poset.js";
-import { createProposal } from "../../core/proposals/persist.js";
+import { getOntologyPaths } from "../../kernel/core/project/paths.js";
+import { loadNodes, loadEdges, loadNodeById } from "../../kernel/core/project/load.js";
+import { EdgeTypeSchema } from "../../kernel/schemas/ontology.js";
+import { validateEdgeDirection } from "../../kernel/graph/poset.js";
+import { createProposal } from "../../kernel/core/proposals/persist.js";
 import {
   buildEmbeddingIndex,
   loadEmbeddingIndex,
@@ -12,8 +12,8 @@ import {
   suggestSemanticPairs,
   DEFAULT_EMBEDDING_MODELS,
   type EmbeddingProvider,
-} from "../../runtime/semantic/embedding-index.js";
-import { errorMessage } from "../../core/errors.js";
+} from "../../kernel/semantic/embedding-index.js";
+import { errorMessage } from "../../kernel/core/errors.js";
 
 // `onto semantic` — the local semantic index over the intent graph and its
 // consumers. Two verbs:
