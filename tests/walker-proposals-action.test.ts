@@ -16,7 +16,7 @@ import {
   applyProposalFromWalker,
   rejectProposalFromWalker,
   summarizeProposalRow,
-} from "../src/walker/actions/proposals-from-walker.js";
+} from "../src/surfaces/walker/actions/proposals-from-walker.js";
 import { listProposals, loadProposal } from "../src/kernel/core/proposals/persist.js";
 
 describe("walker proposal-review actions (Walker v2 PR-1)", () => {

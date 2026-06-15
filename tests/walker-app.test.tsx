@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import React from "react";
 import { render } from "ink-testing-library";
-import { App } from "../src/walker/app.js";
+import { App } from "../src/surfaces/walker/app.js";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
 import { runCli } from "./helpers/run-cli.js";
 import { saveDraft } from "../src/kernel/core/drafts/persist.js";

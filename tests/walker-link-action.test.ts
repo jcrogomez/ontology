@@ -1,7 +1,7 @@
 import { describe, expect, it, afterEach } from "vitest";
 import { runCli } from "./helpers/run-cli.js";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
-import { linkFromWalker } from "../src/walker/actions/link-from-walker.js";
+import { linkFromWalker } from "../src/surfaces/walker/actions/link-from-walker.js";
 import { loadNodeById } from "../src/kernel/core/project/load.js";
 import { listProposals } from "../src/kernel/core/proposals/persist.js";
 

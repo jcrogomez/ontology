@@ -12,7 +12,7 @@ import {
   formatCostEstimateHuman,
   readFileSizeInfos,
   resolveProviderRate,
-} from "../src/commands/ingest/cost-estimate.js";
+} from "../src/surfaces/commands/ingest/cost-estimate.js";
 
 // Coverage for `onto ingest <path> --cost-estimate` — the pre-flight
 // cost guard that runs entirely locally with no API call. This test

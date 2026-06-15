@@ -3,7 +3,7 @@ import {
   RETRY_BACKOFF_MS,
   dispatchWithRetry,
   type DispatchFn,
-} from "../src/commands/ingest/index.js";
+} from "../src/surfaces/commands/ingest/index.js";
 import type { LlmResponse } from "../src/runtime/llm/types.js";
 
 // Phase ε H3 — dispatchWithRetry should:

@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createTempProject, cleanupTempProject } from './helpers/temp-project.js';
-import { nodeListCommand } from '../src/commands/node/list.js';
-import { nodeShowCommand } from '../src/commands/node/show.js';
+import { nodeListCommand } from '../src/surfaces/commands/node/list.js';
+import { nodeShowCommand } from '../src/surfaces/commands/node/show.js';
 import { OntologyNode } from '../src/kernel/schemas/ontology.js';
 
 describe('Node Observability Commands', () => {

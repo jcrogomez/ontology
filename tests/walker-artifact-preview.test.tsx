@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import React from "react";
 import { render } from "ink-testing-library";
-import { App } from "../src/walker/app.js";
+import { App } from "../src/surfaces/walker/app.js";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
 import { runCli } from "./helpers/run-cli.js";
 

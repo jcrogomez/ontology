@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { EXTRACTION_SYSTEM_PROMPT } from "../src/commands/ingest/index.js";
+import { EXTRACTION_SYSTEM_PROMPT } from "../src/surfaces/commands/ingest/index.js";
 
 // Smoke fixture for the δ' EXTRACTION_SYSTEM_PROMPT — design item §4.3.
 //

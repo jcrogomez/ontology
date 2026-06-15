@@ -12,7 +12,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { ingestCommand, type IngestCommandOptions } from "../src/commands/ingest/index.js";
+import { ingestCommand, type IngestCommandOptions } from "../src/surfaces/commands/ingest/index.js";
 
 describe("onto ingest --intent (mock, dry-run)", () => {
   let tmpDir: string;

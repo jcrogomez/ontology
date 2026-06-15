@@ -7,8 +7,8 @@ import * as os from "node:os";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 
-import { ontologyTools, type OntologyTool } from "../src/runtime/mcp/tools.js";
-import { createOntologyMcpServer } from "../src/runtime/mcp/server.js";
+import { ontologyTools, type OntologyTool } from "../src/surfaces/mcp/tools.js";
+import { createOntologyMcpServer } from "../src/surfaces/mcp/server.js";
 import { listPersistedRuns } from "../src/kernel/core/runs/persist.js";
 
 const CLI_PATH = path.resolve(__dirname, "../dist/cli.js");

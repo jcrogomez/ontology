@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { renderReportMarkdown } from "../src/commands/verify/homeomorphism.js";
+import { renderReportMarkdown } from "../src/surfaces/commands/verify/homeomorphism.js";
 import type {
   AggregateReport,
   HomeomorphismVerdict,

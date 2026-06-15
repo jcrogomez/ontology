@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseGraphViewArgs } from "../src/walker/state/parse-graph-view-args.js";
+import { parseGraphViewArgs } from "../src/surfaces/walker/state/parse-graph-view-args.js";
 
 describe("parseGraphViewArgs", () => {
   it("returns depth 2 for an empty tail", () => {

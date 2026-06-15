@@ -9,7 +9,7 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { runCli } from "./helpers/run-cli.js";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
-import { graphViewFromWalker } from "../src/walker/actions/graph-view-from-walker.js";
+import { graphViewFromWalker } from "../src/surfaces/walker/actions/graph-view-from-walker.js";
 
 describe("graphViewFromWalker", () => {
   let cwd: string;

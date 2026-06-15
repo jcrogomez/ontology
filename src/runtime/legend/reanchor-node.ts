@@ -8,7 +8,7 @@ import { ensureDir, writeJson, readJson, appendJsonl } from "../../kernel/core/f
 import { buildMerkleTree, hashFileContent, normalizeLeafPath } from "../../kernel/core/integrity/merkle.js";
 import { OntologyEventSchema } from "../../kernel/schemas/ontology.js";
 import { errorMessage } from "../../kernel/core/errors.js";
-import type { DriftSnapshot } from "../../commands/drift.js";
+import type { DriftSnapshot } from "../../surfaces/commands/drift.js";
 
 // Per-node drift re-anchor — the write primitive `onto sync` needs after a
 // successful regeneration.

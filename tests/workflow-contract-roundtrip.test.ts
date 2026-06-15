@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveContract } from "../src/commands/workflow/run.js";
+import { resolveContract } from "../src/surfaces/commands/workflow/run.js";
 import type { WorkflowProvision } from "../src/kernel/schemas/workflow.js";
 
 // O4 — the round-trip F∘G ≈ id on a single workflow output. `resolveContract`

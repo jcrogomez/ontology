@@ -5,7 +5,7 @@ import {
   DefaultAnthropicRouting,
   DefaultOllamaRouting,
 } from "../src/runtime/llm/registry.js";
-import { resolveProviderRate } from "../src/commands/ingest/cost-estimate.js";
+import { resolveProviderRate } from "../src/surfaces/commands/ingest/cost-estimate.js";
 import type { OntologyModel } from "../src/kernel/schemas/ontology.js";
 
 // Tests for the cross-provider routing infrastructure landed after the

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseLinkArgs } from "../src/walker/state/parse-link-args.js";
+import { parseLinkArgs } from "../src/surfaces/walker/state/parse-link-args.js";
 
 describe("parseLinkArgs", () => {
   it("parses --to and --type in either order", () => {

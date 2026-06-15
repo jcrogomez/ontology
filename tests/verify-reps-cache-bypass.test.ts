@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js";
 import { runCli } from "./helpers/run-cli.js";
 import { createNode } from "../src/kernel/core/nodes/create-node.js";
-import { verifyHomeomorphismCommand } from "../src/commands/verify/homeomorphism.js";
+import { verifyHomeomorphismCommand } from "../src/surfaces/commands/verify/homeomorphism.js";
 import { getOntologyPaths } from "../src/kernel/core/project/paths.js";
 
 // End-to-end integration test for the `--reps` cache-bypass fix

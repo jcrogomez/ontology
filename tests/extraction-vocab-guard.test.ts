@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   ExtractionResultSchema,
   SymbolNameSchema,
-} from "../src/commands/ingest/index.js";
+} from "../src/surfaces/commands/ingest/index.js";
 
 // MR_2026-05-17 §6.2 / MR_2026-05-18 §6.2 — vocabulary contract guard.
 //

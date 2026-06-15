@@ -6,7 +6,7 @@ import {
   NodeKindSchema,
 } from "../src/kernel/schemas/ontology.js";
 import { buildStaticSummary } from "../src/runtime/legend/static-summary.js";
-import { decideStaticClassifierIngestAction } from "../src/commands/ingest/static-classifier-policy.js";
+import { decideStaticClassifierIngestAction } from "../src/surfaces/commands/ingest/static-classifier-policy.js";
 import { classifySourceFile } from "../src/runtime/legend/structural-classifier.js";
 import type {
   StructuralClassification,
