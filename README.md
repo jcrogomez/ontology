@@ -158,8 +158,8 @@ with a semantic gate ($\text{validateIntent} \to \Omega$, a three-valued predica
 
 - [**Project Legend**](docs/design/inverse/PROJECT_LEGEND.md) — design doc + phase plan. Phases α–ε closed (self-ingestion of this repo, 4-arm bake-off, fidelity matrix); **Phase ζ (the workflow runtime) is active** — see the [workflow runtime spec](docs/design/runtime/WORKFLOW_RUNTIME_SPEC.md).
 - [**Calibration log**](docs/legend/calibrations/CALIBRATION_LOG.md) — the dated, pre-registered experiment record (hypotheses committed *before* runs).
-- [**Open-Prompt protocol spec**](docs/design/surfaces/OPEN_PROMPT.md) — signed intent + audit-chain replay as a third trust posture. Spec-only; the `onto mcp` read surface is its first tangible slice.
-- [**Branch Model**](docs/design/runtime/BRANCH_MODEL.md) — the Option-C design decision gating cross-branch propagation.
+- [**Open-Prompt protocol spec**](docs/design/proposals/OPEN_PROMPT.md) — signed intent + audit-chain replay as a third trust posture. Spec-only; the `onto mcp` read surface is its first tangible slice.
+- [**Branch Model**](docs/design/proposals/BRANCH_MODEL.md) — the Option-C design decision gating cross-branch propagation.
 
 **Contributing / current state:**
 
