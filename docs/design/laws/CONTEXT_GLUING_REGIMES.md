@@ -6,7 +6,7 @@
 
 ## 0. Why this exists
 
-`glueFragments` (`src/runtime/context/gluing.ts`) treats two *distinct*
+`glueFragments` (`src/forward/context/gluing.ts`) treats two *distinct*
 nodes providing the same `provides` key as a `duplicate_provider`
 conflict — **provider uniqueness**. `MATHEMATICAL_CLAIMS.md` §Axiom 5
 pins this as a T1 *separated presheaf* (gluing axiom fails for agreeing
@@ -65,7 +65,7 @@ Re-verified against source. The uncomfortable parts are load-bearing:
 
 1. **The discriminator fields exist but are empty.**
    `ContextProvisionSchema = {key, nodeType, entity?, description?}`
-   (`src/schemas/ontology.ts:129`), but in practice `nodeType` is almost
+   (`src/kernel/schemas/ontology.ts:129`), but in practice `nodeType` is almost
    always the placeholder `"declared"` (set by `create-node`,
    `update-node`, ingest-on-apply), `entity` is **never populated
    anywhere**, and `description` is unused by gluing. `buildFragment`
@@ -93,7 +93,7 @@ Re-verified against source. The uncomfortable parts are load-bearing:
    overload of `mode`.
 5. **The loop is unclosed in code (but the substrate exists).** The ζ
    workflow runtime is, *today*, separated from the intention graph: a
-   standalone schema (`WorkflowNode`, `src/schemas/workflow.ts`), a
+   standalone schema (`WorkflowNode`, `src/kernel/schemas/workflow.ts`), a
    read-only executor, no context access, no graph mutation. Graph mutation
    already has a substrate — the proposal system (`createProposal`) — but ζ
    does not emit into it yet. So "execution proposes intent changes" is
@@ -137,7 +137,7 @@ drift detection).
   Provenance/origin and definition-hash were considered and rejected
   (provenance is conservative but only semantic-by-accident; definition-hash
   mostly degenerates to uniqueness). **Scoping finding:** the codebase parses
-  TS with `ts.createSourceFile` (`src/runtime/static/typescript.ts`) — a
+  TS with `ts.createSourceFile` (`src/inverse/static/typescript.ts`) — a
   *syntactic* parser, **no `TypeChecker`/`createProgram`**. So O1 extracts the
   **written** signature (param + annotation + return text for functions;
   member shape for interfaces/types/classes), normalised + hashed. **Resolved
@@ -224,7 +224,7 @@ instance of "variable intent: grow, improve, learn patterns."
 The execution→intent loop now carries a **verified contract**, closing O3→O2.
 - **Declare (intent):** a workflow graph may declare `provides`
   (`[{key, signature?}]`) and an optional `artefactLanguage`
-  (`src/schemas/workflow.ts`). This is the author's commitment — *what* the
+  (`src/kernel/schemas/workflow.ts`). This is the author's commitment — *what* the
   agentic execution produces.
 - **Measure + round-trip (teeth):** when `artefactLanguage` names code,
   `onto workflow run --as-proposal` parses the produced artefact (G, the O1

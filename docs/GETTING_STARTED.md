@@ -119,7 +119,7 @@ The workflow node now declares "I depend on the harvest entity". `edges.jsonl` g
 
 Self-links and unknown edge types are rejected. Hashes link every event to the previous one.
 
-The full list of edge types is in [`src/schemas/ontology.ts`](../src/schemas/ontology.ts) under `EdgeTypeSchema`.
+The full list of edge types is in [`src/kernel/schemas/ontology.ts`](../src/kernel/schemas/ontology.ts) under `EdgeTypeSchema`.
 
 ---
 

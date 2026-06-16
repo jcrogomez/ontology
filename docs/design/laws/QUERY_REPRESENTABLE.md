@@ -82,7 +82,7 @@ identifier* of each context-contract entry:
 | `forbids`   | `node.context.forbids[i].source`    |
 
 This is exactly the projection the context-presheaf engine already uses
-(`src/runtime/context/presheaf.ts`). A query and the context engine
+(`src/forward/context/presheaf.ts`). A query and the context engine
 therefore agree on what "this node provides X" means; one cannot drift
 from the other.
 
@@ -185,14 +185,14 @@ post-hoc.
 
 ## 5. Implementation outline
 
-- `src/runtime/query/types.ts` — Zod schema + `QueryShape` type.
-- `src/runtime/query/representable.ts` — pure matcher. Pre-builds an
+- `src/laws/query/types.ts` — Zod schema + `QueryShape` type.
+- `src/laws/query/representable.ts` — pure matcher. Pre-builds an
   `(incoming, outgoing)` edge-type index in O(|edges|) so each
   `matchesShape` call after that is O(|shape constraints|), not
   O(|edges|).
-- `src/commands/query/run-query.ts` — translates CLI options into a
+- `src/surfaces/commands/query/run-query.ts` — translates CLI options into a
   validated shape, invokes `queryNodes`, prints.
-- `src/commands/query/index.ts` — `registerQueryCommand(program)` is
+- `src/surfaces/commands/query/index.ts` — `registerQueryCommand(program)` is
   the single hook into `src/cli.ts`.
 
 The matcher is a pure function: it takes `nodes`, `shape`, and `edges`

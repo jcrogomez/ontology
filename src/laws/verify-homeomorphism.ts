@@ -268,7 +268,7 @@ export interface AggregateReport {
   /**
    * Phase ε prework C: the six-axis matrix per node, populated when the
    * verify command runs with --matrix. Undefined for the legacy verdict-only
-   * report shape. The matrix module (`src/runtime/legend/matrix.ts`) owns
+   * report shape. The matrix module (`src/laws/matrix.ts`) owns
    * the canonical mapping from `HomeomorphismVerdict` to the structural
    * axis state; other axes (contract, behavior, intent) are explicit
    * "not-measured" / "untested" / "not-reviewed" until their checkers ship.

@@ -31,7 +31,7 @@ empirical data points anchor the round-trip claim:
 
 | Data point | Corpus | Setup | Result | Cost |
 |---|---|---|---:|---:|
-| γ-2 | `src/core/integrity/hash.ts` (one file) | Claude Opus 4.7 end-to-end | **5 / 5 functions ε-equivalent** under F ∘ G | ~$0.08 |
+| γ-2 | `src/kernel/core/integrity/hash.ts` (one file) | Claude Opus 4.7 end-to-end | **5 / 5 functions ε-equivalent** under F ∘ G | ~$0.08 |
 | γ-7 | [Julius-Woo/Vibe-Reasoning](https://github.com/Julius-Woo/Vibe-Reasoning) (24 Python files) | Two-pass `onto verify-homeomorphism` with γ-7 prompt invariants | **36% → 65% ε-equivalent** (+29 pp); `divergent_both` fully eliminated (4 → 0) | ~$2.28 |
 
 Full reports: [`HASH_TS_2026-05-12.md`](../../legend/calibrations/HASH_TS_2026-05-12.md)

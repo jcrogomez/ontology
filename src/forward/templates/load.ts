@@ -2,7 +2,7 @@
 //
 // Templates ship as data under repoRoot/templates/*.json (added to
 // package.json#files). The directory resolves the same way in dev
-// (src/runtime/templates/load.ts) and in the published build
+// (src/forward/templates/load.ts) and in the published build
 // (dist/runtime/templates/load.js): both sit three levels under the repo
 // root, so `../../../templates` lands on repoRoot/templates either way.
 

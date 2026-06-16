@@ -7,7 +7,7 @@
 // rooted at the architectural top-level dirs (`src`, `tests`, …).
 //
 // Why preview-only:
-//   `ProposalMutationSchema` (src/schemas/ontology.ts:504) supports
+//   `ProposalMutationSchema` (src/kernel/schemas/ontology.ts:504) supports
 //   `node_create` and `edge_create` only. There is no `node_update_parent`
 //   variant, so reparenting an existing file node is not expressible as a
 //   proposal today. Creating the directory nodes in isolation would leave

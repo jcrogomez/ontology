@@ -123,7 +123,7 @@ export const MODEL_CAPABILITY_PROFILES: readonly ModelCapabilityProfile[] = [
     model: "claude-opus-4-7",
     preferredFor: ["code_generation", "critique"],
     notes:
-      "Critic tier — code_sketch (compile-back / verify-homeomorphism) and node_critique. γ-2 calibration on src/core/integrity/hash.ts (2026-05-12, HASH_TS_2026-05-12.md) ran Opus end-to-end as both extractor and compiler: 5/5 functions semantically equivalent at ~$0.08/round-trip. γ-7 (VIBE_REASONING_GAMMA_7_2026-05-12.md) Vibe-Reasoning corpus measurement also used Opus throughout, with the MANDATORY EXPORTS block lifting the ε-equivalent fraction +29pp. The publishable code-generation tier today.",
+      "Critic tier — code_sketch (compile-back / verify-homeomorphism) and node_critique. γ-2 calibration on src/kernel/core/integrity/hash.ts (2026-05-12, HASH_TS_2026-05-12.md) ran Opus end-to-end as both extractor and compiler: 5/5 functions semantically equivalent at ~$0.08/round-trip. γ-7 (VIBE_REASONING_GAMMA_7_2026-05-12.md) Vibe-Reasoning corpus measurement also used Opus throughout, with the MANDATORY EXPORTS block lifting the ε-equivalent fraction +29pp. The publishable code-generation tier today.",
   },
 ];
 

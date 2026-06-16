@@ -7,7 +7,7 @@
 //
 // Each function returns a discriminated union so the panel renderer
 // can show success/failure inline without exposing core types to the
-// UI layer. The advisory lock (src/core/fs/lock.ts) is intentionally
+// UI layer. The advisory lock (src/kernel/core/fs/lock.ts) is intentionally
 // NOT acquired here — apply/reject from the walker run inside a
 // single TUI process; the lock would block the operator from
 // applying their own proposals. (The lock matters for cross-process

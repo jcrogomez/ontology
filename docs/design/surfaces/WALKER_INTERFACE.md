@@ -243,9 +243,9 @@ and the inverse direction:
   from the drift anchor. Clean/no-anchor states stay silent. Recompiling is
   ALWAYS manual (`:compile`) — drift is surfaced, never acted on
   automatically.
-- Implementation: `src/walker/state/shadow-status.ts` (status + preview +
+- Implementation: `src/surfaces/walker/state/shadow-status.ts` (status + preview +
   owner lookup, reusing the merkle hash + drift snapshot),
-  `src/walker/layout/artifact-preview-panel.tsx`. Pinned by
+  `src/surfaces/walker/layout/artifact-preview-panel.tsx`. Pinned by
   `tests/walker-artifact-preview.test.tsx` (stdin-driven flows).
 
 ### v1.x — `:graph view [depth]` (post-0.9)
@@ -269,8 +269,8 @@ larger.
 
 Deterministic — two runs over the same `.ontology/` produce
 byte-identical output. Implemented by
-`src/walker/actions/graph-view-from-walker.ts`; the parser lives at
-`src/walker/state/parse-graph-view-args.ts`. This is the terminal-first
+`src/surfaces/walker/actions/graph-view-from-walker.ts`; the parser lives at
+`src/surfaces/walker/state/parse-graph-view-args.ts`. This is the terminal-first
 answer to the "Visual DAG Studio" follow-up — keeps the project to a
 single surface (Ink/TUI) and avoids forking into a web codebase.
 Dismiss with `:clearinfo`.
@@ -287,8 +287,8 @@ validation summary, requires (with provider attribution), provides,
 forbids (with violators), and a list of edge proposal suggestions. Each
 suggestion is a copy-pasteable `onto propose link …` command — the
 walker never auto-creates proposals. Read-only; dismiss with
-`:clearinfo`. Helper: `src/walker/actions/link-analysis-from-walker.ts`,
-shared with the CLI via `src/runtime/context/edge-suggester.ts`.
+`:clearinfo`. Helper: `src/surfaces/walker/actions/link-analysis-from-walker.ts`,
+shared with the CLI via `src/forward/context/edge-suggester.ts`.
 
 ## 10. v2 scope
 

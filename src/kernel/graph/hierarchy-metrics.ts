@@ -20,7 +20,7 @@
 //      exist?", the second answers "does it reach the prompt?". When the two
 //      diverge, that gap is the hierarchizer's target.
 //   6. Path fibers — buckets by `outputs.files[0]` dirname (mirrors
-//      `pathProjection` from src/runtime/fibration/branch-fiber.ts).
+//      `pathProjection` from src/laws/fibration/branch-fiber.ts).
 //
 // A final `flatness` block summarises the verdict — `healthy | flat |
 // edge_starved | hierarchy_starved` — so a single line tells you whether the
@@ -109,7 +109,7 @@ const NODE_STDLIB_MODULES: ReadonlySet<string> = new Set([
 ]);
 
 // Edge types the strict context assembler walks by default. Kept in lockstep
-// with `assembleContext` in src/runtime/context/assembler.ts so
+// with `assembleContext` in src/forward/context/assembler.ts so
 // "context-reachable" here means the same thing as "would be glued into the
 // prompt" there.
 export const DEFAULT_CONTEXT_EDGE_TYPES: ReadonlyArray<OntologyEdge["type"]> = [

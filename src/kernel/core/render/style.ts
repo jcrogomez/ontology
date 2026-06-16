@@ -1,7 +1,7 @@
 // ANSI styling for non-Ink command output. Zero deps — pure escape codes.
 //
 // Design notes:
-// - The walker (Ink) has its own coloring layer in `src/walker/theme/colors.ts`.
+// - The walker (Ink) has its own coloring layer in `src/surfaces/walker/theme/colors.ts`.
 //   This module is the equivalent for plain-stdout commands (inspect, node show,
 //   runs list, etc.) and reuses the same named-color palette so a "domain" node
 //   looks the same yellow whether you see it in the walker or in `node show`.

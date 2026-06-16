@@ -63,7 +63,7 @@ and vice versa.
 
 ## 4. Surface
 
-- Pure checker: `src/runtime/legend/contract-checker.ts` —
+- Pure checker: `src/laws/contract-checker.ts` —
   `checkContract({nodeId, declared, regenText, regenFileName})` →
   `{state, reason, missingKeys, driftedKeys, incomparableKeys, checkedKeys}`.
 - CLI: `onto verify-homeomorphism --matrix --contract-check` (requires

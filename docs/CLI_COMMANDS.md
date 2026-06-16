@@ -444,7 +444,7 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 
 ### `branch list` *(post-Bootstrap 0.9)*
 
-- **Purpose:** Enumerate every distinct branch in the project, with per-branch node counts and total. Read-only wrap over `listBranches` from `src/runtime/fibration/`.
+- **Purpose:** Enumerate every distinct branch in the project, with per-branch node counts and total. Read-only wrap over `listBranches` from `src/laws/fibration/`.
 - **Example:** `npm run dev -- branch list` (or `... --json`)
 - **Output (human):** `=== ONTOLOGY BRANCHES ===` header, summary line `Branches: N   Total nodes: M`, then one line per branch with its node count. Branches are sorted lexicographically.
 - **Output (JSON):** `{ branches: [{name, nodeCount}], totalNodes }`.
@@ -473,9 +473,9 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **Purpose (γ-4):** walk a source directory and report the import-derived edge graph — which file `depends_on` which (value imports) and which `uses_token` which (type-only `import type` statements). Pure static analysis; zero LLM cost; runs in milliseconds per file. Read-only. TypeScript files use the TS compiler API; Python files use a regex-based parser; Rust files use a tree-sitter (WASM) backend (γ-4-rust, 2026-06-10).
 - **Purpose (γ-6, with `--create-proposals`):** in addition to the report, resolve each inferred edge to applied node IDs by matching `outputs.files[0]` on each endpoint, then emit one `edge_create` proposal per resolved pair. Skips edges whose endpoints are not yet on the graph (the user hasn't applied that file's ingest proposal yet — surfaced as `from_node_missing` / `to_node_missing` in the JSON report) and edges that already exist with the same `(from, to, type)` tuple — so γ-6 is idempotent.
 - **Flags:** `--create-proposals` (γ-6 mode), `--metrics-preview` (resolve edges the same way `--create-proposals` does but simulate the resulting edge fabric and report before/after metrics — especially `closedWorldContextReachableSatisfaction` — without writing anything), `--ontology-dir <path>` (score `--metrics-preview` against an arbitrary ontology directory; mutually exclusive with `--create-proposals`), `--include <exts>` (comma-separated; default `ts,tsx` — pass `py` for a Python project, `py,ts,tsx` for a mixed-language repo), `--json`.
-- **Example (preview, TS):** `npm run dev -- graph infer-edges src/runtime/fibration`
+- **Example (preview, TS):** `npm run dev -- graph infer-edges src/laws/fibration`
 - **Example (preview, Python):** `npm run dev -- graph infer-edges path/to/python/project --include py`
-- **Example (γ-6):** `npm run dev -- graph infer-edges src/runtime/fibration --create-proposals --json`
+- **Example (γ-6):** `npm run dev -- graph infer-edges src/laws/fibration --create-proposals --json`
 - **Output (human):** one line per edge in the form `from.ts  ──→  to.ts` (or `─type→` for `uses_token`), with the imported tokens listed underneath.
 - **Output (JSON, γ-6):** `{ ok, rootDir, edgeCount, createdCount, skippedCount, edges, proposals: [{proposalId, fromNodeId, toNodeId, type}], skipped: [{fromFile, toFile, type, reason, detail}] }`.
 - **Edge-type mapping:** `depends_on` for value imports (runtime); `uses_token` for type-only imports. Both are first-class `EdgeType` enum values; γ-6 puts each in `payload.type` on the `edge_create` proposal. Python imports are all classified `depends_on` in v0 — Python has no static type-only import marker (TYPE_CHECKING runtime check is out of scope).
@@ -499,9 +499,9 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
   - `--ensemble <mode>` — structured-extraction ensemble strategy: `none` (default, single run) or `high-confidence` (run llama3.2:3b three times, select the most complete valid extraction). Honoured for `semantic_parse` only.
   - `--static-classifier <mode>` — `report-only` (classify every file with the deterministic AST-based classifier, surface aggregates in the report) or `enabled` (additionally let `barrel` / `declaration_only` files bypass the LLM with a deterministic static summary).
 - **Examples:**
-  - `npm run dev -- ingest src/runtime/fibration --cost-estimate --provider anthropic   # zero-cost pre-flight`
-  - `npm run dev -- ingest src/core/integrity/hash.ts --dry-run`
-  - `npm run dev -- ingest src/runtime/fibration --provider anthropic --json`
+  - `npm run dev -- ingest src/laws/fibration --cost-estimate --provider anthropic   # zero-cost pre-flight`
+  - `npm run dev -- ingest src/kernel/core/integrity/hash.ts --dry-run`
+  - `npm run dev -- ingest src/laws/fibration --provider anthropic --json`
   - `npm run dev -- ingest path/to/python/project --provider ollama --include py`
 - **Output (JSON, file mode):** `{ ok, dryRun, proposal: {id, status, mutationKind, hash}, event, extracted, usage, model, provider }`.
 - **Output (JSON, directory mode):** `{ ok, dryRun, rootDir, fileCount, okCount, failedCount, totalTokens, results: [{filePath, ok, reason?, message?, extracted?, proposalId?, tokensUsed?}], edges: [γ-4 inferences] }`.
@@ -649,7 +649,7 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
   not **enforcement** (verifying the code obeys); assertable rules should
   additionally route to a runtime check / behaviour fixture. Off by
   default — it changes artifact content. See
-  `src/runtime/compile/rules-grounding.ts`.
+  `src/forward/compile/rules-grounding.ts`.
 - **Flags:** `--write`, `--draws <n>`, `--consensus <k>`, `--provider`,
   `--model`, `--ollama-host`, `--behavior-check`,
   `--behavior-fixtures-dir <path>`, `--loc-threshold`, `--jaccard-threshold`,
@@ -837,7 +837,7 @@ fail fast with a friendly message naming the holder.
   the file is stale beyond what the auto-detector can verify (e.g.
   cross-host).
 
-Spec: `src/core/fs/lock.ts`. Reasoning: `docs/archive/POST_GAMMA_PLAN_2026-05-13.md` §5.1.
+Spec: `src/kernel/core/fs/lock.ts`. Reasoning: `docs/archive/POST_GAMMA_PLAN_2026-05-13.md` §5.1.
 
 ### Model Routing (post-γ-7 reviewer fix)
 
@@ -954,5 +954,5 @@ of the Ontology repo; see `docs/ROADMAP.md` and
   and `@expand: gen_xxx` composition (reusing the existing PromptAST
   marker). Prerequisite for [`WAKEUP_SCANNERS.md`](design/runtime/WAKEUP_SCANNERS.md)
   Fase 3 (LLM-using scanners) and migration target for the two
-  hardcoded prompts in `src/commands/ingest/` and
-  `src/runtime/translator.ts`. Spec: [`PROMPT_GENERATORS.md`](design/forward/PROMPT_GENERATORS.md).
+  hardcoded prompts in `src/surfaces/commands/ingest/` and
+  `src/inverse/translator.ts`. Spec: [`PROMPT_GENERATORS.md`](design/forward/PROMPT_GENERATORS.md).

@@ -9,8 +9,8 @@ report names exactly which nodes' artifacts moved.
 
 | Module | Role |
 |---|---|
-| `src/core/integrity/merkle.ts` | Pure tree + diff: `buildMerkleTree`, `diffMerkleTrees`, `hashFileContent`, `normalizeLeafPath`. No filesystem access. Determinism contract: identical leaf sets in ANY input order produce byte-identical trees and the same root hash; duplicate leaf paths and file/dir conflicts are errors. Diff prunes subtrees whose dir fingerprints match (O(1) dismissal of unchanged regions). |
-| `src/commands/drift.ts` | The CLI command: collects the leaf set from `node.outputs.files`, builds the tree, loads/diffs against the snapshot, optionally re-anchors. A referenced-but-absent file hashes to the sentinel `"missing"` (and is listed under `missing` in the report), so disappear-and-reappear-unchanged round-trips to "unchanged". |
+| `src/kernel/core/integrity/merkle.ts` | Pure tree + diff: `buildMerkleTree`, `diffMerkleTrees`, `hashFileContent`, `normalizeLeafPath`. No filesystem access. Determinism contract: identical leaf sets in ANY input order produce byte-identical trees and the same root hash; duplicate leaf paths and file/dir conflicts are errors. Diff prunes subtrees whose dir fingerprints match (O(1) dismissal of unchanged regions). |
+| `src/surfaces/commands/drift.ts` | The CLI command: collects the leaf set from `node.outputs.files`, builds the tree, loads/diffs against the snapshot, optionally re-anchors. A referenced-but-absent file hashes to the sentinel `"missing"` (and is listed under `missing` in the report), so disappear-and-reappear-unchanged round-trips to "unchanged". |
 | `src/cli.ts` (~line 173) | Flag registration. |
 
 ## State and events

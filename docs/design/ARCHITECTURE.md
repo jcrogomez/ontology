@@ -105,22 +105,22 @@ USER ── onto compile run node_0042 --provider mock
           │
           ▼
 src/cli.ts                  → dispatch
-src/commands/compile/run.ts → orchestration, stdout
+src/surfaces/commands/compile/run.ts → orchestration, stdout
           │
           ▼
-src/runtime/graph/compile-plan.ts
+src/kernel/graph/compile-plan.ts
           │  (Kahn's algorithm over depends_on / inherits_from / refines /
           │   implements / uses_token; rejects contradicts; halts on
           │   supersedes; deterministic alphabetic tie-break)
           ▼
-src/runtime/compile/compile-plan-runner.ts
+src/forward/compile/compile-plan-runner.ts
           │  (for each step: compile-node → write → validate-language →
           │   optional runtime-check, all chained via bindWithLog)
           ▼
 src/runtime/llm/dispatcher.ts → mock | ollama adapter
-src/runtime/compile/artifact-writer.ts → .ontology/artifacts/generated/<id>.<ext>
-src/core/runs/persist.ts             → .ontology/runs/run_<hash>.json + run_persisted event
-src/core/state/state-store.ts        → events.jsonl (compilation_run) + state.json
+src/forward/compile/artifact-writer.ts → .ontology/artifacts/generated/<id>.<ext>
+src/kernel/core/runs/persist.ts             → .ontology/runs/run_<hash>.json + run_persisted event
+src/kernel/core/state/state-store.ts        → events.jsonl (compilation_run) + state.json
 ```
 
 Audit chain: every artifact resolves back through one
@@ -133,8 +133,8 @@ read-only.
 
 ## Validator (post-0.9)
 
-`src/runtime/context/intent-validator.ts` is built on the topos
-predicate algebra (`src/runtime/topos/`). The three rules — gluing ok,
+`src/forward/context/intent-validator.ts` is built on the topos
+predicate algebra (`src/laws/topos/`). The three rules — gluing ok,
 candidate non-empty, FORBID phrase scan — compile to atomic
 `Predicate`s; `allOf` folds them into a single conjunction; the
 verdict comes from `evaluatePredicate(predicate, ctx)` against an

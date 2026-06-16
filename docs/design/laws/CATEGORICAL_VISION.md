@@ -36,10 +36,10 @@ Multigraph   (compile)    transform    functor /         classifier
                                        Yoneda            (Ω, topos)
    │              │           │               │              │
    ▼              ▼           ▼               ▼              ▼
-src/schemas    src/runtime  (compile        src/runtime    src/runtime
-src/core/      /compile/    plan steps,     /query/        /topos/
-edges/        compile-      future merge    representable  predicate.ts
-nodes/        plan-runner   proposals)
+src/kernel/schemas    src/forward/  (compile        src/laws/      src/laws/
+src/kernel/core/      compile/      plan steps,     query/         topos/
+edges/, nodes/        plan-runner   future merge    representable  predicate.ts
+                                    proposals)
                                        
    ┌────────────────────────────────────────────────────────┐
    ▼                            ▼                           ▼
@@ -50,8 +50,8 @@ nodes/        plan-runner   proposals)
     not yet formal)             
    │                            │                           │
    ▼                            ▼                           ▼
-   src/core/proposals/         src/runtime/effects/        src/runtime
-   persist.ts                                              /fibration/
+   src/kernel/core/proposals/    src/laws/effects/        src/laws/
+   persist.ts                                             fibration/
 ```
 
 Each box names a concept; underneath sits the file (or files) that *embody* it
@@ -70,15 +70,15 @@ edges allowed between the same pair of objects.
 
 | Categorical idea           | Ontology home                                  |
 | -------------------------- | ---------------------------------------------- |
-| Object                     | `OntologyNode` ([src/schemas/ontology.ts](../../../src/schemas/ontology.ts))      |
+| Object                     | `OntologyNode` ([src/kernel/schemas/ontology.ts](../../../src/kernel/schemas/ontology.ts))      |
 | Morphism                   | `OntologyEdge` (18 typed relations)            |
 | Composition                | implicit via `compile-plan` traversal          |
 | Identity                   | every node trivially has a self-existence edge |
 | Multiple morphisms A → B   | allowed (multigraph, not simple graph)         |
 
-Edges live in [`src/core/edges/create-edge.ts`](../../../src/core/edges/create-edge.ts) and the
+Edges live in [`src/kernel/core/edges/create-edge.ts`](../../../src/kernel/core/edges/create-edge.ts) and the
 typed vocabulary is enforced by `EdgeTypeSchema` in
-[`src/schemas/ontology.ts`](../../../src/schemas/ontology.ts). The *abstraction poset*
+[`src/kernel/schemas/ontology.ts`](../../../src/kernel/schemas/ontology.ts). The *abstraction poset*
 (axiom 3) restricts the direction of refinement-family edges
 (`refines`, `inherits_from`, `implements`, `belongs_to`) but does not restrict
 the rest of the multigraph structure.
@@ -95,7 +95,7 @@ from the category of *intentions* to the category $\mathcal{C}$ of *artifacts* (
 - **Morphisms.** Hard-dependency edges in $\mathcal{I}$ (`depends_on`, `inherits_from`, `refines`, `implements`, `validates_against`, `belongs_to`) determine the topological compile order in $\mathcal{C}$.
 - **Identity / composition.** A leaf node compiled with the mock provider on `task: code_sketch` returns its `prompt.raw` verbatim — that is $F$ acting as the identity functor on a degenerate object.
 
-The implementation is [`src/runtime/compile/compile-plan-runner.ts`](../../../src/runtime/compile/compile-plan-runner.ts) plus the planner [`src/runtime/graph/compile-plan.ts`](../../../src/runtime/graph/compile-plan.ts) (Kahn's algorithm over the hard-dependency edge family).
+The implementation is [`src/forward/compile/compile-plan-runner.ts`](../../../src/forward/compile/compile-plan-runner.ts) plus the planner [`src/kernel/graph/compile-plan.ts`](../../../src/kernel/graph/compile-plan.ts) (Kahn's algorithm over the hard-dependency edge family).
 
 The **inverse direction** $G\colon \mathcal{C} \to \mathcal{I}$ is the central construction of [Project Legend](../inverse/PROJECT_LEGEND.md) — an approximate left adjoint that lifts existing source into the intent layer. The operational adjunction $G \dashv F$ (with unit $\eta\colon \mathrm{id}_{\mathcal{C}} \Rightarrow F \circ G$) and the measured $\varepsilon$ on the round-trip $F \circ G \approx \mathrm{id}_{\mathcal{C}}$ is `MATHEMATICAL_CLAIMS.md` §3.10.
 
@@ -107,7 +107,7 @@ $$\begin{array}{ccc} F(X) & \xrightarrow{\eta_X} & G(X) \\ F(f)\downarrow & & \d
 
 commutes.
 
-In Ontology, the most natural place this concept will land is the **branch-merge proposal** (future work): given two compile functors $F_b, F_{b'}\colon \mathcal{I} \to \mathcal{C}$ viewing the graph from two different branches $b, b'$, merging branches is a natural transformation $F_b \Rightarrow F_{b'}$ over the cartesian-lift functor. Today the structure is implicit in the proposal system ([`src/core/proposals/persist.ts`](../../../src/core/proposals/persist.ts)) which already pins `parentHash` re-validation and stale detection — these are the coherence conditions a natural transformation must satisfy.
+In Ontology, the most natural place this concept will land is the **branch-merge proposal** (future work): given two compile functors $F_b, F_{b'}\colon \mathcal{I} \to \mathcal{C}$ viewing the graph from two different branches $b, b'$, merging branches is a natural transformation $F_b \Rightarrow F_{b'}$ over the cartesian-lift functor. Today the structure is implicit in the proposal system ([`src/kernel/core/proposals/persist.ts`](../../../src/kernel/core/proposals/persist.ts)) which already pins `parentHash` re-validation and stale detection — these are the coherence conditions a natural transformation must satisfy.
 
 A second concrete natural transformation is the **Inspector triangle** (Project Legend §3): $\tau\colon \mathrm{intent} \Rightarrow \mathrm{prose}$ produces a per-node `translator` paragraph; combined with $F$ and the LLM-described-code map $\sigma$, it gives a (probabilistically) commuting square.
 
@@ -125,7 +125,7 @@ A second concrete natural transformation is the **Inspector triangle** (Project 
   $$\mathrm{Plan}(n) \;\approx\; \mathrm{colim}\Bigl(\,\{m \in \mathcal{I} : m \to^{\,*}\, n \text{ along hard-deps}\}\,\Bigr).$$
   
   What is *actually* pinned (and stronger than this analogy) is **functoriality**: the plan is a linear extension of the dependency poset that `F` preserves — identity, morphisms, and composition are test-pinned (`MATHEMATICAL_CLAIMS.md` §Axiom 6 / §3.2, T1). That is the real structural claim; "colimit" is just the diagram shape.
-- **Context assembly — a *separated-presheaf merge*, NOT a colimit.** `assembleContext(focal)` walks parents and edge neighbours and glues their fragments via [`src/runtime/context/gluing.ts`](../../../src/runtime/context/gluing.ts). It is tempting to write this as a quotient
+- **Context assembly — a *separated-presheaf merge*, NOT a colimit.** `assembleContext(focal)` walks parents and edge neighbours and glues their fragments via [`src/forward/context/gluing.ts`](../../../src/forward/context/gluing.ts). It is tempting to write this as a quotient
   
   $$\mathrm{Glue}(n) \;\overset{?}{=}\; \bigsqcup_{m \in \mathrm{Nbhd}(n)} \mathcal{P}(m) \;\big/\; {\sim},$$
   
@@ -137,13 +137,13 @@ The proposal system has the *shape* of an adjunction: every node mutation factor
 
 $$\mathrm{Hom}_{\mathcal{C}}\bigl(\mathrm{propose}(X),\,Y\bigr) \;\cong\; \mathrm{Hom}_{\mathcal{D}}\bigl(X,\,\mathrm{apply}^{-1}(Y)\bigr)$$
 
-is not pinned formally yet, but the existing parentHash re-validation ([`src/core/proposals/persist.ts`](../../../src/core/proposals/persist.ts)) is exactly the coherence law a unit / counit pair would impose. Treat this as a *candidate* adjunction; formalising it cleanly is on the roadmap.
+is not pinned formally yet, but the existing parentHash re-validation ([`src/kernel/core/proposals/persist.ts`](../../../src/kernel/core/proposals/persist.ts)) is exactly the coherence law a unit / counit pair would impose. Treat this as a *candidate* adjunction; formalising it cleanly is on the roadmap.
 
 A second candidate adjunction worth flagging is **refine ⊣ project**: refinement-family edges climb the abstraction poset (refine: $s \to t$ with $\mathrm{level}(s) \le_L \mathrm{level}(t)$), and the "forget the refinement" projection is its right adjoint.
 
 The **third and most important** candidate adjunction — and the only one with a concrete plan to make operational — is **Project Legend's $G \dashv F$** (the ingest functor $G$ as left adjoint to the compile functor $F$), with the round-trip homeomorphism $F \circ G \approx \mathrm{id}$ measured empirically. See [`PROJECT_LEGEND.md`](../inverse/PROJECT_LEGEND.md) §2.1 and [`MATHEMATICAL_CLAIMS.md`](../../MATHEMATICAL_CLAIMS.md) §3.10.
 
-### 2.6 Monad — *Effect runtime, [src/runtime/effects/](../../../src/runtime/effects)*
+### 2.6 Monad — *Effect runtime, [src/laws/effects/](../../../src/laws/effects)*
 
 A monad is an endofunctor T : 𝓒 → 𝓒 with unit η : 1 ⇒ T and multiplication
 μ : T² ⇒ T satisfying associativity and identity. The new effects module ships
@@ -170,7 +170,7 @@ dispatch / write / validate / runtime-check pipeline composes via
 `bindWithLog`, and the top-level `try/catch` is retired. Design rationale is
 in [`docs/EFFECT_MONAD.md`](EFFECT_MONAD.md).
 
-### 2.7 Representable functor & Yoneda — *`onto query`, [src/runtime/query/](../../../src/runtime/query)*
+### 2.7 Representable functor & Yoneda — *`onto query`, [src/laws/query/](../../../src/laws/query)*
 
 The Yoneda Lemma states that an object X in a locally small category is
 fully determined, up to isomorphism, by its representable functor
@@ -188,16 +188,16 @@ onto query --kind rule --has-incoming refines --provides spec
 ```
 
 The pure matcher lives at
-[`src/runtime/query/representable.ts`](../../../src/runtime/query/representable.ts);
+[`src/laws/query/representable.ts`](../../../src/laws/query/representable.ts);
 its Zod-validated shape grammar is in
-[`src/runtime/query/types.ts`](../../../src/runtime/query/types.ts).
+[`src/laws/query/types.ts`](../../../src/laws/query/types.ts).
 
 The empty shape `{}` matches every node (the identity Hom-profile). That's
 the trivial Yoneda statement — every object represents itself.
 
 Full design in [`docs/QUERY_REPRESENTABLE.md`](QUERY_REPRESENTABLE.md).
 
-### 2.8 Fibration — *branches as fibers, [src/runtime/fibration/](../../../src/runtime/fibration)*
+### 2.8 Fibration — *branches as fibers, [src/laws/fibration/](../../../src/laws/fibration)*
 
 A **Grothendieck fibration** is a functor p : E → B such that for every
 morphism f : b → b' in the base and every object E over b', there is a
@@ -219,7 +219,7 @@ The library implements *fibers* and *cartesian lifts* explicitly. The
 the existing `coordinates.branch` projection).
 
 Public API in
-[`src/runtime/fibration/branch-fiber.ts`](../../../src/runtime/fibration/branch-fiber.ts):
+[`src/laws/fibration/branch-fiber.ts`](../../../src/laws/fibration/branch-fiber.ts):
 
 ```ts
 listBranches(state)                 // unique branch names, sorted
@@ -236,7 +236,7 @@ into a fiber).
 
 Full design in [`docs/BRANCH_FIBRATION.md`](BRANCH_FIBRATION.md).
 
-### 2.9 Topos / subobject classifier — *rule predicates, [src/runtime/topos/](../../../src/runtime/topos)*
+### 2.9 Topos / subobject classifier — *rule predicates, [src/laws/topos/](../../../src/laws/topos)*
 
 In an elementary topos, the **subobject classifier** Ω classifies subobjects:
 subobjects of an object X correspond to morphisms X → Ω. In Set, Ω = {⊤, ⊥}.
@@ -292,16 +292,16 @@ Full design in [`docs/RULES_TOPOS.md`](RULES_TOPOS.md).
 
 | Concept                       | Status                                            | Lives in                                  |
 | ----------------------------- | ------------------------------------------------- | ----------------------------------------- |
-| Category / typed multigraph   | ✅ shipped (axiom 1)                              | `src/schemas/`, `src/core/edges/`         |
-| Compiler functor              | ✅ shipped + functor laws pinned (axiom 6, T1 2026-06-01) | `src/runtime/compile/`, `src/runtime/graph/artifact-category.ts` |
-| Natural transformation        | 🟡 implicit (proposal coherence) — formal pending | `src/core/proposals/`                     |
-| Limit / colimit (compile plan)| 🟡 analogy only (T3) — no universal property; functoriality is the real pin | `src/runtime/graph/compile-plan.ts`       |
-| Presheaf (context assembly)   | ✅ restriction law T1; gluing is a separated presheaf, **not** a colimit (T3) | `src/runtime/context/gluing.ts`           |
-| Adjunction (propose ⊣ apply)  | 🟡 candidate, not formal                          | `src/core/proposals/persist.ts`           |
-| Monad (Result / Effect)       | ✅ library shipped, ✅ `compileNode` on `EffectWithLog` (PR #115) | `src/runtime/effects/`                    |
-| Representable / Yoneda query  | ✅ shipped (CLI + walker `:query`)                | `src/runtime/query/`, `src/commands/query/` |
-| Fibration (branches)          | ✅ library shipped, walker `:branch list`, **`onto branch` CLI TODO** | `src/runtime/fibration/`                  |
-| Topos / Ω predicate algebra   | ✅ library shipped, ✅ validator ported onto algebra | `src/runtime/topos/`, `src/runtime/context/intent-validator.ts` |
+| Category / typed multigraph   | ✅ shipped (axiom 1)                              | `src/kernel/schemas/`, `src/kernel/core/edges/`         |
+| Compiler functor              | ✅ shipped + functor laws pinned (axiom 6, T1 2026-06-01) | `src/forward/compile/`, `src/kernel/graph/artifact-category.ts` |
+| Natural transformation        | 🟡 implicit (proposal coherence) — formal pending | `src/kernel/core/proposals/`                     |
+| Limit / colimit (compile plan)| 🟡 analogy only (T3) — no universal property; functoriality is the real pin | `src/kernel/graph/compile-plan.ts`       |
+| Presheaf (context assembly)   | ✅ restriction law T1; gluing is a separated presheaf, **not** a colimit (T3) | `src/forward/context/gluing.ts`           |
+| Adjunction (propose ⊣ apply)  | 🟡 candidate, not formal                          | `src/kernel/core/proposals/persist.ts`           |
+| Monad (Result / Effect)       | ✅ library shipped, ✅ `compileNode` on `EffectWithLog` (PR #115) | `src/laws/effects/`                    |
+| Representable / Yoneda query  | ✅ shipped (CLI + walker `:query`)                | `src/laws/query/`, `src/surfaces/commands/query/` |
+| Fibration (branches)          | ✅ library shipped, walker `:branch list`, **`onto branch` CLI TODO** | `src/laws/fibration/`                  |
+| Topos / Ω predicate algebra   | ✅ library shipped, ✅ validator ported onto algebra | `src/laws/topos/`, `src/forward/context/intent-validator.ts` |
 
 ---
 

@@ -22,7 +22,7 @@ export interface GraphReadinessOptions {
 // `onto graph readiness` — structural-readiness gate.
 //
 // Read-only. Evaluates three rules on top of `computeHierarchyMetrics`
-// (see src/runtime/graph/readiness.ts for the rule list and rationale).
+// (see src/kernel/graph/readiness.ts for the rule list and rationale).
 // Exit code is 0 when every rule passes, 1 when any rule fails. The
 // gate is meant to be used in CI / pre-merge checks and as a self-
 // validation step after an ingest sweep.

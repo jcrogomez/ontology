@@ -74,7 +74,7 @@ export async function nodeUpdateCommand(
     }
     // Binary-content guard. Same shape as the --candidate-file fix
     // (commit 14ecc51) and the create-side guard in
-    // src/commands/node/create.ts. NUL is a high-precision signal of
+    // src/surfaces/commands/node/create.ts. NUL is a high-precision signal of
     // binary content; legitimate UTF-8 text essentially never contains
     // U+0000. node.literal is load-bearing (hashed, emitted verbatim),
     // so a garbled body would silently corrupt the audit chain.

@@ -6,8 +6,8 @@
 > [`CATEGORICAL_VISION.md`](CATEGORICAL_VISION.md) maps the four further
 > categorical concepts the project now embodies — **monads, representable
 > functors / Yoneda, fibrations, and a topos-style subobject classifier** —
-> onto concrete modules under `src/runtime/effects/`, `src/runtime/query/`,
-> `src/runtime/fibration/`, and `src/runtime/topos/` respectively.
+> onto concrete modules under `src/laws/effects/`, `src/laws/query/`,
+> `src/laws/fibration/`, and `src/laws/topos/` respectively.
 >
 > Every claim made here is also classified by rigor in
 > [`MATHEMATICAL_CLAIMS.md`](../../MATHEMATICAL_CLAIMS.md) (strictly implemented /
@@ -57,7 +57,7 @@ with the canonical chain `canon ≥ project ≥ … ≥ artifact`. Every node ca
 - **Implemented (Bootstrap 0.7, partial).** `parsePromptAST(raw)` recognises
   three line-anchored markers (`@requires:`, `@provides:`, `@expand:`),
   strips them from the prompt body, and emits a deduplicated `PromptAST`
-  consumed by `compileNode`. See `src/runtime/prompt/parse.ts`.
+  consumed by `compileNode`. See `src/forward/prompt/parse.ts`.
 - **Not yet implemented:** *rewriting itself*. The AST exposes the markers
   as structured metadata, but no module yet expands `@expand: <nodeId>` by
   substituting the referenced node's compiled artifact into the body. The
@@ -133,7 +133,7 @@ each arrow a stored back-reference, each hash content-addressed.
 Four further categorical concepts now ship as runtime libraries. They are
 *additive*: they extend the model without altering axioms 1–7.
 
-### 8.1 Monad — `src/runtime/effects/`
+### 8.1 Monad — `src/laws/effects/`
 
 The trio `Result<T,E>`, `Effect<T,E> = () => Result<T,E>`, and
 `EffectWithLog<T,E> = () => { value: Result<T,E>; logs: LogEntry[] }` provides
@@ -148,7 +148,7 @@ and the top-level `try/catch` is gone. The walker-side `runFromWalker` is
 still on the legacy try/catch path — porting it is open follow-up work.
 See [`EFFECT_MONAD.md`](EFFECT_MONAD.md).
 
-### 8.2 Representable functor / Yoneda — `src/runtime/query/`
+### 8.2 Representable functor / Yoneda — `src/laws/query/`
 
 `onto query` exposes a node's Hom-profile as a search verb. A query shape is
 a partial Hom-profile (incoming / outgoing edge types, context tokens,
@@ -156,7 +156,7 @@ intrinsic coordinates); the matcher returns every node whose actual profile
 is a superset. The empty shape `{}` matches every node — the trivial Yoneda
 identity. See [`QUERY_REPRESENTABLE.md`](QUERY_REPRESENTABLE.md).
 
-### 8.3 Grothendieck fibration — `src/runtime/fibration/`
+### 8.3 Grothendieck fibration — `src/laws/fibration/`
 
 Branches are modelled as **fibers** over the temporal log. The functor
 `p : Events × Branches → Events` "forgets the branch label". `computeBranchFiber`
@@ -165,7 +165,7 @@ describes the proposal that would relabel a node from one branch to another.
 Read-only library; CLI surface is future work. See
 [`BRANCH_FIBRATION.md`](BRANCH_FIBRATION.md).
 
-### 8.4 Topos / subobject classifier — `src/runtime/topos/`
+### 8.4 Topos / subobject classifier — `src/laws/topos/`
 
 Rules (`requires` / `provides` / `forbids`) lift into a composable predicate
 algebra over a three-valued Ω = `"true" | "false" | "unknown"`. The "unknown"
@@ -176,7 +176,7 @@ evaluator is monotone wrt information refinement.
 and they fold via `allOf`. The high-level `IntentValidationResult` contract
 is preserved; the `verdict: Omega` field exposes the underlying three-valued
 result. See [`RULES_TOPOS.md`](RULES_TOPOS.md) for the algebra and
-`src/runtime/context/intent-validator.ts` for the port.
+`src/forward/context/intent-validator.ts` for the port.
 
 We are *not* a topos in the strict sense: `omegaImplies` is the Kleene
 material implication `¬a ∨ b`, not the Heyting implication of a frame Ω.

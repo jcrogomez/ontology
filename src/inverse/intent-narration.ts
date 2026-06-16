@@ -1,7 +1,7 @@
 // Intent narration — the WHY-as-prompt extractor (Project Legend, the lift G
 // that actually targets *intent*, not *contract*).
 //
-// The existing `EXTRACTION_SYSTEM_PROMPT` (src/commands/ingest/index.ts) is a
+// The existing `EXTRACTION_SYSTEM_PROMPT` (src/surfaces/commands/ingest/index.ts) is a
 // CONTRACT extractor: it specifies what a future implementation MUST recreate
 // (exact symbols, signatures, re-export obligations), optimised for a
 // round-trip measured by structural Jaccard. That is the WHAT, and it is
@@ -41,7 +41,7 @@ import { z } from "zod";
  * Allowed abstraction levels for a narrated intent. A single concrete file is
  * usually `unit` / `artifact`; the composed intent of a multi-file
  * neighbourhood rises to `architecture` / `domain` / `workflow`. Mirrors the
- * kernel's abstraction poset (src/schemas/ontology.ts AbstractionLevelSchema).
+ * kernel's abstraction poset (src/kernel/schemas/ontology.ts AbstractionLevelSchema).
  */
 export const IntentLevelSchema = z.enum([
   "canon",

@@ -123,7 +123,7 @@ $x_1, x_2, \ldots, x_k$ emitted by `O`'s real system, does each
 $x_i$ satisfy $\mathrm{validateIntent}(x_i, \mathsf{N}_O)$ ?
 
 `validateIntent` is the same function the compile pipeline already
-uses to gate every artifact (`src/runtime/context/intent-validator.ts`).
+uses to gate every artifact (`src/forward/context/intent-validator.ts`).
 Under closed-world semantics it returns a Boolean verdict; under
 open-world it returns a three-valued $\Omega \in \{\mathrm{true},
 \mathrm{false}, \mathrm{unknown}\}$. The published `N_O` carries the

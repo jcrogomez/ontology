@@ -1,6 +1,6 @@
 # Compiler
 
-**Status:** Implemented (Bootstrap 0.8). The compiler is the structure-preserving functor from axiom 6 of the canon, now running concrete code under `src/runtime/compile/`.
+**Status:** Implemented (Bootstrap 0.8). The compiler is the structure-preserving functor from axiom 6 of the canon, now running concrete code under `src/forward/compile/`.
 
 ## What the compiler does
 
@@ -23,7 +23,7 @@ Every artifact carries provenance back through the events log: `artifact path �
 
 ### 1. Plan
 
-The compiler asks the kernel: *"what is the topological order to compile this node?"* That answer comes from `computeCompilePlan(focalId, edges)` in `src/runtime/graph/compile-plan.ts`. The helper:
+The compiler asks the kernel: *"what is the topological order to compile this node?"* That answer comes from `computeCompilePlan(focalId, edges)` in `src/kernel/graph/compile-plan.ts`. The helper:
 
 - Walks the dependency closure rooted at the focal, following only **hard-dependency edge types**: `depends_on`, `inherits_from`, `refines`, `implements`, `uses_token`.
 - Sorts the closure with Kahn's algorithm. Independent nodes break ties alphabetically by id, so the same graph always produces the same plan.
@@ -33,17 +33,17 @@ The same helper backs the read-only preview commands `onto compile plan <nodeId>
 
 ### 2. Step
 
-For each plan step, the compiler invokes `compileNode` (`src/runtime/compile/compile-node.ts`):
+For each plan step, the compiler invokes `compileNode` (`src/forward/compile/compile-node.ts`):
 
 1. Compute the deterministic run id for this step (hash of `(input, model)`). If a record already exists in `.ontology/runs/`, the step is a **cache hit** — no model dispatch fires. The cached response is reused.
 2. Otherwise, dispatch the focal node's `prompt.raw` against the configured provider (mock or ollama) with `task: code_sketch`.
 3. Persist the run via `createPersistedRun`. This records the input hashes, the model identity, the response, and emits a `run_persisted` event.
-4. Hand the response text to the **artifact-writer** (`src/runtime/compile/artifact-writer.ts`). The writer picks the file extension from the node's `coordinates.manifestation` and `technical.language` (see [Manifestation mapping](#manifestation-mapping)). The artifact lands at `.ontology/artifacts/generated/<nodeId>.<ext>`.
+4. Hand the response text to the **artifact-writer** (`src/forward/compile/artifact-writer.ts`). The writer picks the file extension from the node's `coordinates.manifestation` and `technical.language` (see [Manifestation mapping](#manifestation-mapping)). The artifact lands at `.ontology/artifacts/generated/<nodeId>.<ext>`.
 5. Append a **`compilation_run`** event whose payload carries `nodeId`, `runId`, `cached`, `artifactRelativePath`, and `bytes`. This is the audit-chain anchor for the artifact.
 
 ### 3. Plan-runner
 
-`runCompilePlan` (`src/runtime/compile/compile-plan-runner.ts`) is the outer loop: it computes the plan, then iterates `compileNode` over each step. The runner stops on the first step failure and reports the partial successes that already landed (those artifacts are real and audit-traceable; the events log records them). On full success, the runner returns the focal's artifact path so callers can surface the "main" output.
+`runCompilePlan` (`src/forward/compile/compile-plan-runner.ts`) is the outer loop: it computes the plan, then iterates `compileNode` over each step. The runner stops on the first step failure and reports the partial successes that already landed (those artifacts are real and audit-traceable; the events log records them). On full success, the runner returns the focal's artifact path so callers can surface the "main" output.
 
 ## Manifestation mapping
 
@@ -60,7 +60,7 @@ The artifact's file extension is derived from the node's `coordinates.manifestat
 
 When `manifestation` is `code` or `test` and `node.technical.language` is one of `python`, `typescript`, `javascript`, `rust`, `go`, `ruby`, `java`, `c`, `cpp`, `csharp`, `shell`, `bash`, `sql`, `html`, `css`, `json`, `yaml`, `toml`, `markdown`, the language extension wins. Unknown languages fall back to `.txt`.
 
-The mapping lives in `src/runtime/compile/manifestation-mapper.ts`. Adding a new language is one entry in the `LANGUAGE_EXTENSION` table.
+The mapping lives in `src/forward/compile/manifestation-mapper.ts`. Adding a new language is one entry in the `LANGUAGE_EXTENSION` table.
 
 Set the mapping at node creation:
 
@@ -116,7 +116,7 @@ You can run that chain on any artifact in the project. Without the chain, a gene
 
 The Bootstrap 0.8 v0 listed four gaps in this section. Three closed in 0.9:
 
-- **Prompt parsing — shipped (PR #113).** `parsePromptAST(raw)` recognises three line-anchored markers (`@requires:`, `@provides:`, `@expand:`), strips them from the prompt body, and emits a deduplicated `PromptAST`. `compileNode` consumes the parsed body instead of `prompt.raw`. Axiom 4 is now structural rather than textual. See `src/runtime/prompt/parse.ts`.
+- **Prompt parsing — shipped (PR #113).** `parsePromptAST(raw)` recognises three line-anchored markers (`@requires:`, `@provides:`, `@expand:`), strips them from the prompt body, and emits a deduplicated `PromptAST`. `compileNode` consumes the parsed body instead of `prompt.raw`. Axiom 4 is now structural rather than textual. See `src/forward/prompt/parse.ts`.
 - **Upstream-output threading — shipped (PR #105).** The plan-runner threads each refinement parent's compiled response into the per-node `compileNode` call as `UpstreamContextItem[]`, and the system prompt renders them under XML `<context>` tags (PR #109 fixed an earlier format leak). Downstream nodes now actually see what their refinement parents produced.
 - **`contradicts` / `supersedes` semantics in the plan — shipped (PR #112).** `computeCompilePlan` rejects any plan whose closure contains a `contradicts` edge as a hard `CompilePlanError`, and halts BFS on `supersedes` with a `superseded` warning. Note the asymmetry: `contradicts` is loud (the plan errors out); `supersedes` is silent-by-design (the predecessor is dropped from the closure even when its successor is unreachable from the focal — that is the intended semantics of "this node has been replaced"). Tests should pin both behaviours.
 

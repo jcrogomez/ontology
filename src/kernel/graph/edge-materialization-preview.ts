@@ -2,7 +2,7 @@
 //
 // Given an existing graph `{ nodes, edges }` and a list of statically-
 // inferred file-to-file edges (produced by `inferEdgesAutoFromDirectory`
-// in src/runtime/static/edges.ts), this module reports what the metrics
+// in src/inverse/static/edges.ts), this module reports what the metrics
 // would look like if those edges were applied — without writing anything.
 //
 // Why preview-only: edge proposals already exist (`onto graph
