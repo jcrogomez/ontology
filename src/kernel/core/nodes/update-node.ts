@@ -50,6 +50,10 @@ export interface UpdateNodeOptions {
   // "ollama-qwen-tools"). Undefined preserves the existing model. Used by
   // the walker's `m` shortcut to permute a node's model in place.
   model?: { ref: string };
+  // Re-point the node's compiled output files (e.g. after a source-tree
+  // move). Replaces outputs.files wholesale; undefined preserves the
+  // existing list. The contract (provides) is independent and untouched.
+  outputsFiles?: string[];
   cwd?: string;
   // Free-form metadata appended to the event payload — useful for
   // proposal-driven updates that want to record the source proposalId.
@@ -125,6 +129,9 @@ export function updateNode(
     rules: options.rules !== undefined ? options.rules : existing.rules,
     context: updatedContext,
     model: options.model !== undefined ? options.model : existing.model,
+    outputs: options.outputsFiles !== undefined
+      ? { ...existing.outputs, files: options.outputsFiles }
+      : existing.outputs,
     integrity: integrityWithoutHash,
   };
   if (options.literal === CLEAR_LITERAL) {
