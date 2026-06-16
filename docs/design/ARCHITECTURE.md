@@ -177,7 +177,7 @@ are the highest-priority hardening item — see
 ## What is *not* in the architecture
 
 - **No PromptAST rewriting today.** Markers are parsed; nothing
-  rewrites the body based on them. [`PROMPT_GENERATORS.md`](forward/PROMPT_GENERATORS.md)
+  rewrites the body based on them. [`PROMPT_GENERATORS.md`](proposals/PROMPT_GENERATORS.md)
   (RFC) introduces `@expand: gen_xxx` as real substitution in
   *generator bodies only*, leaving node-level `@expand:` as
   metadata until separate work picks it up.

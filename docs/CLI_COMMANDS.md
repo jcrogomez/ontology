@@ -924,7 +924,7 @@ of the Ontology repo; see `docs/ROADMAP.md` and
 **Other:**
 - **`onto branch lift <nodeId> --to <branch>`** — turn the read-only
   `describeCartesianLift` into an `edge_create` / `node_create`
-  proposal. Depends on the [`BRANCH_MODEL.md`](design/runtime/BRANCH_MODEL.md)
+  proposal. Depends on the [`BRANCH_MODEL.md`](design/proposals/BRANCH_MODEL.md)
   materialisation decision.
 - **`onto sign <branch>` / `onto verify-published` / `onto replay --against`** —
   Open-Prompt protocol primitives. Phase ζ.
@@ -943,16 +943,16 @@ of the Ontology repo; see `docs/ROADMAP.md` and
   runs system-initiated scanners over a subgraph, emitting typed Intents
   that materialise as bundles of atomic proposals. Fase 1 ships the
   topological scanners (`orphan_warning`, `missing_edge`) with no LLM
-  dependency. Spec: [`WAKEUP_SCANNERS.md`](design/runtime/WAKEUP_SCANNERS.md).
+  dependency. Spec: [`WAKEUP_SCANNERS.md`](design/proposals/WAKEUP_SCANNERS.md).
 - 🟡 **`onto bundle list / show / apply / reject`** — manage the
   transactional groupers that wakeup produces. `bundle apply` ratifies
   all hijas atomically after dry-run pre-flight under the existing
-  advisory lock. Spec: [`WAKEUP_SCANNERS.md`](design/runtime/WAKEUP_SCANNERS.md) §2.3.
+  advisory lock. Spec: [`WAKEUP_SCANNERS.md`](design/proposals/WAKEUP_SCANNERS.md) §2.3.
 - 🟡 **`onto generator register / list / show / compile / verify`** —
   manage content-addressed, composable prompt templates in
   `.ontology/generators/`. Materialisation via `{{param}}` substitution
   and `@expand: gen_xxx` composition (reusing the existing PromptAST
-  marker). Prerequisite for [`WAKEUP_SCANNERS.md`](design/runtime/WAKEUP_SCANNERS.md)
+  marker). Prerequisite for [`WAKEUP_SCANNERS.md`](design/proposals/WAKEUP_SCANNERS.md)
   Fase 3 (LLM-using scanners) and migration target for the two
   hardcoded prompts in `src/surfaces/commands/ingest/` and
-  `src/inverse/translator.ts`. Spec: [`PROMPT_GENERATORS.md`](design/forward/PROMPT_GENERATORS.md).
+  `src/inverse/translator.ts`. Spec: [`PROMPT_GENERATORS.md`](design/proposals/PROMPT_GENERATORS.md).

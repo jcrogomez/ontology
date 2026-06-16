@@ -65,7 +65,7 @@ with the canonical chain `canon ≥ project ≥ … ≥ artifact`. Every node ca
   a rewrite system. `MATHEMATICAL_CLAIMS.md` §2.4 classifies this as T2
   (operational) for the AST and T3 (analogy) for the rewrite-rule framing.
 - The rewrite-rule framing remains T3 metadata today (verified
-  2026-06-10). [`PROMPT_GENERATORS.md`](../forward/PROMPT_GENERATORS.md) is the RFC
+  2026-06-10). [`PROMPT_GENERATORS.md`](../proposals/PROMPT_GENERATORS.md) is the RFC
   that would lift it to T2 — for the generator domain only — and has not
   shipped.
 

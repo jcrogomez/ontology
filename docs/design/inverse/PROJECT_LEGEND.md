@@ -40,7 +40,7 @@ round-trip tolerance $\varepsilon$ measured per axis
 the active stream.
 
 Companion reads:
-[`BRANCH_FIBRATION.md`](../laws/BRANCH_FIBRATION.md) · [`BRANCH_MODEL.md`](../runtime/BRANCH_MODEL.md) ·
+[`BRANCH_FIBRATION.md`](../laws/BRANCH_FIBRATION.md) · [`BRANCH_MODEL.md`](../proposals/BRANCH_MODEL.md) ·
 [`MATHEMATICAL_CLAIMS.md`](../../MATHEMATICAL_CLAIMS.md) · [`COMPILER.md`](../forward/COMPILER.md).
 
 ---
@@ -475,7 +475,7 @@ infrastructure stack sits on top:
 | 6 | Verification framework (`verify-homeomorphism`, dual-distance + verdict folder) | **shipped** δ-2 (`29b330c`) | ~150 |
 | 7 | The `onto ingest <path>` command itself | **shipped** γ-1 single-file (`b670ca3`) + γ-5 directory (`a25ade9`) | ~250 |
 | 8 | Open-Prompt signing + replay (out of scope for v1) | future | ~260 |
-| 9 | Self-maintaining intent network — wakeup scanners ([`WAKEUP_SCANNERS.md`](../runtime/WAKEUP_SCANNERS.md)) + content-addressed prompt templates ([`PROMPT_GENERATORS.md`](../forward/PROMPT_GENERATORS.md)) | future (RFCs drafted) | see RFCs |
+| 9 | Self-maintaining intent network — wakeup scanners ([`WAKEUP_SCANNERS.md`](../proposals/WAKEUP_SCANNERS.md)) + content-addressed prompt templates ([`PROMPT_GENERATORS.md`](../proposals/PROMPT_GENERATORS.md)) | future (RFCs drafted) | see RFCs |
 
 ### Per-layer detail
 
@@ -604,7 +604,7 @@ $\varepsilon$ on the divergent set.
 ### Phase ζ — release + Open-Prompt seed (~3–5 h)
 [`LEGEND.md`](LEGEND.md) is the 0.4.0 release note (authored
 2026-05-13; covers γ-0 through δ-2 + the post-γ-7 hardening sweep).
-[`OPEN_PROMPT.md`](../surfaces/OPEN_PROMPT.md) is the sibling protocol spec —
+[`OPEN_PROMPT.md`](../proposals/OPEN_PROMPT.md) is the sibling protocol spec —
 spec-only in this release, v0 implementation targeted for 0.5.0
 after Phase ε ships the data the spec presumes.
 

@@ -169,7 +169,7 @@ distribution. A reviewer who reads §3.10 as anything stronger than
 into it than the data supports.
 
 **Not Phase ζ.** The Open-Prompt protocol (sign / verify-published
-/ replay) is specified in [`OPEN_PROMPT.md`](../surfaces/OPEN_PROMPT.md) but is
+/ replay) is specified in [`OPEN_PROMPT.md`](../proposals/OPEN_PROMPT.md) but is
 not implemented in this release. The protocol design is stable
 enough to publish as a seed; the v1 implementation lands in the
 0.5.0 line after Phase ε ships the data the spec presumes.
@@ -225,7 +225,7 @@ If you want to **start using the system**:
 
 If you want to **read Project Legend specifically**:
 - [`PROJECT_LEGEND.md`](PROJECT_LEGEND.md) — the design document.
-- [`OPEN_PROMPT.md`](../surfaces/OPEN_PROMPT.md) — the Phase ζ protocol spec.
+- [`OPEN_PROMPT.md`](../proposals/OPEN_PROMPT.md) — the Phase ζ protocol spec.
 - [`legend/calibrations/`](../../legend/calibrations) — the two empirical
   data points (γ-2 + γ-7) and the Vibe-Reasoning runbook.
 

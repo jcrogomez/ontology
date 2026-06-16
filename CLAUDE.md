@@ -108,7 +108,7 @@ src/                 grouped by role in F : Intent→Code, G : Code→Intent (se
   surfaces/          what a user/agent touches: commands/ (onto <verb>), walker/ (TUI), mcp/
 tests/             vitest suites (mirror src/ loosely)
 docs/              orientation at top level (ROADMAP, VISION, MATHEMATICAL_CLAIMS, CLI_COMMANDS, GETTING_STARTED)
-  design/          component design grouped by role — kernel/ forward/(F) inverse/(G) laws/ runtime/ surfaces/; index in design/README.md
+  design/          component design grouped by role — kernel/ forward/(F) inverse/(G) laws/ runtime/ surfaces/ (current, built); proposals/ = forward-looking specs NOT yet built; index in design/README.md
   meta/            contributor-facing (COMMENTING_GUIDE, POSITIONING, SELF_INGEST_RUNBOOK)
   legend/          Project Legend records: legend/calibrations/ = ε records (immutable), legend/prompts/, legend/architecture/
 examples/          hello-world (compile demo), workflow-imo-verify-refine (Phase ζ demo)

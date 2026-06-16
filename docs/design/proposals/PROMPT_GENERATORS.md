@@ -3,7 +3,7 @@
 > **Status: RFC only — NOT IMPLEMENTED (verified 2026-06-10).** No `onto generator` commands exist; Phase 1 substrate has not shipped. Do not build against this spec without checking src/ first.
 
 **Status:** Draft
-**Bootstrap target:** post-0.9 (prerequisite of [`WAKEUP_SCANNERS.md`](../runtime/WAKEUP_SCANNERS.md) Fase 3+)
+**Bootstrap target:** post-0.9 (prerequisite of [`WAKEUP_SCANNERS.md`](WAKEUP_SCANNERS.md) Fase 3+)
 **Depends on:** [`RUN_PERSISTENCE.md`](../kernel/RUN_PERSISTENCE.md) (shipped), `src/forward/prompt/parse.ts` (existing AST parser)
 **Lifts:** [`MATHEMATICAL_CLAIMS.md`](../../MATHEMATICAL_CLAIMS.md) Axiom 4 from T3 → T2 (actual rewriting via `@expand:` substitution)
 **Date:** 2026-05-18
