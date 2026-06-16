@@ -67,7 +67,7 @@ reject after 10 consecutive major-issue steps}*.
 
 ## 2. Why this, not the existing compile-plan
 
-The existing `compile-plan` shipped at γ-2 (`src/runtime/graph/compile-plan.ts`)
+The existing `compile-plan` shipped at γ-2 (`src/kernel/graph/compile-plan.ts`)
 walks a DAG in topological order and dispatches each node exactly
 once. That's the right primitive for "compile this graph of code
 nodes into artifacts." It is not the right primitive for verify-refine
@@ -248,7 +248,7 @@ therefore `output: artefact` in the implementation.
 > **Note (2026-06-09, commit `ba66010`, PR #140).** When the graph's
 > `artefactLanguage` is a code language, the final artefact is
 > FENCE-STRIPPED via `projectWorkflowArtefact`
-> (`src/commands/workflow/run.ts`) before BOTH the §3.6 contract
+> (`src/surfaces/commands/workflow/run.ts`) before BOTH the §3.6 contract
 > measurement and the proposal payload — the same projection
 > `compile-node` applies before writing artifacts (compiler parity).
 > Without it, a fenced-but-correct artefact measures as an EMPTY
@@ -304,7 +304,7 @@ surfaced as a defect note, not a block).
 
 > **Note (2026-06-09, commit `ba66010`, PR #140).** For code
 > `artefactLanguage`, the artefact is fence-stripped via
-> `projectWorkflowArtefact` (`src/commands/workflow/run.ts`) before
+> `projectWorkflowArtefact` (`src/surfaces/commands/workflow/run.ts`) before
 > BOTH the contract measurement above and the proposal payload (both
 > modes) — compiler parity. A markdown-fenced artefact would otherwise
 > measure as an empty contract and the proposed node's prompt would
@@ -415,9 +415,9 @@ graph design needs revisiting. Report this prominently.
 
 | Module / file | Change |
 |---|---|
-| `src/schemas/ontology.ts` | Extend `OntologyNode.coordinates` with optional `kind: "generator" \| "verifier" \| "terminal"` and optional `verifierSchema: string`. Extend `EdgeTypeSchema` with `"feeds"` and `"branches_on"` variants. The `branches_on` shape carries a `predicate: string` field; introduce `OntologyEdgeBranchesOnSchema` as a discriminated variant. |
+| `src/kernel/schemas/ontology.ts` | Extend `OntologyNode.coordinates` with optional `kind: "generator" \| "verifier" \| "terminal"` and optional `verifierSchema: string`. Extend `EdgeTypeSchema` with `"feeds"` and `"branches_on"` variants. The `branches_on` shape carries a `predicate: string` field; introduce `OntologyEdgeBranchesOnSchema` as a discriminated variant. |
 | `src/runtime/workflow/` | New directory. `predicate-parser.ts` (the recursive-descent DSL parser), `verifier-schemas.ts` (the registry of pre-declared verifier output shapes), `executor.ts` (the `runWorkflow` loop above), `graph-load.ts` (load + structural-validate a workflow graph from JSON). |
-| `src/commands/workflow/run.ts` | New CLI command implementing the surface from §3.5. |
+| `src/surfaces/commands/workflow/run.ts` | New CLI command implementing the surface from §3.5. |
 | `src/cli.ts` | Register `program.command("workflow run [graph]")`. |
 | `examples/workflow-imo-verify-refine/` | New example. Carries the IMO graph (6 nodes + edges) as JSON, a tiny test input, and a README mapping the graph to Figure 1 of arXiv:2507.15855v4. |
 | `tests/workflow-runtime.test.ts` | New test file. Scenarios: (a) terminate-on-accept; (b) terminate-on-reject; (c) loop with consecutive-pass counter; (d) step-budget exhaustion; (e) no-matching-branch; (f) verifier schema-parse retry; (g) IMO graph end-to-end against a mock provider whose verdicts are pre-scripted. |

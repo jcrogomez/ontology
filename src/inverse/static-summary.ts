@@ -40,7 +40,7 @@ import type {
 // specific semantics still keep going through the LLM (the routing
 // adapter lives in commands/ingest/static-classifier-policy.ts).
 
-// Mirror of ExtractionResult from src/commands/ingest/index.ts.
+// Mirror of ExtractionResult from src/surfaces/commands/ingest/index.ts.
 // Duplicated locally to keep this module free of cyclic imports with
 // the command layer. If you change one, change the other.
 type AbstractionLevel = z.infer<typeof AbstractionLevelSchema>;

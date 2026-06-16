@@ -13,7 +13,7 @@ import { z } from "zod";
 // criterion fits.
 //
 // Design decision: workflow schemas are STANDALONE, deliberately
-// separate from `src/schemas/ontology.ts`. The spec's §6 suggested
+// separate from `src/kernel/schemas/ontology.ts`. The spec's §6 suggested
 // extending `OntologyNode.coordinates` with workflow-specific fields,
 // but workflows model *execution* (where a runtime visits each node
 // possibly many times) while ontology nodes model *intent* (where each

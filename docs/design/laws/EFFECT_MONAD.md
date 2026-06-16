@@ -189,7 +189,7 @@ step fails").
 ## File map
 
 ```
-src/runtime/effects/
+src/laws/effects/
   result.ts   — Result<T, E> + bind/map/mapErr/traverse/sequence
   io.ts       — Effect<T, E> + EffectWithLog<T, E> + log helpers
   async.ts    — AsyncEffect<T, E> = () => Promise<Result<T, E>>; same

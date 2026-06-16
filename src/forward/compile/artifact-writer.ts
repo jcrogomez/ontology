@@ -26,7 +26,7 @@ import type { OntologyNode } from "../../kernel/schemas/ontology.js";
 // rolls back automatically.
 //
 // Read-only on the graph: never mutates events.jsonl, edges.jsonl, state.json,
-// or the node files. The compile-node helper (src/runtime/compile/compile-node.ts)
+// or the node files. The compile-node helper (src/forward/compile/compile-node.ts)
 // is responsible for emitting the compilation_run event AFTER the artifact
 // is on disk AND every validator has accepted it.
 

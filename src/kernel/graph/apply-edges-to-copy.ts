@@ -1,7 +1,7 @@
 // Pure composer for materialising resolved edges into a self-consistent
 // `{ edges, events, newState }` triple. No filesystem, no LLM.
 //
-// The production code path for edge creation (src/core/edges/create-edge.ts)
+// The production code path for edge creation (src/kernel/core/edges/create-edge.ts)
 // is tied to `getOntologyPaths()` and `readState()`/`writeState()`, which
 // resolve against `.ontology` relative to cwd. For the Phase ε empirical
 // validation we need to apply edges into a *copy* of an archived ontology

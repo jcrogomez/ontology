@@ -9,11 +9,11 @@ artifact; the index is a disposable, derived accelerator.
 
 | Module | Role |
 |---|---|
-| `src/runtime/semantic/embedding-index.ts` | Build/load the index, `cosineSimilarity`, `rankBySimilarity`, `suggestSemanticPairs` (same-branch, unlinked-in-either-direction pairs above a threshold), `staleIndexNodeIds`. |
+| `src/kernel/semantic/embedding-index.ts` | Build/load the index, `cosineSimilarity`, `rankBySimilarity`, `suggestSemanticPairs` (same-branch, unlinked-in-either-direction pairs above a threshold), `staleIndexNodeIds`. |
 | `src/runtime/llm/mock.ts` | `embed()`: deterministic bag-of-words feature hashing, 64-dim, L2-normalised — texts sharing vocabulary get high cosine, so the whole pipeline is testable at $0. |
 | `src/runtime/llm/ollama/adapter.ts` | `embed()`: defaults to `nomic-embed-text` (768-dim) via the local Ollama host. |
-| `src/commands/semantic/index.ts` | `onto semantic index` / `onto semantic links`. |
-| `src/commands/query/run-query.ts` | `onto query --semantic <text>` consumer. |
+| `src/surfaces/commands/semantic/index.ts` | `onto semantic index` / `onto semantic links`. |
+| `src/surfaces/commands/query/run-query.ts` | `onto query --semantic <text>` consumer. |
 
 ## Index location and shape
 

@@ -1,15 +1,15 @@
 # Intent Narration — the WHY-as-prompt lift
 
 > Status (2026-06-01): prompt + neighbourhood builder + **CLI wiring shipped and
-> tested** — `onto ingest --intent [<files...>]` (`src/runtime/legend/intent-narration.ts`,
-> wired in `src/commands/ingest/index.ts`, `tests/intent-narration.test.ts` +
+> tested** — `onto ingest --intent [<files...>]` (`src/inverse/intent-narration.ts`,
+> wired in `src/surfaces/commands/ingest/index.ts`, `tests/intent-narration.test.ts` +
 > `tests/ingest-intent-cli.test.ts`). A real-model run (frontier) is the last
 > step. This is the designed path toward filling the **intent** column of the
 > fidelity cartography matrix, currently explicit no-data (see `ROADMAP.md`).
 
 ## Why this exists
 
-The shipped `EXTRACTION_SYSTEM_PROMPT` (`src/commands/ingest/index.ts`) is a
+The shipped `EXTRACTION_SYSTEM_PROMPT` (`src/surfaces/commands/ingest/index.ts`) is a
 **contract** extractor: it specifies what a future implementation MUST recreate
 — exact exported symbols, signatures, re-export obligations — optimised for a
 round-trip measured by **structural Jaccard**. That is the *what*, and it is
@@ -53,7 +53,7 @@ oracle's reference set and the prompt's few-shot exemplars. Note throughout:
 `intentPrompt` never names `acquireLock`, `O_EXCL`, `writeJson`, etc. — purpose,
 not symbols.
 
-### Example 1 — single file: `src/core/fs/lock.ts`
+### Example 1 — single file: `src/kernel/core/fs/lock.ts`
 
 **What the contract extractor produces today (the WHAT — for contrast):**
 
@@ -87,11 +87,11 @@ not symbols.
     "With the bypass enabled, acquisition is skipped entirely.",
     "The holder record is human-readable without the tool."
   ],
-  "sourceFiles": ["src/core/fs/lock.ts"]
+  "sourceFiles": ["src/kernel/core/fs/lock.ts"]
 }
 ```
 
-### Example 2 — neighbourhood: `src/core/fs/lock.ts` + `src/core/fs/json.ts`
+### Example 2 — neighbourhood: `src/kernel/core/fs/lock.ts` + `src/kernel/core/fs/json.ts`
 
 The **composed** intent — which neither file states alone:
 
@@ -117,7 +117,7 @@ The **composed** intent — which neither file states alone:
     "No operation rewrites earlier log entries.",
     "These hold without the calling command doing anything special."
   ],
-  "sourceFiles": ["src/core/fs/lock.ts", "src/core/fs/json.ts"]
+  "sourceFiles": ["src/kernel/core/fs/lock.ts", "src/kernel/core/fs/json.ts"]
 }
 ```
 

@@ -175,7 +175,7 @@ export interface AstProvidesPatch {
  *     can safely apply unconditionally without re-checking the guards.
  *
  * Background: discovered via Move 1c diagnostic on context/types.ts +
- * fibration/types.ts. Their upstream supplier src/schemas/ontology.ts
+ * fibration/types.ts. Their upstream supplier src/kernel/schemas/ontology.ts
  * emitted provides=[] from qwen 3b ingest because the ~600-line file
  * with ~60 exports exceeded the model's working-memory budget, so the
  * model emitted an empty array rather than a partial list. The empty

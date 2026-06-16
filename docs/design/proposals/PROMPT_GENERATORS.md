@@ -3,8 +3,8 @@
 > **Status: RFC only — NOT IMPLEMENTED (verified 2026-06-10).** No `onto generator` commands exist; Phase 1 substrate has not shipped. Do not build against this spec without checking src/ first.
 
 **Status:** Draft
-**Bootstrap target:** post-0.9 (prerequisite of [`WAKEUP_SCANNERS.md`](../runtime/WAKEUP_SCANNERS.md) Fase 3+)
-**Depends on:** [`RUN_PERSISTENCE.md`](../kernel/RUN_PERSISTENCE.md) (shipped), `src/runtime/prompt/parse.ts` (existing AST parser)
+**Bootstrap target:** post-0.9 (prerequisite of [`WAKEUP_SCANNERS.md`](WAKEUP_SCANNERS.md) Fase 3+)
+**Depends on:** [`RUN_PERSISTENCE.md`](../kernel/RUN_PERSISTENCE.md) (shipped), `src/forward/prompt/parse.ts` (existing AST parser)
 **Lifts:** [`MATHEMATICAL_CLAIMS.md`](../../MATHEMATICAL_CLAIMS.md) Axiom 4 from T3 → T2 (actual rewriting via `@expand:` substitution)
 **Date:** 2026-05-18
 
@@ -12,7 +12,7 @@
 
 ## 1. Motivación
 
-Hoy los prompts no triviales del proyecto viven como **constantes hardcoded en `src/`** (`EXTRACTION_SYSTEM_PROMPT` en `src/commands/ingest/index.ts:192`, `INSPECTOR_SYSTEM_PROMPT` en `src/runtime/translator.ts:35`) o como **texto ensamblado dinámicamente sin versionado** (`assembleContext` en `src/runtime/context/assembler.ts:146`). Esto funciona mientras el iniciador es un humano que invoca *un* prompt en el momento (`onto run prompt --prompt "..."`); deja de funcionar en el momento en que un scanner programático tiene que invocar *el mismo prompt versionado* sobre N nodos del grafo.
+Hoy los prompts no triviales del proyecto viven como **constantes hardcoded en `src/`** (`EXTRACTION_SYSTEM_PROMPT` en `src/surfaces/commands/ingest/index.ts:192`, `INSPECTOR_SYSTEM_PROMPT` en `src/inverse/translator.ts:35`) o como **texto ensamblado dinámicamente sin versionado** (`assembleContext` en `src/forward/context/assembler.ts:146`). Esto funciona mientras el iniciador es un humano que invoca *un* prompt en el momento (`onto run prompt --prompt "..."`); deja de funcionar en el momento en que un scanner programático tiene que invocar *el mismo prompt versionado* sobre N nodos del grafo.
 
 Tres consecuencias concretas de seguir así:
 
@@ -55,7 +55,7 @@ Notas de campo:
 - `name` — handle estable + sufijo de versión explícito (`split_detector_v1`, `_v2`). Inmutable post-registro. Una nueva versión es un *nuevo* registro con `name: ..._v2`, no una mutación.
 - `parameters` — schema declarativo. v0 soporta `type: "string"` solamente; otros tipos quedan para v1 (§10).
 - `requires` — lista de `generatorId` que este invoca vía `@expand:`. Declarativo y verificable: el registro rechaza generators cuyo body usa `@expand: gen_xxx` sin tenerlo en `requires`. Esto previene dependencias implícitas y permite cómputo eficiente del dependency closure.
-- `body` — el template. Sintaxis: `{{paramName}}` para substitución de parámetro, `@expand: gen_xxx` para composición con otro generator (línea-anclado, mismo parser que `@requires:` y `@provides:` ya implementado en `src/runtime/prompt/parse.ts`).
+- `body` — el template. Sintaxis: `{{paramName}}` para substitución de parámetro, `@expand: gen_xxx` para composición con otro generator (línea-anclado, mismo parser que `@requires:` y `@provides:` ya implementado en `src/forward/prompt/parse.ts`).
 - `hash` — `gen:hash:sha256(canonicalJson({ name, parameters, requires, body }))`. Excluye `id`, `createdAt`, `hash` mismo. Sigue el patrón existente de `hashPrompt` / `hashContext` / `hashRun` (RUN_PERSISTENCE §3).
 
 ---
@@ -138,7 +138,7 @@ No hay eventos de mutación porque no hay mutación. No hay evento de materializ
 
 ## 7. Composición con el AST parser existente
 
-`src/runtime/prompt/parse.ts` reconoce hoy tres markers (`@requires:`, `@provides:`, `@expand:`) y los strippea del body sin substituir. Este RFC **agrega semántica a `@expand:` en el contexto de generators únicamente**, sin tocar el comportamiento existente para `node.prompt`:
+`src/forward/prompt/parse.ts` reconoce hoy tres markers (`@requires:`, `@provides:`, `@expand:`) y los strippea del body sin substituir. Este RFC **agrega semántica a `@expand:` en el contexto de generators únicamente**, sin tocar el comportamiento existente para `node.prompt`:
 
 - En `node.prompt.raw`, `@expand:` sigue siendo metadata declarativa (status quo). Un futuro RFC puede decidir extender la substitución a node-level si tiene sentido.
 - En `generator.body`, `@expand: gen_xxx` se substituye al materializar. Esto es lo que MATHEMATICAL_CLAIMS §Axiom 4 §Rigor improvement nombra como el upgrade T3 → T2: *"implement the missing piece — `@expand: <nodeId>` resolves to the referenced node's compiled artifact and substitutes it inline"*. Aquí se hace en el dominio de generators, no de nodos, pero el mecanismo (regex existente del parser, marker idéntico) se reusa.
@@ -200,8 +200,8 @@ Los dos consumidores actuales (scanners de wakeup, prompts hardcoded migrables) 
 ### Fase 1 — Substrate (sin consumidores)
 
 - Zod schema de generator + validator.
-- `.ontology/generators/` directorio + persistence layer (`src/core/generators/persist.ts`).
-- `hashGenerator` helper en `src/core/integrity/hash.ts` (paralelo a `hashPrompt`, `hashContext`, `hashRun`).
+- `.ontology/generators/` directorio + persistence layer (`src/kernel/core/generators/persist.ts`).
+- `hashGenerator` helper en `src/kernel/core/integrity/hash.ts` (paralelo a `hashPrompt`, `hashContext`, `hashRun`).
 - `materialize(...)` puro en `src/runtime/generators/materialize.ts`.
 - `onto generator register / list / show / compile / verify`.
 - Evento `generator_registered`.

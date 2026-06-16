@@ -32,7 +32,7 @@ and Layer 7 (`onto ingest <file>` / `<directory>` with rich-payload
 EXPORTS block + comprehensive `provides` capture, `2e8853e`) hardened
 the round-trip after the Vibe-Reasoning Vertiente C surfaced
 rename / decomposition divergences. γ-2 calibration on
-`src/core/integrity/hash.ts` with `claude-opus-4-7` end-to-end reads
+`src/kernel/core/integrity/hash.ts` with `claude-opus-4-7` end-to-end reads
 **5/5 ε-equivalent** (see §7.1). Phase ε (self-ingestion on the
 Ontology codebase) subsequently ran and closed 2026-05-26 with the
 round-trip tolerance $\varepsilon$ measured per axis
@@ -40,7 +40,7 @@ round-trip tolerance $\varepsilon$ measured per axis
 the active stream.
 
 Companion reads:
-[`BRANCH_FIBRATION.md`](../laws/BRANCH_FIBRATION.md) · [`BRANCH_MODEL.md`](../runtime/BRANCH_MODEL.md) ·
+[`BRANCH_FIBRATION.md`](../laws/BRANCH_FIBRATION.md) · [`BRANCH_MODEL.md`](../proposals/BRANCH_MODEL.md) ·
 [`MATHEMATICAL_CLAIMS.md`](../../MATHEMATICAL_CLAIMS.md) · [`COMPILER.md`](../forward/COMPILER.md).
 
 ---
@@ -211,8 +211,8 @@ A **path fiber** $p^{-1}(d)$ is the set of intent nodes whose
 artifacts live under directory $d$. Path fibers are the natural unit
 for **token vocabulary normalisation**: within a fiber, tokens are
 expected to share semantic meaning more than across fibers. When
-ingest extracts a new token for file `src/runtime/topos/foo.ts`, it
-first checks the existing tokens in $p^{-1}(\text{src/runtime/topos})$
+ingest extracts a new token for file `src/laws/topos/foo.ts`, it
+first checks the existing tokens in $p^{-1}(\text{src/laws/topos})$
 and reuses one if the LLM judges it equivalent. Cross-fiber
 suggestions are accepted only on explicit user confirmation.
 
@@ -339,7 +339,7 @@ reproduces the timeline of "what was read, when, and at what cost".
 
 The translator uses a new `LlmTask: "inspect"` in the routing registry
 (fast tier — short prose, doesn't need critic-tier compute). Pure
-library at `src/runtime/legend/translator.ts` owns the prompt builder,
+library at `src/inverse/translator.ts` owns the prompt builder,
 source-hash math, and cache-validity check; the CLI command owns the
 dispatch + persistence.
 
@@ -475,7 +475,7 @@ infrastructure stack sits on top:
 | 6 | Verification framework (`verify-homeomorphism`, dual-distance + verdict folder) | **shipped** δ-2 (`29b330c`) | ~150 |
 | 7 | The `onto ingest <path>` command itself | **shipped** γ-1 single-file (`b670ca3`) + γ-5 directory (`a25ade9`) | ~250 |
 | 8 | Open-Prompt signing + replay (out of scope for v1) | future | ~260 |
-| 9 | Self-maintaining intent network — wakeup scanners ([`WAKEUP_SCANNERS.md`](../runtime/WAKEUP_SCANNERS.md)) + content-addressed prompt templates ([`PROMPT_GENERATORS.md`](../forward/PROMPT_GENERATORS.md)) | future (RFCs drafted) | see RFCs |
+| 9 | Self-maintaining intent network — wakeup scanners ([`WAKEUP_SCANNERS.md`](../proposals/WAKEUP_SCANNERS.md)) + content-addressed prompt templates ([`PROMPT_GENERATORS.md`](../proposals/PROMPT_GENERATORS.md)) | future (RFCs drafted) | see RFCs |
 
 ### Per-layer detail
 
@@ -497,7 +497,7 @@ step. This is essential for code that has irreducible specificity (a
 specific regex, a magic constant, a license header). The validator
 still runs against it; `runtime_check` still applies.
 
-**Layer 3 — Static analysis.** A small library `src/runtime/static/`
+**Layer 3 — Static analysis.** A small library `src/inverse/static/`
 with per-language plugins. For TypeScript: walk `ts.SourceFile`
 imports → produce `depends_on` edges between the corresponding nodes.
 For Python: AST walk for `import` / `from … import`. Static edges are
@@ -510,7 +510,7 @@ that import).
 `computeFiberBy(input, projection)` where `projection: Node → label`.
 Branch fibration: `projection = n.coordinates.branch`. Path fibration:
 `projection = n.outputs.files[0]?.relativeToDir`. The library lives
-under `src/runtime/fibration/` and the two are sibling exports.
+under `src/laws/fibration/` and the two are sibling exports.
 
 **Layer 6 — Verification.** The `verify-homeomorphism` command and
 its batch counterpart. Output is structured (JSON + human) and
@@ -558,12 +558,12 @@ landed two follow-ups: review blockers (`fix(compile,node)`
   Schema now carries optional manifestation / language / requires
   / provides / forbids / rules / literal / sourceFiles so
   `onto proposal apply` produces a complete node in one step.
-- γ-2: first end-to-end calibration on `src/core/integrity/hash.ts`
+- γ-2: first end-to-end calibration on `src/kernel/core/integrity/hash.ts`
   with `claude-opus-4-7` end-to-end — 5/5 functions semantically
   equivalent, $0.08 per round-trip, 70s wall-clock. Full report:
   [`docs/legend/calibrations/HASH_TS_2026-05-12.md`](../../legend/calibrations/HASH_TS_2026-05-12.md).
 - γ-4: static-edge inference (Layer 3, TS-first, `feat(static)`
-  `62d8c86`). New `src/runtime/static/typescript.ts` uses the
+  `62d8c86`). New `src/inverse/static/typescript.ts` uses the
   TypeScript compiler API to parse `import` / `export` declarations
   and emit `depends_on` / `uses_token` edges without an LLM call.
   Generic `collectSourceFiles(rootDir, extensions)` walker is the
@@ -604,7 +604,7 @@ $\varepsilon$ on the divergent set.
 ### Phase ζ — release + Open-Prompt seed (~3–5 h)
 [`LEGEND.md`](LEGEND.md) is the 0.4.0 release note (authored
 2026-05-13; covers γ-0 through δ-2 + the post-γ-7 hardening sweep).
-[`OPEN_PROMPT.md`](../surfaces/OPEN_PROMPT.md) is the sibling protocol spec —
+[`OPEN_PROMPT.md`](../proposals/OPEN_PROMPT.md) is the sibling protocol spec —
 spec-only in this release, v0 implementation targeted for 0.5.0
 after Phase ε ships the data the spec presumes.
 
@@ -635,7 +635,7 @@ that builds bridges to the math literature.
 
 After γ-0 (Anthropic provider), γ-1 (`onto ingest <file>` command),
 and γ-3 (rich proposal payload) landed, we ran the first end-to-end
-round-trip on `src/core/integrity/hash.ts` — a small, pure, single-
+round-trip on `src/kernel/core/integrity/hash.ts` — a small, pure, single-
 file utility module of the kind the design hypothesises lives in
 $\mathcal{C}_{\text{faithful}}$. Full report:
 [`docs/legend/calibrations/HASH_TS_2026-05-12.md`](../../legend/calibrations/HASH_TS_2026-05-12.md).

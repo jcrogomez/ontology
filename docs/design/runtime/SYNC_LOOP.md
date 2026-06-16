@@ -73,7 +73,7 @@ full per-node detail.
 
 `--explain` shows the reasoning so you can follow the decision without
 reading any code. Here is a clean pass (from the 2026-06-14 acceptance,
-`node_0011` = `src/core/errors.ts`):
+`node_0011` = `src/kernel/core/errors.ts`):
 
 ```text
 $ onto sync node_0011 --provider ollama --model qwen2.5-coder:7b --explain
@@ -84,8 +84,8 @@ $ onto sync node_0011 --provider ollama --model qwen2.5-coder:7b --explain
   rules:      clean (0 violations)
 
 ✔ SYNC node_0011 — WROTE (all gates passed)
-  wrote:  src/core/errors.ts
-  re-anchored: src/core/errors.ts (this node only)
+  wrote:  src/kernel/core/errors.ts
+  re-anchored: src/kernel/core/errors.ts (this node only)
 ```
 
 The re-anchor is **path-scoped on purpose**: it refreshes only this

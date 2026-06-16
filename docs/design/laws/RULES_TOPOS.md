@@ -1,7 +1,7 @@
 # Rules as Subobjects: a Topos-style Predicate Algebra
 
-> Status: shipped + integrated. `src/runtime/topos/` provides the predicate
-> algebra; `src/runtime/context/intent-validator.ts` is now ported onto it
+> Status: shipped + integrated. `src/laws/topos/` provides the predicate
+> algebra; `src/forward/context/intent-validator.ts` is now ported onto it
 > (its three rules — gluing ok, candidate non-empty, FORBID phrase scan —
 > compile to predicates that fold via `allOf` and evaluate against an
 > `EvaluationContext`). `gluing.ts` remains unchanged and continues to feed

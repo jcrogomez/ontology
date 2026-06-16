@@ -31,7 +31,6 @@ it consumes and the prompt generators it drives.
 - [`forward/COMPILER.md`](forward/COMPILER.md) — the forward functor F.
 - [`forward/CONTEXT_ASSEMBLER.md`](forward/CONTEXT_ASSEMBLER.md) — presheaf context assembly.
 - [`forward/MODEL_RUNTIME.md`](forward/MODEL_RUNTIME.md) — LLM dispatch / model runtime.
-- [`forward/PROMPT_GENERATORS.md`](forward/PROMPT_GENERATORS.md) — prompt generation.
 
 ## `inverse/` — **G : Code → Intent** (Project Legend / extraction)
 
@@ -65,17 +64,25 @@ The workflow state machine and the governed intent→code loop.
 - [`runtime/WORKFLOW_RUNTIME_SPEC.md`](runtime/WORKFLOW_RUNTIME_SPEC.md) — the ζ verify-refine runtime.
 - [`runtime/SYNC_LOOP.md`](runtime/SYNC_LOOP.md) — the governed loop, how-to.
 - [`runtime/SYNC_LOOP_SPEC.md`](runtime/SYNC_LOOP_SPEC.md) — the loop's contract + acceptance.
-- [`runtime/WAKEUP_SCANNERS.md`](runtime/WAKEUP_SCANNERS.md) — wakeup scanners.
-- [`runtime/BRANCH_MODEL.md`](runtime/BRANCH_MODEL.md) — branch materialization (runtime side of the fibration).
 
 ## `surfaces/` — what a user / agent touches
 
 - [`surfaces/WALKER_INTERFACE.md`](surfaces/WALKER_INTERFACE.md) — the Walker TUI.
-- [`surfaces/OPEN_PROMPT.md`](surfaces/OPEN_PROMPT.md) — the Open-Prompt / `onto mcp` surface.
+
+## `proposals/` — not yet built (forward-looking specs)
+
+Design for features that do **not** ship yet — isolated here so the role
+folders above describe only the current, built system. Each carries its own
+status banner; check `src/` before building against any of them.
+
+- [`proposals/OPEN_PROMPT.md`](proposals/OPEN_PROMPT.md) — signed-intent + audit-replay protocol (spec-only; the `onto mcp` read surface is its first slice).
+- [`proposals/PROMPT_GENERATORS.md`](proposals/PROMPT_GENERATORS.md) — versioned prompt generators (RFC; not implemented).
+- [`proposals/WAKEUP_SCANNERS.md`](proposals/WAKEUP_SCANNERS.md) — proactive scanners that open proposals (RFC; not implemented).
+- [`proposals/BRANCH_MODEL.md`](proposals/BRANCH_MODEL.md) — branch materialization semantics (design note; awaiting confirmation).
 
 ---
 
 *Dated records (calibrations, hypotheses, results, release notes) are **not**
-here — they live under [`../legend/calibrations/`](../legend/calibrations/)
-and [`../archive/`](../archive/) and are historical / immutable per the
+here — they live under [`../legend/calibrations/`](../legend/calibrations)
+and [`../archive/`](../archive) and are historical / immutable per the
 project convention. This index covers only the living design docs.*

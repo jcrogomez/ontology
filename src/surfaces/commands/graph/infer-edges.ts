@@ -319,7 +319,7 @@ function loadEdgesSet(): Set<string> {
   return out;
 }
 
-// Mirror of the helper in src/commands/ingest/index.ts. Kept inline
+// Mirror of the helper in src/surfaces/commands/ingest/index.ts. Kept inline
 // (rather than imported) to avoid a cross-command dependency for one
 // 5-line helper. The macOS-symlink normalisation rule is the same:
 // realpath both ends to make the relative path stable.

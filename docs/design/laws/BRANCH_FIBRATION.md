@@ -4,7 +4,7 @@ Status: read-only library shipped in PR #111. Walker `:branch list` (PR #114)
 is the first surface; an `onto branch` CLI (`onto branch list` / `onto branch
 fiber <branch>`), branch-aware compile (`onto compile run --branch <name>`),
 and the cartesian-lift proposal (`onto branch lift`) are open follow-ups —
-see *Future Work*. All helpers live under `src/runtime/fibration/`.
+see *Future Work*. All helpers live under `src/laws/fibration/`.
 
 Rigor classification: [`MATHEMATICAL_CLAIMS.md`](../../MATHEMATICAL_CLAIMS.md)
 §3.8 — T2 for `computeBranchFiber` (partition + sub-graph closure

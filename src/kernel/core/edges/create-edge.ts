@@ -15,7 +15,7 @@ import {
 import type { z } from "zod";
 
 // Core helper for creating a typed edge between two existing nodes.
-// Mirrors src/core/nodes/create-node.ts: both `onto node link` and
+// Mirrors src/kernel/core/nodes/create-node.ts: both `onto node link` and
 // `onto proposal apply` (for edge_create proposals) call this function.
 //
 // The helper does NOT verify that from/to nodes exist or that the poset
