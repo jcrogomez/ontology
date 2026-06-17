@@ -40,7 +40,7 @@ export interface DriftOptions {
 }
 
 // The on-disk drift baseline (version:1). Owned here; the per-node re-anchor in
-// runtime/legend/reanchor-node.ts reads/writes the same format.
+// laws/reanchor-node.ts reads/writes the same format.
 export interface DriftSnapshot {
   version: 1;
   createdAt: string;

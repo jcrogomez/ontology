@@ -239,7 +239,7 @@ export interface IngestCommandOptions {
   //     classified as barrels, declaration-only modules, or
   //     configuration modules bypass the LLM entirely and receive a
   //     deterministic static summary instead (see
-  //     runtime/legend/static-summary.ts). Files classified as test
+  //     inverse/static-summary.ts). Files classified as test
   //     modules are skipped (no proposal). All other shapes
   //     (schema_module, adapter_module, cli_module, executable_module,
   //     component_module, mixed_module, unknown) still dispatch to
@@ -1490,7 +1490,7 @@ export async function ingestCommand(
   //     barrels / declaration-only / configuration modules bypass
   //     the LLM via a deterministic static summary; test modules are
   //     skipped; all other shapes still go through the LLM. See
-  //     runtime/legend/static-summary.ts for the routing table.
+  //     inverse/static-summary.ts for the routing table.
   // Unknown values fail fast so a typo doesn't silently downgrade.
   const staticClassifierMode: StaticClassifierMode = (() => {
     const raw = options.staticClassifier;

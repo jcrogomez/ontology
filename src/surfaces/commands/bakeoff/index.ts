@@ -1,6 +1,6 @@
 // `onto bakeoff` — cross-arm fidelity synthesis + release-gate (#4).
 //
-// Wraps the pure `synthesizeBakeoff` reducer (src/runtime/legend/
+// Wraps the pure `synthesizeBakeoff` reducer (src/laws/
 // bakeoff-synthesis.ts) so the cross-arm comparison isn't a hand-rolled
 // script. Reads N verify-homeomorphism `--json` reports (recorded arm
 // outputs), folds them into one synthesis, and applies an H1 floor GATE:

@@ -2,7 +2,7 @@ import type { StructuralClassification } from "../../../inverse/structural-class
 
 // Ingest-policy adapter for the Structural Semantic Classifier — the
 // "ingest policy consumes facts" side of Project Legend's separation
-// principle. The classifier (runtime/legend/structural-classifier.ts)
+// principle. The classifier (inverse/structural-classifier.ts)
 // produces typed structural facts about a single file. This module
 // decides, given those facts and the operator-selected
 // --static-classifier mode, whether ingest should:
@@ -10,7 +10,7 @@ import type { StructuralClassification } from "../../../inverse/structural-class
 //   - dispatch the file to the LLM via the normal semantic_parse
 //     path (default), or
 //   - bypass the LLM and synthesize a deterministic extraction via
-//     buildStaticSummary (runtime/legend/static-summary.ts).
+//     buildStaticSummary (inverse/static-summary.ts).
 //
 // Design principle (load-bearing):
 //   - classifier produces facts (pure, no policy knowledge)
