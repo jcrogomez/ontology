@@ -397,8 +397,8 @@ function buildPreludeE(
           : path.resolve(options.cwd ?? process.cwd(), sourceRel);
         const scan = scanFileSymbols(sourceAbs);
         if (scan.ok && scan.mandatoryExports.length > 0) {
-          groundingSection = buildAstGroundingSystemSection(scan.mandatoryExports);
-          groundingHash = hashAstGrounding(scan.mandatoryExports);
+          groundingSection = buildAstGroundingSystemSection(scan.mandatoryExports, scan.signatures);
+          groundingHash = hashAstGrounding(scan.mandatoryExports, scan.signatures);
         }
       }
     }

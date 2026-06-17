@@ -26,6 +26,16 @@ describe("buildAstGroundingSystemSection", () => {
     const out = buildAstGroundingSystemSection(["A"]) ?? "";
     expect(out).toMatch(/MUST NOT introduce additional exports/);
   });
+
+  it("renders the type signature inline when one is provided (grounding the surface, not just the name)", () => {
+    const out =
+      buildAstGroundingSystemSection(["acquireLock", "Lock"], {
+        acquireLock: "(repoRoot: string) => Lock",
+      }) ?? "";
+    expect(out).toMatch(/- acquireLock: \(repoRoot: string\) => Lock/);
+    expect(out).toMatch(/- Lock$/m); // no signature → name-only, unchanged
+    expect(out).toMatch(/match that exact signature/);
+  });
 });
 
 describe("joinSystemSections", () => {
@@ -68,6 +78,12 @@ describe("hashAstGrounding", () => {
     const a = hashAstGrounding(["Foo", "Bar"]);
     const b = hashAstGrounding(["Foo", "Bar"]);
     expect(a).toBe(b);
+  });
+
+  it("folds signatures into the hash, but absent/empty signatures preserve the legacy digest", () => {
+    const bare = hashAstGrounding(["A"]);
+    expect(hashAstGrounding(["A"], {})).toBe(bare); // empty → byte-identical to legacy
+    expect(hashAstGrounding(["A"], { A: "() => void" })).not.toBe(bare);
   });
 });
 

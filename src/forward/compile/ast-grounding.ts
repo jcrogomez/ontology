@@ -42,6 +42,7 @@ import stringify from "fast-json-stable-stringify";
  */
 export function buildAstGroundingSystemSection(
   mandatoryExports: readonly string[],
+  signatures?: Readonly<Record<string, string>>,
 ): string | null {
   if (mandatoryExports.length === 0) return null;
   const lines: string[] = [];
@@ -50,13 +51,15 @@ export function buildAstGroundingSystemSection(
   lines.push(
     "The following identifiers were extracted directly from the source AST. " +
       "You MUST emit each of them as an exported binding in the regenerated " +
-      "file, with EXACTLY this spelling. You MUST NOT introduce additional " +
-      "exports not in this list. You MUST NOT paraphrase, pluralise, or " +
-      "abbreviate these names.",
+      "file, with EXACTLY this spelling and — where a type signature is " +
+      "given — implement it to match that exact signature. You MUST NOT " +
+      "introduce additional exports not in this list. You MUST NOT paraphrase, " +
+      "pluralise, or abbreviate these names.",
   );
   lines.push("");
   for (const name of mandatoryExports) {
-    lines.push(`  - ${name}`);
+    const sig = signatures?.[name];
+    lines.push(sig ? `  - ${name}: ${sig}` : `  - ${name}`);
   }
   lines.push("");
   lines.push(
@@ -97,9 +100,17 @@ export function joinSystemSections(
  */
 export function hashAstGrounding(
   mandatoryExports: readonly string[],
+  signatures?: Readonly<Record<string, string>>,
 ): string | null {
   if (mandatoryExports.length === 0) return null;
-  const canonical = { mandatoryExports: [...mandatoryExports] };
+  // Backward-compat: with no signatures the canonical shape (and therefore
+  // the digest) is byte-identical to the pre-signature-grounding hash, so
+  // existing grounded-run cache keys are preserved. Signatures, when present,
+  // fold into the key so a richer contract cleanly separates the cache.
+  const hasSigs = signatures !== undefined && Object.keys(signatures).length > 0;
+  const canonical = hasSigs
+    ? { mandatoryExports: [...mandatoryExports], signatures }
+    : { mandatoryExports: [...mandatoryExports] };
   const digest = createHash("sha256").update(stringify(canonical)).digest("hex");
   return `grounding:hash:${digest}`;
 }

@@ -61,6 +61,11 @@ export interface ASTSymbolScanResult {
    * to call any declared name phantom — the name may be legitimately surfaced
    * through the wildcard. */
   hasWildcardReExport: boolean;
+  /** Per-export syntactic (O1) type signature, keyed by export name, for the
+   * exports that carry one (un-annotated bindings are omitted). Fed into the
+   * compile-back AST grounding so the regenerator gets the exact surface
+   * shape, not just the names. */
+  signatures: Record<string, string>;
 }
 
 /**
@@ -73,7 +78,7 @@ export function scanFileSymbols(filePath: string): ASTSymbolScanResult {
   try {
     source = fs.readFileSync(filePath, "utf-8");
   } catch {
-    return { filePath, mandatoryExports: [], reExportedNames: [], ok: false, hasWildcardReExport: false };
+    return { filePath, mandatoryExports: [], reExportedNames: [], ok: false, hasWildcardReExport: false, signatures: {} };
   }
   try {
     const parsed = parseTypeScriptFile(filePath, source);
@@ -86,11 +91,15 @@ export function scanFileSymbols(filePath: string): ASTSymbolScanResult {
     // scanner output against LLM-extracted provides.
     const mandatoryExports: string[] = [];
     const reExportedNames: string[] = [];
+    const signatures: Record<string, string> = {};
     for (const ref of parsed.exports) {
       if (ref.isDefault) continue;
       mandatoryExports.push(ref.name);
       if (ref.reExportedFrom !== undefined) {
         reExportedNames.push(ref.name);
+      }
+      if (ref.signature !== undefined && ref.signature.length > 0) {
+        signatures[ref.name] = ref.signature;
       }
     }
     return {
@@ -99,9 +108,10 @@ export function scanFileSymbols(filePath: string): ASTSymbolScanResult {
       reExportedNames,
       ok: true,
       hasWildcardReExport: parsed.wildcardReExports.length > 0,
+      signatures,
     };
   } catch {
-    return { filePath, mandatoryExports: [], reExportedNames: [], ok: false, hasWildcardReExport: false };
+    return { filePath, mandatoryExports: [], reExportedNames: [], ok: false, hasWildcardReExport: false, signatures: {} };
   }
 }
 
