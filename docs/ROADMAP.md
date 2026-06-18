@@ -56,6 +56,96 @@ exhaustively pinned by `tests/runtime/topos/closed-world-parity.test.ts`)
 
 ## Open follow-ups
 
+### 2026-06-18 checkpoint — the four product gaps
+
+The missing work is no longer "invent the primitives." The primitives now
+exist: `onto regenerate`, `onto sync`, `onto status`, `onto execute`,
+`onto ficha`, `onto probe`, `onto rules`, drift anchoring, and the read-only
+MCP surface. The remaining gap is **trusted surface area plus a humane cabin**:
+more of the graph must be safe to regenerate, the executor must be measured on
+a stronger model ladder, and Walker must become the place where a human can
+actually steer all of this without mentally composing CLI commands.
+
+Live snapshot from `onto status` / `onto ficha audit` on 2026-06-18:
+
+- Graph: **228 nodes**, **713 edges**, **3670 events**; **221** nodes have a
+  code shadow.
+- Syncable core: **47 / 221** shadows have a behaviour fixture and no static
+  rule violation; **174 / 221** are lower-confidence because they lack a
+  behaviour fixture.
+- Drift: **15** shadows have moved from the current anchor.
+- Ficha quality: **4** nodes under-declare exports (**+5** missing exports),
+  **76** nodes over-declare (**308** phantom provides), and **57** prose/noise
+  rules remain to triage.
+
+**1. Grow the trustworthy core (47/221 → measured majority).** This is the
+highest-leverage reliability work. The system can only write with confidence
+where a node has an honest ficha, a code shadow, a behaviour fixture, and clean
+rules. The next pass should attack that stack in order:
+
+- Close deterministic ficha gaps first: run the completion/prune worklist until
+  `missingExports = 0`, phantom provides are materially reduced, and every
+  added/removed contract token is backed by AST evidence.
+- Turn prose rules into executable safety: route behavioural rules through
+  `onto probe`, keep statically-decidable rules in `onto rules check`, and prune
+  extraction-noise/prose only with human review.
+- Add fixtures where they buy graph leverage: prioritize hard-dependency hubs,
+  drifted shadows, CLI/runtime boundary modules, and nodes already in the
+  calibrated sync sample.
+- Re-measure with `onto status`, `onto ficha audit`, and a small `onto sync
+  --dry-run --json` cohort. The success metric is not a perfect graph; it is a
+  visibly larger core and fewer lower-confidence writes.
+
+**2. Run `onto execute` on a frontier ladder over the calibrated set.** The
+local 7B acceptance run in `SYNC_LOOP_SPEC.md` §8 put the honest floor at
+**1/6 ≈ 17% clean** on the six-node core sample:
+`node_0011`, `node_0017`, `node_0022`, `node_0026`, `node_0029`,
+`node_0225`. The §8.1 determinacy probe showed that ficha pruning is real on
+individual nodes but too small to rise above 7B run-to-run variance in the
+aggregate. The next measurement should keep the sample fixed and change only
+the capability ladder:
+
+- Run `onto execute <sample...> --dry-run --allow-paid --json` with the model
+  registry annotated so the ladder climbs local/free → frontier only after the
+  cheaper rungs fail.
+- Record terminal states per node: `closed`, `extraction-gap`,
+  `capacity-ceiling`, `blocked-upstream`, `unverified-no-fixture`,
+  `infra-error`.
+- Interpret honestly: if frontier closes nodes that local cannot, the bottleneck
+  was model capacity/variance; if frontier still plateaus with clean lint, flag
+  G/ficha quality; if dirty lint dominates, invest in refine/decompose and
+  better compile-back grounding.
+- Keep it dry-run until the measured policy is boring. Paid/frontier execution
+  must remain explicit (`--allow-paid`), never an automatic background spend.
+
+**3. Make Walker v2 the central experience.** The CLI now has the power; the
+product does not yet have the cabin. Walker v2 should stop being "a TUI that can
+call commands" and become the operator surface for the governed loop:
+
+- First screen: focal node identity, intent/ficha quality, shadow status,
+  fixture/rule coverage, drift, upstream/downstream closure, and the next safe
+  action.
+- One-shot controls: `sync --explain`, `execute --dry-run`, `probe`, `ficha
+  cleanup`, `rules audit`, proposal review/apply/reject, and re-anchor, all
+  rendered as decisions with reasons rather than raw command output.
+- Editing surface: intent/prompt/rules/contract edits with before/after contract
+  diff and provider-gluing warnings before mutation.
+- Escalation surface: when a node becomes `extraction-gap` or
+  `capacity-ceiling`, Walker shows the exact evidence and offers the next
+  governed lever instead of asking the user to infer it from logs.
+
+The acceptance bar: a human should be able to edit a core node's intention,
+run the governed loop, understand a write/refusal, and review the resulting
+proposal or artifact **without leaving Walker**.
+
+**4. Keep hygiene green before measuring.** `npm run check` is green, and the
+NUL guard caught one real source hygiene issue: a literal NUL separator in
+`src/forward/compile/rules-grounding.ts` line 140. It is fixed by spelling the
+runtime NUL as an escaped string literal (`"\0"`), so source bytes stay text
+while hash semantics stay unchanged. `npm run check:nul` should remain a hard
+pre-measurement gate; no frontier run or published metric should start from a
+tree that fails source hygiene.
+
 ### Highest-value validation gaps
 
 These close the largest distance between what's *built* and what's
@@ -146,4 +236,13 @@ Detail per PR is in [`RELEASE_NOTES.md`](RELEASE_NOTES.md); the table below is a
 
 ---
 
-*Last refresh: **2026-06-14** (state as of PR #151, commit `1ccb974`). The intent→code regeneration loop (PRs #148–#151) shipped + measured over 2026-06-12→14: `onto regenerate`/`probe`/`rules`, the kernel-of-equivalence map, lens laws under edits, rules-grounding (E2 closed), rule enforcement + triage — detail compressed into one bullet above, full records in `legend/calibrations/`. The load-bearing finding across all of it: the binding constraint is extraction/GET quality, now four-times confirmed; §3.10 stays **T2**. Honest current T1 count is **13** (see `MATHEMATICAL_CLAIMS.md` §5). Phase ζ active. This file is the single source of truth for open work; when a follow-up ships, promote it out of the open list into the bootstrap-history table or `RELEASE_NOTES.md`.*
+*Last refresh: **2026-06-18** (state as of local `main` around `707a3fe`,
+plus this checkpoint). The intent→code regeneration loop is now joined by the
+governed executor layer (`onto execute`) and a live status surface: **47/221**
+code shadows are in the syncable core, **15** shadows are drifted, and ficha
+quality still shows **+5** missing exports, **308** phantom provides, and **57**
+prose/noise rules. The load-bearing finding remains: the binding constraint is
+extraction/GET quality plus model variance/capacity, not the existence of the
+compiler primitives. Phase ζ active. This file is the single source of truth for
+open work; when a follow-up ships, promote it out of the open list into the
+bootstrap-history table or `RELEASE_NOTES.md`.*
