@@ -63,9 +63,10 @@ describe("executor runner", () => {
     expect(rec.written).toBe(true);
     expect(rec.finalRung).toBe(0); // never climbed
     expect(rec.attempts).toBe(1);
-    // exactly one probe + one governed write, all on the cheap rung
-    expect(calls.map((c) => c.opts.model)).toEqual(["cheap", "cheap"]);
-    expect(calls.filter((c) => c.opts.write).length).toBe(1);
+    // a single attempt at the cheap rung that writes atomically (governed) —
+    // no separate re-draw at converge time
+    expect(calls.map((c) => c.opts.model)).toEqual(["cheap"]);
+    expect(calls.every((c) => c.opts.write)).toBe(true);
   });
 
   it("escalates the ladder to close a glue node (node_0013 shape)", async () => {
@@ -83,8 +84,9 @@ describe("executor runner", () => {
       { lever: { kind: "refine" } },
       { lever: { kind: "escalate" } },
     ]);
-    // the governed write happened on the capable rung
-    expect(calls.filter((c) => c.opts.write).every((c) => c.opts.model === "capable")).toBe(true);
+    // the attempt that closed (and wrote) was on the capable rung
+    expect(rec.written).toBe(true);
+    expect(calls.at(-1)?.opts.model).toBe("capable");
   });
 
   it("reports blocked-upstream instead of mis-blaming a downstream node", async () => {

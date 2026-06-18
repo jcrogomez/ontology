@@ -14,7 +14,7 @@ import type { RegenerateCommandOptions, RegenerateResult } from "../../surfaces/
 import { decide, DEFAULT_REFINE_ROUNDS } from "./policy.js";
 import { normalize } from "./verdict.js";
 import { buildReport, type ExecReport } from "./report.js";
-import type { Decision, Lever, NodeExecState, NodeRecord, Terminal } from "./types.js";
+import type { Decision, Lever, NodeExecState, NodeRecord } from "./types.js";
 
 export interface ExecutorConfig {
   // Focal nodes to close. Each focal's dependency closure is walked in
@@ -40,8 +40,15 @@ export interface ExecutorDeps {
 
 const HARD_TYPES: ReadonlySet<string> = new Set(HARD_DEPENDENCY_EDGE_TYPES as readonly string[]);
 
-// Base gate configuration applied to every probe: behaviour + rules + grounding
-// on, single draw (the policy, not consensus, drives retries), no write.
+// Base gate configuration applied to every attempt: behaviour + rules +
+// grounding on, single draw (the policy, not consensus, drives retries).
+//
+// write is on by default and governed BY runRegenerate itself: the command
+// writes the attempt's draft ONLY when its own gates are green (structure-safe
+// verdict + behaviour pass + no rule violations), so a non-passing attempt
+// writes nothing. Crucially the WRITE happens on the same call as the passing
+// draw — we never re-generate at converge time, because a fresh stochastic draw
+// would not reproduce the draft that actually passed (the 7B is high-variance).
 function baseOptions(config: ExecutorConfig, model: ResolvedNodeModel): RegenerateCommandOptions {
   return {
     provider: model.provider,
@@ -51,7 +58,7 @@ function baseOptions(config: ExecutorConfig, model: ResolvedNodeModel): Regenera
     astGrounding: true,
     rulesGrounding: true,
     draws: 1,
-    write: false,
+    write: config.write !== false,
     behaviorFixturesDir: config.behaviorFixturesDir,
     ollamaHost: config.ollamaHost,
     maxTokens: config.maxTokens,
@@ -97,6 +104,10 @@ async function runNode(
     maxAttemptsPerNode: config.maxAttemptsPerNode ?? 8,
   };
   const decisions: Decision[] = [];
+  // Whether the attempt that produced the most recent verdict actually wrote.
+  // The passing attempt writes atomically (write is on by default and gated by
+  // runRegenerate), so on a `closed` terminal this reflects the real write.
+  let lastWritten = false;
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
@@ -104,11 +115,10 @@ async function runNode(
     decisions.push({ rung: state.rung, action });
 
     if (action.type === "terminate") {
-      const written = await maybeConvergeWrite(action.terminal, nodeId, state, config, deps);
       return {
         nodeId,
         terminal: action.terminal,
-        written,
+        written: action.terminal === "closed" ? lastWritten : false,
         finalRung: state.rung,
         attempts: state.history.length,
         decisions,
@@ -122,34 +132,33 @@ async function runNode(
       rung = Math.min(rung + 1, ladderSize - 1);
     }
     const model = config.ladder[rung];
-    const result = await deps.regenerate(nodeId, leverOptions(action.lever, config, model));
-    const verdict = normalize(result);
+    // runRegenerate normally returns a RegenerateResult even for refusals/blocks;
+    // it throws only on genuinely exceptional failures (a non-lock error from the
+    // compile lock, or — for an IO node like lock.ts — a draft whose throw escapes
+    // the v0 in-process containment). Treat any throw as an infra-error verdict so
+    // ONE pathological node cannot crash the whole batch. (A truly DEFERRED uncaught
+    // throw from an orphaned draft timer can still escape this; the principled fix
+    // is child-process isolation of the behaviour check — tracked follow-up.)
+    let verdict;
+    try {
+      const result = await deps.regenerate(nodeId, leverOptions(action.lever, config, model));
+      verdict = normalize(result);
+      lastWritten = result.written === true;
+    } catch (err) {
+      verdict = {
+        outcome: "infra-error" as const,
+        lintClean: undefined,
+        hasFixture: false,
+        detail: `regenerate threw: ${err instanceof Error ? err.message : String(err)}`,
+      };
+      lastWritten = false;
+    }
     state = {
       ...state,
       rung,
       history: [...state.history, { rung, lever: action.lever.kind, verdict }],
     };
   }
-}
-
-// Governed write: only a `closed` terminal writes, and only when config.write is
-// on. The write is a fresh runRegenerate with write:true at the winning rung —
-// the command STILL refuses to overwrite unless its own gates are green, so the
-// policy's decision and the command's gate are a double lock.
-async function maybeConvergeWrite(
-  terminal: Terminal,
-  nodeId: string,
-  state: NodeExecState,
-  config: ExecutorConfig,
-  deps: ExecutorDeps,
-): Promise<boolean> {
-  if (terminal !== "closed" || config.write === false) return false;
-  const model = config.ladder[state.rung];
-  const res = await deps.regenerate(nodeId, {
-    ...baseOptions(config, model),
-    write: true,
-  });
-  return res.written === true;
 }
 
 export async function runExecutor(config: ExecutorConfig, deps: ExecutorDeps): Promise<ExecReport> {
