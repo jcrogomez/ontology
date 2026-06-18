@@ -110,6 +110,12 @@ export interface RegenerateResult {
   written: boolean;
   writeBlockedReason?: string;
   failure?: string;
+  /** Static-lint issue count of the chosen candidate (undefined-reference +
+   *  async/sync drift against the source signatures). Surfaced so the executor
+   *  policy can tell a clean-but-failing draft (intention-insufficient →
+   *  extraction-gap) from a broken one (refine/escalate). Single-draw path
+   *  only; undefined when not computed. */
+  lintIssueCount?: number;
   // Multi-draw consensus fields (present only when draws > 1).
   draws?: number;
   acceptableDraws?: number;
@@ -641,6 +647,17 @@ export async function runRegenerate(
   // ── Single-draw path (draws === 1): preserve the exact original gate. ──
   if (draws === 1) {
     const e = evals[0];
+    // Lint the chosen candidate against the source signatures (same check the
+    // refine loop uses) so the result carries a clean/dirty signal even on a
+    // single round. Best-effort: a read/parse failure leaves it undefined.
+    let lintIssueCount: number | undefined;
+    if (e.compiled) {
+      try {
+        lintIssueCount = lintDraft(fs.readFileSync(e.regenPath, "utf-8"), sourceSignatures).length;
+      } catch {
+        lintIssueCount = undefined;
+      }
+    }
     const base: RegenerateResult = {
       ok: true,
       nodeId,
@@ -651,6 +668,7 @@ export async function runRegenerate(
       metrics: e.metrics,
       behaviorVerdict: e.behaviorVerdict,
       ruleViolations: e.ruleViolations,
+      lintIssueCount,
       written: false,
       ...refineFields,
     };

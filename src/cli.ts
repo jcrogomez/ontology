@@ -54,6 +54,7 @@ import { registerQueryCommand } from "./surfaces/commands/query/index.js";
 import { verifyHomeomorphismCommand } from "./surfaces/commands/verify/homeomorphism.js";
 import { regenerateCommand } from "./surfaces/commands/regenerate.js";
 import { syncCommand } from "./surfaces/commands/sync.js";
+import { executeCommand } from "./surfaces/commands/execute.js";
 import { statusCommand } from "./surfaces/commands/status.js";
 import { probeCommand } from "./surfaces/commands/probe.js";
 import { rulesCheckCommand, rulesAuditCommand } from "./surfaces/commands/rules.js";
@@ -1170,6 +1171,24 @@ program
       await syncCommand(nodeId, options);
     } catch (err: unknown) {
       console.error(`✖ Error during sync: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("execute <nodeIds...>")
+  .description("The governed EXECUTOR loop: for each node (and its dependency closure, in topological order) regenerate from intent, gate on behaviour, and DECIDE the next move — refine, decompose, or climb the model capability ladder — writing ONLY nodes that pass. Reports each node honestly as closed / extraction-gap (intention insufficient — flag G, not written) / capacity-ceiling / blocked-upstream / unverified-no-fixture. $0/local by default (paid models excluded from the ladder unless --allow-paid). See src/runtime/executor.")
+  .option("--dry-run", "Run the whole loop (regen + gates + decisions) but write nothing — preview the decisions.")
+  .option("--max-attempts <n>", "Hard backstop on attempts per node (default 8).", (v) => parseInt(v, 10))
+  .option("--allow-paid", "Allow paid models into the capability ladder (default: $0 — paid models excluded).")
+  .option("--behavior-fixtures-dir <path>", "Override the behaviour-fixtures directory (default tests/behavior-fixtures).")
+  .option("--ollama-host <host>", "Host for the Ollama provider.")
+  .option("--json", "Output the full report as JSON.")
+  .action(async (nodeIds, options) => {
+    try {
+      await executeCommand(nodeIds, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during execute: ${errorMessage(err)}`);
       process.exit(1);
     }
   });

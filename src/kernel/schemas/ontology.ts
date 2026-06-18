@@ -332,6 +332,27 @@ export const OntologyAssetSchema = z.object({
 
 export type OntologyAsset = z.infer<typeof OntologyAssetSchema>;
 
+// Capability descriptors for premise-based ladder selection (executor layer).
+// Optional and additive: when absent, the model-ladder selector derives caps
+// from `provider` (ollama → local/free/open-weights, anthropic/openai/gemini →
+// cloud/paid/closed). The architect expresses a ModelPremise (e.g. "prefer
+// local, escalate to cloud-open-free, never paid") and the selector resolves it
+// into an ordered escalation ladder over these caps. See
+// src/runtime/executor/model-ladder.ts.
+export const ModelCapsSchema = z.object({
+  // Where the model runs. Drives the $0/local-default premise.
+  locality: z.enum(["local", "cloud"]),
+  // Coarse capability tier — the natural escalation axis.
+  tier: z.enum(["cheap", "mid", "frontier"]),
+  // Whether using it costs money. The default premise forbids "paid" so opus
+  // is excluded from the ladder unless the human opts in explicitly.
+  cost: z.enum(["free", "paid"]),
+  // Open-weights vs closed. Lets a premise prefer open models.
+  openWeights: z.boolean(),
+});
+
+export type ModelCaps = z.infer<typeof ModelCapsSchema>;
+
 export const OntologyModelSchema = z.object({
   id: z.string(),
   provider: z.enum([
@@ -346,6 +367,7 @@ export const OntologyModelSchema = z.object({
   temperature: z.number().min(0).max(2).default(0.2),
   multimodal: z.boolean().default(false),
   notes: z.string().optional(),
+  caps: ModelCapsSchema.optional(),
 });
 
 export type OntologyModel = z.infer<typeof OntologyModelSchema>;
