@@ -116,6 +116,13 @@ export interface RegenerateResult {
    *  extraction-gap) from a broken one (refine/escalate). Single-draw path
    *  only; undefined when not computed. */
   lintIssueCount?: number;
+  /** Whether a behaviour fixture was actually loaded for this node — INDEPENDENT
+   *  of the draft's outcome. `behaviorVerdict` alone is ambiguous: it reports
+   *  "no_fixture" both when no fixture exists AND when a fixture IS present but
+   *  the draft could not be behaviourally evaluated (did not compile / not
+   *  comparable). Callers (the executor policy) need the unambiguous signal to
+   *  tell "genuinely unverifiable" from "a bad draw to refine/escalate". */
+  fixturePresent?: boolean;
   // Multi-draw consensus fields (present only when draws > 1).
   draws?: number;
   acceptableDraws?: number;
@@ -669,6 +676,7 @@ export async function runRegenerate(
       behaviorVerdict: e.behaviorVerdict,
       ruleViolations: e.ruleViolations,
       lintIssueCount,
+      fixturePresent: fixture != null,
       written: false,
       ...refineFields,
     };

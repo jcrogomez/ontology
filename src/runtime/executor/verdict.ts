@@ -34,7 +34,10 @@ export interface GateVerdict {
 const BROKEN_FAILURE = /compile-back failed|could not read source/i;
 
 export function normalize(r: RegenerateResult): GateVerdict {
-  const hasFixture = r.behaviorVerdict !== undefined && r.behaviorVerdict !== "no_fixture";
+  // Prefer the unambiguous fixturePresent signal; fall back to the behaviorVerdict
+  // heuristic only for results that predate that field.
+  const hasFixture =
+    r.fixturePresent ?? (r.behaviorVerdict !== undefined && r.behaviorVerdict !== "no_fixture");
   const lintClean = r.lintIssueCount === undefined ? undefined : r.lintIssueCount === 0;
 
   if (!r.ok) {
@@ -68,11 +71,20 @@ export function normalize(r: RegenerateResult): GateVerdict {
   if (r.behaviorVerdict === "fail") {
     return { outcome: "behavior-fail", lintClean, hasFixture, detail: "behaviour fail" };
   }
-  // "untested" or "no_fixture"
-  return {
-    outcome: "untested",
-    lintClean,
-    hasFixture,
-    detail: r.behaviorVerdict ?? "untested",
-  };
+  // behaviorVerdict is "untested" or "no_fixture" here. The meaning depends on
+  // whether a fixture actually exists:
+  //   - fixture present → the draft could not be evaluated against it (did not
+  //     compile / oracle threw / not comparable). That is a bad draw to refine
+  //     or escalate, NOT a genuinely unverifiable node → "broken".
+  //   - no fixture → the node cannot be behaviour-gated at all → "untested",
+  //     which the policy terminates as unverified-no-fixture.
+  if (hasFixture) {
+    return {
+      outcome: "broken",
+      lintClean,
+      hasFixture,
+      detail: `draft not behaviourally evaluable (${r.behaviorVerdict ?? "unevaluable"}, fixture present)`,
+    };
+  }
+  return { outcome: "untested", lintClean, hasFixture: false, detail: "no fixture" };
 }
