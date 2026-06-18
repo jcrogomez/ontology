@@ -9,6 +9,7 @@ import type { GraphViewResult, GraphViewNodeRow } from "../actions/graph-view-fr
 import type { VerifyFromWalkerResult } from "../actions/verify-from-walker.js";
 import type { WorkflowFromWalkerResult } from "../actions/workflow-from-walker.js";
 import type { ModelsFromWalkerResult } from "../actions/models-from-walker.js";
+import type { NodeHealthResult } from "../actions/node-health-from-walker.js";
 import { POSET_COLORS } from "../theme/colors.js";
 
 // Unified info panel for read-only walker commands that produce a small,
@@ -31,7 +32,8 @@ export type InfoPanelState =
   | { kind: "graph-view"; result: GraphViewResult }
   | { kind: "verify"; result: VerifyFromWalkerResult }
   | { kind: "workflow"; result: WorkflowFromWalkerResult }
-  | { kind: "models"; result: ModelsFromWalkerResult };
+  | { kind: "models"; result: ModelsFromWalkerResult }
+  | { kind: "node-health"; result: NodeHealthResult };
 
 export interface InfoPanelProps {
   state: InfoPanelState;
@@ -56,6 +58,14 @@ export function InfoPanel({ state }: InfoPanelProps): React.ReactElement | null 
     ? (state.result.ok && state.result.verdict === "accept" ? "green" : "red")
     : state.kind === "models" && !state.result.ok
     ? "red"
+    : state.kind === "node-health"
+    ? (!state.result.ok
+        ? "red"
+        : state.result.confidence === "syncable"
+        ? "green"
+        : state.result.confidence === "blocked"
+        ? "red"
+        : "yellow")
     : state.kind === "query" || state.kind === "branches" || state.kind === "graph-view" || state.kind === "models"
     ? "yellow"
     : "blue";
@@ -160,6 +170,68 @@ function renderBody(state: Exclude<InfoPanelState, { kind: "idle" }>): React.Rea
         </Box>
         <Box marginTop={1}>
           <Text dimColor>:route &lt;task&gt; &lt;model-id&gt;  ·  :route &lt;task&gt; off  (fall back to per-node)</Text>
+        </Box>
+      </>
+    );
+  }
+
+  if (state.kind === "node-health") {
+    const { result } = state;
+    if (!result.ok) {
+      return (
+        <>
+          <Text bold color="red">HEALTH — error</Text>
+          <Text>{result.message ?? "(no detail)"}</Text>
+        </>
+      );
+    }
+    const confColor =
+      result.confidence === "syncable" ? "green" : result.confidence === "blocked" ? "red" : "yellow";
+    const mark = (ok: boolean): string => (ok ? "✓" : "✗");
+    return (
+      <>
+        <Text bold color={confColor}>
+          HEALTH {result.nodeId}
+          {result.label ? ` — ${result.label}` : ""}
+        </Text>
+        <Text dimColor>
+          {result.kind ?? "?"} · {result.srcFile ?? "(no shadow)"}
+        </Text>
+        <Box marginTop={1} flexDirection="column">
+          <Text>
+            {"  "}confidence: <Text bold color={confColor}>{result.confidence}</Text>
+          </Text>
+          <Text>
+            {"  "}shadow:    <Text color={result.shadow === "clean" ? "green" : result.shadow === "drifted" ? "yellow" : "red"}>{result.shadow}</Text>
+            {result.driftedFiles.length > 0 ? ` (${result.driftedFiles.length} drifted)` : ""}
+          </Text>
+          <Text>
+            {"  "}fixture:   <Text color={result.hasFixture ? "green" : "yellow"}>{mark(result.hasFixture)} {result.hasFixture ? "present" : "none — lower confidence"}</Text>
+          </Text>
+          <Text>
+            {"  "}rules:     <Text color={result.rules.violations === 0 ? "green" : "red"}>{result.rules.violations === 0 ? "clean" : `${result.rules.violations} violation(s)`}</Text>
+            <Text dimColor> ({result.rules.staticDecidable} static, {result.rules.behavioural} behavioural, {result.rules.prose} prose)</Text>
+          </Text>
+          <Text>
+            {"  "}ficha:     <Text color={result.ficha.missing.length + result.ficha.phantom.length === 0 ? "green" : "yellow"}>{result.ficha.missing.length} missing / {result.ficha.phantom.length} phantom</Text>
+            {!result.ficha.parseOk ? <Text dimColor> (source unparsed)</Text> : null}
+          </Text>
+          <Text>
+            {"  "}closure:   <Text dimColor>{result.closure.upstream.length} upstream dep(s), {result.closure.dependents.length} dependent(s)</Text>
+          </Text>
+        </Box>
+        <Box marginTop={1} flexDirection="column">
+          <Text dimColor>next safe action:</Text>
+          {result.nextActions.length === 0 ? (
+            <Text>  (nothing actionable)</Text>
+          ) : (
+            result.nextActions.map((a, i) => (
+              <Box key={i} flexDirection="column">
+                <Text>  {i + 1}. {a.label}</Text>
+                {a.command ? <Text color="cyan">       $ {a.command}</Text> : null}
+              </Box>
+            ))
+          )}
         </Box>
       </>
     );

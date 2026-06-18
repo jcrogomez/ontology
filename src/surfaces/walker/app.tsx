@@ -44,6 +44,7 @@ import { graphViewFromWalker } from "./actions/graph-view-from-walker.js";
 import { parseGraphViewArgs } from "./state/parse-graph-view-args.js";
 import { linkFromWalker } from "./actions/link-from-walker.js";
 import { modelsFromWalker, routeFromWalker } from "./actions/models-from-walker.js";
+import { nodeHealthFromWalker } from "./actions/node-health-from-walker.js";
 import { InfoPanel, type InfoPanelState } from "./layout/info-panel.js";
 import { ArtifactPreviewPanel } from "./layout/artifact-preview-panel.js";
 import {
@@ -599,7 +600,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       return;
     }
     if (cmd === "help") {
-      setMessage("i edit · a/:preview artifact · :which <file> · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :models · :route <task> <model-id|off> · :clear{run,plan,compile,info,draft,preview} · :q");
+      setMessage("i edit · a/:preview artifact · :which <file> · :health (node dashboard) · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :models · :route <task> <model-id|off> · :clear{run,plan,compile,info,draft,preview} · :q");
       return;
     }
     if (cmd === "propose") {
@@ -864,6 +865,13 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
     // reasoning model on G-extraction (semantic_parse/inspect) + verification.
     if (cmd === "models" || cmd === "routing") {
       setInfoState({ kind: "models", result: modelsFromWalker(cwd) });
+      return;
+    }
+    // :health  ·  :status — the Walker v2 node dashboard. Composes shadow +
+    // fixture + rule + ficha + drift + closure for the FOCAL node and names the
+    // next safe action in the governed loop. Read-only; writes nothing.
+    if (cmd === "health" || cmd === "status") {
+      setInfoState({ kind: "node-health", result: nodeHealthFromWalker(focalId, cwd) });
       return;
     }
     // :route <task> <model-id>  ·  :route <task> off
