@@ -42,36 +42,100 @@ export interface FichaCleanupOptions {
   prune?: boolean;
 }
 
-export async function fichaCleanupCommand(nodeId: string, options: FichaCleanupOptions): Promise<void> {
-  const cwd = process.cwd();
+// The deterministic reconciliation a node's ficha needs, computed read-only.
+// `ok:false` carries the failure (node missing / unparseable source). The
+// canonical home for both the worklist and the mutation, so callers (the CLI
+// command AND the Walker action) share ONE implementation of the delicate
+// provide-signature-preserving apply below.
+export interface FichaCleanupPlan {
+  ok: boolean;
+  nodeId: string;
+  srcFile?: string;
+  missing: string[];
+  phantom: string[];
+  pruneSuppressed: boolean;
+  proseRules: number;
+  failure?: string;
+}
+
+export function planFichaCleanup(
+  nodeId: string,
+  options: { prune?: boolean },
+  cwd: string = process.cwd(),
+): FichaCleanupPlan {
   const node = loadNodeById(nodeId, cwd);
   if (!node) {
-    out({ ok: false, nodeId, failure: `node not found: ${nodeId}` }, options.json);
-    process.exit(1);
-    return;
+    return { ok: false, nodeId, missing: [], phantom: [], pruneSuppressed: false, proseRules: 0, failure: `node not found: ${nodeId}` };
   }
   const q = fichaQuality(node, cwd);
   if (!q.parseOk && q.srcFile) {
-    out({ ok: false, nodeId, failure: `could not parse the source to scan exports: ${q.srcFile}` }, options.json);
-    process.exit(1);
-    return;
+    return { ok: false, nodeId, srcFile: q.srcFile, missing: [], phantom: [], pruneSuppressed: false, proseRules: q.ruleNoise.prose, failure: `could not parse the source to scan exports: ${q.srcFile}` };
   }
-  const missing = q.contractGap.missing;
   // Phantom only enters the picture under --prune. fichaQuality gates it on a
   // FULLY determinable export surface (every file parsed, no bare `export *`,
   // positive surface) — when that fails, phantom is [] and surfaceDeterminable
   // is false. `--prune` must respect that: a non-determinable surface means we
   // cannot prove any provide is absent, so pruning is skipped, not silent.
-  const phantom = options.prune ? q.contractOverflow.phantom : [];
-  const pruneSuppressed = options.prune === true && !q.contractOverflow.surfaceDeterminable;
+  return {
+    ok: true,
+    nodeId,
+    srcFile: q.srcFile ?? undefined,
+    missing: q.contractGap.missing,
+    phantom: options.prune ? q.contractOverflow.phantom : [],
+    pruneSuppressed: options.prune === true && !q.contractOverflow.surfaceDeterminable,
+    proseRules: q.ruleNoise.prose,
+  };
+}
+
+// Apply a plan via the governed updateNode. CRITICAL: updateNode replaces the
+// whole provides array, so we must re-supply the KEPT keys' O1 signatures via
+// provideSignatures or they would be silently dropped (most live nodes carry
+// signatures). The newly-added exports are presence-only (the AST scanner gives
+// names, not signatures). Returns the applied delta.
+export function applyFichaCleanup(
+  plan: FichaCleanupPlan,
+  cwd: string = process.cwd(),
+): { added: string[]; pruned: string[] } {
+  const node = loadNodeById(plan.nodeId, cwd);
+  if (!node) return { added: [], pruned: [] };
+  const phantomSet = new Set(plan.phantom);
+  const keptProvides = (node.context?.provides ?? []).filter(
+    (p) => !phantomSet.has(typeof p === "string" ? p : p.key),
+  );
+  const keptKeys = keptProvides.map((p) => (typeof p === "string" ? p : p.key));
+  const provideSignatures: Record<string, string> = {};
+  for (const p of keptProvides) {
+    if (typeof p === "object" && p.signature) provideSignatures[p.key] = p.signature;
+  }
+  updateNode({
+    id: plan.nodeId,
+    provides: [...keptKeys, ...plan.missing],
+    provideSignatures,
+    cwd,
+    eventMetadata: { source: "ficha-cleanup", addedExports: plan.missing, prunedProvides: plan.phantom },
+  });
+  return { added: plan.missing, pruned: plan.phantom };
+}
+
+export async function fichaCleanupCommand(nodeId: string, options: FichaCleanupOptions): Promise<void> {
+  const cwd = process.cwd();
+  const plan = planFichaCleanup(nodeId, { prune: options.prune }, cwd);
+  if (!plan.ok) {
+    out({ ok: false, nodeId, failure: plan.failure }, options.json);
+    process.exit(1);
+    return;
+  }
+  const missing = plan.missing;
+  const phantom = plan.phantom;
+  const pruneSuppressed = plan.pruneSuppressed;
   const result = {
     ok: true,
     nodeId,
-    srcFile: q.srcFile,
+    srcFile: plan.srcFile,
     missingExports: missing,
     phantomProvides: phantom,
     pruneSuppressed,
-    proseRules: q.ruleNoise.prose,
+    proseRules: plan.proseRules,
     applied: false as boolean,
   };
 
@@ -85,8 +149,8 @@ export async function fichaCleanupCommand(nodeId: string, options: FichaCleanupO
     if (pruneSuppressed && !options.json) {
       console.log(`  ⚠ --prune did nothing here on purpose: this node's full export surface can't be determined from its AST, so pruning could delete a legitimately re-exported provide.`);
     }
-    if (q.ruleNoise.prose > 0 && !options.json) {
-      console.log(`  note: ${q.ruleNoise.prose} prose/extraction-noise rule(s) — review manually (not auto-removed).`);
+    if (plan.proseRules > 0 && !options.json) {
+      console.log(`  note: ${plan.proseRules} prose/extraction-noise rule(s) — review manually (not auto-removed).`);
     }
     return;
   }
@@ -104,28 +168,9 @@ export async function fichaCleanupCommand(nodeId: string, options: FichaCleanupO
     return;
   }
 
-  // Apply the deterministic reconciliation: drop phantom provides (when --prune)
-  // and union with the AST-missing exports. CRITICAL: updateNode replaces the
-  // whole provides array, so we must re-supply the KEPT keys' O1 signatures via
-  // provideSignatures or they would be silently dropped (216/228 live nodes
-  // carry signatures). The newly-added exports are presence-only (the AST
-  // scanner gives names, not signatures).
-  const phantomSet = new Set(phantom);
-  const keptProvides = (node.context?.provides ?? []).filter(
-    (p) => !phantomSet.has(typeof p === "string" ? p : p.key),
-  );
-  const keptKeys = keptProvides.map((p) => (typeof p === "string" ? p : p.key));
-  const provideSignatures: Record<string, string> = {};
-  for (const p of keptProvides) {
-    if (typeof p === "object" && p.signature) provideSignatures[p.key] = p.signature;
-  }
-  updateNode({
-    id: nodeId,
-    provides: [...keptKeys, ...missing],
-    provideSignatures,
-    cwd,
-    eventMetadata: { source: "ficha-cleanup", addedExports: missing, prunedProvides: phantom },
-  });
+  // Apply the deterministic reconciliation via the shared core (governed
+  // updateNode; preserves kept provides' signatures — see applyFichaCleanup).
+  applyFichaCleanup(plan, cwd);
   const notes: string[] = [];
   if (missing.length) notes.push(`added ${missing.length} export(s)`);
   if (phantom.length) notes.push(`pruned ${phantom.length} phantom provide(s)`);
@@ -134,7 +179,7 @@ export async function fichaCleanupCommand(nodeId: string, options: FichaCleanupO
     if (missing.length) console.log(`  ✔ contract completed: +${missing.join(", ")}`);
     if (phantom.length) console.log(`  ✔ pruned (not real exports): -${phantom.join(", ")}`);
     if (pruneSuppressed) console.log(`  ⚠ --prune suppressed: export surface not fully AST-determinable (wildcard re-export or unreadable file); no provide pruned.`);
-    if (q.ruleNoise.prose > 0) console.log(`  note: ${q.ruleNoise.prose} prose-rule(s) remain — review manually.`);
+    if (plan.proseRules > 0) console.log(`  note: ${plan.proseRules} prose-rule(s) remain — review manually.`);
   }
 }
 

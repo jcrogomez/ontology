@@ -45,6 +45,8 @@ import { parseGraphViewArgs } from "./state/parse-graph-view-args.js";
 import { linkFromWalker } from "./actions/link-from-walker.js";
 import { modelsFromWalker, routeFromWalker } from "./actions/models-from-walker.js";
 import { nodeHealthFromWalker } from "./actions/node-health-from-walker.js";
+import { fichaCleanupFromWalker } from "./actions/ficha-cleanup-from-walker.js";
+import { reanchorNodeArtifacts } from "../../laws/reanchor-node.js";
 import { InfoPanel, type InfoPanelState } from "./layout/info-panel.js";
 import { ArtifactPreviewPanel } from "./layout/artifact-preview-panel.js";
 import {
@@ -600,7 +602,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       return;
     }
     if (cmd === "help") {
-      setMessage("i edit · a/:preview artifact · :which <file> · :health (node dashboard) · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :models · :route <task> <model-id|off> · :clear{run,plan,compile,info,draft,preview} · :q");
+      setMessage("i edit · a/:preview artifact · :which <file> · :health (node dashboard) · :fichacleanup · :reanchor · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :models · :route <task> <model-id|off> · :clear{run,plan,compile,info,draft,preview} · :q");
       return;
     }
     if (cmd === "propose") {
@@ -871,6 +873,25 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
     // fixture + rule + ficha + drift + closure for the FOCAL node and names the
     // next safe action in the governed loop. Read-only; writes nothing.
     if (cmd === "health" || cmd === "status") {
+      setInfoState({ kind: "node-health", result: nodeHealthFromWalker(focalId, cwd) });
+      return;
+    }
+    // :fichacleanup — governed one-shot control: run the deterministic ficha
+    // reconciliation (complete + prune) on the focal, then refresh :health so
+    // the user SEES the contract gap close without leaving Walker.
+    if (cmd === "fichacleanup" || cmd === "ficha cleanup") {
+      const r = fichaCleanupFromWalker(focalId, cwd);
+      setMessage(`ficha cleanup ${focalId}: ${r.message}`);
+      if (r.ok && (r.added.length > 0 || r.pruned.length > 0)) setReloadTick((t) => t + 1);
+      setInfoState({ kind: "node-health", result: nodeHealthFromWalker(focalId, cwd) });
+      return;
+    }
+    // :reanchor — governed one-shot control: refresh THIS node's drift anchor
+    // (accept the current shadow as the baseline), then refresh :health.
+    if (cmd === "reanchor") {
+      const r = reanchorNodeArtifacts(focalId, cwd ?? process.cwd());
+      setMessage(r.anchored ? `re-anchored ${focalId}: ${r.paths.join(", ")}` : `re-anchor skipped: ${r.reason ?? "no change"}`);
+      if (r.anchored) setReloadTick((t) => t + 1);
       setInfoState({ kind: "node-health", result: nodeHealthFromWalker(focalId, cwd) });
       return;
     }
