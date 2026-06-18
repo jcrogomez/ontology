@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveNodeModel } from "../src/runtime/llm/resolve-node-model.js";
+import { resolveNodeModel, resolveTaskModel } from "../src/runtime/llm/resolve-node-model.js";
 import type { OntologyModel } from "../src/kernel/schemas/ontology.js";
 
 const mockEntry: OntologyModel = {
@@ -64,5 +64,38 @@ describe("resolveNodeModel", () => {
     const r = resolveNodeModel("anything", { models: [] });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toBe("ref_not_found");
+  });
+});
+
+describe("resolveTaskModel (per-task routing)", () => {
+  const models = [mockEntry, ollamaEntry];
+
+  it("returns null when there is no routing map (per-node fallback)", () => {
+    expect(resolveTaskModel("code_sketch", { models })).toBeNull();
+  });
+
+  it("returns null when the task has no routing entry", () => {
+    expect(resolveTaskModel("inspect", { models, routing: { code_sketch: "qwen-coder" } })).toBeNull();
+  });
+
+  it("resolves the routed model id for a task", () => {
+    const r = resolveTaskModel("code_sketch", { models, routing: { code_sketch: "qwen-coder" } });
+    expect(r).toEqual({ ok: true, resolved: { provider: "ollama", model: "qwen2.5-coder:1.5b" } });
+  });
+
+  it("routes different tasks to different models (F code-model vs G reasoning-model intent)", () => {
+    const reg = { models, routing: { code_sketch: "qwen-coder", semantic_parse: "mock_default" } };
+    expect(resolveTaskModel("code_sketch", reg)).toMatchObject({ ok: true, resolved: { model: "qwen2.5-coder:1.5b" } });
+    expect(resolveTaskModel("semantic_parse", reg)).toMatchObject({ ok: true, resolved: { model: "deterministic-mock-model" } });
+  });
+
+  it("surfaces an unresolvable routed id as a failed result (not null)", () => {
+    const r = resolveTaskModel("code_sketch", { models, routing: { code_sketch: "does-not-exist" } });
+    expect(r?.ok).toBe(false);
+    if (r && !r.ok) expect(r.reason).toBe("ref_not_found");
+  });
+
+  it("ignores an empty-string routing entry (treated as unset)", () => {
+    expect(resolveTaskModel("code_sketch", { models, routing: { code_sketch: "" } })).toBeNull();
   });
 });

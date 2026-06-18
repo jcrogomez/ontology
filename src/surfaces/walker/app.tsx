@@ -43,6 +43,7 @@ import { linkAnalysisFromWalker } from "./actions/link-analysis-from-walker.js";
 import { graphViewFromWalker } from "./actions/graph-view-from-walker.js";
 import { parseGraphViewArgs } from "./state/parse-graph-view-args.js";
 import { linkFromWalker } from "./actions/link-from-walker.js";
+import { modelsFromWalker, routeFromWalker } from "./actions/models-from-walker.js";
 import { InfoPanel, type InfoPanelState } from "./layout/info-panel.js";
 import { ArtifactPreviewPanel } from "./layout/artifact-preview-panel.js";
 import {
@@ -598,7 +599,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       return;
     }
     if (cmd === "help") {
-      setMessage("i edit · a/:preview artifact · :which <file> · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :clear{run,plan,compile,info,draft,preview} · :q");
+      setMessage("i edit · a/:preview artifact · :which <file> · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :models · :route <task> <model-id|off> · :clear{run,plan,compile,info,draft,preview} · :q");
       return;
     }
     if (cmd === "propose") {
@@ -855,6 +856,30 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
         .join(" ");
       setInfoState({ kind: "query", result, shapeSummary: summary });
       if (!result.ok) setMessage(result.message ?? "query failed");
+      return;
+    }
+    // :models — view the per-task model routing + the registry catalog.
+    // The policy layer between a CLI --model override and a node's model.ref
+    // (REGEN_ORACLE_REFINE): put a code-expert on F (code_sketch), a stronger
+    // reasoning model on G-extraction (semantic_parse/inspect) + verification.
+    if (cmd === "models" || cmd === "routing") {
+      setInfoState({ kind: "models", result: modelsFromWalker(cwd) });
+      return;
+    }
+    // :route <task> <model-id>  ·  :route <task> off
+    // Re-point a task at a registered model (governed write to registry.json),
+    // or clear it (fall back to per-node model.ref). Refreshes the :models view.
+    if (cmd === "route" || cmd.startsWith("route ")) {
+      const args = cmd.slice("route".length).trim().split(/\s+/).filter(Boolean);
+      if (args.length !== 2) {
+        setMessage("usage: :route <task> <model-id|off>  — e.g. :route code_sketch extract_local  ·  :route inspect off  (see :models)");
+        return;
+      }
+      const [task, target] = args;
+      const res = routeFromWalker(task, target === "off" ? null : target, cwd);
+      setMessage(res.message);
+      // Always refresh the panel so the user immediately SEES the new routing.
+      setInfoState({ kind: "models", result: modelsFromWalker(cwd) });
       return;
     }
     if (cmd === "clearinfo") {

@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import React from "react";
 import { render } from "ink-testing-library";
 import { App } from "../src/surfaces/walker/app.js";
@@ -187,5 +189,38 @@ describe("walker keyboard flows (stdin-driven)", () => {
     await w.press(ESC);
     await waitFor(w.frame, (f) => f.includes("proposals panel dismissed"), "panel dismissed");
     w.unmount();
+  });
+
+  it("`:models` shows the per-task routing + catalog; `:route` reconfigures it live (REGEN_ORACLE_REFINE)", async () => {
+    const w = await mountWalker(tempDir);
+    // View: the routing table + the registry catalog.
+    await w.press(":");
+    await waitFor(w.frame, (f) => f.includes(":_"), "command prompt");
+    await w.press("models");
+    await w.press(ENTER);
+    const viewed = await waitFor(w.frame, (f) => f.includes("MODEL ROUTING"), "routing panel");
+    expect(viewed).toContain("code_sketch"); // a routable task is shown
+    expect(viewed).toContain("mock_default"); // the catalog lists the registered model
+    expect(viewed).toMatch(/per-node model\.ref/); // unrouted by default
+
+    // Reconfigure: route code_sketch → mock_default, see it reflected live.
+    await w.press(":");
+    await waitFor(w.frame, (f) => f.includes(":_"), "command prompt 2");
+    await w.press("route code_sketch mock_default");
+    await w.press(ENTER);
+    await waitFor(w.frame, (f) => f.includes('routed "code_sketch"'), "route confirmation");
+    // The panel refreshed and now shows the resolved routing.
+    await waitFor(
+      w.frame,
+      (f) => f.includes("code_sketch") && f.includes("[mock/deterministic-mock-model]"),
+      "routing resolved in panel",
+    );
+    w.unmount();
+
+    // And it persisted to the registry on disk (governed write).
+    const reg = JSON.parse(
+      fs.readFileSync(path.join(tempDir, ".ontology/models/registry.json"), "utf-8"),
+    );
+    expect(reg.routing).toEqual({ code_sketch: "mock_default" });
   });
 });

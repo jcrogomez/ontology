@@ -170,4 +170,59 @@ describe("onto regenerate", () => {
     expect(p.written).toBe(false);
     expect(fs.readFileSync(path.join(tempDir, SHADOW_REL), "utf-8")).toBe(before);
   });
+
+  // Verify-refine loop (REGEN_INTENT_CONSUMPTION_2026-06-17 #2). The mock
+  // provider is the identity functor, so it cannot actually "improve" across
+  // rounds — but that lets us pin the loop MECHANICS deterministically:
+  // early convergence, round accounting, and the no-refine output shape.
+  it("default (no --refine) output carries no refine fields (backward-compat shape)", () => {
+    const id = setupShadowNode(tempDir, 'print("hello world")');
+    const p = JSON.parse(runCli(tempDir, ["regenerate", id, "--provider", "mock", "--json"]).stdout);
+    expect(p.refineRounds).toBeUndefined();
+    expect(p.refineRoundsUsed).toBeUndefined();
+    expect(p.converged).toBeUndefined();
+  });
+
+  it("--refine: a round-1 acceptable regeneration converges immediately (no wasted rounds)", () => {
+    const id = setupShadowNode(tempDir, 'print("hello world")');
+    const r = runCli(tempDir, ["regenerate", id, "--provider", "mock", "--refine", "3", "--write", "--json"]);
+    expect(r.status).toBe(0);
+    const p = JSON.parse(r.stdout);
+    expect(p.refineRounds).toBe(3);
+    expect(p.refineRoundsUsed).toBe(1); // converged on the first round
+    expect(p.converged).toBe(true);
+    expect(p.verdict).toBe("epsilon_equivalent");
+    expect(p.written).toBe(true);
+  });
+
+  it("--decompose: slices → assemble → gate; the identity node still verifies and writes", () => {
+    // Mock is the identity functor (echoes the user prompt). The node here has
+    // no TS top-level declarations, so decomposition plans a single slice; the
+    // assembled output equals the source → epsilon_equivalent. This exercises
+    // the full decompose path (slice dispatch with skipIntentGate + scoped
+    // grounding, then assembly + the same gates) end-to-end.
+    const id = setupShadowNode(tempDir, 'print("hello world")');
+    const r = runCli(tempDir, ["regenerate", id, "--provider", "mock", "--decompose", "--write", "--json"]);
+    expect(r.status).toBe(0);
+    const p = JSON.parse(r.stdout);
+    expect(p.verdict).toBe("epsilon_equivalent");
+    expect(p.written).toBe(true);
+    // Decompose pins a single candidate — no consensus/refine bookkeeping.
+    expect(p.draws).toBeUndefined();
+    expect(p.refineRounds).toBeUndefined();
+  });
+
+  it("--refine: a draft that never becomes acceptable exhausts the rounds without converging", () => {
+    const divergent = Array.from({ length: 40 }, (_, i) => `def f${i}(x):\n    return x * ${i}`).join("\n\n");
+    const id = setupShadowNode(tempDir, divergent);
+    const before = fs.readFileSync(path.join(tempDir, SHADOW_REL), "utf-8");
+    const r = runCli(tempDir, ["regenerate", id, "--provider", "mock", "--refine", "3", "--write", "--json"]);
+    expect(r.status).toBe(1);
+    const p = JSON.parse(r.stdout);
+    expect(p.refineRounds).toBe(3);
+    expect(p.refineRoundsUsed).toBe(3); // ran every round (mock cannot improve)
+    expect(p.converged).toBe(false);
+    expect(p.written).toBe(false);
+    expect(fs.readFileSync(path.join(tempDir, SHADOW_REL), "utf-8")).toBe(before);
+  });
 });

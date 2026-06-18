@@ -151,7 +151,20 @@ export function loadEdges(cwd = process.cwd()): OntologyEdge[] {
   return edges;
 }
 
-export function loadModelsRegistry(cwd = process.cwd()): { models: OntologyModel[] } {
+export interface ModelsRegistry {
+  models: OntologyModel[];
+  /** Optional per-TASK model routing (REGEN_ORACLE_REFINE): maps an LlmTask
+   *  (e.g. "code_sketch" for the forward functor F, "semantic_parse"/"inspect"
+   *  for the inverse G extraction, "node_critique" for verification) to a model
+   *  `id` in `models`. The policy layer between a CLI `--model` override and a
+   *  node's own `model.ref`: when a task has a routing entry, that model is used
+   *  for the task unless a CLI override is given. Absent → per-node `model.ref`
+   *  behaviour is unchanged (no regression). Lets a project put a code-expert on
+   *  F and a stronger reasoning model on G — the round-trip's measured neck. */
+  routing?: Record<string, string>;
+}
+
+export function loadModelsRegistry(cwd = process.cwd()): ModelsRegistry {
   const paths = getOntologyPaths(cwd);
   if (!fs.existsSync(paths.modelsRegistryPath)) {
     throw new Error(`Missing required file: .ontology/models/registry.json`);
@@ -160,7 +173,12 @@ export function loadModelsRegistry(cwd = process.cwd()): { models: OntologyModel
   const content = fs.readFileSync(paths.modelsRegistryPath, "utf-8");
   try {
     const parsed = JSON.parse(content);
-    const parsedModels = z.object({ models: z.array(OntologyModelSchema) }).parse(parsed);
+    const parsedModels = z
+      .object({
+        models: z.array(OntologyModelSchema),
+        routing: z.record(z.string(), z.string()).optional(),
+      })
+      .parse(parsed);
     return parsedModels;
   } catch (err: unknown) {
     if (err instanceof z.ZodError) {

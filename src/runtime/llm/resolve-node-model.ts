@@ -40,6 +40,24 @@ const DISPATCHABLE_PROVIDERS = new Set([
   "literal",
 ]);
 
+/**
+ * Per-TASK routing (REGEN_ORACLE_REFINE): if the registry's `routing` map has
+ * an entry for `task`, resolve that model id. Returns null when there is no
+ * routing entry for the task (caller then falls back to the node's own
+ * `model.ref`). The policy layer: CLI override > task routing > node.model.ref.
+ * This is what lets a project put a code-expert model on the forward functor
+ * (`code_sketch`) and a stronger reasoning model on G-extraction
+ * (`semantic_parse` / `inspect`) and verification (`node_critique`).
+ */
+export function resolveTaskModel(
+  task: string,
+  registry: { models: OntologyModel[]; routing?: Record<string, string> },
+): ResolveNodeModelResult | null {
+  const ref = registry.routing?.[task];
+  if (ref === undefined || ref.length === 0) return null;
+  return resolveNodeModel(ref, registry);
+}
+
 export function resolveNodeModel(
   ref: string,
   registry: { models: OntologyModel[] },

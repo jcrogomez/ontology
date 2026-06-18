@@ -15,6 +15,15 @@ import {
 } from "../../laws/verify-homeomorphism.js";
 import { loadFixture, runBehaviorCheck, type BehaviorVerdict } from "../../laws/behavior-checker.js";
 import { checkRules } from "../../inverse/rule-checker.js";
+import { buildRefineFeedbackSection, type RefineFeedback } from "../../forward/compile/refine-feedback.js";
+import { lintDraft } from "../../forward/compile/draft-lint.js";
+import {
+  scanTopLevelDecls,
+  planDecomposition,
+  buildSliceInstruction,
+  assembleSlices,
+} from "../../forward/compile/decompose-plan.js";
+import { scanFileSymbols } from "../../inverse/ast-symbol-scanner.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
 
 // `onto regenerate <nodeId>` — the governed lever that turns the
@@ -68,6 +77,20 @@ export interface RegenerateCommandOptions {
   checkRules?: boolean;
   draws?: number;
   consensus?: number;
+  // Verify-refine loop (REGEN_INTENT_CONSUMPTION_2026-06-17 §"WHAT TO BUILD"
+  // #2). Maximum number of generate→check→refine rounds. Default 1 (a single
+  // round — byte-identical to the pre-refine behaviour). When > 1 and a
+  // behaviour fixture is present, a round that does not reach a writeable
+  // consensus feeds the deterministic gates' critique (failed criteria +
+  // export drift) of its best draft into the next round's prompt. Converges
+  // the moment a round reaches consensus. Clamped to [1, 4].
+  refine?: number;
+  // Decomposition (REGEN_INTENT_CONSUMPTION_2026-06-17 #4). Regenerate the
+  // module in slices (scaffold types+helpers → one slice per exported
+  // function, each seeing the prior slices as fixed context), then assemble
+  // and gate the whole. Attacks the "can't hold the whole contract at once" 7B
+  // ceiling. v1: implies a single assembled candidate (no consensus/refine).
+  decompose?: boolean;
   noLock?: boolean;
   json?: boolean;
 }
@@ -94,6 +117,10 @@ export interface RegenerateResult {
   consensusK?: number;
   clusterSizes?: number[];
   draftSummary?: { i: number; verdict?: HomeomorphismVerdict; behaviorVerdict: BehaviorVerdict | "no_fixture"; acceptable: boolean }[];
+  // Verify-refine fields (present only when refine > 1).
+  refineRounds?: number;
+  refineRoundsUsed?: number;
+  converged?: boolean;
 }
 
 interface DraftEval {
@@ -106,6 +133,27 @@ interface DraftEval {
   declKey?: string;
   acceptable: boolean;
   ruleViolations?: number;
+  // Per-case behaviour outcomes (when a fixture ran) — drives refine feedback.
+  behaviorCases?: { name: string; outcome: string; detail?: string }[];
+}
+
+// Reduce the behaviour checker's per-case detail to a DRAFT-SIDE-ONLY
+// diagnostic safe to feed back into the prompt. The checker's detail can
+// mention the source's behaviour ("src threw X, regen threw Y"); we surface
+// only what the CANDIDATE itself did — its own thrown error, or a generic
+// mismatch note — so the refine signal stays "fix your output" and never
+// leaks the source implementation. Returns undefined when there's nothing
+// draft-specific to say.
+function draftSideDiagnostic(outcome: string, detail?: string): string | undefined {
+  if (detail) {
+    const threw = detail.match(/regen threw:\s*(.+)$/);
+    if (threw) return `threw: ${threw[1]}`;
+    if (/false on regen/.test(detail)) return "returned a value that failed the case's assertion";
+    if (/non-deep-equal|values diverged/.test(detail)) return "returned a different value than the criterion requires";
+    if (/regen side.*timed out|timed out.*regen/.test(detail)) return "timed out (possible infinite loop)";
+  }
+  if (outcome === "divergent") return "did not match the required behaviour for this case";
+  return undefined;
 }
 
 function emit(result: RegenerateResult, json: boolean | undefined): void {
@@ -145,6 +193,43 @@ function emit(result: RegenerateResult, json: boolean | undefined): void {
     console.log(`  ✖ not written: ${result.writeBlockedReason}`);
   } else {
     console.log(`  preview only — pass --write to overwrite the shadow (gated on verification).`);
+  }
+}
+
+// Untrusted-draft guard. The v0 behaviour checker imports and runs
+// LLM-generated drafts IN-PROCESS, with no sandbox
+// (BEHAVIOUR_AXIS_CHECKER_SPEC §3.2). A draft can schedule a DEFERRED throw
+// — an undefined-symbol reference inside a process `exit`/signal hook, a
+// stray timer, a late microtask — that surfaces as an `uncaughtException`
+// or `unhandledRejection` on a later tick, AFTER the per-draft try/catch has
+// returned. Without containment that kills the whole regenerate run (often
+// mid-loop, before it can emit any verdict), which is exactly what a glue/IO
+// node like lock.ts triggers when the model drops a helper it still calls.
+// We scope process-level handlers to the run, swallow draft-originated async
+// errors (we have already recorded each draft's verdict), and restore the
+// prior handler behaviour in `finally`. This is the pragmatic containment;
+// the principled fix is to run the check in a child process (tracked as
+// follow-up — it would also cap runaway loops and `process.exit` calls by a
+// draft). REGEN_INTENT_CONSUMPTION addendum.
+async function withRegenDraftGuard<T>(fn: () => Promise<T>): Promise<T> {
+  const swallowed: unknown[] = [];
+  const guard = (err: unknown): void => {
+    swallowed.push(err);
+  };
+  process.on("uncaughtException", guard);
+  process.on("unhandledRejection", guard);
+  try {
+    return await fn();
+  } finally {
+    process.removeListener("uncaughtException", guard);
+    process.removeListener("unhandledRejection", guard);
+    if (swallowed.length > 0) {
+      const first = swallowed[0];
+      const msg = first instanceof Error ? first.message : String(first);
+      console.error(
+        `⚠ regenerate: contained ${swallowed.length} deferred error(s) from in-process draft execution (v0 behaviour checker has no sandbox; e.g. "${msg}").`,
+      );
+    }
   }
 }
 
@@ -189,7 +274,11 @@ export async function runRegenerate(
     loc: options.locThreshold ?? DEFAULT_THRESHOLDS.loc,
     jaccard: options.jaccardThreshold ?? DEFAULT_THRESHOLDS.jaccard,
   };
-  const draws = Math.max(1, Math.min(options.draws ?? 1, 9));
+  // Decomposition v1 produces a single assembled candidate, so it pins
+  // draws=1 (and the refine loop to 1 round) — consensus/refine compose with
+  // decomposition in a later iteration.
+  const decompose = options.decompose === true;
+  const draws = decompose ? 1 : Math.max(1, Math.min(options.draws ?? 1, 9));
   const consensusK = options.consensus ?? Math.floor(draws / 2) + 1;
   const ext = path.extname(sourcePath) || ".txt";
   const stagingDir = path.join(cwd, ".ontology/verify");
@@ -205,28 +294,331 @@ export async function runRegenerate(
     fixture = await loadFixture(fixturesDir, nodeId).catch(() => null);
   }
 
-  // 4. Compile N drafts inside one lock (each a fresh dispatch via a distinct
-  //    cache-bypass token, mirroring verify-homeomorphism --reps).
-  const compiled: { i: number; ok: boolean; message?: string }[] = [];
+  // Oracle-into-generation (REGEN_INTENT_CONSUMPTION_2026-06-17 §"WHAT TO
+  // BUILD" #1). When a behaviour fixture is present, lift its per-case
+  // acceptance criteria (name + optional contract-level description) and
+  // feed them into the compile-back system prompt — so the SAME fixture
+  // that GATES the regen also GUIDES it. The generator sees the spec it
+  // will be executed against, instead of compiling blind and being judged
+  // after. Carries only black-box contract prose (no implementation): the
+  // fixture's setup/invoke/assert function bodies never reach the prompt.
+  const behaviorOracle = fixture
+    ? fixture.fixture.cases.map((c) => ({ name: c.name, description: c.description }))
+    : undefined;
+
+  // Verify-refine: up to `rounds` generate→check→refine iterations. rounds=1
+  // (default) is byte-identical to the pre-refine path. Decomposition composes
+  // WITH refine: each later round re-generates the slices with the prior
+  // assembled attempt's critique (the lint catches e.g. the async-vs-sync
+  // override that survives whole-file refine).
+  const rounds = Math.max(1, Math.min(options.refine ?? 1, 4));
+
+  // Per-round cache-bypass token. draws===1 keeps the canonical single-draw
+  // runId (undefined). draws>1 with no refine (rounds===1) keeps the legacy
+  // `regen_draw_i_of_N` token byte-for-byte so existing consensus runs are
+  // unchanged; refine rounds qualify the token with the round so a re-draw
+  // after feedback is a fresh dispatch rather than a cache hit.
+  const draftToken = (round: number, i: number): string | undefined =>
+    draws === 1
+      ? undefined
+      : rounds === 1
+        ? `regen_draw_${i}_of_${draws}`
+        : `regen_r${round}_draw_${i}_of_${draws}`;
+
+  // Compile `draws` drafts for one round, threading the oracle (lever #1)
+  // always and the refine feedback (lever #2) when present.
+  const compileRound = async (
+    round: number,
+    refineFeedback: RefineFeedback | undefined,
+  ): Promise<{ i: number; ok: boolean; message?: string }[]> => {
+    const out: { i: number; ok: boolean; message?: string }[] = [];
+    for (let i = 1; i <= draws; i++) {
+      const r = await runCompilePlan({
+        focalId: nodeId,
+        provider,
+        model: options.model,
+        ollamaHost: options.ollamaHost,
+        targetPath: draftPath(i),
+        force: true,
+        openWorld: options.openWorld ?? true,
+        maxTokens: options.maxTokens,
+        astGrounding: options.astGrounding ?? true,
+        rulesGrounding: options.rulesGrounding ?? false,
+        repCacheBypassToken: draftToken(round, i),
+        behaviorOracle,
+        refineFeedback,
+      });
+      out.push({ i, ok: r.ok, message: r.ok ? undefined : r.message ?? r.reason ?? "compile-back failed" });
+    }
+    return out;
+  };
+
+  // Decomposition (lever #4): generate the module in slices — a scaffold
+  // (types + private helpers) then one slice per exported function, each
+  // dispatch seeing the previously-generated slices as fixed context and
+  // scoped to ITS declarations only (intent gate skipped per-slice). Assemble
+  // the slice outputs into one module written to the canonical draft path, so
+  // the SAME structural + behaviour gates judge the whole. Returns a single
+  // compiled entry (i=1) like a draws=1 run.
+  const compileDecomposed = async (
+    round: number,
+    refineFeedback: RefineFeedback | undefined,
+  ): Promise<{ i: number; ok: boolean; message?: string }[]> => {
+    let sourceText: string;
+    try {
+      sourceText = fs.readFileSync(sourcePath, "utf-8");
+    } catch (e) {
+      return [{ i: 1, ok: false, message: `cannot read source for decomposition: ${String(e)}` }];
+    }
+    const slices = planDecomposition(scanTopLevelDecls(sourceText));
+    const sliceOutputs: { code: string; owned: typeof slices[number]["targets"] }[] = [];
+    let priorCode = "";
+    // The prior assembled attempt's critique (lint + failed criteria), shared
+    // across this round's slices so the slice that owns a flagged export (e.g.
+    // "acquireLock must be synchronous") fixes it.
+    const refineSection = refineFeedback ? buildRefineFeedbackSection(refineFeedback) : null;
+    for (let s = 0; s < slices.length; s++) {
+      const slice = slices[s];
+      const slicePath = path.join(stagingDir, `${nodeId}.slice${s}${ext}`);
+      const r = await runCompilePlan({
+        focalId: nodeId,
+        provider,
+        model: options.model,
+        ollamaHost: options.ollamaHost,
+        targetPath: slicePath,
+        force: true,
+        openWorld: options.openWorld ?? true,
+        maxTokens: options.maxTokens,
+        astGrounding: false, // the slice instruction supplies scoped grounding
+        rulesGrounding: false,
+        extraSystemSections: [
+          buildSliceInstruction(slice, priorCode),
+          ...(refineSection ? [refineSection] : []),
+        ],
+        skipIntentGate: true, // the assembled whole is contract-gated, not each slice
+        behaviorOracle, // acceptance criteria help the entry-point slices
+        // Round 1 keeps the legacy token so cached slices are reused; later
+        // rounds qualify by round so the refined feedback dispatches fresh.
+        repCacheBypassToken:
+          round === 1
+            ? `decompose_slice_${s}_of_${slices.length}`
+            : `decompose_r${round}_slice_${s}_of_${slices.length}`,
+      });
+      if (!r.ok) {
+        return [{ i: 1, ok: false, message: `decomposition slice "${slice.label}" failed: ${r.message ?? r.reason ?? "compile failed"}` }];
+      }
+      let out: string;
+      try {
+        out = fs.readFileSync(slicePath, "utf-8");
+      } catch (e) {
+        return [{ i: 1, ok: false, message: `cannot read decomposition slice output: ${String(e)}` }];
+      }
+      sliceOutputs.push({ code: out, owned: slice.targets });
+      priorCode = priorCode.length > 0 ? `${priorCode}\n\n${out}` : out;
+    }
+    try {
+      fs.writeFileSync(draftPath(1), assembleSlices(sliceOutputs), "utf-8");
+    } catch (e) {
+      return [{ i: 1, ok: false, message: `cannot write assembled module: ${String(e)}` }];
+    }
+    return [{ i: 1, ok: true }];
+  };
+
+  // Evaluate one round's compiled drafts: structural verdict + behaviour.
+  const evaluateRound = async (
+    roundCompiled: { i: number; ok: boolean; message?: string }[],
+  ): Promise<DraftEval[]> => {
+    const out: DraftEval[] = [];
+    for (const c of roundCompiled) {
+      if (!c.ok) {
+        out.push({ i: c.i, regenPath: draftPath(c.i), compiled: false, behaviorVerdict: "no_fixture", acceptable: false });
+        continue;
+      }
+      const rp = draftPath(c.i);
+      const metrics = compareFiles(sourcePath, rp);
+      if (metrics === null) {
+        out.push({ i: c.i, regenPath: rp, compiled: true, behaviorVerdict: "no_fixture", acceptable: false });
+        continue;
+      }
+      const verdict = classifyVerdict(metrics, thresholds);
+      let behaviorVerdict: BehaviorVerdict | "no_fixture" = "no_fixture";
+      let behaviorCases: { name: string; outcome: string }[] | undefined;
+      if (fixture) {
+        // Contain a pathological draft: the v0 behaviour checker imports and
+        // runs LLM-generated code in-process (no sandbox — spec §3.2), so a
+        // draft that, say, references an undefined symbol or registers a
+        // throwing process hook can surface an error the per-case guards
+        // don't reach. A single bad draft must not abort the whole multi-draw
+        // run — treat a thrown check as a non-acceptable "untested" draft.
+        try {
+          const bc = await runBehaviorCheck({ nodeId, sourcePath, regenPath: rp, fixture: fixture.fixture });
+          behaviorVerdict = bc.verdict;
+          behaviorCases = bc.cases?.map((cc) => ({ name: cc.name, outcome: cc.outcome, detail: cc.detail }));
+        } catch {
+          // A draft that makes the trustworthy oracle itself throw is, for
+          // our purposes, a behavioural failure — never acceptable to write.
+          behaviorVerdict = "fail";
+        }
+      }
+      const declKey = [...metrics.regenDeclarations].sort().join(",");
+      // Rule gate (--check-rules): a regen that violates a statically-decidable
+      // declared rule (FORBID/REQUIRE symbol) must not overwrite working source.
+      let ruleViolations = 0;
+      if (options.checkRules && (node.rules ?? []).length > 0) {
+        const rc = checkRules({ nodeId, rules: node.rules ?? [], artifactText: fs.readFileSync(rp, "utf-8") });
+        ruleViolations = rc.violations;
+      }
+      // Behaviour gate: when a fixture is present (behaviour-check requested
+      // AND a fixture loaded), only a confirmed PASS is acceptable — a "fail"
+      // OR an "untested" (the regen failed to load / the oracle threw) must
+      // block, because a structurally-epsilon module that does not even import
+      // must never be written or counted as a win. Without a fixture, fall
+      // back to the structural gate (untested/no_fixture is expected there).
+      const behaviorOk = fixture ? behaviorVerdict === "pass" : behaviorVerdict !== "fail";
+      const acceptable = WRITE_SAFE_VERDICTS.has(verdict) && behaviorOk && ruleViolations === 0;
+      out.push({ i: c.i, regenPath: rp, compiled: true, metrics, verdict, behaviorVerdict, declKey, acceptable, ruleViolations, behaviorCases });
+    }
+    return out;
+  };
+
+  // Has this round produced a writeable consensus? Mirrors the write gate
+  // below (draws===1: the single draft is acceptable; draws>1: the largest
+  // acceptable declKey cluster reaches K). This is the refine convergence
+  // test — the behaviour gate is folded into `acceptable`.
+  const roundConverged = (roundEvals: DraftEval[]): boolean => {
+    if (draws === 1) return roundEvals[0]?.acceptable === true;
+    const sizes = new Map<string, number>();
+    for (const e of roundEvals.filter((x) => x.acceptable)) {
+      const k = e.declKey ?? "";
+      sizes.set(k, (sizes.get(k) ?? 0) + 1);
+    }
+    const top = Math.max(0, ...sizes.values());
+    return top >= consensusK;
+  };
+
+  // Grounded export signatures (same data the AST grounding puts in the
+  // prompt) — used to decide which exports the draft lint must hold to be
+  // synchronous. Empty {} when the source can't be scanned; the lint degrades
+  // to the undefined-reference check only.
+  const sourceSignatures = scanFileSymbols(sourcePath).signatures;
+
+  // Build refinement feedback from the round's BEST failing draft — the one
+  // closest to passing (most behavioural matches, tie-broken by a write-safe
+  // structural verdict). Drives the next round. Returns undefined when there
+  // is nothing actionable to say (then the next round re-draws with the
+  // oracle only, exactly like round 1).
+  const buildFeedback = (roundEvals: DraftEval[], nextRound: number): RefineFeedback | undefined => {
+    const candidates = roundEvals.filter((e) => e.compiled && e.metrics);
+    if (candidates.length === 0) return undefined;
+    const score = (e: DraftEval): number => {
+      const matches = (e.behaviorCases ?? []).filter((cc) => cc.outcome === "match").length;
+      return matches + (WRITE_SAFE_VERDICTS.has(e.verdict!) ? 0.5 : 0);
+    };
+    const best = [...candidates].sort((a, b) => score(b) - score(a))[0];
+    const failedCriteria = (best.behaviorCases ?? [])
+      .filter((cc) => cc.outcome !== "match")
+      .map((cc) => ({ name: cc.name, diagnostic: draftSideDiagnostic(cc.outcome, cc.detail) }));
+    const original = new Set(best.metrics!.originalDeclarations);
+    const regen = new Set(best.metrics!.regenDeclarations);
+    const extraExports = [...regen].filter((d) => !original.has(d));
+    const missingExports = [...original].filter((d) => !regen.has(d));
+    // Static lint on the best draft's own source — undefined-reference calls
+    // and async-where-the-signature-is-sync. Leak-free (reads the candidate),
+    // best-effort (never throws).
+    let lintIssues: { symbol: string; message: string }[] = [];
+    try {
+      lintIssues = lintDraft(fs.readFileSync(best.regenPath, "utf-8"), sourceSignatures);
+    } catch {
+      lintIssues = [];
+    }
+    if (
+      failedCriteria.length === 0 &&
+      extraExports.length === 0 &&
+      missingExports.length === 0 &&
+      lintIssues.length === 0
+    ) {
+      return undefined;
+    }
+    return { round: nextRound, failedCriteria, extraExports, missingExports, lintIssues };
+  };
+
+  // 4. Run the verify-refine rounds inside one lock. Round 1 is the
+  //    oracle-grounded blind draw; each later round feeds the prior round's
+  //    deterministic critique back into the prompt. Stop the moment a round
+  //    reaches a writeable consensus. Keep the last round that actually
+  //    compiled something, so a flaky empty round does not erase progress.
+  //
+  // Everything that EXECUTES untrusted draft code (the round loop, the
+  // behaviour check, the write) runs under withRegenDraftGuard so a draft's
+  // deferred throw cannot abort the run before it returns a verdict.
+  return await withRegenDraftGuard(async (): Promise<RegenerateResult> => {
+  let compiled: { i: number; ok: boolean; message?: string }[] = [];
+  let evals: DraftEval[] = [];
+  let roundsUsed = 0;
+  let converged = false;
+  // Score a round by its best draft: a write-acceptable draft ranks highest,
+  // then by how many behavioural criteria it passes. Used to keep the BEST
+  // round across a refine run rather than the LAST — the local 7B is
+  // high-variance round-to-round (a later round can regress), so reporting
+  // the last round would discard a better earlier one.
+  const roundScore = (rEvals: DraftEval[]): number =>
+    Math.max(
+      -1,
+      ...rEvals.map(
+        (e) =>
+          (e.acceptable ? 1000 : 0) +
+          (e.behaviorCases?.filter((c) => c.outcome === "match").length ?? 0),
+      ),
+    );
+  // Snapshot a round's draft artifact(s) to stable `.best` paths so the
+  // reported result and `--write` read the BEST round even after a later
+  // round overwrites the working draft path. Only used when refining.
+  const bestPath = (i: number): string =>
+    draws === 1
+      ? path.join(stagingDir, `${nodeId}.best${ext}`)
+      : path.join(stagingDir, `${nodeId}.best.d${i}${ext}`);
+  const snapshotBest = (rEvals: DraftEval[]): DraftEval[] =>
+    rEvals.map((e) => {
+      if (!e.compiled) return e;
+      try {
+        const bp = bestPath(e.i);
+        fs.copyFileSync(e.regenPath, bp);
+        return { ...e, regenPath: bp };
+      } catch {
+        return e;
+      }
+    });
+  let bestScore = -1;
+  const adopt = (rc: typeof compiled, re: DraftEval[]): void => {
+    compiled = rc;
+    evals = rounds > 1 ? snapshotBest(re) : re;
+  };
   try {
     await withLock(
       cwd,
       async () => {
-        for (let i = 1; i <= draws; i++) {
-          const r = await runCompilePlan({
-            focalId: nodeId,
-            provider,
-            model: options.model,
-            ollamaHost: options.ollamaHost,
-            targetPath: draftPath(i),
-            force: true,
-            openWorld: options.openWorld ?? true,
-            maxTokens: options.maxTokens,
-            astGrounding: options.astGrounding ?? true,
-            rulesGrounding: options.rulesGrounding ?? false,
-            repCacheBypassToken: draws === 1 ? undefined : `regen_draw_${i}_of_${draws}`,
-          });
-          compiled.push({ i, ok: r.ok, message: r.ok ? undefined : r.message ?? r.reason ?? "compile-back failed" });
+        let refineFeedback: RefineFeedback | undefined;
+        for (let round = 1; round <= rounds; round++) {
+          const roundCompiled = decompose
+            ? await compileDecomposed(round, refineFeedback)
+            : await compileRound(round, refineFeedback);
+          roundsUsed = round;
+          if (roundCompiled.every((c) => !c.ok)) {
+            if (compiled.length === 0) compiled = roundCompiled; // record for failure message
+            continue;
+          }
+          const roundEvals = await evaluateRound(roundCompiled);
+          const score = roundScore(roundEvals);
+          if (rounds === 1 || score > bestScore) {
+            bestScore = score;
+            adopt(roundCompiled, roundEvals);
+          }
+          if (roundConverged(roundEvals)) {
+            converged = true;
+            adopt(roundCompiled, roundEvals);
+            break;
+          }
+          if (round < rounds) refineFeedback = buildFeedback(roundEvals, round + 1);
         }
       },
       { skipLock: options.noLock, command: `regenerate ${nodeId}` },
@@ -238,40 +630,13 @@ export async function runRegenerate(
     throw err;
   }
 
-  if (compiled.every((c) => !c.ok)) {
+  if (compiled.length === 0 || compiled.every((c) => !c.ok)) {
     return { ok: false, nodeId, sourceFile: sourceRel, written: false, failure: `compile-back failed: ${compiled[0]?.message ?? "no draft compiled"}` };
   }
 
-  // 5. Evaluate each compiled draft: structural verdict + behaviour.
-  const evals: DraftEval[] = [];
-  for (const c of compiled) {
-    if (!c.ok) {
-      evals.push({ i: c.i, regenPath: draftPath(c.i), compiled: false, behaviorVerdict: "no_fixture", acceptable: false });
-      continue;
-    }
-    const rp = draftPath(c.i);
-    const metrics = compareFiles(sourcePath, rp);
-    if (metrics === null) {
-      evals.push({ i: c.i, regenPath: rp, compiled: true, behaviorVerdict: "no_fixture", acceptable: false });
-      continue;
-    }
-    const verdict = classifyVerdict(metrics, thresholds);
-    let behaviorVerdict: BehaviorVerdict | "no_fixture" = "no_fixture";
-    if (fixture) {
-      const bc = await runBehaviorCheck({ nodeId, sourcePath, regenPath: rp, fixture: fixture.fixture });
-      behaviorVerdict = bc.verdict;
-    }
-    const declKey = [...metrics.regenDeclarations].sort().join(",");
-    // Rule gate (--check-rules): a regen that violates a statically-decidable
-    // declared rule (FORBID/REQUIRE symbol) must not overwrite working source.
-    let ruleViolations = 0;
-    if (options.checkRules && (node.rules ?? []).length > 0) {
-      const rc = checkRules({ nodeId, rules: node.rules ?? [], artifactText: fs.readFileSync(rp, "utf-8") });
-      ruleViolations = rc.violations;
-    }
-    const acceptable = WRITE_SAFE_VERDICTS.has(verdict) && behaviorVerdict !== "fail" && ruleViolations === 0;
-    evals.push({ i: c.i, regenPath: rp, compiled: true, metrics, verdict, behaviorVerdict, declKey, acceptable, ruleViolations });
-  }
+  // Verify-refine reporting fields, attached to whichever result shape we
+  // return below. Empty (omitted) for the default single-round path.
+  const refineFields = rounds > 1 ? { refineRounds: rounds, refineRoundsUsed: roundsUsed, converged } : {};
 
   // ── Single-draw path (draws === 1): preserve the exact original gate. ──
   if (draws === 1) {
@@ -287,6 +652,7 @@ export async function runRegenerate(
       behaviorVerdict: e.behaviorVerdict,
       ruleViolations: e.ruleViolations,
       written: false,
+      ...refineFields,
     };
     if (e.metrics === undefined) {
       return { ...base, ok: false, failure: "could not read source or regen for comparison" };
@@ -297,8 +663,10 @@ export async function runRegenerate(
     if (!WRITE_SAFE_VERDICTS.has(e.verdict!)) {
       return { ...base, writeBlockedReason: `verdict ${e.verdict} is not structure-preserving — refusing to overwrite working source` };
     }
-    if (e.behaviorVerdict === "fail") {
-      return { ...base, writeBlockedReason: "behaviour check failed — refusing to overwrite working source" };
+    // With a fixture present, only a confirmed PASS may write — "fail" and
+    // "untested" (regen failed to load / oracle threw) both block.
+    if (e.behaviorVerdict === "fail" || (fixture && e.behaviorVerdict !== "pass")) {
+      return { ...base, writeBlockedReason: `behaviour check ${e.behaviorVerdict} — refusing to overwrite working source` };
     }
     if ((e.ruleViolations ?? 0) > 0) {
       return { ...base, writeBlockedReason: `${e.ruleViolations} declared rule(s) violated — refusing to overwrite working source` };
@@ -337,6 +705,7 @@ export async function runRegenerate(
     consensusK,
     clusterSizes,
     draftSummary: evals.map((e) => ({ i: e.i, verdict: e.verdict, behaviorVerdict: e.behaviorVerdict, acceptable: e.acceptable })),
+    ...refineFields,
   };
 
   if (!options.write) {
@@ -347,6 +716,7 @@ export async function runRegenerate(
   }
   writeShadow(node, rep.regenPath, sourcePath, cwd);
   return { ...base, written: true };
+  });
 }
 
 // CLI wrapper: run the core, render it, and map the outcome to an exit code.

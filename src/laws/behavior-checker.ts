@@ -44,6 +44,20 @@ export interface BehaviorCase<TApi = unknown, TCtx = unknown> {
   /** Short label for the case, surfaced in the failure message. */
   name: string;
   /**
+   * Optional human-readable acceptance criterion: the CONTRACT this case
+   * pins, in prose, at the level of observable behaviour (not
+   * implementation). Purely documentary for the checker — it never reads
+   * this field when deciding a verdict. Its purpose is the inverse
+   * direction: `oracle-grounding.ts` surfaces `name` + `description` into
+   * the compile-back system prompt so the regenerator SEES the behavioural
+   * spec it will be judged against (the "oracle-into-generation" lever,
+   * REGEN_INTENT_CONSUMPTION_2026-06-17 §"WHAT TO BUILD" #1). Keep it
+   * contract-level — e.g. "acquiring on a fresh repo returns a handle whose
+   * body records THIS process's pid/hostname" — never "use fs.openSync with
+   * the wx flag", which would leak implementation into the prompt.
+   */
+  description?: string;
+  /**
    * Build a fresh per-case context. Called twice — once per side — so
    * a case that creates a temp file does not leak side-effects between
    * the source-side invocation and the regen-side invocation.

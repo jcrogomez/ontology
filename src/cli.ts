@@ -1100,6 +1100,8 @@ program
   .option("--behavior-fixtures-dir <path>", "Override the behaviour-fixtures directory (default tests/behavior-fixtures).")
   .option("--draws <n>", "Multi-draw consensus: compile N independent drafts and only write the majority structural-agreement class (defangs single-draw variance). Default 1.", (v) => parseInt(v, 10))
   .option("--consensus <k>", "Consensus floor: write only when at least K of N draws agree (default strict majority, floor(N/2)+1).", (v) => parseInt(v, 10))
+  .option("--refine <n>", "Verify-refine rounds (REGEN_INTENT_CONSUMPTION_2026-06-17 #2): when a round fails the gates, feed the failed behaviour criteria + export drift back into the next round's prompt. Needs --behavior-check for the behaviour signal. Default 1 (no refine); clamped to 4.", (v) => parseInt(v, 10))
+  .option("--decompose", "Decomposition (REGEN_INTENT_CONSUMPTION_2026-06-17 #4): regenerate the module in slices (scaffold types+helpers → one slice per exported function, each seeing prior slices as fixed context), then assemble and gate the whole. Attacks the 'whole-contract-at-once' capacity limit. Implies a single assembled candidate.")
   .option("--loc-threshold <n>", "LoC distance threshold for the verdict (default 0.3).", (v) => parseFloat(v))
   .option("--jaccard-threshold <n>", "Structural Jaccard threshold for the verdict (default 0.5).", (v) => parseFloat(v))
   .option("--no-open-world", "Enforce strict requires-satisfaction during compile-back (default open-world).")

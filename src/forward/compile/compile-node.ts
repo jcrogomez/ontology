@@ -1,8 +1,8 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, createHash } from "node:crypto";
 import type { OntologyNode, OntologyEvent, OntologyModel, PersistedRunInput, PersistedRunModel } from "../../kernel/schemas/ontology.js";
 import { OntologyEventSchema } from "../../kernel/schemas/ontology.js";
 import { dispatchLlmRequest } from "../../runtime/llm/dispatcher.js";
-import { resolveNodeModel } from "../../runtime/llm/resolve-node-model.js";
+import { resolveNodeModel, resolveTaskModel } from "../../runtime/llm/resolve-node-model.js";
 import type { LlmProvider, LlmTask } from "../../runtime/llm/types.js";
 import { hashPrompt, hashContext } from "../../kernel/core/integrity/hash.js";
 import type { ContextAssemblyOutput } from "../context/types.js";
@@ -34,6 +34,16 @@ import {
   joinSystemSections,
   composeContextHash,
 } from "./ast-grounding.js";
+import {
+  buildOracleGroundingSystemSection,
+  hashOracleGrounding,
+  type OracleConstraint,
+} from "./oracle-grounding.js";
+import {
+  buildRefineFeedbackSection,
+  hashRefineFeedback,
+  type RefineFeedback,
+} from "./refine-feedback.js";
 import { scanFileSymbols } from "../../inverse/ast-symbol-scanner.js";
 import * as path from "node:path";
 import { getOntologyPaths } from "../../kernel/core/project/paths.js";
@@ -106,7 +116,7 @@ export interface CompileNodeOptions {
   cwd?: string;
   // Models registry. Required when `provider` is undefined (per-node routing
   // path). The plan-runner loads it once and threads it to every step.
-  registry?: { models: OntologyModel[] };
+  registry?: { models: OntologyModel[]; routing?: Record<string, string> };
   // When true, after parse-validation the compiled artifact is **executed**
   // in a subprocess with a timeout (default 5s, max 60s). Non-zero exit or
   // timeout produces a `runtime_failed` outcome. Off by default because
@@ -185,6 +195,37 @@ export interface CompileNodeOptions {
   // (verifySweepId, repIndex) pair if a single sweep needs distinct
   // identities from earlier sweeps).
   repCacheBypassToken?: string;
+  // Oracle-into-generation (REGEN_INTENT_CONSUMPTION_2026-06-17 §"WHAT TO
+  // BUILD" #1). The focal node's behaviour-fixture acceptance criteria —
+  // case name + optional contract-level description — surfaced into the
+  // code_sketch system prompt as MUST-PASS constraints, so the generator
+  // SEES the spec it will be executed against (the dual of astGrounding for
+  // the behaviour axis). Folded into the run-cache contextHash like the
+  // other grounding signals. Undefined / empty preserves the legacy runId
+  // and system prompt byte-for-byte. Carries no implementation — only the
+  // black-box contract prose. See oracle-grounding.ts.
+  behaviorOracle?: OracleConstraint[];
+  // Verify-refine loop (REGEN_INTENT_CONSUMPTION_2026-06-17 §"WHAT TO
+  // BUILD" #2). On a refine round, the deterministic gates' critique of the
+  // PRIOR draft — which behavioural criteria failed + which exports drifted
+  // — surfaced into the system prompt so the next draw fixes the named
+  // failures instead of re-rolling blind. Folded into the run-cache
+  // contextHash so each round dispatches fresh. Undefined preserves the
+  // legacy runId/system prompt byte-for-byte. Code-free by construction
+  // (criterion names + declared-name sets only). See refine-feedback.ts.
+  refineFeedback?: RefineFeedback;
+  // Decomposition (REGEN_INTENT_CONSUMPTION_2026-06-17 §"WHAT TO BUILD" #4).
+  // Extra system-prompt sections appended after grounding/oracle/refine — used
+  // to carry a per-slice generation instruction (the slice's target
+  // declarations + prior-slice code). Folded into the run-cache contextHash so
+  // each slice dispatches distinctly. Undefined / empty preserves the legacy
+  // system prompt + runId byte-for-byte.
+  extraSystemSections?: string[];
+  // When true, the semantic intent gate (validateIntentE) is skipped. Used for
+  // decomposition slices: one slice is NOT the node's full contract, so the
+  // per-node contract is enforced on the ASSEMBLED module downstream (the
+  // homeomorphism + behaviour gates), not on each slice. Off by default.
+  skipIntentGate?: boolean;
 }
 
 export type CompileNodeFailureReason =
@@ -274,6 +315,24 @@ function resolveModelE(options: CompileNodeOptions): EffectWithLog<ResolvedModel
           message: "compileNode called without an explicit provider and without a registry; cannot resolve node.model.ref",
         }),
         logs: [{ level: "error", message: "resolveModel: registry missing on per-node path" }],
+      };
+    }
+    // Task-routing policy layer (REGEN_ORACLE_REFINE): between the CLI
+    // override (handled above) and the node's own `model.ref`. When the
+    // project routes this task, that model wins — e.g. a code-expert on
+    // `code_sketch` (F) — without the caller pinning `--model`. Absent →
+    // per-node `model.ref` resolution is unchanged.
+    const routed = resolveTaskModel(COMPILE_TASK, options.registry);
+    if (routed !== null) {
+      if (!routed.ok) {
+        return {
+          value: err({ reason: "model_ref_unresolved", message: `task routing for "${COMPILE_TASK}": ${routed.message}` }),
+          logs: [{ level: "error", message: `resolveModel: task routing failed: ${routed.message}` }],
+        };
+      }
+      return {
+        value: ok({ provider: routed.resolved.provider, resolvedModel: routed.resolved.model }),
+        logs: [{ level: "info", message: `resolveModel: task routing ${COMPILE_TASK} → provider=${routed.resolved.provider}, model=${routed.resolved.model}` }],
       };
     }
     const r = resolveNodeModel(options.node.model.ref, options.registry);
@@ -403,10 +462,47 @@ function buildPreludeE(
       }
     }
 
+    // Oracle-into-generation: surface the focal node's behaviour-fixture
+    // acceptance criteria into the system prompt as MUST-PASS constraints
+    // (the dual of AST grounding for the behaviour axis). Null section +
+    // null hash when no oracle was threaded in — byte-identical to the
+    // pre-oracle path, so legacy + grounding-only run caches are preserved.
+    let oracleSection: string | null = null;
+    let oracleHash: string | null = null;
+    const oracle = options.behaviorOracle ?? [];
+    if (oracle.length > 0) {
+      oracleSection = buildOracleGroundingSystemSection(oracle);
+      oracleHash = hashOracleGrounding(oracle);
+    }
+
+    // Verify-refine: surface the deterministic gates' critique of the prior
+    // draft into the system prompt. Null section + null hash when no
+    // feedback was threaded in (round 1, or a round that found nothing to
+    // fix), so the pre-refine path is byte-identical.
+    let refineSection: string | null = null;
+    let refineHash: string | null = null;
+    if (options.refineFeedback !== undefined) {
+      refineSection = buildRefineFeedbackSection(options.refineFeedback);
+      refineHash = hashRefineFeedback(options.refineFeedback);
+    }
+
+    // Decomposition: extra per-slice instruction sections. Folded after the
+    // refine section; null + null hash when none, so the legacy path is
+    // byte-identical.
+    const extra = (options.extraSystemSections ?? []).filter((s) => s && s.length > 0);
+    const extraSection = extra.length > 0 ? extra.join("\n\n") : null;
+    const extraHash =
+      extraSection !== null
+        ? `extra:hash:${createHash("sha256").update(extraSection).digest("hex")}`
+        : null;
+
     const systemPrompt = joinSystemSections([
       upstreamSystemPrompt,
       assembledSystemSection,
       groundingSection,
+      oracleSection,
+      refineSection,
+      extraSection,
     ]);
 
     // contextHash composes four ingredients now:
@@ -431,10 +527,25 @@ function buildPreludeE(
       upstreamPlusAssembled,
       groundingHash,
     );
-    const contextHash = composeContextHash(
+    // Fold the oracle hash in after grounding, before the rep token. Null
+    // oracleHash returns the input unchanged (composeContextHash's
+    // backward-compat contract), so non-oracle runs hash exactly as before.
+    const upstreamPlusAssembledPlusGroundingPlusOracle = composeContextHash(
       upstreamPlusAssembledPlusGrounding,
-      repHash,
+      oracleHash,
     );
+    // Fold the refine-feedback hash in after the oracle, before the rep
+    // token. Null refineHash returns the input unchanged, so non-refine
+    // runs hash exactly as before.
+    const upstreamPlusAssembledPlusGroundingPlusOraclePlusRefine =
+      composeContextHash(upstreamPlusAssembledPlusGroundingPlusOracle, refineHash);
+    // Fold the decomposition extra-sections hash after refine, before the rep
+    // token. Null extraHash returns the input unchanged.
+    const upstreamThroughExtra = composeContextHash(
+      upstreamPlusAssembledPlusGroundingPlusOraclePlusRefine,
+      extraHash,
+    );
+    const contextHash = composeContextHash(upstreamThroughExtra, repHash);
 
     // Dispatch knobs that influence the model's output. Only emit the
     // `dispatch` sub-object when at least one knob is set, so legacy
@@ -772,6 +883,14 @@ function validateIntentE(
   artifactContent: string,
 ): EffectWithLog<void, CompileFailure> {
   return () => {
+    // Decomposition slices skip the contract gate — a slice carries only part
+    // of the export surface; the assembled module is contract-gated downstream.
+    if (input.options.skipIntentGate === true) {
+      return {
+        value: ok(undefined),
+        logs: [{ level: "info", message: "validateIntent: skipped (decomposition slice)" }],
+      };
+    }
     try {
       const cwd = input.options.cwd ?? process.cwd();
       // Pin the assembly to the focal's own branch — assembleContext

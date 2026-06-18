@@ -42,16 +42,26 @@ export async function probeOllama(timeoutMs = 1500): Promise<OllamaProbeResult> 
 }
 
 /**
- * The cheapest installed CHAT model — smallest on-disk size. On the 8 GB
- * reference machine this is what keeps the smoke fast and load-safe.
- * Embedding-only models (nomic-embed-text, bge, …) reject `/api/chat`
- * with `does not support chat`; /api/tags does not expose capabilities,
- * so filter them by name.
+ * The cheapest LOCALLY-INSTALLED CHAT model — smallest on-disk size. On the
+ * 8 GB reference machine this is what keeps the smoke fast and load-safe.
+ *
+ * Filters:
+ *   - Embedding-only models (nomic-embed-text, bge, …) reject `/api/chat`
+ *     with `does not support chat`; /api/tags does not expose capabilities,
+ *     so filter them by name.
+ *   - CLOUD models (`<name>:cloud` / `<name>-cloud`, surfaced once the user
+ *     runs `ollama signin`) are NOT installed locally: /api/tags reports them
+ *     with size 0, so they sort FIRST and would be picked — but they execute
+ *     remotely (slow, metered) and some require a paid subscription (a real
+ *     403 the live test hit). Exclude them by the cloud tag AND by size 0
+ *     (not on disk) so the live test only ever routes to a model that is
+ *     genuinely present locally.
  */
 export function smallestInstalledModel(
   probe: OllamaProbeResult,
 ): string | undefined {
   return [...probe.models]
     .filter((m) => !/embed|bge|minilm/i.test(m.name))
+    .filter((m) => !/[:-]cloud$/i.test(m.name) && m.size > 0)
     .sort((a, b) => a.size - b.size)[0]?.name;
 }

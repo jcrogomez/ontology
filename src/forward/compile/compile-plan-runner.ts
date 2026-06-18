@@ -6,6 +6,8 @@ import { computeBranchFiber, listBranches } from "../../laws/fibration/branch-fi
 import { compileNode, type CompileNodeResult } from "./compile-node.js";
 import type { WriteArtifactResult } from "./artifact-writer.js";
 import type { UpstreamContextItem } from "./upstream-context.js";
+import type { OracleConstraint } from "./oracle-grounding.js";
+import type { RefineFeedback } from "./refine-feedback.js";
 
 // Plan runner: walks the topological compile plan computed by
 // computeCompilePlan and dispatches compileNode for each step in order.
@@ -74,6 +76,21 @@ export interface CompilePlanRunOptions {
   // runIds across reps. Undefined preserves the legacy single-draw
   // cache identity. See CompileNodeOptions.repCacheBypassToken.
   repCacheBypassToken?: string;
+  // Oracle-into-generation: the focal node's behaviour-fixture acceptance
+  // criteria, surfaced into the focal step's system prompt as MUST-PASS
+  // constraints. Applied ONLY at the focal step (like targetPath /
+  // repCacheBypassToken) — upstream parents are not the node under test.
+  // See CompileNodeOptions.behaviorOracle and oracle-grounding.ts.
+  behaviorOracle?: OracleConstraint[];
+  // Verify-refine feedback for the focal step's next draw. Applied ONLY at
+  // the focal step. See CompileNodeOptions.refineFeedback and
+  // refine-feedback.ts.
+  refineFeedback?: RefineFeedback;
+  // Decomposition: extra per-slice system-prompt sections + intent-gate skip,
+  // applied ONLY at the focal step. See CompileNodeOptions.extraSystemSections
+  // / skipIntentGate and decompose-plan.ts.
+  extraSystemSections?: string[];
+  skipIntentGate?: boolean;
 }
 
 export interface CompilePlanStepResult {
@@ -239,6 +256,19 @@ export async function runCompilePlan(options: CompilePlanRunOptions): Promise<Co
       // without changing the variance signal the focal is measuring.
       repCacheBypassToken:
         step.nodeId === options.focalId ? options.repCacheBypassToken : undefined,
+      // Oracle constraints judge the focal's behaviour, so they ground only
+      // the focal step — upstream parents are not the node under test.
+      behaviorOracle:
+        step.nodeId === options.focalId ? options.behaviorOracle : undefined,
+      // Refine feedback critiques the focal's prior draft, so it grounds
+      // only the focal step.
+      refineFeedback:
+        step.nodeId === options.focalId ? options.refineFeedback : undefined,
+      // Decomposition slice instruction + intent-gate skip — focal step only.
+      extraSystemSections:
+        step.nodeId === options.focalId ? options.extraSystemSections : undefined,
+      skipIntentGate:
+        step.nodeId === options.focalId ? options.skipIntentGate : undefined,
     });
 
     if (!stepResult.ok) {

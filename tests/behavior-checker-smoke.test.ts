@@ -90,6 +90,13 @@ const CASES: readonly IdentityCase[] = [
   // coverage. Each was self-validated source-vs-source at generation.
   { nodeId: "node_0017", sourceRelative: "src/kernel/core/nodes/node-id.ts" },
   { nodeId: "node_0022", sourceRelative: "src/kernel/core/project/paths.ts" },
+  // Hand-written glue/IO oracle (REGEN_INTENT_CONSUMPTION_2026-06-17):
+  // the auto-generated 7B probe fixture for lock.ts was shallow and was
+  // removed. This fixture pins the lock protocol — fresh acquire,
+  // cross-host refusal, stale-PID reclaim, ownership-verified idempotent
+  // release — so the F∘G round-trip for a side-effectful node is judged
+  // against a trustworthy gate. Identity (src-vs-src) must pass here.
+  { nodeId: "node_0013", sourceRelative: "src/kernel/core/fs/lock.ts" },
   { nodeId: "node_0109", sourceRelative: "src/laws/effects/io.ts" },
   { nodeId: "node_0131", sourceRelative: "src/inverse/frontier-tagger.ts" },
   { nodeId: "node_0146", sourceRelative: "src/runtime/llm/dispatcher.ts" },

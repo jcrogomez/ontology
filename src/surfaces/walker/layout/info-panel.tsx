@@ -8,6 +8,7 @@ import type { LinkAnalysisFromWalkerResult } from "../actions/link-analysis-from
 import type { GraphViewResult, GraphViewNodeRow } from "../actions/graph-view-from-walker.js";
 import type { VerifyFromWalkerResult } from "../actions/verify-from-walker.js";
 import type { WorkflowFromWalkerResult } from "../actions/workflow-from-walker.js";
+import type { ModelsFromWalkerResult } from "../actions/models-from-walker.js";
 import { POSET_COLORS } from "../theme/colors.js";
 
 // Unified info panel for read-only walker commands that produce a small,
@@ -29,7 +30,8 @@ export type InfoPanelState =
   | { kind: "link-analysis"; result: LinkAnalysisFromWalkerResult }
   | { kind: "graph-view"; result: GraphViewResult }
   | { kind: "verify"; result: VerifyFromWalkerResult }
-  | { kind: "workflow"; result: WorkflowFromWalkerResult };
+  | { kind: "workflow"; result: WorkflowFromWalkerResult }
+  | { kind: "models"; result: ModelsFromWalkerResult };
 
 export interface InfoPanelProps {
   state: InfoPanelState;
@@ -52,7 +54,9 @@ export function InfoPanel({ state }: InfoPanelProps): React.ReactElement | null 
     ? (state.result.ok && state.result.verdict === "epsilon_equivalent" ? "green" : "yellow")
     : state.kind === "workflow"
     ? (state.result.ok && state.result.verdict === "accept" ? "green" : "red")
-    : state.kind === "query" || state.kind === "branches" || state.kind === "graph-view"
+    : state.kind === "models" && !state.result.ok
+    ? "red"
+    : state.kind === "query" || state.kind === "branches" || state.kind === "graph-view" || state.kind === "models"
     ? "yellow"
     : "blue";
 
@@ -110,6 +114,52 @@ function renderBody(state: Exclude<InfoPanelState, { kind: "idle" }>): React.Rea
           {result.branches.map((b) => (
             <Text key={b}>  • {b}</Text>
           ))}
+        </Box>
+      </>
+    );
+  }
+
+  if (state.kind === "models") {
+    const { result } = state;
+    if (!result.ok) {
+      return (
+        <>
+          <Text bold color="red">MODELS — error</Text>
+          <Text>{result.message ?? "(no detail)"}</Text>
+        </>
+      );
+    }
+    return (
+      <>
+        <Text bold color="yellow">MODEL ROUTING (per task)</Text>
+        <Box marginTop={1} flexDirection="column">
+          {result.routing.map((r) => {
+            const target = r.modelId === null
+              ? "· per-node model.ref (no override)"
+              : r.resolved
+                ? `→ ${r.modelId}  [${r.provider}/${r.modelName}]`
+                : `→ ${r.modelId}  ⚠ ${r.problem ?? "unresolved"}`;
+            const color = r.modelId === null ? "gray" : r.resolved ? "green" : "red";
+            return (
+              <Text key={r.task}>
+                {"  "}<Text color="cyan">{r.task.padEnd(15)}</Text>
+                <Text dimColor>{r.role.padEnd(22)}</Text>
+                <Text color={color}>{target}</Text>
+              </Text>
+            );
+          })}
+        </Box>
+        <Box marginTop={1} flexDirection="column">
+          <Text dimColor>registered models (use the id with :route):</Text>
+          {result.catalog.map((m) => (
+            <Text key={m.id}>
+              {"  "}<Text color="cyan">{m.id.padEnd(22)}</Text>
+              <Text dimColor>{m.provider}/{m.name}{m.role ? `  — ${m.role}` : ""}</Text>
+            </Text>
+          ))}
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>:route &lt;task&gt; &lt;model-id&gt;  ·  :route &lt;task&gt; off  (fall back to per-node)</Text>
         </Box>
       </>
     );
