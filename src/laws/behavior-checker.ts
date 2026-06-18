@@ -180,6 +180,17 @@ export async function loadFixture(
 ): Promise<{ path: string; fixture: BehaviorFixture } | null> {
   const fixturePath = resolveFixturePath(fixturesDir, nodeId);
   if (!fixturePath) return null;
+  return { path: fixturePath, fixture: await loadFixtureFromPath(fixturePath) };
+}
+
+/**
+ * Load + validate a fixture from an absolute path (the path-keyed variant of
+ * loadFixture). Throws when the file does not import or has the wrong shape.
+ * Used by the isolated child entry, which only knows the fixture's path.
+ */
+export async function loadFixtureFromPath(
+  fixturePath: string,
+): Promise<BehaviorFixture> {
   const mod = await importIsolatedRaw(fixturePath);
   if (!mod.ok) {
     throw new Error(`fixture import failed: ${mod.reason}`);
@@ -200,7 +211,7 @@ export async function loadFixture(
       );
     }
   }
-  return { path: fixturePath, fixture: { cases: cases as BehaviorCase[] } };
+  return { cases: cases as BehaviorCase[] };
 }
 
 // ── Isolated import ─────────────────────────────────────────────────────────

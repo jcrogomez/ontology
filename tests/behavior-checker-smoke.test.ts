@@ -98,6 +98,12 @@ const CASES: readonly IdentityCase[] = [
   // against a trustworthy gate. Identity (src-vs-src) must pass here.
   { nodeId: "node_0013", sourceRelative: "src/kernel/core/fs/lock.ts" },
   { nodeId: "node_0109", sourceRelative: "src/laws/effects/io.ts" },
+  // Probe-generated during the EXECUTOR real-run validation (2026-06-18):
+  // leaf nodes used to exercise `onto execute` end-to-end. Self-validated
+  // source-vs-source at generation → identity must pass here.
+  { nodeId: "node_0110", sourceRelative: "src/laws/effects/result.ts" },
+  { nodeId: "node_0122", sourceRelative: "src/kernel/graph/poset.ts" },
+  { nodeId: "node_0172", sourceRelative: "src/laws/topos/omega.ts" },
   { nodeId: "node_0131", sourceRelative: "src/inverse/frontier-tagger.ts" },
   { nodeId: "node_0146", sourceRelative: "src/runtime/llm/dispatcher.ts" },
   { nodeId: "node_0176", sourceRelative: "src/runtime/workflow/graph-load.ts" },

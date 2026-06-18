@@ -13,7 +13,8 @@ import {
   type VerdictThresholds,
   type DistanceMetrics,
 } from "../../laws/verify-homeomorphism.js";
-import { loadFixture, runBehaviorCheck, type BehaviorVerdict } from "../../laws/behavior-checker.js";
+import { loadFixture, type BehaviorVerdict } from "../../laws/behavior-checker.js";
+import { runBehaviorCheckIsolated } from "../../laws/behavior-checker-isolated.js";
 import { checkRules } from "../../inverse/rule-checker.js";
 import { buildRefineFeedbackSection, type RefineFeedback } from "../../forward/compile/refine-feedback.js";
 import { lintDraft } from "../../forward/compile/draft-lint.js";
@@ -464,7 +465,11 @@ export async function runRegenerate(
         // don't reach. A single bad draft must not abort the whole multi-draw
         // run — treat a thrown check as a non-acceptable "untested" draft.
         try {
-          const bc = await runBehaviorCheck({ nodeId, sourcePath, regenPath: rp, fixture: fixture.fixture });
+          // Run the DRAFT in a disposable child process. The draft is untrusted
+          // LLM output; a deferred throw (orphaned timer in an IO node like
+          // lock.ts) would otherwise escape the in-process guard and crash the
+          // whole run. Isolation bounds it: the child dies with its verdict.
+          const bc = runBehaviorCheckIsolated({ nodeId, sourcePath, regenPath: rp, fixturePath: fixture.path });
           behaviorVerdict = bc.verdict;
           behaviorCases = bc.cases?.map((cc) => ({ name: cc.name, outcome: cc.outcome, detail: cc.detail }));
         } catch {
