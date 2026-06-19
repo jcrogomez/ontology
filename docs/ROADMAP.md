@@ -76,6 +76,10 @@ exhaustively pinned by `tests/runtime/topos/closed-world-parity.test.ts`)
 
 ### 2026-06-18 checkpoint — the four product gaps
 
+> **Superseded in part — see the "Shipped 2026-06-18" block above.** Gaps 1/3/4
+> shipped that same day; the snapshot/numbers below (e.g. core 47/221) are the
+> *pre-grind baseline* this plan was written against. Only **Gap 2** remains open.
+
 The missing work is no longer "invent the primitives." The primitives now
 exist: `onto regenerate`, `onto sync`, `onto status`, `onto execute`,
 `onto ficha`, `onto probe`, `onto rules`, drift anchoring, and the read-only

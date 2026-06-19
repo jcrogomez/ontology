@@ -215,3 +215,50 @@ Still pending:
   dominant phenomenon is variance — the next real lever is a stronger/less-
   variable model, not more determinacy edits. The live graph was not mutated.
   Full record: `docs/SYNC_LOOP_SPEC.md` §8.1.
+
+### Phase ζ — the dynamic-agent layer + the trustworthy-core grind (2026-06-18 → 19)
+
+The governed *executor* (the dynamic half), child-process isolation that unblocks
+IO nodes, a Walker v2 cockpit, a fixtures grind that doubled the trustworthy
+core, and the order-theory instrumentation. Branch `feat/trustworthy-core`.
+Design: `docs/design/runtime/EXECUTOR_SPEC.md`. Tiering: T2 operational (closes
+when it can, flags honestly when it can't) — NOT autonomous correctness.
+
+- **`onto execute <nodes...>` — the governed executor loop.** Closes intent→code
+  for a node and its dependency closure (topological): regenerate → gate →
+  *decide* the next move (refine / decompose / escalate the model ladder) → write
+  ONLY behind green gates → classify what it can't close. Pure decision policy
+  (`policy.ts`, exhaustively tested), anti-corruption verdict layer
+  (`verdict.ts`), premise-based capability ladder (`model-ladder.ts`; a model is
+  a rung only with explicit `caps`; $0/local default forbids paid), topological
+  runner with upstream propagation + governed write (`runner.ts`). Terminal
+  taxonomy = the report enum: closed / extraction-gap / capacity-ceiling /
+  blocked-upstream / unverified-no-fixture / infra-error.
+- **Child-process isolation of the draft behaviour check.** The v0 checker ran
+  untrusted drafts in-process; an IO node (`lock.ts`) scheduled a deferred throw
+  that crashed the whole run. Fixed: `behavior-checker-isolated.ts` +
+  `behavior-check-child.ts` (spawnSync tsx child, result file, SIGKILL timeout;
+  crash/hang/exit-without-result → untested). Real payoff: `node_0013` now closes
+  by escalating 7B→`qwen3-coder:480b-cloud` — first end-to-end ladder escalation.
+- **Walker v2 (early): the governed-loop cockpit.** `:health` node dashboard
+  (identity + shadow + fixture + rules + ficha + closure + ranked next safe
+  action), and one-shot controls `:fichacleanup` / `:reanchor` (governed, refresh
+  `:health`). `WALKER_INTERFACE.md` §10.1.
+- **Trustworthy-core grind: 47 → 136 / 221.** Deterministic ficha cleanup
+  (missing/phantom contract keys → 0), then a cloud-probed fixtures grind
+  (`qwen3-coder:480b-cloud`, free tier, cloud-first hard→easy): +89 behaviour
+  fixtures, each self-validated source-vs-source AND passing the stricter
+  in-process identity check. Dropped 20 React/Ink `.tsx` nodes (not behaviour-
+  testable) + flaky. (A stray non-governed deletion of node_0003 appeared mid-
+  grind; restored from backup, validate+replay green.)
+- **Order theory applied (A/B/C).** (A) `onto status --blockers` — the
+  batch-syncable *order ideal* + the fix-first *blocker antichain* (live: 136
+  core but 77 batch-syncable; `node_0021` blocks 82). (B) the core as fixed
+  points of an F∘G closure, with a tested monotonicity property. (C) κ\* — the
+  least ladder rung that closes a node (the capability barometer), recorded per
+  run, with a cost-optimal warm start. Honestly tiered in `MATHEMATICAL_CLAIMS`
+  §3.11 (order least-element T1; closure/rate-distortion readings T2/T3).
+- **Hygiene.** Escaped a literal NUL byte in `rules-grounding.ts` (the NUL guard
+  caught it); `check:nul` green.
+- **Deferred:** the measured executor close-rate sweep over the calibrated sample
+  (ROADMAP "Gap 2") — the number that gates building the Architect.

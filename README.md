@@ -67,6 +67,10 @@ Longer term, the **Open-Prompt protocol** turns the signed intent + audit chain 
 | `onto graph infer-edges / neighbors / path / subgraph / metrics` | Static edge inference (no LLM) and read-only graph queries. |
 | `onto verify-homeomorphism` | Measure the round-trip: dual distances, five-label verdict, fidelity-cartography matrix, behaviour checker. |
 | `onto drift` | Merkle change-detection over compiled artifacts; `--update` re-anchors the baseline, `--fail-on-drift` gates CI; feeds `verify-homeomorphism --nodes`. |
+| `onto regenerate` | Re-derive a node's code from its intent with the in-machinery levers: `--behavior-check`, `--draws N` (consensus), `--refine N` (verify-refine), `--decompose`; writes only behind the gates. |
+| `onto probe` / `onto rules` / `onto ficha` | Generate a self-validated behaviour fixture (`probe`); check/triage declared rules (`rules`); audit + deterministically reconcile a node's contract (`ficha audit` / `ficha cleanup --apply --prune`). |
+| `onto sync` / `onto status` | The one-step governed loop (`sync`: regen + 3 gates + re-anchor, write-or-refuse) and read-only graph health (`status`; `--blockers` = the dependency-order syncable *ideal* + fix-first blocker *antichain*). |
+| `onto execute` | The governed **executor**: closes a node + its closure by refine/decompose/**escalate** up a model capability ladder, writes only behind green gates, and reports each node honestly (closed / extraction-gap / capacity-ceiling / blocked-upstream / unverified). |
 | `onto workflow run` | Verify-refine state machine over a typed workflow graph; `--as-proposal` feeds accepted results back into the intent graph (create or `--update-node`). |
 | `onto bakeoff <reports…>` | Fidelity regression gate over recorded verify reports (wired into CI). |
 | `onto query` | Search nodes by Hom-profile (edges + contract + coordinates); `--semantic <text>` adds embedding re-rank (hybrid retrieval). |
@@ -169,11 +173,13 @@ with a semantic gate ($\text{validateIntent} \to \Omega$, a three-valued predica
 
 ## Status
 
-**Alpha.** Project Legend phases α–ε are closed; Phase ζ (workflow runtime) is active. In one breath:
+**Alpha.** Project Legend phases α–ε are closed; Phase ζ is active — the workflow
+runtime AND the governed **dynamic-agent executor**. In one breath:
 
-- **Both directions are operational** — F (compile) and G (ingest) — and the round-trip is *measured*: AST grounding contributes Δ = +0.355 mean structural Jaccard over an ablation control on this repo's 125-file core; the fidelity matrix fills 2 of 5 columns (structural + behaviour), the rest are explicit no-data.
-- **The kernel's mathematical claims are test-pinned where it matters** — 13 T1 laws (crash-atomic durable event log, presheaf restriction, sheaf-on-subcategory gluing, compiler functoriality, monad laws, Ω closed-world parity, content-addressed runs, …).
+- **Both directions are operational** — F (compile) and G (ingest) — and the round-trip is *measured*: AST grounding contributes Δ = +0.355 mean structural Jaccard over an ablation control on this repo's 125-file core; the fidelity matrix fills 3 of 5 columns (structural + behaviour + contract), the rest are explicit no-data.
+- **The dynamic half exists** — `onto execute` closes a node by refining/decomposing/escalating a model capability ladder, writing only behind green gates and flagging *extraction-gap* (intent too thin) vs *capacity-ceiling* honestly. Child-process draft isolation, an order-ideal readiness view (`onto status --blockers`), and the κ\* capability barometer ship with it. The trustworthy core (shadow + fixture + clean rules) is **136 / 221** nodes.
+- **The kernel's mathematical claims are test-pinned where it matters** — 15 T1 laws (crash-atomic durable event log, presheaf restriction, sheaf-on-subcategory gluing, compiler functoriality, monad laws, Ω closed-world parity, content-addressed runs, the syncable order ideal, …).
 - **Durability:** `state.json` writes are atomic + durable, `events.jsonl` appends are durable; the advisory lock covers the long-running mutators only (quick mutations rely on per-write atomicity — worst case last-writer-wins, never corruption).
-- **Not yet:** a clean real-LLM pass of the ζ verify-refine loop (frontier-gated; first attempt 2026-05-29 surfaced fixes) and the signing half of Open-Prompt.
+- **Not yet:** the *measured* executor close-rate sweep over a calibrated sample (the number that gates building the meta-agent "Architect"); a clean real-LLM pass of the ζ verify-refine loop; the signing half of Open-Prompt.
 
 Live phase state, metrics, dates and open work: [**ROADMAP.md**](docs/ROADMAP.md). Everything is meant to fail loudly and exit `1` rather than silently corrupt.

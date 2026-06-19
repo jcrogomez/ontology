@@ -26,6 +26,7 @@ full pitch and `docs/design/inverse/PROJECT_LEGEND.md` for the design.
 | Phase ε self-ingestion experiment record | [`docs/legend/calibrations/CALIBRATION_LOG.md`](docs/legend/calibrations/CALIBRATION_LOG.md) | Hand-rolled index of the calibration corpus. These are **dated, pre-registered records — historical, do not rewrite.** |
 | Phase ζ workflow runtime | [`docs/design/runtime/WORKFLOW_RUNTIME_SPEC.md`](docs/design/runtime/WORKFLOW_RUNTIME_SPEC.md) | The `onto workflow run` verify-refine state machine, predicate DSL, artefact-slot dataflow. |
 | The governed sync loop (`onto sync` / `onto status`) | [`docs/design/runtime/SYNC_LOOP.md`](docs/design/runtime/SYNC_LOOP.md) (how-to), [`docs/design/runtime/SYNC_LOOP_SPEC.md`](docs/design/runtime/SYNC_LOOP_SPEC.md) (contract + acceptance) | One command closes intent→code: regen + 3 gates + per-node re-anchor. Honest number in §8. |
+| The dynamic-agent EXECUTOR (`onto execute`) | [`docs/design/runtime/EXECUTOR_SPEC.md`](docs/design/runtime/EXECUTOR_SPEC.md) | Governed loop that closes a node by refine/decompose/escalate up a capability ladder, writes only behind green gates, flags extraction-gap vs capacity-ceiling. Child-process draft isolation, order-ideal readiness (`onto status --blockers`), κ\* barometer. |
 | Per-commit detail | [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md) | |
 | Onboarding / first run | [`README.md`](README.md), [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md) | |
 | CLI surface | [`docs/CLI_COMMANDS.md`](docs/CLI_COMMANDS.md) | |
@@ -103,8 +104,10 @@ src/                 grouped by role in F : Intent→Code, G : Code→Intent (se
   inverse/           G : Code→Intent — extraction: ast-symbol-scanner, ficha-quality,
                      intent-narration, structural-classifier, frontier-tagger, … + static/, ingest/
   laws/              F∘G≈id + extensions: verify-homeomorphism, matrix, behavior/contract
-                     checkers, … + topos/ fibration/ effects/ query/
-  runtime/           the live engines: llm/ (dispatcher, adapters, registry), workflow/ (Phase ζ)
+                     checkers (+ behavior-checker-isolated: child-process draft runner), topos/ fibration/ effects/ query/
+  kernel/graph/      … + sync-readiness (order-ideal batch-syncability for `onto status --blockers`)
+  runtime/           the live engines: llm/ (dispatcher, adapters, registry), workflow/ (Phase ζ),
+                     executor/ (the governed dynamic-agent loop: policy, model-ladder, runner, kappa-star)
   surfaces/          what a user/agent touches: commands/ (onto <verb>), walker/ (TUI), mcp/
 tests/             vitest suites (mirror src/ loosely)
 docs/              orientation at top level (ROADMAP, VISION, MATHEMATICAL_CLAIMS, CLI_COMMANDS, GETTING_STARTED)
@@ -120,9 +123,12 @@ Kept last on purpose: this is the only section that changes often, so
 editing it does not invalidate the prompt cache for the stable rules
 above. Do not move it up, and do not duplicate ROADMAP detail here.
 
-- **Phases α–ε are closed; Phase ζ (the workflow runtime) is active.**
+- **Phases α–ε are closed; Phase ζ is active** — two parallel ζ streams: the
+  workflow runtime AND the governed **dynamic-agent layer** (`onto execute`
+  executor + child-process draft isolation + order-ideal readiness + κ\*),
+  shipped 2026-06-18/19 (`EXECUTOR_SPEC.md`). Trustworthy core 47→136/221.
 - **Naming gotcha:** "Phase ζ" in older docs sometimes meant "release +
-  Open-Prompt seeds" (the original plan). The *active* ζ stream is the
-  workflow runtime.
+  Open-Prompt seeds" (the original plan). The *active* ζ streams are the
+  workflow runtime and the dynamic-agent executor.
 - For phase specifics, metrics, dates, and open work, trust
   `docs/ROADMAP.md` — that is the single source of truth.
