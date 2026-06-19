@@ -56,6 +56,24 @@ exhaustively pinned by `tests/runtime/topos/closed-world-parity.test.ts`)
 
 ## Open follow-ups
 
+### Shipped 2026-06-18 (against the four-gap checkpoint below)
+
+- **Gap 1 (trustworthy core) — done.** Deterministic ficha cleanup
+  (`missingExports`/phantom-provides → 0) + a cloud-probed fixtures grind
+  (`qwen3-coder:480b-cloud`, +89 self-validated fixtures) took the syncable core
+  **47 → 136 / 221**. The order-ideal view (`onto status --blockers`,
+  `MATHEMATICAL_CLAIMS` §3.11) shows 77 *batch*-syncable + the fix-first blocker
+  antichain (`node_0021` alone blocks 82).
+- **Gap 3 (Walker v2) — early shipped.** `:health` node dashboard +
+  `:fichacleanup` / `:reanchor` governed one-shot controls.
+- **Gap 4 (hygiene) — done.** NUL-byte guard fix; `check:nul` green.
+- **Plus:** the governed **executor** (`onto execute`) with a premise capability
+  ladder + child-process isolation of the draft behaviour check (unblocks IO/glue
+  nodes — `node_0013` now closes by escalating 7B→cloud). See
+  [`design/runtime/EXECUTOR_SPEC.md`](design/runtime/EXECUTOR_SPEC.md).
+- **Still open: Gap 2** — the measured `onto execute` sweep over the calibrated
+  sample (close-rate per terminal state). That number gates the Architect.
+
 ### 2026-06-18 checkpoint — the four product gaps
 
 The missing work is no longer "invent the primitives." The primitives now
@@ -236,13 +254,15 @@ Detail per PR is in [`RELEASE_NOTES.md`](RELEASE_NOTES.md); the table below is a
 
 ---
 
-*Last refresh: **2026-06-18** (state as of local `main` around `707a3fe`,
-plus this checkpoint). The intent→code regeneration loop is now joined by the
-governed executor layer (`onto execute`) and a live status surface: **47/221**
-code shadows are in the syncable core, **15** shadows are drifted, and ficha
-quality still shows **+5** missing exports, **308** phantom provides, and **57**
-prose/noise rules. The load-bearing finding remains: the binding constraint is
-extraction/GET quality plus model variance/capacity, not the existence of the
-compiler primitives. Phase ζ active. This file is the single source of truth for
-open work; when a follow-up ships, promote it out of the open list into the
-bootstrap-history table or `RELEASE_NOTES.md`.*
+*Last refresh: **2026-06-18 (pm)** (state as of branch `feat/trustworthy-core`,
+the `main @ 707a3fe` work plus the trustworthy-core session). The governed
+executor (`onto execute`, premise capability ladder, child-process draft
+isolation) is shipped, and the four-gap checkpoint's gaps 1/3/4 are done: ficha
+contract gaps zeroed (missing/phantom 0; **57** prose rules remain), and a
+cloud-probed fixtures grind took the syncable core **47 → 136 / 221** (order-ideal
+view: 77 *batch*-syncable; **15** drifted). The load-bearing finding is unchanged:
+the binding constraint is extraction/ficha quality plus model variance/capacity,
+not the existence of primitives — and the next decision-point is **Gap 2**, the
+measured executor close-rate sweep that gates the Architect. Phase ζ active. This
+file is the single source of truth for open work; promote shipped follow-ups into
+the bootstrap-history table or `RELEASE_NOTES.md`.*

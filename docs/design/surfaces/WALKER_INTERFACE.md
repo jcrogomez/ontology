@@ -1,6 +1,10 @@
 # RFC: Walker Interface
 
-**Status:** Walker v1 complete — v0 (Bootstrap 0.4), v1 PR-A (drafts + `:propose`), v1 PR-B (`:run`), v1 PR-C (`:plan`) all shipped. v2 still planned.
+**Status:** Walker v1 complete; **v2 early (2026-06-18)** — the node-health
+cockpit (`:health`) + governed one-shot controls (`:fichacleanup`, `:reanchor`)
+shipped (see §10.1). v0 (Bootstrap 0.4), v1 PR-A (drafts + `:propose`), v1 PR-B
+(`:run`), v1 PR-C (`:plan`) all shipped. Full v2 scope (editing + escalation
+surfaces) still planned.
 **Bootstrap target:** 0.4 (v0 read-only) → 0.6 (full pipeline cockpit)
 **Related:** Proposal System (RFC), Run Persistence (RFC)
 **Date:** 2026-05-05
@@ -291,6 +295,30 @@ walker never auto-creates proposals. Read-only; dismiss with
 shared with the CLI via `src/forward/context/edge-suggester.ts`.
 
 ## 10. v2 scope
+
+### 10.1 v2 early — shipped 2026-06-18
+
+The governed-loop cockpit, focal-node first:
+
+- **`:health`** (alias `:status`) — the node-health dashboard for the focal
+  node: identity, code-shadow freshness, behaviour-fixture + static-rule
+  coverage, ficha quality, dependency closure (upstream/dependents), and the
+  ranked **next safe action** (what + why + the command). Colour-coded by
+  confidence (syncable=green / lower=yellow / blocked=red). Pure read-only
+  composition (`actions/node-health-from-walker.ts`); the same readiness
+  `onto status --blockers` computes at the graph level.
+- **`:fichacleanup`** — one-shot control: run the deterministic ficha
+  reconciliation (complete missing exports + prune phantom provides) on the
+  focal, governed via `updateNode`, then refresh `:health`.
+- **`:reanchor`** — one-shot control: refresh THIS node's drift anchor (accept
+  the current shadow as baseline), then refresh `:health`.
+
+Both controls reuse the shared cores in `commands/ficha.ts` /
+`laws/reanchor-node.ts` (one implementation of the delicate mutation) and bump
+the reload tick so the focal's derived state recomputes immediately. The
+remaining v2 surfaces (editing with contract diff, escalation surface) are below.
+
+### 10.2 v2 scope (planned)
 
 Walker v2:
 

@@ -90,3 +90,49 @@ describe("computeSyncReadiness — the syncable order ideal", () => {
     expect(r.ideal).toEqual(["A", "B"]);
   });
 });
+
+// The ideal behaves as an order-theoretic CLOSURE/selection operator on the
+// ready set. These properties are the T1 anchor for the (B) framing: the
+// trustworthy core can only GROW as readiness grows — "adding a fixture or
+// fixing extraction never shrinks the batch-syncable set". A violation at the
+// graph level would mean a governance regression (e.g. a node silently lost).
+describe("computeSyncReadiness — closure-operator properties", () => {
+  const EDGES = [dep("TOP", "L"), dep("TOP", "R"), dep("L", "BASE"), dep("R", "BASE")];
+  const SH = S("TOP", "L", "R", "BASE");
+
+  it("extensive-by-selection: every ideal member is itself ready", () => {
+    const r = computeSyncReadiness({ shadowed: SH, ready: S("TOP", "R", "BASE"), edges: EDGES });
+    expect(r.ideal.every((id) => S("TOP", "R", "BASE").has(id))).toBe(true);
+  });
+
+  it("down-closed: every shadowed dependency of an ideal member is also in the ideal", () => {
+    const r = computeSyncReadiness({ shadowed: SH, ready: SH, edges: EDGES });
+    const ideal = new Set(r.ideal);
+    // BASE below L,R,TOP; if TOP is ideal so must be L,R,BASE.
+    if (ideal.has("TOP")) expect(["L", "R", "BASE"].every((d) => ideal.has(d))).toBe(true);
+  });
+
+  it("MONOTONE: ready ⊆ ready' ⟹ ideal(ready) ⊆ ideal(ready')", () => {
+    const ladder = [
+      S("R"),
+      S("R", "BASE"),
+      S("R", "BASE", "L"),
+      S("R", "BASE", "L", "TOP"),
+    ];
+    let prev: string[] = [];
+    for (const ready of ladder) {
+      const ideal = computeSyncReadiness({ shadowed: SH, ready, edges: EDGES }).ideal;
+      // each step only ADDS to the ideal — never removes
+      expect(prev.every((id) => ideal.includes(id))).toBe(true);
+      prev = ideal;
+    }
+    // the top of the ladder (everything ready) is the whole graph
+    expect(prev.sort()).toEqual(["BASE", "L", "R", "TOP"]);
+  });
+
+  it("idempotent selection: the ideal of an already-ideal ready-set is itself", () => {
+    const first = computeSyncReadiness({ shadowed: SH, ready: SH, edges: EDGES }).ideal;
+    const second = computeSyncReadiness({ shadowed: SH, ready: new Set(first), edges: EDGES }).ideal;
+    expect(second).toEqual(first);
+  });
+});

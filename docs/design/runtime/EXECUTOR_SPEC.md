@@ -1,0 +1,163 @@
+# Executor — the governed dynamic-agent loop
+
+**Status:** shipped 2026-06-18 (Phase ζ). Code in `src/runtime/executor/` +
+`onto execute`. Tiering: **T2 operational** — "closes a node when it can,
+flags honestly when it can't." This is NOT autonomous correctness and NOT an
+autonomous system builder; it is a governed actuator over machinery that already
+exists (`runRegenerate` + the three gates + per-task routing).
+
+See also: [`SYNC_LOOP_SPEC.md`](SYNC_LOOP_SPEC.md) (the one-step seed the
+executor generalises), [`WORKFLOW_RUNTIME_SPEC.md`](WORKFLOW_RUNTIME_SPEC.md)
+(the sibling ζ engine), and `docs/MATHEMATICAL_CLAIMS.md` §3.11 (the order
+theory of sync readiness).
+
+## 1. What it does
+
+`onto execute <nodes...>` closes intent→code for each node **and its dependency
+closure**, in topological order:
+
+```
+regenerate from intent → gate (structural + behaviour + rules)
+  → DECIDE the next move (refine / decompose / escalate the model ladder)
+  → write ONLY behind green gates
+  → classify every node it cannot close, honestly.
+```
+
+It introduces **no new verification semantics** — the gates are
+`runRegenerate`'s. What it adds is the *decision*: which lever to pull, when to
+climb the capability ladder, and an honest terminal verdict per node.
+
+Per-node terminal states (this enum IS the report taxonomy — no remapping):
+
+| Terminal | Meaning |
+|---|---|
+| `closed` | gates green; the passing draft was written under governance |
+| `extraction-gap` | clean lint at the top rung yet still failing → the **intention** is the limit, not the model. Flag G; do **not** write |
+| `capacity-ceiling` | levers + ladder exhausted with non-clean/unknown lint → the available models can't close it |
+| `blocked-upstream` | a hard dependency did not close → not attempted (never disguised as a capacity ceiling) |
+| `unverified-no-fixture` | no behaviour fixture → cannot gate on behaviour, so the executor refuses to write |
+| `infra-error` | machine failure (provider down, missing shadow, lock, a draft that crashed the checker) |
+
+## 2. Why this, not `sync` or `workflow`
+
+`onto sync` is the *one-step* governed loop: one regen, three gates, write-or-
+refuse. The executor is `sync` generalised into a **decision loop with memory**:
+it retries with escalating levers, walks a whole dependency closure, and reports
+*why* a node didn't close. `onto workflow` runs an author-defined graph; the
+executor's "graph" is the intent DAG itself, walked topologically.
+
+## 3. The decision policy — a pure reducer (`policy.ts`)
+
+`decide(state: NodeExecState): Action` is **pure** (no IO, no LLM): given the
+history of gate verdicts it returns the next `Action`, either `{apply, lever}`
+or `{terminate, terminal}`. This is the heart and the cheapest thing to test —
+exhaustive branch coverage in `tests/executor-policy.test.ts`.
+
+Levers: `generate` (plain draw), `refine N` (runRegenerate's internal verify-
+refine), `decompose` (slice-and-assemble), `escalate` (climb one ladder rung).
+
+Branch order (read from the 2026-06-17 calibration record):
+1. upstream not all closed → `blocked-upstream`.
+2. no history → `generate` at the cheapest rung.
+3. behaviour `pass` → `closed`; `infra-error` → terminate; `untested` with no
+   fixture → `unverified-no-fixture`.
+4. budget/ladder exhausted → `classifyPlateau`: **clean lint → extraction-gap,
+   else capacity-ceiling** (unknown lint stays conservative = capacity, never
+   accusing the intention without evidence).
+5. otherwise climb the lever ladder: refine → escalate → decompose → concede.
+
+The anti-corruption layer `verdict.ts` collapses the 20-field `RegenerateResult`
+into a small `GateVerdict {outcome, lintClean, hasFixture, detail}` so the policy
+never sees the fat type. `fixturePresent` disambiguates the overloaded
+`no_fixture` verdict: a fixture-present-but-unevaluable draw is `broken`
+(refinable), not `untested` (unverifiable).
+
+## 4. The capability ladder (`model-ladder.ts`)
+
+`escalate` climbs a ladder ordered cheapest → most capable. The ladder is **not
+hardcoded** — it is the result of resolving a `ModelPremise` (allow/forbid/order
+over `caps`: locality, tier, cost) against the model registry. A model is a rung
+**only if it carries explicit `caps`** (the opt-in; keeps embed/extract models
+out of the compile ladder). `DEFAULT_PREMISE` forbids `paid` + `mock`, so the
+$0/local default falls out: opus is absent unless `--allow-paid` is passed.
+
+Live ladder: `qwen2.5-coder:7b` (local) → `qwen3-coder:480b-cloud` (cloud, free
+tier) → `claude-opus-4-7` (only with `--allow-paid`).
+
+## 5. The runner — a topological walk (`runner.ts`)
+
+NOT a `map` over nodes — a dependency-ordered walk (via `computeCompilePlan`)
+where a node's `upstreamAllClosed` feeds its decision. Key invariants:
+- **write on the passing attempt**: `write` is on for every attempt and gated by
+  `runRegenerate` (writes only behind green gates), so the draft that passes is
+  written atomically. No fresh re-draw at converge time (the 7B is high-variance;
+  a re-draw would not reproduce the passing draft).
+- **upstream propagation**: a node whose dependency didn't close is
+  `blocked-upstream`, never mis-blamed as capacity.
+- **resilience**: a `runRegenerate` throw is caught as `infra-error` so one
+  pathological node never aborts the batch.
+
+`runRegenerate` is injected (`ExecutorDeps.regenerate`) so the walk, the policy
+integration, and the governance are testable without a live LLM
+(`tests/executor-runner.test.ts`). `runExecutorLive` (`commands/execute.ts`)
+binds the real command + loads graph/registry + resolves the premise ladder.
+
+## 6. Child-process isolation of the behaviour check
+
+The v0 behaviour checker runs untrusted LLM drafts **in-process**. An IO node
+like `lock.ts` schedules a deferred throw (an orphaned retry timer) that fires
+after the in-process guard tears down → an uncaughtException that crashed the
+whole run. The principled fix (shipped): run the draft check in a **disposable
+child process** (`behavior-checker-isolated.ts` + `behavior-check-child.ts`):
+`spawnSync(tsx, child)` with a hard timeout + SIGKILL, the verdict written to a
+result file. A child that crashes / hangs / `process.exit`s without a result →
+`untested` (so the executor refines/escalates; never writes). Only the untrusted
+draft path (regenerate) is isolated; `onto probe` self-validation and
+`onto verify` stay in-process (they run trusted source). Containment proven in
+`tests/behavior-checker-isolated.test.ts`.
+
+## 7. Sync readiness as an order ideal (`kernel/graph/sync-readiness.ts`)
+
+The dependency relation is a poset. A node is confidently **batch**-syncable
+only if its whole shadowed dependency closure is also ready — i.e. the batch-
+syncable set is the largest **down-closed subset (order ideal)** of the
+atomically-ready `core` tier. The dual is the leverage: non-ready nodes are
+**blockers**, ranked by transitive dependents; the minimal ones form the
+**fix-first antichain**. `computeSyncReadiness` is pure and `onto status
+--blockers` surfaces it. The ideal is a monotone closure-style operator (adding a
+fixture only grows it), proven in `tests/sync-readiness.test.ts`. See
+`MATHEMATICAL_CLAIMS.md` §3.11.
+
+## 8. Honest results (2026-06-18, real machinery)
+
+- `node_0110` / `node_0172` (pure leaves): `closed` at rung 0, written governed.
+- `node_0013` (`lock.ts`, glue/IO): **escalates 7B→480b-cloud and closes** —
+  the 7B can't, the cloud can; first end-to-end ladder escalation observed.
+- Trustworthy core 47 → **136 / 221** after the fixtures grind; the order-ideal
+  view shows only **77 batch-syncable**, 59 blocked-from-below, with
+  `node_0021` (`load.ts`) alone blocking 82 nodes.
+
+## 9. What it does NOT cover (yet)
+
+- The measured frontier sweep / close-rate over the calibrated sample
+  (ROADMAP gap #2) — the number that decides whether to build the Architect.
+- The Architect (Goal→Intent): proposes an intent subgraph and validates each
+  node via the executor. Designed as "the same loop one level up"; gated on the
+  sweep.
+- A truly deferred uncaught throw from a child is contained by killing the child;
+  a draft that corrupts shared on-disk state before exit is out of scope.
+
+## 10. Implementation handles
+
+```
+src/runtime/executor/
+  types.ts        NodeExecState, Lever, Action, Terminal, NodeRecord
+  verdict.ts      RegenerateResult → GateVerdict (anti-corruption)
+  policy.ts       decide() — the pure reducer
+  model-ladder.ts ModelPremise + resolveLadder (caps opt-in)
+  runner.ts       runExecutor — topological walk, governed write
+  report.ts       ExecReport + formatReport
+src/surfaces/commands/execute.ts   runExecutorLive + executeCommand
+src/laws/behavior-checker-isolated.ts + behavior-check-child.ts
+src/kernel/graph/sync-readiness.ts  computeSyncReadiness
+```

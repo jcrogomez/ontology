@@ -62,6 +62,7 @@ equivalence), plus the topos / fibration / monad / representable extensions.
 The workflow state machine and the governed intent→code loop.
 
 - [`runtime/WORKFLOW_RUNTIME_SPEC.md`](runtime/WORKFLOW_RUNTIME_SPEC.md) — the ζ verify-refine runtime.
+- [`runtime/EXECUTOR_SPEC.md`](runtime/EXECUTOR_SPEC.md) — the governed dynamic-agent loop (`onto execute`): decision policy, premise capability ladder, topological runner, child-process isolation, order-ideal sync readiness.
 - [`runtime/SYNC_LOOP.md`](runtime/SYNC_LOOP.md) — the governed loop, how-to.
 - [`runtime/SYNC_LOOP_SPEC.md`](runtime/SYNC_LOOP_SPEC.md) — the loop's contract + acceptance.
 

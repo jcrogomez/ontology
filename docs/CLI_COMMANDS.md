@@ -698,7 +698,34 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
   count — `SYNC_LOOP_SPEC.md` §8). The lever is model quality / ficha
   determinacy, not the consensus knob.
 
-### `status` *(2026-06-14 — graph health for the sync loop)*
+### `execute <nodes...>` *(2026-06-18 — the governed executor loop)*
+
+- **Purpose:** close intent→code for each node **and its dependency closure**
+  (topological order): regenerate → gate → **decide** the next move (refine /
+  decompose / escalate the model ladder) → write ONLY behind green gates →
+  classify what it can't close, honestly. Generalises `sync` into a decision
+  loop with memory + capability escalation. No new verification semantics — the
+  gates are `regenerate`'s. **T2 operational; not autonomous correctness.**
+- **Terminal per node:** `closed` · `extraction-gap` (clean lint at the top
+  rung yet failing → the *intention* is the limit; not written) ·
+  `capacity-ceiling` · `blocked-upstream` · `unverified-no-fixture` ·
+  `infra-error`. The enum IS the report taxonomy.
+- **Capability ladder:** ordered cheapest→capable by resolving a `ModelPremise`
+  against the registry's `caps` (a model is a rung only with explicit `caps`).
+  $0/local default forbids paid; `--allow-paid` opts into the frontier rung.
+  Live ladder: `qwen2.5-coder:7b` → `qwen3-coder:480b-cloud` → `claude-opus-4-7`.
+- **Flags:** `--dry-run` (decide + gate but never write), `--max-attempts <n>`
+  (backstop, default 8), `--allow-paid` (allow paid models in the ladder),
+  `--behavior-fixtures-dir <path>`, `--ollama-host <host>`, `--json`.
+- **Governance:** writes only the passing attempt (gated by `regenerate`); a
+  draft is run in a disposable child process so a deferred throw can't crash the
+  batch (`EXECUTOR_SPEC.md` §6). Exit non-zero only on `infra-error`.
+- **Example:** `npm run dev -- execute node_0013 --json` ·
+  `onto execute node_0110 node_0172 --dry-run`
+- **Real run (2026-06-18):** `node_0013` (lock.ts, glue) closed by escalating
+  7B→480b-cloud; pure leaves close at rung 0. See `design/runtime/EXECUTOR_SPEC.md`.
+
+### `status` *(2026-06-14 — graph health for the sync loop; --blockers 2026-06-18)*
 
 - **Purpose:** read-only "can I sync, and what's in the way" view. A pure
   composition of shadow/fixture presence + static rule cleanliness +
@@ -711,8 +738,16 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **"Core" is presence-based:** status does not execute fixture code (a
   health check must not run arbitrary source); a fixture's actual
   green-against-source is confirmed at sync time by the behaviour gate.
-- **Flags:** `--list` (node ids per tier), `--json` (full per-node detail).
-- **Example:** `onto status` · `onto status --list`
+- **Flags:** `--list` (node ids per tier), `--blockers` (dependency-order
+  readiness: the syncable **ideal** — core nodes whose whole closure is core —
+  plus the fix-first **blocker antichain** ranked by how many nodes each blocks),
+  `--json` (full per-node detail + the `readiness` object).
+- **`--blockers` (order theory):** the batch-syncable set is the largest
+  down-closed subset (order ideal) of the core tier under the dependency poset;
+  the minimal non-ready nodes are the leverage. Live (2026-06-18): 136 core but
+  only 77 batch-syncable; `node_0021` alone blocks 82. See `MATHEMATICAL_CLAIMS`
+  §3.11 + `design/runtime/EXECUTOR_SPEC.md` §7.
+- **Example:** `onto status` · `onto status --list` · `onto status --blockers`
 - **Live graph (2026-06-14):** 228 nodes, 221 with a shadow → 43 core, 178
   lower-confidence, 0 blocked; 43/221 have fixtures; 5 shadows drifted.
 - **Output (JSON):** `{ ok, report: { totalNodes, trackable, core, lowerConfidence, blocked, withFixture, drift: { hasAnchor, drifted }, ficha: { underDeclared, missingExports, proseRules }, nodes: [...] } }`.

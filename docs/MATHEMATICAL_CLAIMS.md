@@ -254,6 +254,38 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 
 - **Why this is the load-bearing T2 of the project.** Every other category-theoretic claim shipped is either a single-direction functor (T1/T2) or an internal monad (T1). An **adjoint pair with measured per-axis tolerance** is qualitatively stronger; it is the standard structure category theory uses to relate two categories, and constructing one operationally is what distinguishes "rhetorical category theory in a README" from "operational category theory in a tool". γ-2 was the first concrete evidence (n = 1); Phase ε is where the claim moved from "exists for n = 1" to "exists with measured tolerance on a subcategory of the Ontology repo, against pre-registered falsifiers, with a control arm isolating the intervention effect".
 
+### 3.11 Sync readiness as an order ideal (the thin-category corner) — **T1 (order part) / T2 (F∘G part)**
+
+The dependency relation `e.from depends on e.to` is a poset, hence a *thin
+category* (a unique arrow `a → b` iff `a ≤ b`). Two facts of this corner are now
+shipped and tested (`src/kernel/graph/sync-readiness.ts`,
+`tests/sync-readiness.test.ts`):
+
+- **The batch-syncable set is an order ideal (a sieve).** A node is confidently
+  batch-syncable iff its whole *shadowed* dependency closure is also
+  atomically-ready (shadow + fixture + clean rules). That set is the largest
+  **down-closed subset** of the ready set — i.e. a **sieve** on the dependency
+  poset, equivalently a point of the subobject classifier Ω of that site (cf.
+  §3.9). `computeSyncReadiness` returns it plus the dual: the **blocker
+  antichain** (minimal non-ready nodes, ranked by transitive dependents).
+  This is **T1** — the characterising property is tested: the selection operator
+  is **monotone** (`ready ⊆ ready' ⟹ ideal ⊆ ideal'`), idempotent, and
+  down-closed. `onto status --blockers` surfaces it.
+- **The trustworthy core as fixed points of the F∘G closure — T2.** Operationally
+  the trustworthy core (nodes where the round-trip writes a behaviour-equivalent
+  shadow) behaves like the fixed-point set of an `F∘G` closure operator on the
+  intent poset. The falsifiable prediction this licenses: **the core only grows
+  under fixture-addition / extraction-improvement, never shrinks** — a monotone
+  invariant that doubles as an integrity guard (a silent node loss would violate
+  it). The order-theoretic monotonicity above is proven; that `F∘G` itself is a
+  genuine closure operator (idempotent/extensive on a real intent poset) is
+  **not** proven — it stays T2 operational, riding on the §3.10 round-trip
+  measurement. Do not state it as a theorem.
+
+The honest framing: order theory is the **computable T1 skeleton** of the
+project's categorical vision; the adjunction/closure claims about F and G stay at
+the operational tier they earned in §3.10.
+
 ---
 
 ## 4. Cross-cutting claims
@@ -335,11 +367,11 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 
 ## 5. Index — claims by tier
 
-### T1 — Strictly implemented (14)
+### T1 — Strictly implemented (15)
 
 - Axiom 1: typed directed multigraph.
 - Axiom 2: crash-atomic + durable append-only event log + advisory single-writer lock (`tests/fs-json.test.ts`, `tests/advisory-lock.test.ts`; promoted 2026-06-01 — code already shipped, entry was stale).
-- Axiom 3 (refinement-family edges only): poset enforcement.
+- Axiom 3 (refinement-family edges only): poset enforcement (`tests/poset.test.ts`, `tests/poset-cli.test.ts`).
 - Axiom 5 (restriction law only): presheaf restriction *F(S') ⊑ F(S)* on `assembleContext` (`tests/presheaf-sheaf-laws.test.ts`, pinned 2026-06-01).
 - Axiom 5 (gluing, `identify-if-equal` opt-in): **sheaf on the equal-signature overlap subcategory** — gluing axiom pinned as a characterising law over an explicit cover with restriction maps (`restrictSection`, `presheaf-sheaf-laws.test.ts` Part 3: existence + restriction round-trip + well-definedness/reconstruction (section-uniqueness follows) + exhaustive sweep over all 49 ordered two-piece families (28 distinct two-piece covers) + boundary; promoted 2026-06-09, Path-to-T1 gate #2). Subcategory currently defined by the syntactic discriminator; the resolved-type refinement is a fidelity axis, not a law gap.
 - Axiom 6: compiler functor — identity / morphism / composition laws pinned via the named artifact category (`tests/compiler-functoriality.test.ts`, `src/kernel/graph/artifact-category.ts`, 2026-06-01).
@@ -351,8 +383,9 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 - §3.9 (validator port): closed-world parity == Boolean oracle, exhaustive over predicate-tree × closed-world (`tests/runtime/topos/closed-world-parity.test.ts`, pinned 2026-06-01).
 - §4.1: content-addressed run records.
 - §4.4: replay law — `onto replay` rebuilds the state summary from the log and `replay(history(state)) === state` holds for every log-derived field, chain integrity verified in the same fold (`src/kernel/core/state/replay.ts`, `tests/replay-cli.test.ts`; promoted T3 → T1 2026-06-09).
+- §3.11 (order part): batch-syncable set = order ideal / sieve on the dependency poset; selection operator monotone + idempotent + down-closed (`src/kernel/graph/sync-readiness.ts`, `tests/sync-readiness.test.ts`; shipped 2026-06-18). Surfaced by `onto status --blockers`.
 
-### T2 — Operationally implemented (6)
+### T2 — Operationally implemented (7)
 
 - Axiom 4 (AST): marker-based prompt parser (no actual rewriting).
 - Axiom 5 (gluing, default): separated presheaf with provider-uniqueness — **not** a sheaf (gluing axiom fails for agreeing sections; negative law pinned 2026-06-01). Restriction half promoted to T1 above.
@@ -360,6 +393,7 @@ Movement between tiers is always cheap (downgrade aspirational → analogy → o
 - §3.8 (fibers): branch fibration partition + induced subgraph (no morphism-level fibration test).
 - §3.10: compile adjoint — Phase ε self-ingest, cartography matrix **3/5 measured columns** (2-column at the 2026-05-26 promotion; contract filled 2026-06-09 at \$0, pass rate 0.726), pre-registered falsifiers met. Reframed 2026-06-01 as a *probabilistic/enriched* adjoint; verdict-*fold* determinism + variance-measurement core both test-pinned (`verdict-variance.ts`); only budget-gated real-LLM N-run generation remains open. Stays T2.
 - §4.2: proposal system lifecycle + provenance (categorical reading is generous).
+- §3.11 (F∘G part): trustworthy core ≈ fixed-point set of an F∘G closure on the intent poset; licenses the monotone-growth invariant (core never shrinks under fixture-add / extraction-fix). Order-monotonicity proven (T1 above); that F∘G is a genuine closure operator is unproven — rides on §3.10. Shipped 2026-06-18.
 
 ### T3 — Useful analogy (7)
 
