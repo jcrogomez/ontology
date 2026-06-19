@@ -128,6 +128,29 @@ atomically-ready `core` tier. The dual is the leverage: non-ready nodes are
 fixture only grows it), proven in `tests/sync-readiness.test.ts`. See
 `MATHEMATICAL_CLAIMS.md` §3.11.
 
+### 7.1 κ* — the capability barometer (`kappa-star.ts`)
+
+κ* is the **least rung of the capability ladder that closes a node** — the
+sensor for "escalate the model" vs "improve the intention". The ladder is a
+chain; "closes" is assumed an upward-closed (monotone-threshold) predicate, so
+the executor's climb is a **least-element search** and κ* is the threshold.
+
+- `kappaStar(observations)` (pure, T1): the least closing rung + whether the
+  observed rungs are actually monotone + any **violation** (closed low, failed
+  higher = variance / non-threshold — surfaced, not hidden).
+- Every `onto execute` run records κ* per closed node and a **κ* distribution**
+  (rung → count + never-closed) — the rate-distortion-flavoured measurement of
+  *how much model capability this graph's F∘G needs*. Free from any multi-node run.
+- **Cost-optimal warm start:** `priorKappa` lets a node start its climb at its
+  last known κ* instead of rung 0 — the least-element search from a known lower
+  bound, skipping rungs known to fail. This is the order-theoretic "best
+  approximation from below" made operational.
+
+Honest tiering: the least-element computation is T1 (tested); the
+monotone-threshold + rate-distortion reading is T2/T3 (see
+`MATHEMATICAL_CLAIMS.md` §3.11). A high κ* with clean lint at the top rung is the
+`extraction-gap` signal; a low κ* means cheap models suffice.
+
 ## 8. Honest results (2026-06-18, real machinery)
 
 - `node_0110` / `node_0172` (pure leaves): `closed` at rung 0, written governed.
@@ -155,7 +178,8 @@ src/runtime/executor/
   verdict.ts      RegenerateResult → GateVerdict (anti-corruption)
   policy.ts       decide() — the pure reducer
   model-ladder.ts ModelPremise + resolveLadder (caps opt-in)
-  runner.ts       runExecutor — topological walk, governed write
+  kappa-star.ts   κ* barometer — least-element of the capability chain
+  runner.ts       runExecutor — topological walk, governed write, κ* + warm start
   report.ts       ExecReport + formatReport
 src/surfaces/commands/execute.ts   runExecutorLive + executeCommand
 src/laws/behavior-checker-isolated.ts + behavior-check-child.ts

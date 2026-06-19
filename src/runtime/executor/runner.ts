@@ -13,6 +13,7 @@ import type { ResolvedNodeModel } from "../llm/resolve-node-model.js";
 import type { RegenerateCommandOptions, RegenerateResult } from "../../surfaces/commands/regenerate.js";
 import { decide, DEFAULT_REFINE_ROUNDS } from "./policy.js";
 import { normalize } from "./verdict.js";
+import { kappaStar } from "./kappa-star.js";
 import { buildReport, type ExecReport } from "./report.js";
 import type { Decision, Lever, NodeExecState, NodeRecord } from "./types.js";
 
@@ -30,6 +31,11 @@ export interface ExecutorConfig {
   maxTokens?: number;
   // Converge-write closed nodes (default true). false = dry run (probe only).
   write?: boolean;
+  // Cost-optimal WARM START: a prior κ* per node (the rung that closed it last
+  // time). The node starts its climb at that rung instead of rung 0 — the
+  // least-element search from a known lower bound, skipping rungs known to fail.
+  // Clamped to the ladder; absent → start at rung 0.
+  priorKappa?: Record<string, number>;
 }
 
 export interface ExecutorDeps {
@@ -95,9 +101,12 @@ async function runNode(
 ): Promise<NodeRecord> {
   const ladderSize = config.ladder.length;
   const targets = upstreamTargets(nodeId, deps.edges);
+  // Warm start at the prior κ* (least-element search from a known lower bound),
+  // clamped to the ladder. Absent → rung 0.
+  const startRung = Math.min(Math.max(0, config.priorKappa?.[nodeId] ?? 0), ladderSize - 1);
   let state: NodeExecState = {
     nodeId,
-    rung: 0,
+    rung: startRung,
     ladderSize,
     history: [],
     upstreamAllClosed: targets.every((t) => closed.has(t)),
@@ -115,6 +124,11 @@ async function runNode(
     decisions.push({ rung: state.rung, action });
 
     if (action.type === "terminate") {
+      // κ* = the least rung observed to close (pass). For the normal climb this
+      // is the rung where it passed; null when it never closed.
+      const kappa = kappaStar(
+        state.history.map((a) => ({ rung: a.rung, closed: a.verdict.outcome === "pass" })),
+      ).kappa;
       return {
         nodeId,
         terminal: action.terminal,
@@ -123,6 +137,7 @@ async function runNode(
         attempts: state.history.length,
         decisions,
         lastDetail: state.history.at(-1)?.verdict.detail,
+        kappa,
       };
     }
 
@@ -183,6 +198,7 @@ export async function runExecutor(config: ExecutorConfig, deps: ExecutorDeps): P
         attempts: 0,
         decisions: [],
         lastDetail: `compile plan failed: ${plan.reason}`,
+        kappa: null,
       });
       continue;
     }

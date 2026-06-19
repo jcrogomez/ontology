@@ -282,9 +282,18 @@ shipped and tested (`src/kernel/graph/sync-readiness.ts`,
   **not** proven — it stays T2 operational, riding on the §3.10 round-trip
   measurement. Do not state it as a theorem.
 
+- **κ* — least element of the capability chain — T1 (order) / T3 (rate-distortion).**
+  The model ladder is a chain; κ* is the least rung that closes a node's F∘G
+  (`src/runtime/executor/kappa-star.ts`, `tests/executor-kappa.test.ts`). The
+  least-element computation + the monotonicity check (is "closes" upward-closed
+  over observed rungs?) are **T1** (pure, tested); reading κ* as the minimum model
+  capacity needed to reconstruct a node within tolerance is a **T3** rate-
+  distortion analogy, not a coding theorem. The executor records κ* per run and
+  can warm-start from a prior κ* (cost-optimal best-approximation-from-below).
+
 The honest framing: order theory is the **computable T1 skeleton** of the
-project's categorical vision; the adjunction/closure claims about F and G stay at
-the operational tier they earned in §3.10.
+project's categorical vision; the adjunction/closure/rate-distortion readings of
+F and G stay at the operational/analogy tier they earned (§3.10, here).
 
 ---
 

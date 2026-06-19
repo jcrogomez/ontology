@@ -101,4 +101,7 @@ export interface NodeRecord {
   attempts: number;
   decisions: Decision[];
   lastDetail?: string;
+  /** κ* — the least ladder rung observed to close this node (null if it never
+   *  closed). The capability barometer; see runtime/executor/kappa-star.ts. */
+  kappa: number | null;
 }

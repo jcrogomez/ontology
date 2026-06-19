@@ -3,6 +3,7 @@
 // ceiling" is read directly off the records with no remapping.
 
 import type { NodeRecord, Terminal } from "./types.js";
+import { kappaDistribution, type KappaDistribution } from "./kappa-star.js";
 
 export interface ExecReport {
   total: number;
@@ -12,6 +13,9 @@ export interface ExecReport {
   blockedUpstream: number;
   unverified: number;
   infraError: number;
+  /** κ* distribution over the run — how much ladder capacity the closed nodes
+   *  needed (rung → count) + how many never closed. The capability barometer. */
+  kappa: KappaDistribution;
   nodes: NodeRecord[];
 }
 
@@ -25,6 +29,7 @@ export function buildReport(nodes: NodeRecord[]): ExecReport {
     blockedUpstream: count("blocked-upstream"),
     unverified: count("unverified-no-fixture"),
     infraError: count("infra-error"),
+    kappa: kappaDistribution(nodes.map((n) => n.kappa)),
     nodes,
   };
 }
@@ -41,8 +46,20 @@ export function formatReport(report: ExecReport): string {
   const lines = report.nodes.map((n) => {
     const mark =
       n.terminal === "closed" ? (n.written ? "✓ closed" : "✓ closed (not written)") : `· ${n.terminal}`;
-    return `  ${n.nodeId}  ${mark}  [rung ${n.finalRung}, ${n.attempts} attempt(s)]` +
+    const k = n.kappa === null ? "" : `, κ*=${n.kappa}`;
+    return `  ${n.nodeId}  ${mark}  [rung ${n.finalRung}, ${n.attempts} attempt(s)${k}]` +
       (n.lastDetail ? `  — ${n.lastDetail}` : "");
   });
-  return [head, ...lines].join("\n");
+  // κ* barometer: how much capability the closed nodes needed.
+  const kd = report.kappa;
+  const hist = Object.keys(kd.byRung)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .map((r) => `rung ${r}: ${kd.byRung[r]}`)
+    .join(" · ");
+  const kappaLine =
+    kd.closed > 0
+      ? `κ* barometer: ${hist}${kd.neverClosed ? ` · never-closed: ${kd.neverClosed}` : ""}`
+      : "";
+  return [head, ...lines, ...(kappaLine ? ["", kappaLine] : [])].join("\n");
 }
