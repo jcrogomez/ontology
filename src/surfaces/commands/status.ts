@@ -1,9 +1,10 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { loadNodes } from "../../kernel/core/project/load.js";
+import { loadNodes, loadEdges } from "../../kernel/core/project/load.js";
 import { getOntologyPaths } from "../../kernel/core/project/paths.js";
 import { auditFichas } from "../../inverse/ficha-quality.js";
 import { checkRules } from "../../inverse/rule-checker.js";
+import { computeSyncReadiness, type SyncReadiness } from "../../kernel/graph/sync-readiness.js";
 import { readDriftState } from "./drift.js";
 import { errorMessage } from "../../kernel/core/errors.js";
 
@@ -26,6 +27,9 @@ export interface StatusCommandOptions {
   json?: boolean;
   /** List the node ids in each tier (human output only). */
   list?: boolean;
+  /** Show the dependency-order readiness view: the syncable ideal + the
+   *  fix-first blocker antichain (human output only; always in JSON). */
+  blockers?: boolean;
 }
 
 type Tier = "core" | "lower" | "blocked" | "no-shadow";
@@ -58,6 +62,8 @@ interface StatusReport {
     missingExports: number;
     proseRules: number;
   };
+  /** Dependency-order readiness: the syncable ideal + the blocker antichain. */
+  readiness: SyncReadiness;
   nodes: NodeStatus[];
 }
 
@@ -125,6 +131,15 @@ export function buildStatusReport(cwd: string): StatusReport {
   }
 
   const trackable = nodeStatuses.filter((n) => n.hasShadow);
+
+  // Dependency-order readiness: the syncable ideal + blocker antichain. The
+  // readiness predicate is the `core` tier (shadow + fixture + rules clean).
+  const readiness = computeSyncReadiness({
+    shadowed: new Set(trackable.map((n) => n.nodeId)),
+    ready: new Set(nodeStatuses.filter((n) => n.tier === "core").map((n) => n.nodeId)),
+    edges: loadEdges(cwd),
+  });
+
   return {
     totalNodes: nodes.length,
     trackable: trackable.length,
@@ -132,6 +147,7 @@ export function buildStatusReport(cwd: string): StatusReport {
     lowerConfidence: nodeStatuses.filter((n) => n.tier === "lower").length,
     blocked: nodeStatuses.filter((n) => n.tier === "blocked").length,
     withFixture: trackable.filter((n) => n.hasFixture).length,
+    readiness,
     drift: {
       hasAnchor,
       drifted: trackable.filter((n) => n.drifted).length,
@@ -195,6 +211,25 @@ function emit(report: StatusReport, options: StatusCommandOptions): void {
     console.log(`  drift:     (no baseline — run \`onto drift --update\` to anchor)`);
   }
   console.log(`  ficha:     ${r.ficha.underDeclared} node(s) under-declare exports (+${r.ficha.missingExports} total), ${r.ficha.proseRules} prose-rule(s) to prune`);
+
+  if (options.blockers) {
+    const rd = r.readiness;
+    console.log("");
+    console.log(`  ── dependency-order readiness ──`);
+    console.log(`  syncable ideal:    ${rd.ideal.length}\tcore nodes whose whole dependency closure is also core (batch-syncable)`);
+    console.log(`  blocked-from-below:${rd.blockedReady.length}\tcore nodes held back only by an unready dependency`);
+    if (rd.frontier.length > 0) {
+      console.log(`  fix-first (antichain of ${rd.frontier.length}): close these to unblock a down-set —`);
+      // Show the frontier blockers with their leverage (blockedDescendants).
+      const byId = new Map(rd.blockers.map((b) => [b.nodeId, b.blockedDescendants]));
+      for (const id of rd.frontier.slice(0, 12)) {
+        console.log(`    ${id}\tblocks ${byId.get(id) ?? 0} node(s)`);
+      }
+      if (rd.frontier.length > 12) console.log(`    ...and ${rd.frontier.length - 12} more`);
+    } else {
+      console.log(`  ✓ no blockers — every core node is batch-syncable`);
+    }
+  }
 
   if (options.list) {
     console.log("");

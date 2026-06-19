@@ -1136,7 +1136,8 @@ program
   .command("status")
   .description("Read-only graph health for the sync loop: how many nodes are syncable-with-confidence (code shadow + behaviour fixture + rules statically clean), how many are lower-confidence (no fixture) or blocked (rule violation), how many shadows drifted from the anchor, and the ficha-quality summary. A pure composition of shadow/fixture presence + `onto drift` + `onto ficha audit` — writes nothing, runs no fixtures. See docs/design/runtime/SYNC_LOOP_SPEC.md §4.")
   .option("--list", "List the node ids in each syncability tier.")
-  .option("--json", "Output the full report (incl. per-node detail) as JSON.")
+  .option("--blockers", "Show the dependency-order readiness view: the syncable ideal (core nodes whose whole closure is core) + the fix-first blocker antichain ranked by how many nodes each blocks.")
+  .option("--json", "Output the full report (incl. per-node detail + readiness) as JSON.")
   .action(async (options) => {
     try {
       await statusCommand(options);
