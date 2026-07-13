@@ -4,6 +4,7 @@ import {
   planDecomposition,
   buildSliceInstruction,
   assembleSlices,
+  hasSyntaxErrors,
 } from "../src/forward/compile/decompose-plan.js";
 
 // Tests for the decomposition planner + assembler
@@ -158,6 +159,66 @@ describe("assembleSlices", () => {
     expect(out).not.toMatch(/export function f/);
     expect(out.match(/export \{/g)).toHaveLength(1);
     expect(out).toMatch(/\bf\b/);
+  });
+
+  it("strips import bindings that collide with assembly-declared names (node_0032 failure mode)", () => {
+    // A later chunk re-imports earlier chunks' declarations from an invented
+    // module instead of reusing them — the assembled module would declare AND
+    // import the same names and never load. The assembler must resolve it.
+    const chunk1 = {
+      code: `import { z } from "zod";\nconst AlphaSchema = z.enum(["a"]);`,
+      owned: [{ name: "AlphaSchema", kind: "const" as const, isExported: true }],
+    };
+    const chunk2 = {
+      code:
+        `import { z } from "zod";\n` +
+        `import { AlphaSchema } from "./types";\n` +
+        `const BetaSchema = z.object({ a: AlphaSchema });`,
+      owned: [{ name: "BetaSchema", kind: "const" as const, isExported: true }],
+    };
+    const out = assembleSlices([chunk1, chunk2]);
+    expect(out).not.toMatch(/from ["']\.\/types["']/); // colliding import dropped entirely
+    expect(out.match(/import \{ z \} from "zod";/g)).toHaveLength(1); // legit import kept, deduped
+    expect(out.match(/const AlphaSchema/g)).toHaveLength(1);
+  });
+
+  it("keeps non-colliding bindings of a mixed import and drops only the colliders", () => {
+    const a = {
+      code: `const Alpha = 1;`,
+      owned: [{ name: "Alpha", kind: "const" as const, isExported: true }],
+    };
+    const b = {
+      code: `import { Alpha, external } from "some-lib";\nconst Beta = external(Alpha);`,
+      owned: [{ name: "Beta", kind: "const" as const, isExported: true }],
+    };
+    const out = assembleSlices([a, b]);
+    expect(out).toMatch(/import \{ external \} from ["']some-lib["'];/); // collider stripped, rest kept
+    expect(out).not.toMatch(/import \{ Alpha/);
+  });
+
+  it("hasSyntaxErrors: detects a truncated declaration; passes clean code", () => {
+    // The 2026-07-07 7B truncation shape: generation cut mid-expression.
+    const truncated = `const A = z.object({\n  previousEventId: z.string().nullable\n\n();\n`;
+    expect(hasSyntaxErrors(truncated)).toBe(true);
+    expect(hasSyntaxErrors(`const A = 1;\nexport function f(): number { return A; }`)).toBe(false);
+    expect(hasSyntaxErrors("")).toBe(false);
+  });
+
+  it("an invented inline-exported declaration stays internal (never extra-export drift)", () => {
+    const a = {
+      code: `export function f() { return helper(); }\nexport const ApiKey = "invented";\nfunction helper() { return ApiKey; }`,
+      owned: [decl("f", true), decl("helper")],
+    };
+    const out = assembleSlices([a]);
+    expect(out).toMatch(/const ApiKey/); // kept as internal helper…
+    expect(out).not.toMatch(/export \{[\s\S]*ApiKey[\s\S]*\};/); // …but not exported
+    expect(out).toMatch(/export \{[\s\S]*\bf\b[\s\S]*\};/);
+  });
+
+  it("keeps side-effect imports verbatim", () => {
+    const a = { code: `import "./polyfill.js";\nconst x = 1;`, owned: [decl("x")] };
+    const out = assembleSlices([a]);
+    expect(out).toMatch(/import ["']\.\/polyfill\.js["'];/);
   });
 
   it("keeps distinct imports from different slices", () => {
