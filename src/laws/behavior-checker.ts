@@ -365,8 +365,17 @@ export function deepEqual(a: unknown, b: unknown): boolean {
 
   const ao = a as Record<string, unknown>;
   const bo = b as Record<string, unknown>;
-  const aKeys = Object.keys(ao).sort();
-  const bKeys = Object.keys(bo).sort();
+  // An own key explicitly set to `undefined` is indistinguishable from an
+  // absent key at the API level (`obj.k === undefined` either way) — no
+  // consumer behaviour can depend on the difference short of key-iteration
+  // introspection. Comparing raw key sets therefore produced FALSE
+  // divergences (found 2026-07-08: a regen writing `defaultImport: undefined`
+  // vs the source omitting the key — byte-identical JSON, "divergent"
+  // verdict). Normalise both sides: undefined-valued keys are treated as
+  // absent. This can only turn undefined-vs-absent into a match; a key
+  // carrying any DEFINED value still compares by value.
+  const aKeys = Object.keys(ao).filter((k) => ao[k] !== undefined).sort();
+  const bKeys = Object.keys(bo).filter((k) => bo[k] !== undefined).sort();
   if (aKeys.length !== bKeys.length) return false;
   for (let i = 0; i < aKeys.length; i++) {
     if (aKeys[i] !== bKeys[i]) return false;
