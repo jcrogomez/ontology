@@ -47,6 +47,112 @@ absent.** Not "trust the fidelity" — *here is exactly how far it holds and
 where it breaks.* See [`MATHEMATICAL_CLAIMS.md`](MATHEMATICAL_CLAIMS.md)
 for the tiered ledger that keeps this honest.
 
+## The objection that matters: won't better models close the gap?
+
+The sharpest challenge to this vision is optimistic, not skeptical:
+*AI is improving weekly; the round-trip fidelity `F∘G ≈ id` will reach
+`= id` soon; so the measured intention layer is scaffolding that better
+models make unnecessary.* Taken seriously — and it should be — this
+objection **strengthens** the case for the layer rather than dissolving
+it. The move is to notice that "the gap" is not one quantity. It is
+three, and only one of them is capability-bound.
+
+1. **The capacity-ceiling gap — real, and shrinking.** Some of the loss
+   today is simply that the model is not yet good enough to regenerate a
+   node faithfully. This closes with better models, possibly fast. We
+   concede it completely; the project already *names* this term and
+   predicts its decline — `κ*` and the executor's `extraction-gap` vs
+   `capacity-ceiling` distinction exist precisely to separate "the
+   intention was under-captured" from "the model couldn't reach it"
+   (`MATHEMATICAL_CLAIMS.md` §3.11, `EXECUTOR_SPEC.md`). Better models
+   move this term toward zero. Good.
+
+2. **The structural gap — information-theoretic, not capability-bound.**
+   `G : Code → Intent` is intrinsically one-to-many: many artifacts
+   realise the same intention, and compression is *lossy by
+   construction*. A smarter model does not make a genuinely ambiguous
+   inverse unique — the ambiguity is in the *relation*, not in the
+   solver. You can only remove it by adding bits to the intention, and
+   in the limit that turns intention back into the code it was meant to
+   compress. This is the compression-ratio ↔ fidelity trade-off, and it
+   is a floor no model quality erases. It is exactly the **T3
+   rate-distortion reading** of `κ*` and `F∘G` the ledger already grades
+   as analogy, not theorem (`MATHEMATICAL_CLAIMS.md` §3.11) — do not
+   overclaim it as `= id`.
+
+3. **The verification gap — widens as generation improves.** Even a
+   model that generates *perfectly* does not tell you *that* it did:
+   knowing the output is faithful still requires a checker. As
+   generation gets cheaper and volume explodes, the fraction a human can
+   audit by reading shrinks, so this gap **grows** with capability. This
+   is just the asymmetry thesis restated: the scarce resource was never
+   generation — it is trust and steering.
+
+**This is not abstract — it is the live industry debate.** AI Engineer
+Europe 2026 surfaced what Alex Volkov named the **Z/L Continuum**
+(Zechner–Lopopolo spectrum): OpenAI's Ryan Lopopolo arguing "code is a
+liability," delegate heavily and stop reading it, against Mario Zechner's
+"read every [expletive] line of critical code." [Rohan Verma's
+reframe](https://rohanverma.net/pages/harness-engineering/notes/the-z-l-continuum/)
+is the useful one: it is not an identity, it is a risk policy keyed on
+*blast radius*, and what matters is what your harness forces before code
+ships, not where you sit on the spectrum. Ontology's answer to "where do I
+sit" is to stop treating it as one global human call and compute it per
+node instead: the syncable-core split (core / lower-confidence / blocked),
+the executor's terminal-state taxonomy (`closed` / `extraction-gap` /
+`capacity-ceiling` / `blocked-upstream`), and the fix-first antichain *are*
+blast-radius and trust, measured rather than vibed. (See also [ThursdAI's
+recap](https://sub.thursdai.news/p/the-lopopolo-zechner-spectrum) of the
+conference debate — both are commentary, cited for framing, not evidence.)
+
+**The same principle keeps arriving from independent directions.** Agile's
+[definition-of-done framing applied to AI
+builders](https://www.braingrid.ai/blog/definition-of-done-for-ai-builders)
+makes the identical split this project already ships as code: acceptance
+criteria (feature-specific — what a node's intent/prompt/rules say it
+should do) versus a definition of done (a generic, standing floor —
+tests/behaviour pass, verified against criteria, nothing broken — applied
+the same way to every feature). That is exactly gates vs. ficha: the ficha
+is the acceptance criteria, the structural + behaviour + rules gates are
+the DoD, and the point of this project is that the DoD is *computed*, not
+a checklist a human remembers to run. And on July 11, 2026, Terence Tao
+[published an experiment](https://www.techtimes.com/articles/320238/20260712/ai-agents-ported-taos-27-year-old-math-code-hours-found-two-bugs-he-had-missed.htm)
+reviving 27-year-old Java applets with a coding agent, stating the rule
+explicitly: the automation you can profitably use is proportional to how
+stringent your verification is, and licensing agent use only where a
+failure is fast to detect, visible, and bounded. He published the session
+transcripts as the audit trail. That is κ\*/the executor's capability
+ladder (verification stringency gates autonomy) and the `wfrun_*` run
+record (the persisted transcript), independently re-derived by a
+mathematician working from first principles on an unrelated problem. Three
+lines of argument — an industry framework, agile practice, and pure
+mathematics — converge on one governance rule; this project's contribution
+is not the rule, it is making it computable per node instead of a human
+judgment call.
+
+The inversion is the payoff. Grant the objection its strongest form —
+assume generation fidelity effectively saturates. That is the strongest
+argument *for* an intention-plus-gates layer, not against it. When the
+AI writes more than any human can review by reading the diff, the only
+place left to retain control is the compressed, law-checked intention
+surface, with gates that verify on your behalf. Capability improvements
+do not obsolete this layer; they **relocate the entire bottleneck onto
+it** — precisely the verification-and-steering work it exists to serve.
+The leverage a developer can safely exert stays governed by
+`compression × measured fidelity × gate strength`; the optimistic
+scenario sends the first two terms up and makes the gates the whole
+game.
+
+And we do not need to win the timeline bet to hold this conclusion. If
+the optimist is right, the intention layer matters *more*; if progress
+is slower or the structural floor bites, the measured-fidelity discipline
+is what keeps the tool honest in the meantime. Either way, nothing here
+licenses stating `F∘G = id` — `MATHEMATICAL_CLAIMS.md` stays the ledger,
+and the honest core number lives in `ROADMAP.md`. The one-line form:
+**the intention layer is the dual of capability — as generating code
+gets cheaper, auditing and steering it get scarcer, and that scarcity is
+exactly what this layer is built to serve.**
+
 ## The shape, in the math we already built
 
 The categorical structure is not decoration here — it is what makes the

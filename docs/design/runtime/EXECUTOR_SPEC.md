@@ -54,7 +54,11 @@ or `{terminate, terminal}`. This is the heart and the cheapest thing to test —
 exhaustive branch coverage in `tests/executor-policy.test.ts`.
 
 Levers: `generate` (plain draw), `refine N` (runRegenerate's internal verify-
-refine), `decompose` (slice-and-assemble), `escalate` (climb one ladder rung).
+refine), `decompose` (slice-and-assemble — since 2026-07-07 it composes
+refine + monotone `keepSlices`: green slices freeze between rounds, only
+implicated slices regenerate; see
+[`../proposals/MONOTONE_DECOMPOSE.md`](../proposals/MONOTONE_DECOMPOSE.md)),
+`escalate` (climb one ladder rung).
 
 Branch order (read from the 2026-06-17 calibration record):
 1. upstream not all closed → `blocked-upstream`.
@@ -150,6 +154,20 @@ Honest tiering: the least-element computation is T1 (tested); the
 monotone-threshold + rate-distortion reading is T2/T3 (see
 `MATHEMATICAL_CLAIMS.md` §3.11). A high κ* with clean lint at the top rung is the
 `extraction-gap` signal; a low κ* means cheap models suffice.
+
+### 7.2 Ladder economics (added 2026-07-07)
+
+Every attempt records `durationMs`; each `NodeRecord` aggregates wall-clock +
+attempts split by **rung locality** (from the ladder's `caps`, attached by
+`resolveLadder`; provider heuristic as fallback) + `closedLocality` (the κ\*
+rung's locality). `ExecReport.economics` derives the **local-coverage share**
+— closed-at-local / closed — the run's oracle-routing measurement: how much of
+the work the $0/local rungs handled before the ladder had to climb. Measured
+facts only (time + locality; no fabricated cost/energy). Motivation, external
+signals, and the queued follow-ons (persisted κ\* warm starts, speculative
+sweep ordering) in
+[`../proposals/LADDER_ECONOMICS.md`](../proposals/LADDER_ECONOMICS.md).
+Pinned by `tests/executor-economics.test.ts`.
 
 ## 8. Honest results (2026-06-18, real machinery)
 
