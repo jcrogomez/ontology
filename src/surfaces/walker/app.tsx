@@ -61,6 +61,8 @@ import {
   openProjectFromWalker,
   createProjectFromWalker,
 } from "./actions/projects-from-walker.js";
+import { NextActionsPanel, emptyNextActionsPanelState, type NextActionsPanelState } from "./layout/next-actions-panel.js";
+import { nextActions } from "./actions/next-actions.js";
 import {
   loadProposalsForWalker,
   applyProposalFromWalker,
@@ -147,6 +149,9 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
   });
   const [projectsPanel, setProjectsPanel] = useState<ProjectsPanelState>(
     emptyProjectsPanelState(),
+  );
+  const [nextPanel, setNextPanel] = useState<NextActionsPanelState>(
+    emptyNextActionsPanelState(),
   );
   const [pendingLinkAnalysis, setPendingLinkAnalysis] = useState<{ focalId: string } | null>(null);
   // Async sentinel for `:workflow` (v1.5) — same two-stage pattern as :run.
@@ -563,6 +568,46 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
       return;
     }
 
+    // The "next safe action" panel: j/k scroll the fix-first list, enter FOCUSES
+    // the selected node (so you can act on it), R recomputes, Esc closes.
+    if (nextPanel.open) {
+      if (key.escape) {
+        setNextPanel(emptyNextActionsPanelState());
+        setMessage("next-actions panel dismissed");
+        return;
+      }
+      if (input === "R") {
+        const r = nextActions(cwd);
+        setNextPanel((s) => ({
+          ...s,
+          syncableNow: r.syncableNow,
+          actions: r.actions,
+          cursor: Math.min(s.cursor, Math.max(0, r.actions.length - 1)),
+          message: r.ok ? undefined : `✖ ${r.message ?? "reload failed"}`,
+        }));
+        return;
+      }
+      if (input === "j" || key.downArrow) {
+        setNextPanel((s) => ({ ...s, cursor: Math.min(s.actions.length - 1, s.cursor + 1) }));
+        return;
+      }
+      if (input === "k" || key.upArrow) {
+        setNextPanel((s) => ({ ...s, cursor: Math.max(0, s.cursor - 1) }));
+        return;
+      }
+      if (key.return) {
+        const a = nextPanel.actions[nextPanel.cursor];
+        if (a) {
+          setFocalId(a.nodeId);
+          setNextPanel(emptyNextActionsPanelState());
+          setMessage(`focal → ${a.nodeId}  (${a.suggestion})`);
+        }
+        return;
+      }
+      // Any other key ignored — keep the panel focused.
+      return;
+    }
+
     // VIEW mode bindings.
     if (key.upArrow) {
       const next = navigateUp(neighborhood);
@@ -674,7 +719,7 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
       return;
     }
     if (cmd === "help") {
-      setMessage("i edit · a/:preview artifact · :which <file> · :health (node dashboard) · :projects (switch/create project) · :fichacleanup · :reanchor · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :models · :route <task> <model-id|off> · :clear{run,plan,compile,info,draft,preview} · :q");
+      setMessage("i edit · a/:preview artifact · :which <file> · :health (node dashboard) · :next (what to do next) · :projects (switch/create project) · :fichacleanup · :reanchor · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :models · :route <task> <model-id|off> · :clear{run,plan,compile,info,draft,preview} · :q");
       return;
     }
     if (cmd === "propose") {
@@ -1075,6 +1120,30 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
       setMessage("projects panel dismissed");
       return;
     }
+    if (cmd === "next" || cmd === "actions") {
+      // Walker v2 — the "what do I do next?" cockpit. Reuses the sync-readiness
+      // triage (`onto status`/`onto dod`): syncable-now count + the fix-first
+      // frontier ranked by leverage. enter focuses a node so you can act on it.
+      const r = nextActions(cwd);
+      setNextPanel({
+        ...emptyNextActionsPanelState(),
+        open: true,
+        syncableNow: r.syncableNow,
+        actions: r.actions,
+        message: r.ok ? undefined : `✖ ${r.message ?? "failed to compute next actions"}`,
+      });
+      setMessage(
+        r.actions.length === 0
+          ? `${r.syncableNow} node(s) syncable — no blockers`
+          : `next: ${r.actions.length} fix-first action(s) — j/k, enter to focus`,
+      );
+      return;
+    }
+    if (cmd === "clearnext") {
+      setNextPanel(emptyNextActionsPanelState());
+      setMessage("next-actions panel dismissed");
+      return;
+    }
     setMessage(`unknown command: :${cmd}`);
   }
 
@@ -1153,6 +1222,7 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
           });
         }}
       />
+      <NextActionsPanel state={nextPanel} />
       <HintBar mode={mode === "edit" ? "view" : mode} command={command} message={message} />
     </Box>
   );

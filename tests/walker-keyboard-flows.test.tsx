@@ -270,4 +270,23 @@ describe("walker keyboard flows (stdin-driven)", () => {
     await waitFor(w.frame, (f) => f.includes("projects panel dismissed"), "panel dismissed");
     w.unmount();
   });
+
+  it("`:next` opens the safe-action panel and Esc dismisses it", async () => {
+    const w = await mountWalker(tempDir);
+    await w.press(":");
+    await waitFor(w.frame, (f) => f.includes(":_"), "command prompt");
+    await w.press("next");
+    await waitFor(w.frame, (f) => f.includes(":next_"), "next typed");
+    await w.press(ENTER);
+    // Fresh `init` graph: canon has no shadow → nothing blocked → the panel
+    // shows the header + the batch-syncable line, not a crash.
+    await waitFor(w.frame, (f) => f.includes("NEXT SAFE ACTIONS"), "next-actions panel");
+    await waitFor(w.frame, (f) => f.includes("batch-syncable now"), "syncable line");
+    // j/k on a possibly-empty list must be harmless.
+    await w.press("j");
+    await w.press("k");
+    await w.press(ESC);
+    await waitFor(w.frame, (f) => f.includes("next-actions panel dismissed"), "panel dismissed");
+    w.unmount();
+  });
 });

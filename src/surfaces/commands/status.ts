@@ -34,7 +34,7 @@ export interface StatusCommandOptions {
 
 export type Tier = "core" | "lower" | "blocked" | "no-shadow";
 
-interface NodeStatus {
+export interface NodeStatus {
   nodeId: string;
   srcFile: string | null;
   hasShadow: boolean;
@@ -44,7 +44,7 @@ interface NodeStatus {
   tier: Tier;
 }
 
-interface StatusReport {
+export interface StatusReport {
   totalNodes: number;
   /** Nodes with a code shadow present on disk — the syncable universe. */
   trackable: number;
