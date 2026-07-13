@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import React from "react";
 import { render } from "ink-testing-library";
@@ -69,14 +70,29 @@ async function mountWalker(cwd: string, focal = "node_0000_canon"): Promise<Harn
 
 describe("walker keyboard flows (stdin-driven)", () => {
   let tempDir: string;
+  let tmpHome: string;
+  let originalXdg: string | undefined;
 
   beforeEach(() => {
+    // Redirect the project registry (XDG_CONFIG_HOME/ontology/projects.json)
+    // to a throwaway dir so the `:projects` flow never reads or writes the
+    // developer's real registry. Set BEFORE `init` so the subprocess inherits
+    // it and registers the temp project into the isolated registry.
+    tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "onto-walker-xdg-"));
+    originalXdg = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = tmpHome;
     tempDir = createTempProject();
     expect(runCli(tempDir, ["init"]).status).toBe(0);
   });
 
   afterEach(() => {
     cleanupTempProject(tempDir);
+    if (originalXdg === undefined) {
+      delete process.env.XDG_CONFIG_HOME;
+    } else {
+      process.env.XDG_CONFIG_HOME = originalXdg;
+    }
+    fs.rmSync(tmpHome, { recursive: true, force: true });
   });
 
   it("`:` enters command mode, Esc returns to view mode", async () => {
@@ -222,5 +238,36 @@ describe("walker keyboard flows (stdin-driven)", () => {
       fs.readFileSync(path.join(tempDir, ".ontology/models/registry.json"), "utf-8"),
     );
     expect(reg.routing).toEqual({ code_sketch: "mock_default" });
+  });
+
+  it("`:projects` opens the switcher (current project + create row); n enters create, Esc dismisses", async () => {
+    const w = await mountWalker(tempDir);
+
+    // Open the switcher — `init` registered the temp project into the isolated
+    // registry, so it shows as the current row alongside the create row.
+    await w.press(":");
+    await waitFor(w.frame, (f) => f.includes(":_"), "command prompt");
+    await w.press("projects");
+    await waitFor(w.frame, (f) => f.includes(":projects_"), "projects typed");
+    await w.press(ENTER);
+    const panel = await waitFor(w.frame, (f) => f.includes("PROJECTS"), "projects panel");
+    // A real registered project row rendered (not the empty-state placeholder),
+    // plus the always-present create row. (The "current" tag is intentionally
+    // not asserted: macOS resolves os.tmpdir() through a /private symlink, so
+    // the registered path and the live cwd compare unequal — orthogonal to this
+    // flow.)
+    expect(panel).not.toContain("No projects registered yet");
+    expect(panel).toContain("+ Create new Ontology project");
+
+    // n → create sub-mode: the TextInput mounts (name prompt).
+    await w.press("n");
+    await waitFor(w.frame, (f) => f.includes("name:"), "create mode name field");
+
+    // Esc from create returns to the list (still open), Esc again dismisses.
+    await w.press(ESC);
+    await waitFor(w.frame, (f) => f.includes("enter open"), "back to list hints");
+    await w.press(ESC);
+    await waitFor(w.frame, (f) => f.includes("projects panel dismissed"), "panel dismissed");
+    w.unmount();
   });
 });

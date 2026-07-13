@@ -55,6 +55,12 @@ import {
   nodesOwningFile,
 } from "./state/shadow-status.js";
 import { ProposalsPanel, type ProposalsPanelState } from "./layout/proposals-panel.js";
+import { ProjectsPanel, emptyProjectsPanelState, type ProjectsPanelState } from "./layout/projects-panel.js";
+import {
+  projectsForWalker,
+  openProjectFromWalker,
+  createProjectFromWalker,
+} from "./actions/projects-from-walker.js";
 import {
   loadProposalsForWalker,
   applyProposalFromWalker,
@@ -83,8 +89,12 @@ type WalkerMode = "view" | "command" | "edit";
 // ephemeral on-disk state under .ontology/work/drafts/. They become real
 // proposals when the user types `:propose` from the focal node that owns
 // the draft.
-export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
+export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactElement {
   const { exit } = useApp();
+  // `cwd` is prop-seeded but stateful so the Projects panel can switch the
+  // Walker to another `.ontology/` project in place (setCwd + setFocalId).
+  // Every downstream `cwd` reference reads this state unchanged.
+  const [cwd, setCwd] = useState(initialCwd ?? process.cwd());
   const [focalId, setFocalId] = useState(initialNodeId);
   const [mode, setMode] = useState<WalkerMode>("view");
   const [command, setCommand] = useState("");
@@ -135,6 +145,9 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
     proposals: [],
     cursor: 0,
   });
+  const [projectsPanel, setProjectsPanel] = useState<ProjectsPanelState>(
+    emptyProjectsPanelState(),
+  );
   const [pendingLinkAnalysis, setPendingLinkAnalysis] = useState<{ focalId: string } | null>(null);
   // Async sentinel for `:workflow` (v1.5) — same two-stage pattern as :run.
   const [pendingWorkflow, setPendingWorkflow] = useState<WorkflowArgs | null>(null);
@@ -491,6 +504,65 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       return;
     }
 
+    // When the projects panel is open its keys take priority, mirroring the
+    // proposals panel. In create sub-mode the TextInput owns the keyboard —
+    // only Esc (cancel) is handled here; typing + Enter flow to the TextInput.
+    if (projectsPanel.open) {
+      if (projectsPanel.mode === "create") {
+        if (key.escape) {
+          setProjectsPanel((s) => ({ ...s, mode: "list", createName: "", message: undefined }));
+        }
+        return;
+      }
+      if (key.escape) {
+        setProjectsPanel(emptyProjectsPanelState());
+        setMessage("projects panel dismissed");
+        return;
+      }
+      if (input === "R") {
+        const reload = projectsForWalker(cwd);
+        setProjectsPanel((s) => ({
+          ...s,
+          rows: reload.rows,
+          cursor: Math.min(s.cursor, Math.max(0, reload.rows.length - 1)),
+          message: reload.ok ? undefined : `✖ ${reload.message ?? "reload failed"}`,
+        }));
+        return;
+      }
+      if (input === "j" || key.downArrow) {
+        setProjectsPanel((s) => ({ ...s, cursor: Math.min(s.rows.length - 1, s.cursor + 1) }));
+        return;
+      }
+      if (input === "k" || key.upArrow) {
+        setProjectsPanel((s) => ({ ...s, cursor: Math.max(0, s.cursor - 1) }));
+        return;
+      }
+      if (input === "n") {
+        setProjectsPanel((s) => ({ ...s, mode: "create", createName: "", message: undefined }));
+        return;
+      }
+      if (key.return) {
+        const row = projectsPanel.rows[projectsPanel.cursor];
+        if (!row) return;
+        if (row.kind === "create") {
+          setProjectsPanel((s) => ({ ...s, mode: "create", createName: "", message: undefined }));
+          return;
+        }
+        const opened = openProjectFromWalker(row.entry.path);
+        if (opened.ok && opened.cwd && opened.rootNodeId) {
+          setCwd(opened.cwd);
+          setFocalId(opened.rootNodeId);
+          setProjectsPanel(emptyProjectsPanelState());
+          setMessage(`opened ${row.entry.name}`);
+        } else {
+          setProjectsPanel((s) => ({ ...s, message: `✖ ${opened.message ?? "open failed"}` }));
+        }
+        return;
+      }
+      // Any other key is ignored — keep the panel focused.
+      return;
+    }
+
     // VIEW mode bindings.
     if (key.upArrow) {
       const next = navigateUp(neighborhood);
@@ -602,7 +674,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       return;
     }
     if (cmd === "help") {
-      setMessage("i edit · a/:preview artifact · :which <file> · :health (node dashboard) · :fichacleanup · :reanchor · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :models · :route <task> <model-id|off> · :clear{run,plan,compile,info,draft,preview} · :q");
+      setMessage("i edit · a/:preview artifact · :which <file> · :health (node dashboard) · :projects (switch/create project) · :fichacleanup · :reanchor · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :models · :route <task> <model-id|off> · :clear{run,plan,compile,info,draft,preview} · :q");
       return;
     }
     if (cmd === "propose") {
@@ -979,6 +1051,30 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       setMessage("proposals panel dismissed");
       return;
     }
+    if (cmd === "projects" || cmd === "proj") {
+      // Walker v2 — project switcher. Lists registered `.ontology/` projects
+      // (live + stale) plus a create row; the operator drives it with j/k,
+      // enter to open (switches cwd + focal in place), n to create.
+      const result = projectsForWalker(cwd);
+      const projectCount = result.rows.filter((r) => r.kind === "project").length;
+      setProjectsPanel({
+        ...emptyProjectsPanelState(),
+        open: true,
+        rows: result.rows,
+        message: result.ok ? undefined : `✖ ${result.message ?? "failed to load projects"}`,
+      });
+      setMessage(
+        projectCount === 0
+          ? "no projects registered — n to create one"
+          : `${projectCount} project${projectCount === 1 ? "" : "s"} — j/k navigate, enter open, n new`,
+      );
+      return;
+    }
+    if (cmd === "clearprojects") {
+      setProjectsPanel(emptyProjectsPanelState());
+      setMessage("projects panel dismissed");
+      return;
+    }
     setMessage(`unknown command: :${cmd}`);
   }
 
@@ -1031,6 +1127,32 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       <CompileResultPanel state={compileState} />
       <InfoPanel state={infoState} />
       <ProposalsPanel state={proposalsPanel} />
+      <ProjectsPanel
+        state={projectsPanel}
+        onCreateNameChange={(value) =>
+          setProjectsPanel((s) => ({ ...s, createName: value }))
+        }
+        onCreateSubmit={(value) => {
+          setProjectsPanel((s) => ({ ...s, loading: true, message: undefined }));
+          // baseDir is the launch directory (matches the panel's help text),
+          // so a new project always lands under where the Walker started even
+          // after switching into another project in-session.
+          void createProjectFromWalker({ name: value, baseDir: initialCwd ?? process.cwd() }).then((res) => {
+            if (res.ok && res.cwd && res.rootNodeId) {
+              setCwd(res.cwd);
+              setFocalId(res.rootNodeId);
+              setProjectsPanel(emptyProjectsPanelState());
+              setMessage(`created & opened ${res.name ?? value}`);
+            } else {
+              setProjectsPanel((s) => ({
+                ...s,
+                loading: false,
+                message: `✖ ${res.message ?? "create failed"}`,
+              }));
+            }
+          });
+        }}
+      />
       <HintBar mode={mode === "edit" ? "view" : mode} command={command} message={message} />
     </Box>
   );
