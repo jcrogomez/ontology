@@ -7,6 +7,7 @@ import { getOntologyPaths } from "../../../kernel/core/project/paths.js";
 import { dispatchLlmRequest } from "../../../runtime/llm/dispatcher.js";
 import type { LlmProvider } from "../../../runtime/llm/types.js";
 import { errorMessage } from "../../../kernel/core/errors.js";
+import { hashObject, removeIntegrityHash } from "../../../kernel/core/integrity/hash.js";
 import { OntologyEventSchema } from "../../../kernel/schemas/ontology.js";
 import {
   INSPECTOR_SYSTEM_PROMPT,
@@ -124,7 +125,12 @@ export async function nodeInspectCommand(
     return;
   }
 
-  // 4. Cache the result on the node.
+  // 4. Cache the result on the node — and RE-HASH. The node's integrity hash
+  // covers the whole object minus `integrity.hash` (see validate.ts), so
+  // persisting the translator cache without recomputing it leaves the node
+  // failing `onto validate` ("changed outside Ontology's mutation path").
+  // Latent until 2026-07-07: the write only happens on a STALE cache, i.e.
+  // after a prompt/rules/contract edit — the update-then-inspect flow.
   const sourceHash = computeTranslatorSourceHash(node);
   const generatedAt = new Date().toISOString();
   const updatedNode = {
@@ -136,6 +142,10 @@ export async function nodeInspectCommand(
       generatedAt,
       sourceHash,
     },
+  };
+  updatedNode.integrity = {
+    ...node.integrity,
+    hash: hashObject(removeIntegrityHash(updatedNode)),
   };
   const nodePath = path.join(cwd, ".ontology", "nodes", `${nodeId}.json`);
   try {
