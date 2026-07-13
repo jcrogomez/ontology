@@ -14,6 +14,7 @@ import type { RegenerateCommandOptions, RegenerateResult } from "../../surfaces/
 import { decide, DEFAULT_REFINE_ROUNDS } from "./policy.js";
 import { normalize } from "./verdict.js";
 import { kappaStar } from "./kappa-star.js";
+import { rungLocality, type LadderRung } from "./model-ladder.js";
 import { buildReport, type ExecReport } from "./report.js";
 import type { Decision, Lever, NodeExecState, NodeRecord } from "./types.js";
 
@@ -23,7 +24,10 @@ export interface ExecutorConfig {
   // attempted once across focals.
   focalIds: string[];
   // Resolved capability ladder (rung 0 cheapest). See model-ladder.resolveLadder.
-  ladder: ResolvedNodeModel[];
+  // Rungs MAY carry caps (resolveLadder always attaches them); locality falls
+  // back to the provider heuristic for hand-built ladders. ResolvedNodeModel-
+  // shaped arrays therefore remain valid configs.
+  ladder: (ResolvedNodeModel | LadderRung)[];
   maxAttemptsPerNode?: number;
   refineRounds?: number;
   behaviorFixturesDir?: string;
@@ -81,7 +85,17 @@ function leverOptions(
     return { ...base, refine: lever.rounds ?? config.refineRounds ?? DEFAULT_REFINE_ROUNDS };
   }
   if (lever.kind === "decompose") {
-    return { ...base, decompose: true };
+    // Decompose composes with refine + monotone keep-slices: slices whose
+    // behaviour cases pass are frozen between rounds and only the implicated
+    // slices re-generate ("passing work is kept" — slice-keep.ts). This is
+    // what makes the lever effective on large declaration modules, where the
+    // chunked scaffold gives keep-slices real granularity.
+    return {
+      ...base,
+      decompose: true,
+      refine: config.refineRounds ?? DEFAULT_REFINE_ROUNDS,
+      keepSlices: true,
+    };
   }
   // generate / escalate → a plain draw at the current rung.
   return base;
@@ -129,6 +143,13 @@ async function runNode(
       const kappa = kappaStar(
         state.history.map((a) => ({ rung: a.rung, closed: a.verdict.outcome === "pass" })),
       ).kappa;
+      // Ladder economics: wall-clock + rung-locality accounting per attempt.
+      // Measured facts only — the oracle-routing interpretation (how much cloud
+      // spend the local rungs avoided) lives in the report/proposal doc.
+      const localityOf = (r: number): "local" | "cloud" =>
+        rungLocality(config.ladder[Math.min(r, ladderSize - 1)]);
+      const totalDurationMs = state.history.reduce((s, a) => s + (a.durationMs ?? 0), 0);
+      const attemptsLocal = state.history.filter((a) => localityOf(a.rung) === "local").length;
       return {
         nodeId,
         terminal: action.terminal,
@@ -138,6 +159,10 @@ async function runNode(
         decisions,
         lastDetail: state.history.at(-1)?.verdict.detail,
         kappa,
+        totalDurationMs,
+        attemptsLocal,
+        attemptsCloud: state.history.length - attemptsLocal,
+        closedLocality: kappa === null ? null : localityOf(kappa),
       };
     }
 
@@ -155,6 +180,7 @@ async function runNode(
     // throw from an orphaned draft timer can still escape this; the principled fix
     // is child-process isolation of the behaviour check — tracked follow-up.)
     let verdict;
+    const attemptStart = Date.now();
     try {
       const result = await deps.regenerate(nodeId, leverOptions(action.lever, config, model));
       verdict = normalize(result);
@@ -168,10 +194,11 @@ async function runNode(
       };
       lastWritten = false;
     }
+    const durationMs = Date.now() - attemptStart;
     state = {
       ...state,
       rung,
-      history: [...state.history, { rung, lever: action.lever.kind, verdict }],
+      history: [...state.history, { rung, lever: action.lever.kind, verdict, durationMs }],
     };
   }
 }
@@ -199,6 +226,10 @@ export async function runExecutor(config: ExecutorConfig, deps: ExecutorDeps): P
         decisions: [],
         lastDetail: `compile plan failed: ${plan.reason}`,
         kappa: null,
+        totalDurationMs: 0,
+        attemptsLocal: 0,
+        attemptsCloud: 0,
+        closedLocality: null,
       });
       continue;
     }

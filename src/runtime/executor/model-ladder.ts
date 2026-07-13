@@ -37,6 +37,21 @@ export const DEFAULT_PREMISE: ModelPremise = {
   order: ["tier", "cost", "locality"],
 };
 
+// A ladder rung: the dispatchable (provider, model) pair PLUS the caps it was
+// ordered by, so downstream consumers (the runner's economics accounting) can
+// read rung locality without re-loading the registry. `caps` stays optional for
+// hand-built test ladders; rungLocality falls back to the provider heuristic.
+export interface LadderRung extends ResolvedNodeModel {
+  caps?: ModelCaps;
+}
+
+/** Locality of a rung: explicit caps win; otherwise the same coarse
+ *  provider-derivation as deriveCaps (ollama/mock → local, else cloud). */
+export function rungLocality(rung: LadderRung): "local" | "cloud" {
+  if (rung.caps) return rung.caps.locality;
+  return rung.provider === "ollama" || rung.provider === "mock" ? "local" : "cloud";
+}
+
 // Providers the dispatcher can actually route through (mirrors resolve-node-model).
 const DISPATCHABLE = new Set<string>(["mock", "ollama", "anthropic"]);
 
@@ -97,7 +112,7 @@ function passesFilter(m: OntologyModel, caps: ModelCaps, premise: ModelPremise):
 export function resolveLadder(
   premise: ModelPremise,
   registry: { models: OntologyModel[] },
-): ResolvedNodeModel[] {
+): LadderRung[] {
   const candidates = registry.models
     .filter((m) => m.caps !== undefined)
     .map((m) => ({ m, caps: m.caps! }))
@@ -112,8 +127,9 @@ export function resolveLadder(
     return a.m.id.localeCompare(b.m.id);
   });
 
-  return candidates.map(({ m }) => ({
+  return candidates.map(({ m, caps }) => ({
     provider: m.provider as LlmProvider,
     model: m.name,
+    caps,
   }));
 }

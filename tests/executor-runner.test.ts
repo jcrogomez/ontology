@@ -129,4 +129,21 @@ describe("executor runner", () => {
       runExecutor({ focalIds: ["node_0110"], ladder: [] }, { edges: [], regenerate: mockRegen(() => PASS).fn }),
     ).rejects.toThrow(/empty capability ladder/);
   });
+
+  it("a dead provider terminates infra-error on the FIRST attempt — no ladder burn (2026-07-07 misreport, pinned)", async () => {
+    const { fn, calls } = mockRegen((nodeId) => ({
+      ok: false,
+      failure: `compile-back failed: Compile failed at step ${nodeId}: connect ECONNREFUSED 127.0.0.1:11434`,
+    }));
+    const config: ExecutorConfig = { focalIds: ["node_A"], ladder: LADDER };
+    const report = await runExecutor(config, { edges: [], regenerate: fn });
+
+    const rec = report.nodes[0];
+    expect(rec.terminal).toBe("infra-error");
+    expect(rec.attempts).toBe(1); // one probe, then stop
+    expect(rec.finalRung).toBe(0); // never escalated against a down provider
+    expect(calls.length).toBe(1);
+    expect(report.infraError).toBe(1);
+    expect(report.capacityCeiling).toBe(0); // the misclassification this pins away
+  });
 });

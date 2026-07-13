@@ -69,6 +69,12 @@ export interface Attempt {
   rung: number;
   lever: LeverKind | "initial";
   verdict: GateVerdict;
+  /** Wall-clock milliseconds the attempt took (regenerate + gates). Optional so
+   *  synthetic policy-test histories stay terse; the runner always records it.
+   *  This is the honest, measurable unit of the ladder-economics report — we
+   *  measure time and rung locality, never fabricated dollars or watts (see
+   *  docs/design/proposals/LADDER_ECONOMICS.md). */
+  durationMs?: number;
 }
 
 export interface NodeExecState {
@@ -104,4 +110,14 @@ export interface NodeRecord {
   /** κ* — the least ladder rung observed to close this node (null if it never
    *  closed). The capability barometer; see runtime/executor/kappa-star.ts. */
   kappa: number | null;
+  /** Total wall-clock ms across all attempts (sum of Attempt.durationMs). */
+  totalDurationMs: number;
+  /** Attempts spent at local vs cloud rungs (rung locality from the ladder's
+   *  caps, provider-derived when unannotated). The per-node input to the
+   *  oracle-routing economics: how much of the work stayed on-device. */
+  attemptsLocal: number;
+  attemptsCloud: number;
+  /** Locality of the κ* rung — where the node actually closed. null when it
+   *  never closed (or the ladder rung is unknown). */
+  closedLocality: "local" | "cloud" | null;
 }

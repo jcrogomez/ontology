@@ -33,6 +33,18 @@ export interface GateVerdict {
 // provider, missing shadow, lock contention) is infra.
 const BROKEN_FAILURE = /compile-back failed|could not read source/i;
 
+// …EXCEPT when the root cause buried in the failure string is a dead or
+// exhausted provider. A "compile-back failed: … connect ECONNREFUSED" (no
+// draft was ever produced) or "… you have reached your session usage limit"
+// (provider quota, not model capability) is NOT a draft-quality result.
+// Without this precedence the policy burns the whole ladder against an
+// unusable provider and mis-reports capacity-ceiling — observed TWICE on
+// 2026-07-07: the Ollama-down sweep (6 false ceilings, 1.3s wall-clock) and
+// the cloud-quota-exhausted re-run (5 attempts in 4.8s, same false verdict).
+// Infra wins over the compile-back prefix.
+const INFRA_FAILURE =
+  /ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|socket hang up|usage limit|rate limit|too many requests|quota|status code 429/i;
+
 export function normalize(r: RegenerateResult): GateVerdict {
   // Prefer the unambiguous fixturePresent signal; fall back to the behaviorVerdict
   // heuristic only for results that predate that field.
@@ -42,8 +54,13 @@ export function normalize(r: RegenerateResult): GateVerdict {
 
   if (!r.ok) {
     const failure = r.failure ?? "unknown failure";
+    const outcome = INFRA_FAILURE.test(failure)
+      ? "infra-error"
+      : BROKEN_FAILURE.test(failure)
+        ? "broken"
+        : "infra-error";
     return {
-      outcome: BROKEN_FAILURE.test(failure) ? "broken" : "infra-error",
+      outcome,
       lintClean,
       hasFixture,
       detail: failure,
