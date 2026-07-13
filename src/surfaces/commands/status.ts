@@ -32,7 +32,7 @@ export interface StatusCommandOptions {
   blockers?: boolean;
 }
 
-type Tier = "core" | "lower" | "blocked" | "no-shadow";
+export type Tier = "core" | "lower" | "blocked" | "no-shadow";
 
 interface NodeStatus {
   nodeId: string;
@@ -67,11 +67,11 @@ interface StatusReport {
   nodes: NodeStatus[];
 }
 
-function fixturePathFor(nodeId: string, cwd: string): string {
+export function fixturePathFor(nodeId: string, cwd: string): string {
   return path.join(cwd, "tests/behavior-fixtures", `${nodeId}.fixture.ts`);
 }
 
-function classify(hasShadow: boolean, hasFixture: boolean, ruleViolations: number): Tier {
+export function classify(hasShadow: boolean, hasFixture: boolean, ruleViolations: number): Tier {
   if (!hasShadow) return "no-shadow";
   if (ruleViolations > 0) return "blocked";
   return hasFixture ? "core" : "lower";
@@ -220,10 +220,14 @@ function emit(report: StatusReport, options: StatusCommandOptions): void {
     console.log(`  blocked-from-below:${rd.blockedReady.length}\tcore nodes held back only by an unready dependency`);
     if (rd.frontier.length > 0) {
       console.log(`  fix-first (antichain of ${rd.frontier.length}): close these to unblock a down-set —`);
-      // Show the frontier blockers with their leverage (blockedDescendants).
+      // Show the frontier blockers with their leverage (blockedDescendants) AND
+      // their trust-tier, so the triage answers both "how much does this block"
+      // and "why is it not ready" (blocked = rule violation, lower = no fixture)
+      // in one line instead of cross-referencing `--list`.
       const byId = new Map(rd.blockers.map((b) => [b.nodeId, b.blockedDescendants]));
+      const tierById = new Map(r.nodes.map((n) => [n.nodeId, n.tier]));
       for (const id of rd.frontier.slice(0, 12)) {
-        console.log(`    ${id}\tblocks ${byId.get(id) ?? 0} node(s)`);
+        console.log(`    ${id}\t[${tierById.get(id) ?? "?"}]\tblocks ${byId.get(id) ?? 0} node(s)`);
       }
       if (rd.frontier.length > 12) console.log(`    ...and ${rd.frontier.length - 12} more`);
     } else {

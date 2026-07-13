@@ -56,6 +56,7 @@ import { regenerateCommand } from "./surfaces/commands/regenerate.js";
 import { syncCommand } from "./surfaces/commands/sync.js";
 import { executeCommand } from "./surfaces/commands/execute.js";
 import { statusCommand } from "./surfaces/commands/status.js";
+import { dodCommand } from "./surfaces/commands/dod.js";
 import { probeCommand } from "./surfaces/commands/probe.js";
 import { rulesCheckCommand, rulesAuditCommand } from "./surfaces/commands/rules.js";
 import { fichaAuditCommand, fichaCleanupCommand } from "./surfaces/commands/ficha.js";
@@ -1144,6 +1145,21 @@ program
       await statusCommand(options);
     } catch (err: unknown) {
       console.error(`✖ Error during status: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("dod <nodeId>")
+  .description("Per-node DEFINITION OF DONE, read-only: the three verification gates (structural F∘G, behaviour fixture, declared rules) in one view, plus trust-tier and downstream blast-radius. Rules are checked live ($0); structural + behaviour are measured against a CACHED regen (`.ontology/verify/<id>`) when one exists — else reported `unmeasured` (run `onto sync`). Writes nothing, dispatches no LLM.")
+  .option("--no-run", "Skip the behaviour gate's fixture execution (the isolated child run). Structural still measures (pure file compare); behaviour reports `unmeasured`.")
+  .option("--json", "Output the full DoD report as JSON.")
+  .action(async (nodeId, options) => {
+    try {
+      // commander maps `--no-run` to options.run===false (default true).
+      await dodCommand(nodeId, { json: options.json, noRun: options.run === false });
+    } catch (err: unknown) {
+      console.error(`✖ Error during dod: ${errorMessage(err)}`);
       process.exit(1);
     }
   });

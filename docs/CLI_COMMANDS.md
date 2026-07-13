@@ -27,6 +27,7 @@ covering everything through Phase ζ (the workflow runtime).
 | Regenerate a node's code from intent | `onto regenerate <nodeId>` (preview; `--write` to apply, gated) |
 | Close the intent→code loop in one command | `onto sync <nodeId>` (regen + all gates + re-anchor; `--explain`, `--dry-run`) |
 | See graph health for the sync loop | `onto status` (syncable-core / drifted / fixtures / ficha) |
+| Per-node definition of done | `onto dod <nodeId>` (3 gates + trust-tier + blast-radius, read-only; measures structural/behaviour from a cached regen) |
 | Generate a behavioural fixture for a node | `onto probe <nodeId>` (self-validated; gates `regenerate --write`) |
 | Verify / triage a node's rules | `onto rules check <nodeId>` · `onto rules audit` |
 | Measure / fix ficha (intent record) quality | `onto ficha audit` · `onto ficha cleanup <nodeId>` |
@@ -751,6 +752,28 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **Live graph (2026-06-14):** 228 nodes, 221 with a shadow → 43 core, 178
   lower-confidence, 0 blocked; 43/221 have fixtures; 5 shadows drifted.
 - **Output (JSON):** `{ ok, report: { totalNodes, trackable, core, lowerConfidence, blocked, withFixture, drift: { hasAnchor, drifted }, ficha: { underDeclared, missingExports, proseRules }, nodes: [...] } }`.
+
+### `dod <nodeId>` *(2026-07-12 — per-node definition of done, read-only)*
+
+- **Purpose:** consolidate in ONE view what today needs three commands
+  (`verify-homeomorphism` + `probe`/behaviour + `rules check`) plus the tier and
+  blast-radius from `status`: *is this node done, what blocks it, how much sits
+  downstream.* **Writes nothing, dispatches no LLM.**
+- **The three gates are not equal in cost — and the report is honest about it:**
+  - **rules** — pure/static, computed **live** against the current shadow ($0).
+  - **structural** (F∘G≈id) and **behaviour** (fixture) measure a regeneration,
+    so they need a **cached regen** (`.ontology/verify/<id>`, left by `sync`/
+    `regenerate`). When one exists they are measured against it — structural is a
+    pure file compare; behaviour re-runs the fixture in an isolated child — and
+    labelled with the artifact's age. With **no** cached regen they read
+    `unmeasured` and point at `onto sync`; never a fabricated green.
+- **Also shows:** trust-tier (core / lower / blocked, same classifier as
+  `status`), downstream **blast-radius** (shadowed nodes transitively depending
+  on this one), and drift status.
+- **Flags:** `--no-run` (skip the behaviour fixture execution — structural still
+  measures, being a pure compare), `--json`.
+- **Example:** `onto dod node_0013` · `onto dod node_0013 --no-run --json`
+- **Output (JSON):** `{ ok, report: { nodeId, srcFile, hasShadow, tier, blastRadius, drift, hasCachedRegen, gates: { rules: { state, violations, staticChecked }, structural: { state, verdict?, locDistance?, structuralJaccard?, measuredAt? }, behaviour: { state, verdict?, casesPassed?, casesTotal?, measuredAt? } } } }`.
 
 ### `rules check <nodeId>` / `rules audit` *(2026-06-14 — rule enforcement + triage)*
 
