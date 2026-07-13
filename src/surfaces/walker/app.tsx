@@ -62,7 +62,10 @@ import {
   createProjectFromWalker,
 } from "./actions/projects-from-walker.js";
 import { NextActionsPanel, emptyNextActionsPanelState, type NextActionsPanelState } from "./layout/next-actions-panel.js";
-import { nextActions } from "./actions/next-actions.js";
+import { nextActions, nextActionsFromReport } from "./actions/next-actions.js";
+import { ActionBar, type FocalTone } from "./layout/action-bar.js";
+import { buildStatusReport } from "../commands/status.js";
+import { buildDodReport } from "../commands/dod.js";
 import {
   loadProposalsForWalker,
   applyProposalFromWalker,
@@ -164,6 +167,38 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
       return { error: err instanceof Error ? err.message : String(err) };
     }
   }, [focalId, cwd, reloadTick]);
+
+  // Action-bar substrate: the status report drives BOTH the fix-first rotation
+  // (Tab) and the per-focal recommendation. Memoised on the graph so a keypress
+  // is instant; recomputed only when the graph changes (reloadTick).
+  const statusReport = useMemo(() => {
+    try {
+      return buildStatusReport(cwd);
+    } catch {
+      return null;
+    }
+  }, [cwd, reloadTick]);
+  const safeActions = useMemo(
+    () => (statusReport ? nextActionsFromReport(statusReport) : null),
+    [statusReport],
+  );
+  // Tab cycles through the fix-first list like WoW's next-target; the index
+  // survives across presses but resets when the list changes.
+  const [rotationIdx, setRotationIdx] = useState(0);
+
+  // The recommendation the action bar lights for the CURRENT focal, derived from
+  // its tier + drift + whether it sits in the batch-syncable ideal.
+  const focalRec = useMemo<{ label: string; tone: FocalTone }>(() => {
+    const ns = statusReport?.nodes.find((n) => n.nodeId === focalId);
+    if (!ns || !ns.hasShadow) return { label: "intent — i edit / decompose", tone: "intent" };
+    if (ns.drifted) return { label: "drifted → :sync", tone: "warn" };
+    if (ns.tier === "blocked") return { label: `${ns.ruleViolations} rule-viol → fix`, tone: "warn" };
+    if (ns.tier === "lower") return { label: "no fixture → :probe", tone: "todo" };
+    const inIdeal = statusReport?.readiness.ideal.includes(focalId) ?? false;
+    return inIdeal
+      ? { label: "✓ ready → :sync", tone: "ready" }
+      : { label: "ready, blocked from below", tone: "todo" };
+  }, [statusReport, focalId]);
 
   // Whether the focal node currently has a saved draft. Recomputed on every
   // focalId change and whenever draftTick advances (i.e., after save/clear).
@@ -652,7 +687,41 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
       return;
     }
     if (key.tab) {
-      setMessage("plane rotation arrives in walker v2");
+      // WoW's next-target, for development: cycle the fix-first list, focusing
+      // the highest-leverage node first. Shift+Tab steps back. The action bar
+      // then lights what that node needs.
+      const acts = safeActions?.actions ?? [];
+      if (acts.length === 0) {
+        setMessage(`no blockers — ${safeActions?.syncableNow ?? 0} node(s) batch-syncable`);
+        return;
+      }
+      const idx = key.shift
+        ? (rotationIdx - 1 + acts.length) % acts.length
+        : rotationIdx % acts.length;
+      const a = acts[idx];
+      setRotationIdx(key.shift ? idx : idx + 1);
+      setFocalId(a.nodeId);
+      setMessage(`▶ ${a.nodeId}  ${a.reason} → ${a.suggestion}  (unblocks ${a.unblocks})`);
+      return;
+    }
+    if (input === "d") {
+      // Focal definition-of-done at a glance — the "why is this not done?"
+      // reflex. Read-only, no fixture execution (structural stays, pure compare).
+      try {
+        const rep = buildDodReport(focalId, cwd, { runBehaviour: false });
+        if ("error" in rep) {
+          setMessage(`dod: ${rep.error}`);
+        } else {
+          const g = rep.gates;
+          const cell = (s: string): string =>
+            s === "pass" ? "✓" : s === "fail" ? "✖" : s === "no-fixture" ? "no-fix" : "—";
+          setMessage(
+            `dod ${rep.nodeId} · ${rep.tier} · rules ${cell(g.rules.state)} struct ${cell(g.structural.state)} behav ${cell(g.behaviour.state)} · blocks ${rep.blastRadius} · ${rep.drift}`,
+          );
+        }
+      } catch (err) {
+        setMessage(`dod: ${err instanceof Error ? err.message : String(err)}`);
+      }
       return;
     }
     if (input === "T") {
@@ -1223,6 +1292,15 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
         }}
       />
       <NextActionsPanel state={nextPanel} />
+      <ActionBar
+        syncableNow={safeActions?.syncableNow ?? 0}
+        next={
+          safeActions && safeActions.actions.length > 0
+            ? { nodeId: safeActions.actions[0].nodeId, unblocks: safeActions.actions[0].unblocks }
+            : null
+        }
+        focal={focalRec}
+      />
       <HintBar mode={mode === "edit" ? "view" : mode} command={command} message={message} />
     </Box>
   );

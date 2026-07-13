@@ -60,20 +60,10 @@ function actionFor(
   };
 }
 
-export function nextActions(cwd: string): NextActionsResult {
-  let report: StatusReport;
-  try {
-    report = buildStatusReport(cwd);
-  } catch (err) {
-    return {
-      ok: false,
-      message: err instanceof Error ? err.message : String(err),
-      syncableNow: 0,
-      actions: [],
-      blockedTotal: 0,
-    };
-  }
-
+/** Derive the fix-first list from an already-computed StatusReport. The Walker
+ *  memoises the report and calls this so the action bar + the Tab rotation share
+ *  one computation per graph change. */
+export function nextActionsFromReport(report: StatusReport): NextActionsResult {
   const rd = report.readiness;
   const blastById = new Map(rd.blockers.map((b) => [b.nodeId, b.blockedDescendants]));
 
@@ -89,4 +79,20 @@ export function nextActions(cwd: string): NextActionsResult {
     actions,
     blockedTotal: rd.blockers.length,
   };
+}
+
+export function nextActions(cwd: string): NextActionsResult {
+  let report: StatusReport;
+  try {
+    report = buildStatusReport(cwd);
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : String(err),
+      syncableNow: 0,
+      actions: [],
+      blockedTotal: 0,
+    };
+  }
+  return nextActionsFromReport(report);
 }

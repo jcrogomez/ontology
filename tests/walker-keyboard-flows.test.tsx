@@ -289,4 +289,20 @@ describe("walker keyboard flows (stdin-driven)", () => {
     await waitFor(w.frame, (f) => f.includes("next-actions panel dismissed"), "panel dismissed");
     w.unmount();
   });
+
+  it("the action bar is always visible; Tab rotates safe actions; d shows the focal DoD", async () => {
+    const w = await mountWalker(tempDir);
+    // Always-on cockpit strip.
+    await waitFor(w.frame, (f) => f.includes("⚔") && f.includes("syncable"), "action bar");
+    await waitFor(w.frame, (f) => f.includes("Tab next · d dod"), "action-bar key hints");
+
+    // Fresh init graph: canon has no shadow → nothing blocks → Tab says so.
+    await w.press("\t");
+    await waitFor(w.frame, (f) => /no blockers/.test(f), "Tab on an unblocked graph");
+
+    // d → the focal (canon) definition-of-done at a glance.
+    await w.press("d");
+    await waitFor(w.frame, (f) => f.includes("dod node_0000_canon"), "focal DoD line");
+    w.unmount();
+  });
 });
