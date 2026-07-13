@@ -45,7 +45,7 @@ export function ActionBar({ syncableNow, next, focal, provider }: ActionBarProps
         <Text color={TONE_COLOR[focal.tone]}>{focal.label}</Text>
       </Box>
       <Box>
-        <Text dimColor>  Tab next · s sync · d dod · i edit · :next list · fire:</Text>
+        <Text dimColor>  Tab next · s sync · p probe · d dod · i edit · fire:</Text>
         <Text color="magenta">{provider}</Text>
         <Text dimColor> (:prov)</Text>
       </Box>

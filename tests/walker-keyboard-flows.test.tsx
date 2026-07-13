@@ -315,7 +315,11 @@ describe("walker keyboard flows (stdin-driven)", () => {
     // s → async cast: a casting row now, a proc when it resolves.
     await w.press("s");
     await waitFor(w.frame, (f) => f.includes("⟳ casting sync node_0002"), "casting row");
-    await waitFor(w.frame, (f) => /[✓✖] node_0002 sync →/.test(f), "proc flashed", 25000);
+    await waitFor(w.frame, (f) => /[✓✖] node_0002 sync →/.test(f), "sync proc flashed", 25000);
+
+    // p → async probe cast (mock output has no `export const cases` → refused).
+    await w.press("p");
+    await waitFor(w.frame, (f) => /[✓✖] node_0002 probe →/.test(f), "probe proc flashed", 25000);
     w.unmount();
   });
 
@@ -323,7 +327,7 @@ describe("walker keyboard flows (stdin-driven)", () => {
     const w = await mountWalker(tempDir);
     // Always-on cockpit strip.
     await waitFor(w.frame, (f) => f.includes("⚔") && f.includes("syncable"), "action bar");
-    await waitFor(w.frame, (f) => f.includes("Tab next · s sync · d dod"), "action-bar key hints");
+    await waitFor(w.frame, (f) => f.includes("Tab next · s sync · p probe · d dod"), "action-bar key hints");
 
     // Fresh init graph: canon has no shadow → nothing blocks → Tab says so.
     await w.press("\t");

@@ -67,6 +67,7 @@ import { ActionBar, type FocalTone } from "./layout/action-bar.js";
 import { buildStatusReport } from "../commands/status.js";
 import { buildDodReport } from "../commands/dod.js";
 import { runSync } from "../commands/sync.js";
+import { runProbe } from "../commands/probe.js";
 import { CastsPanel, type CastView } from "./layout/casts-panel.js";
 import {
   loadProposalsForWalker,
@@ -372,22 +373,30 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingCompile]);
 
-  // Fire a governed sync on a node ASYNC — the raid-tempo actuator. Returns
+  // Fire a governed action on a node ASYNC — the raid-tempo actuator. Returns
   // immediately (the LLM work runs in the background); a "casting" row shows now
-  // and a green/red "proc" flashes when it resolves. sync WRITES only behind its
-  // three green gates, so a single-key fire is safe by construction.
-  function fireSync(nodeId: string): void {
+  // and a green/red "proc" flashes when it resolves. Both verbs are governed —
+  // sync WRITES only behind its three green gates, probe persists only cases
+  // that self-validate against the source — so a single-key fire is safe.
+  function fireCast(nodeId: string, verb: "sync" | "probe"): void {
     const id = ++castIdRef.current;
-    setCasts((cs) => [...cs, { id, nodeId, verb: "sync", status: "casting" }]);
-    setMessage(`⟳ casting sync ${nodeId} [${sessionProvider}] — Tab to the next target`);
+    setCasts((cs) => [...cs, { id, nodeId, verb, status: "casting" }]);
+    setMessage(`⟳ casting ${verb} ${nodeId} [${sessionProvider}] — Tab to the next target`);
     void (async () => {
       let proc: { ok: boolean; label: string };
       try {
-        const res = await runSync(nodeId, { provider: sessionProvider }, cwd);
-        if (res.decision === "wrote") proc = { ok: true, label: "wrote + re-anchored" };
-        else if (res.decision === "refused")
-          proc = { ok: false, label: `refused: ${res.reason ?? "gate"}` };
-        else proc = { ok: false, label: `${res.decision}${res.reason ? `: ${res.reason}` : ""}` };
+        if (verb === "sync") {
+          const res = await runSync(nodeId, { provider: sessionProvider }, cwd);
+          if (res.decision === "wrote") proc = { ok: true, label: "wrote + re-anchored" };
+          else if (res.decision === "refused")
+            proc = { ok: false, label: `refused: ${res.reason ?? "gate"}` };
+          else proc = { ok: false, label: `${res.decision}${res.reason ? `: ${res.reason}` : ""}` };
+        } else {
+          const res = await runProbe(nodeId, { provider: sessionProvider }, cwd);
+          if (res.written)
+            proc = { ok: true, label: `wrote ${res.keptCases}/${res.generatedCases} case(s)` };
+          else proc = { ok: false, label: res.failure ?? "no case self-validated" };
+        }
       } catch (err) {
         proc = { ok: false, label: err instanceof Error ? err.message : String(err) };
       }
@@ -737,15 +746,17 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
       setMessage(`▶ ${a.nodeId}  ${a.reason} → ${a.suggestion}  (unblocks ${a.unblocks})`);
       return;
     }
-    if (input === "s") {
-      // Fire a governed sync on the focal, async. Only code nodes (with a
-      // shadow) can be synced; intent nodes have no code to close.
+    if (input === "s" || input === "p") {
+      // Fire a governed action on the focal, async: s = sync, p = probe (mint a
+      // behaviour fixture). Only code nodes (with a shadow) qualify; intent
+      // nodes have no code to close or characterise.
+      const verb = input === "s" ? "sync" : "probe";
       const ns = statusReport?.nodes.find((n) => n.nodeId === focalId);
       if (!ns || !ns.hasShadow) {
-        setMessage("sync: focal has no code shadow (nothing to close)");
+        setMessage(`${verb}: focal has no code shadow (nothing to ${input === "s" ? "close" : "probe"})`);
         return;
       }
-      fireSync(focalId);
+      fireCast(focalId, verb);
       return;
     }
     if (input === "d") {
@@ -832,7 +843,7 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
       return;
     }
     if (cmd === "help") {
-      setMessage("i edit · a/:preview artifact · :which <file> · s (async sync focal) · :prov <provider> · :health (node dashboard) · :next (what to do next) · :projects (switch/create project) · :fichacleanup · :reanchor · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :models · :route <task> <model-id|off> · :clear{run,plan,compile,info,draft,preview} · :q");
+      setMessage("i edit · a/:preview artifact · :which <file> · s (async sync focal) · p (async probe focal) · :prov <provider> · :health (node dashboard) · :next (what to do next) · :projects (switch/create project) · :fichacleanup · :reanchor · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :models · :route <task> <model-id|off> · :clear{run,plan,compile,info,draft,preview} · :q");
       return;
     }
     if (cmd === "propose") {
