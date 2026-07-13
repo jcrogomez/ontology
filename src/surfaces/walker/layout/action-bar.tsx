@@ -15,6 +15,8 @@ export interface ActionBarProps {
   next: { nodeId: string; unblocks: number } | null;
   /** The recommendation for the CURRENT focal, already phrased. */
   focal: { label: string; tone: FocalTone };
+  /** The provider `s` fires against (settable with :prov). */
+  provider: string;
 }
 
 const TONE_COLOR: Record<FocalTone, string | undefined> = {
@@ -24,7 +26,7 @@ const TONE_COLOR: Record<FocalTone, string | undefined> = {
   intent: "cyan",
 };
 
-export function ActionBar({ syncableNow, next, focal }: ActionBarProps): React.ReactElement {
+export function ActionBar({ syncableNow, next, focal, provider }: ActionBarProps): React.ReactElement {
   return (
     <Box marginTop={1} flexDirection="column">
       <Box>
@@ -43,7 +45,9 @@ export function ActionBar({ syncableNow, next, focal }: ActionBarProps): React.R
         <Text color={TONE_COLOR[focal.tone]}>{focal.label}</Text>
       </Box>
       <Box>
-        <Text dimColor>  Tab next · d dod · i edit · :next list · :sync/:probe fire</Text>
+        <Text dimColor>  Tab next · s sync · d dod · i edit · :next list · fire:</Text>
+        <Text color="magenta">{provider}</Text>
+        <Text dimColor> (:prov)</Text>
       </Box>
     </Box>
   );

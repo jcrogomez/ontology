@@ -290,11 +290,40 @@ describe("walker keyboard flows (stdin-driven)", () => {
     w.unmount();
   });
 
+  it("`:prov` sets the fire provider; `s` fires an async sync that resolves to a proc", async () => {
+    // A code node with a shadow to sync (mirror of the status/dod fixtures).
+    expect(runCli(tempDir, ["node", "create", "--level", "domain", "--kind", "entity", "--prompt", "Dominio"]).status).toBe(0);
+    expect(runCli(tempDir, ["node", "create", "--level", "artifact", "--kind", "artifact", "--manifestation", "code", "--language", "python", "--prompt", 'print("hi")']).status).toBe(0);
+    expect(runCli(tempDir, ["node", "link", "--from", "node_0002", "--to", "node_0001", "--type", "refines"]).status).toBe(0);
+    const shadowRel = "src/hi.py";
+    fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, shadowRel), 'print("hi")\n');
+    const np = path.join(tempDir, ".ontology/nodes", "node_0002.json");
+    const n = JSON.parse(fs.readFileSync(np, "utf-8"));
+    n.outputs = { ...(n.outputs ?? {}), files: [shadowRel] };
+    fs.writeFileSync(np, JSON.stringify(n, null, 2));
+
+    const w = await mountWalker(tempDir, "node_0002");
+    // Set the fire provider to mock (deterministic, no real LLM; identity regen
+    // is structurally unstable → sync refuses → no write).
+    await w.press(":");
+    await waitFor(w.frame, (f) => f.includes(":_"), "command prompt");
+    await w.press("prov mock");
+    await w.press(ENTER);
+    await waitFor(w.frame, (f) => f.includes("fire:mock"), "action bar shows fire provider");
+
+    // s → async cast: a casting row now, a proc when it resolves.
+    await w.press("s");
+    await waitFor(w.frame, (f) => f.includes("⟳ casting sync node_0002"), "casting row");
+    await waitFor(w.frame, (f) => /[✓✖] node_0002 sync →/.test(f), "proc flashed", 25000);
+    w.unmount();
+  });
+
   it("the action bar is always visible; Tab rotates safe actions; d shows the focal DoD", async () => {
     const w = await mountWalker(tempDir);
     // Always-on cockpit strip.
     await waitFor(w.frame, (f) => f.includes("⚔") && f.includes("syncable"), "action bar");
-    await waitFor(w.frame, (f) => f.includes("Tab next · d dod"), "action-bar key hints");
+    await waitFor(w.frame, (f) => f.includes("Tab next · s sync · d dod"), "action-bar key hints");
 
     // Fresh init graph: canon has no shadow → nothing blocks → Tab says so.
     await w.press("\t");

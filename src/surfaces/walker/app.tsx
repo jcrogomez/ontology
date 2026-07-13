@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Box, Text, useInput, useApp } from "ink";
 import {
   loadFocalNeighborhood,
@@ -66,6 +66,8 @@ import { nextActions, nextActionsFromReport } from "./actions/next-actions.js";
 import { ActionBar, type FocalTone } from "./layout/action-bar.js";
 import { buildStatusReport } from "../commands/status.js";
 import { buildDodReport } from "../commands/dod.js";
+import { runSync } from "../commands/sync.js";
+import { CastsPanel, type CastView } from "./layout/casts-panel.js";
 import {
   loadProposalsForWalker,
   applyProposalFromWalker,
@@ -156,6 +158,13 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
   const [nextPanel, setNextPanel] = useState<NextActionsPanelState>(
     emptyNextActionsPanelState(),
   );
+  // Async fire pool ("casts") — the raid tempo. `s` fires a governed sync on the
+  // focal that runs in the BACKGROUND (non-blocking) so you Tab to the next
+  // target and fire again; when a cast resolves a green/red proc flashes and the
+  // graph refreshes (reloadTick). sessionProvider is what `s` dispatches to.
+  const castIdRef = useRef(0);
+  const [casts, setCasts] = useState<CastView[]>([]);
+  const [sessionProvider, setSessionProvider] = useState<LlmProvider>("ollama");
   const [pendingLinkAnalysis, setPendingLinkAnalysis] = useState<{ focalId: string } | null>(null);
   // Async sentinel for `:workflow` (v1.5) — same two-stage pattern as :run.
   const [pendingWorkflow, setPendingWorkflow] = useState<WorkflowArgs | null>(null);
@@ -362,6 +371,30 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingCompile]);
+
+  // Fire a governed sync on a node ASYNC — the raid-tempo actuator. Returns
+  // immediately (the LLM work runs in the background); a "casting" row shows now
+  // and a green/red "proc" flashes when it resolves. sync WRITES only behind its
+  // three green gates, so a single-key fire is safe by construction.
+  function fireSync(nodeId: string): void {
+    const id = ++castIdRef.current;
+    setCasts((cs) => [...cs, { id, nodeId, verb: "sync", status: "casting" }]);
+    setMessage(`⟳ casting sync ${nodeId} [${sessionProvider}] — Tab to the next target`);
+    void (async () => {
+      let proc: { ok: boolean; label: string };
+      try {
+        const res = await runSync(nodeId, { provider: sessionProvider }, cwd);
+        if (res.decision === "wrote") proc = { ok: true, label: "wrote + re-anchored" };
+        else if (res.decision === "refused")
+          proc = { ok: false, label: `refused: ${res.reason ?? "gate"}` };
+        else proc = { ok: false, label: `${res.decision}${res.reason ? `: ${res.reason}` : ""}` };
+      } catch (err) {
+        proc = { ok: false, label: err instanceof Error ? err.message : String(err) };
+      }
+      setCasts((cs) => cs.map((c) => (c.id === id ? { ...c, status: "done", proc } : c)));
+      setReloadTick((t) => t + 1); // refresh DoD / action bar / next list after a write
+    })();
+  }
 
   // Helper: persist the current edit-mode buffer and exit edit mode.
   function commitDraftAndExit(): void {
@@ -704,6 +737,17 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
       setMessage(`▶ ${a.nodeId}  ${a.reason} → ${a.suggestion}  (unblocks ${a.unblocks})`);
       return;
     }
+    if (input === "s") {
+      // Fire a governed sync on the focal, async. Only code nodes (with a
+      // shadow) can be synced; intent nodes have no code to close.
+      const ns = statusReport?.nodes.find((n) => n.nodeId === focalId);
+      if (!ns || !ns.hasShadow) {
+        setMessage("sync: focal has no code shadow (nothing to close)");
+        return;
+      }
+      fireSync(focalId);
+      return;
+    }
     if (input === "d") {
       // Focal definition-of-done at a glance — the "why is this not done?"
       // reflex. Read-only, no fixture execution (structural stays, pure compare).
@@ -788,7 +832,7 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
       return;
     }
     if (cmd === "help") {
-      setMessage("i edit · a/:preview artifact · :which <file> · :health (node dashboard) · :next (what to do next) · :projects (switch/create project) · :fichacleanup · :reanchor · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :models · :route <task> <model-id|off> · :clear{run,plan,compile,info,draft,preview} · :q");
+      setMessage("i edit · a/:preview artifact · :which <file> · s (async sync focal) · :prov <provider> · :health (node dashboard) · :next (what to do next) · :projects (switch/create project) · :fichacleanup · :reanchor · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :models · :route <task> <model-id|off> · :clear{run,plan,compile,info,draft,preview} · :q");
       return;
     }
     if (cmd === "propose") {
@@ -1213,6 +1257,23 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
       setMessage("next-actions panel dismissed");
       return;
     }
+    if (cmd === "prov" || cmd.startsWith("prov ")) {
+      // Set the provider that `s` fires against.
+      const name = cmd.slice(4).trim();
+      const allowed = ["mock", "ollama", "anthropic", "gemini"];
+      if (allowed.includes(name)) {
+        setSessionProvider(name as LlmProvider);
+        setMessage(`fire provider → ${name}`);
+      } else {
+        setMessage(`:prov <${allowed.join("|")}>  (current: ${sessionProvider})`);
+      }
+      return;
+    }
+    if (cmd === "clearcasts") {
+      setCasts([]);
+      setMessage("casts cleared");
+      return;
+    }
     setMessage(`unknown command: :${cmd}`);
   }
 
@@ -1292,6 +1353,7 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
         }}
       />
       <NextActionsPanel state={nextPanel} />
+      <CastsPanel casts={casts} />
       <ActionBar
         syncableNow={safeActions?.syncableNow ?? 0}
         next={
@@ -1300,6 +1362,7 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
             : null
         }
         focal={focalRec}
+        provider={sessionProvider}
       />
       <HintBar mode={mode === "edit" ? "view" : mode} command={command} message={message} />
     </Box>
