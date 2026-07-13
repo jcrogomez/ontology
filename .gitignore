@@ -56,6 +56,7 @@ AGENT_REVIEW_*.md
 gap2-*.json
 monotone-*.json
 .probe-*
+probe-*.mjs
 _chk_tmp.ts
 
 # Workspace artifacts
