@@ -56,6 +56,43 @@ exhaustively pinned by `tests/runtime/topos/closed-world-parity.test.ts`)
 
 ## Open follow-ups
 
+### Next up — start here (queued 2026-07-17)
+
+Ordered by leverage. Detail/context in the session-handoff note.
+
+1. **Run the Gap-2 executor sweep** — the number that gates the Architect,
+   now unblocked (both blocking extraction-gaps converged). `onto execute` over
+   the 13-node closure (`node_0011 node_0012 node_0017 node_0022 node_0026
+   node_0029 node_0031 node_0014 node_0106 node_0143 node_0225 node_0032
+   node_0168`), `--dry-run --json`. **Paused 2026-07-17 on 8 GB memory** (7B
+   loaded → 7% free); needs `ollama serve` + `qwen2.5-coder:7b` (both present).
+   To cut the memory/time peak, run the critical subset first: `node_0032` +
+   its 5 downstream (0026/0031/0106/0014/0029). The question: do `node_0032` /
+   `node_0168` flip extraction-gap → **closed** in the *real executor* (not just
+   the isolated MONOTONE_DECOMPOSE runs), and cascade-unblock the 7 downstream?
+2. **A1 — a ficha-repair lever for `onto execute`.** Today's levers
+   (`refine`/`decompose`/`escalate`) all act on the code draft; none touches the
+   *intention*. The n=2 convergence playbook (fixture-guided ficha enrichment) is
+   still HUMAN-driven. Turning it into an executor lever is the single biggest
+   yield unlock — better models do NOT close extraction-gaps. This is the path to
+   an autonomous overnight run.
+3. **A2 — field-level oracle feedback.** The divergent-case oracle says "values
+   diverged" without naming the field → the refine loop re-rolls blind (caused the
+   `node_0168` 7/8→5/8 regression). Cheap, already scoped; survives the
+   "capable models" assumption.
+4. **B1/B2 — autonomy scaffolding** for unsupervised runs: provider
+   failover + quota-aware retry (the Ollama-cloud free-tier session limit kept
+   surfacing as infra-error), and a **spend-budget governor** the executor
+   respects before `--allow-paid` climbs opus overnight.
+5. **Prune the 57 prose-rules** (behavioural → `onto probe`; noise → human
+   review) and keep the trustworthy core growing past 136 by putting fixtures on
+   the fix-first hubs (`node_0021` unblocks 82, `node_0106` unblocks 63).
+6. **Attestation-layer design (audit-without-source thread).** Sketch the exact
+   fields `onto` must emit — log/hash/gate-verdict/coverage — so a third party can
+   verify the "no gap between declared and implemented intent, full coverage"
+   claim without seeing `src/`. First concrete step toward the Open-Prompt
+   distinctive-badge idea.
+
 ### Shipped 2026-06-18 (against the four-gap checkpoint below)
 
 - **Gap 1 (trustworthy core) — done.** Deterministic ficha cleanup
