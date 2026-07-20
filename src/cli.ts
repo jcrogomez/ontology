@@ -1139,7 +1139,8 @@ program
   .description("Read-only graph health for the sync loop: how many nodes are syncable-with-confidence (code shadow + behaviour fixture + rules statically clean), how many are lower-confidence (no fixture) or blocked (rule violation), how many shadows drifted from the anchor, and the ficha-quality summary. A pure composition of shadow/fixture presence + `onto drift` + `onto ficha audit` — writes nothing, runs no fixtures. See docs/design/runtime/SYNC_LOOP_SPEC.md §4.")
   .option("--list", "List the node ids in each syncability tier.")
   .option("--blockers", "Show the dependency-order readiness view: the syncable ideal (core nodes whose whole closure is core) + the fix-first blocker antichain ranked by how many nodes each blocks.")
-  .option("--json", "Output the full report (incl. per-node detail + readiness) as JSON.")
+  .option("--gray-zone", "Show the gray-zone index: nodes whose multi-draw regenerations disagreed with EACH OTHER (recorded by `onto sync`/`onto regenerate --draws N`), ranked most-ambiguous first — the repair-the-ficha-first queue. Reads .ontology/reports/gray-zone.json; draws nothing.")
+  .option("--json", "Output the full report (incl. per-node detail + readiness + gray-zone ranking) as JSON.")
   .action(async (options) => {
     try {
       await statusCommand(options);
@@ -1199,12 +1200,15 @@ program
   .option("--dry-run", "Run the whole loop (regen + gates + decisions) but write nothing — preview the decisions.")
   .option("--max-attempts <n>", "Hard backstop on attempts per node (default 8).", (v) => parseInt(v, 10))
   .option("--allow-paid", "Allow paid models into the capability ladder (default: $0 — paid models excluded).")
+  .option("--no-precedents", "Ignore the episodic precedent store for this run (measure every node from scratch; fresh outcomes are still recorded). Default: warm-start κ* from the last run and honour extraction-gap precedents on unchanged fichas.")
   .option("--behavior-fixtures-dir <path>", "Override the behaviour-fixtures directory (default tests/behavior-fixtures).")
   .option("--ollama-host <host>", "Host for the Ollama provider.")
   .option("--json", "Output the full report as JSON.")
   .action(async (nodeIds, options) => {
     try {
-      await executeCommand(nodeIds, options);
+      // commander maps `--no-precedents` to options.precedents === false.
+      const { precedents, ...rest } = options as Record<string, unknown> & { precedents?: boolean };
+      await executeCommand(nodeIds, { ...rest, ...(precedents === false ? { noPrecedents: true } : {}) });
     } catch (err: unknown) {
       console.error(`✖ Error during execute: ${errorMessage(err)}`);
       process.exit(1);

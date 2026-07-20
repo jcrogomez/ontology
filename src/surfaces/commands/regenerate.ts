@@ -28,6 +28,7 @@ import {
 } from "../../forward/compile/decompose-plan.js";
 import { computeKeepSet } from "../../forward/compile/slice-keep.js";
 import { scanFileSymbols } from "../../inverse/ast-symbol-scanner.js";
+import { computeGrayZone, recordGrayZone, type GrayZoneIndex } from "../../laws/gray-zone.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
 
 // `onto regenerate <nodeId>` — the governed lever that turns the
@@ -140,7 +141,10 @@ export interface RegenerateResult {
   consensusSize?: number;
   consensusK?: number;
   clusterSizes?: number[];
-  draftSummary?: { i: number; verdict?: HomeomorphismVerdict; behaviorVerdict: BehaviorVerdict | "no_fixture"; acceptable: boolean }[];
+  draftSummary?: { i: number; verdict?: HomeomorphismVerdict; behaviorVerdict: BehaviorVerdict | "no_fixture"; declKey?: string; acceptable: boolean }[];
+  /** Draw-vs-draw disagreement fold (present only when draws > 1) — the
+   *  gray-zone index persisted to .ontology/reports/gray-zone.json. */
+  grayZone?: GrayZoneIndex;
   // Verify-refine fields (present only when refine > 1).
   refineRounds?: number;
   refineRoundsUsed?: number;
@@ -822,6 +826,19 @@ export async function runRegenerate(
   const rep = consensusClass[0];
   const clusterSizes = ranked.map((c) => c.length);
 
+  // Gray-zone index: what the losing draws prove about the FICHA. Folded from
+  // the same evals the consensus ranking just consumed; persisted best-effort
+  // (a bookkeeping failure must never sink a regeneration that already has a
+  // verdict). Preview runs record too — the measurement is read-only.
+  const grayZone = computeGrayZone(
+    evals.map((e) => ({ i: e.i, compiled: e.compiled, declKey: e.declKey, verdict: e.verdict, behaviorVerdict: e.behaviorVerdict, acceptable: e.acceptable })),
+  );
+  try {
+    recordGrayZone(cwd, { nodeId, measuredAt: new Date().toISOString(), provider: options.provider, ...grayZone });
+  } catch {
+    // best-effort by contract
+  }
+
   const base: RegenerateResult = {
     ok: true,
     nodeId,
@@ -838,7 +855,8 @@ export async function runRegenerate(
     consensusSize: consensusClass.length,
     consensusK,
     clusterSizes,
-    draftSummary: evals.map((e) => ({ i: e.i, verdict: e.verdict, behaviorVerdict: e.behaviorVerdict, acceptable: e.acceptable })),
+    draftSummary: evals.map((e) => ({ i: e.i, verdict: e.verdict, behaviorVerdict: e.behaviorVerdict, declKey: e.declKey, acceptable: e.acceptable })),
+    grayZone,
     ...refineFields,
   };
 

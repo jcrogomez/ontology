@@ -32,8 +32,8 @@ Per-node terminal states (this enum IS the report taxonomy — no remapping):
 | Terminal | Meaning |
 |---|---|
 | `closed` | gates green; the passing draft was written under governance |
-| `extraction-gap` | clean lint at the top rung yet still failing → the **intention** is the limit, not the model. Flag G; do **not** write |
-| `capacity-ceiling` | levers + ladder exhausted with non-clean/unknown lint → the available models can't close it |
+| `extraction-gap` | the **intention** is the limit, not the model — since 2026-07-20 decided by draw-disagreement evidence first (a plateau probe's draws disagree with each other / split pass-fail on the same fixture → the ficha under-determines the artifact), falling back to the original clean-lint proxy. Flag G; do **not** write |
+| `capacity-ceiling` | levers + ladder exhausted and the failure does NOT read as an ambiguous ficha (draws agree yet fail with non-clean lint, or no draw evidence + dirty/unknown lint) → the available models can't close it |
 | `blocked-upstream` | a hard dependency did not close → not attempted (never disguised as a capacity ceiling) |
 | `unverified-no-fixture` | no behaviour fixture → cannot gate on behaviour, so the executor refuses to write |
 | `infra-error` | machine failure (provider down, missing shadow, lock, a draft that crashed the checker) |
@@ -58,23 +58,45 @@ refine), `decompose` (slice-and-assemble — since 2026-07-07 it composes
 refine + monotone `keepSlices`: green slices freeze between rounds, only
 implicated slices regenerate; see
 [`../proposals/MONOTONE_DECOMPOSE.md`](../proposals/MONOTONE_DECOMPOSE.md)),
-`escalate` (climb one ladder rung).
+`escalate` (climb one ladder rung), `probe N` (added 2026-07-20: N independent
+draws at the current rung, fired **once per node** just before a plateau
+verdict, to measure whether the draws agree with EACH OTHER — the gray-zone
+fold from `laws/gray-zone.ts`. Not a new gate: a consensus pass still writes
+and closes the node).
 
 Branch order (read from the 2026-06-17 calibration record):
 1. upstream not all closed → `blocked-upstream`.
-2. no history → `generate` at the cheapest rung.
-3. behaviour `pass` → `closed`; `infra-error` → terminate; `untested` with no
+2. no history + a valid extraction-gap **precedent** (ficha unchanged, ladder
+   no taller — see §5.1) → cite it, terminate `extraction-gap` at zero cost.
+3. no history → `generate` at the cheapest rung.
+4. behaviour `pass` → `closed`; `infra-error` → terminate; `untested` with no
    fixture → `unverified-no-fixture`.
-4. budget/ladder exhausted → `classifyPlateau`: **clean lint → extraction-gap,
-   else capacity-ceiling** (unknown lint stays conservative = capacity, never
-   accusing the intention without evidence).
-5. otherwise climb the lever ladder: refine → escalate → decompose → concede.
+5. budget/ladder exhausted → if the last verdict carries no draw evidence and
+   the probe hasn't fired (and the attempt backstop allows), `probe`; else
+   `classifyPlateauWithEvidence`, the **evidence hierarchy** (2026-07-20,
+   inspired by the flip-flop-as-boundary-signal framing — external, T3):
+   - draws split pass/fail on the same fixture → `extraction-gap`
+     (`behaviour-split`);
+   - no majority declKey cluster across draws → `extraction-gap`
+     (`draw-disagreement`) — the draws PROVE the ficha under-determines;
+   - draws agree + clean lint → `extraction-gap` (`clean-lint`, the original
+     calibrated rule preserved);
+   - draws agree + dirty/unknown lint → `capacity-ceiling` (`draw-agreement`);
+   - no draw evidence → original lint proxy (**clean → extraction-gap, else
+     capacity-ceiling**; unknown lint stays conservative = capacity, never
+     accusing the intention without evidence).
+   The chosen evidence lands on `NodeRecord.gapEvidence` (same fold in policy
+   and runner — no mapping drift) and Gap-A nodes flagged by disagreement are
+   listed as the ficha-repair route in the report footer.
+6. otherwise climb the lever ladder: refine → escalate → decompose → concede.
 
 The anti-corruption layer `verdict.ts` collapses the 20-field `RegenerateResult`
-into a small `GateVerdict {outcome, lintClean, hasFixture, detail}` so the policy
-never sees the fat type. `fixturePresent` disambiguates the overloaded
-`no_fixture` verdict: a fixture-present-but-unevaluable draw is `broken`
-(refinable), not `untested` (unverifiable).
+into a small `GateVerdict {outcome, lintClean, hasFixture, grayZone?, detail}`
+so the policy never sees the fat type. `fixturePresent` disambiguates the
+overloaded `no_fixture` verdict: a fixture-present-but-unevaluable draw is
+`broken` (refinable), not `untested` (unverifiable). `grayZone` (present only
+on multi-draw attempts) carries the draw-agreement fold the plateau
+classification needs.
 
 ## 4. The capability ladder (`model-ladder.ts`)
 
@@ -105,6 +127,31 @@ where a node's `upstreamAllClosed` feeds its decision. Key invariants:
 integration, and the governance are testable without a live LLM
 (`tests/executor-runner.test.ts`). `runExecutorLive` (`commands/execute.ts`)
 binds the real command + loads graph/registry + resolves the premise ladder.
+
+### 5.1 Episodic precedent store (`precedents.ts`, added 2026-07-20)
+
+The executor's memory across runs: one record per node at
+`.ontology/reports/executor-precedents.json` — `{terminal, κ*, gapEvidence,
+ladderSize, fichaHash}`, keyed to a sha256 over exactly the intent surface F
+consumes (prompt + rules + context contract). Consulted by the runner (IO
+stays out of the pure policy; the applicable facts enter the state as data):
+
+- **`closed` precedents warm-start κ*** — the next run begins the climb at the
+  rung that closed the node last time. Never a verification cache: the gates
+  run in full every time; a precedent cannot green-light a write.
+- **`extraction-gap` precedents short-circuit** (evidence `precedent`, zero
+  attempts): re-burning the ladder on an UNCHANGED ficha cannot change "the
+  intention is the limit". Voided the moment the ficha hash changes or the
+  current ladder is taller than the one recorded (new capacity to try).
+- **`capacity-ceiling` deliberately does NOT short-circuit** — the local F is
+  high-variance (P1_COLLAPSE_VARIANCE 2026-07-08), so a fresh climb can close
+  what the last run's draws missed. It is recorded for the audit only.
+- Cited precedents are not re-recorded (the original evidence and date stay);
+  `--no-precedents` blinds the lookup for a from-scratch re-measure while
+  still recording fresh outcomes.
+
+The store is optional (`ExecutorDeps.precedents`); without it every run starts
+from scratch, exactly as before. Coverage: `tests/executor-precedents.test.ts`.
 
 ## 6. Child-process isolation of the behaviour check
 

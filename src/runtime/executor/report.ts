@@ -81,10 +81,23 @@ export function formatReport(report: ExecReport): string {
   const lines = report.nodes.map((n) => {
     const mark =
       n.terminal === "closed" ? (n.written ? "✓ closed" : "✓ closed (not written)") : `· ${n.terminal}`;
+    const evidence = n.gapEvidence ? ` (${n.gapEvidence})` : "";
     const k = n.kappa === null ? "" : `, κ*=${n.kappa}`;
-    return `  ${n.nodeId}  ${mark}  [rung ${n.finalRung}, ${n.attempts} attempt(s)${k}]` +
+    return `  ${n.nodeId}  ${mark}${evidence}  [rung ${n.finalRung}, ${n.attempts} attempt(s)${k}]` +
       (n.lastDetail ? `  — ${n.lastDetail}` : "");
   });
+  // Gap-A routing: extraction-gaps flagged by DRAW DISAGREEMENT are ficha-
+  // repair work, not re-run work — surface the queue explicitly so the human
+  // route (Walker / onto ficha) is one glance away.
+  const grayGaps = report.nodes.filter(
+    (n) =>
+      n.terminal === "extraction-gap" &&
+      (n.gapEvidence === "draw-disagreement" || n.gapEvidence === "behaviour-split"),
+  );
+  const routeLine =
+    grayGaps.length > 0
+      ? `gap-A route: draws disagreed on ${grayGaps.map((n) => n.nodeId).join(", ")} — repair the ficha first (\`onto status --gray-zone\`, \`onto ficha\`/walker), then re-run`
+      : "";
   // κ* barometer: how much capability the closed nodes needed.
   const kd = report.kappa;
   const hist = Object.keys(kd.byRung)
@@ -107,5 +120,6 @@ export function formatReport(report: ExecReport): string {
         ` · attempts local ${eco.attemptsLocal} / cloud ${eco.attemptsCloud}` +
         ` · ${secs}s wall-clock`
       : "";
-  return [head, ...lines, ...(kappaLine ? ["", kappaLine] : []), ...(ecoLine ? [ecoLine] : [])].join("\n");
+  const footer = [routeLine, kappaLine, ecoLine].filter(Boolean);
+  return [head, ...lines, ...(footer.length ? ["", ...footer] : [])].join("\n");
 }

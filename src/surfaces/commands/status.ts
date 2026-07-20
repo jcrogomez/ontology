@@ -5,6 +5,7 @@ import { getOntologyPaths } from "../../kernel/core/project/paths.js";
 import { auditFichas } from "../../inverse/ficha-quality.js";
 import { checkRules } from "../../inverse/rule-checker.js";
 import { computeSyncReadiness, type SyncReadiness } from "../../kernel/graph/sync-readiness.js";
+import { readGrayZoneRecords, type GrayZoneRecord } from "../../laws/gray-zone.js";
 import { readDriftState } from "./drift.js";
 import { errorMessage } from "../../kernel/core/errors.js";
 
@@ -30,6 +31,10 @@ export interface StatusCommandOptions {
   /** Show the dependency-order readiness view: the syncable ideal + the
    *  fix-first blocker antichain (human output only; always in JSON). */
   blockers?: boolean;
+  /** Show the gray-zone ranking: nodes whose multi-draw regenerations
+   *  disagree with each other — repair-the-ficha-first candidates (human
+   *  output only; always in JSON). */
+  grayZone?: boolean;
 }
 
 export type Tier = "core" | "lower" | "blocked" | "no-shadow";
@@ -64,6 +69,17 @@ export interface StatusReport {
   };
   /** Dependency-order readiness: the syncable ideal + the blocker antichain. */
   readiness: SyncReadiness;
+  /** Gray-zone index: latest per-node draw-disagreement measurements (from
+   *  multi-draw sync/regenerate runs), ranked most-ambiguous first. Empty
+   *  until a multi-draw run has recorded — status never draws by itself. */
+  grayZone: {
+    measured: number;
+    /** Nodes in the "gray" zone (no majority cluster) — Gap-A suspects. */
+    gray: number;
+    /** Nodes where draws split pass/fail on the SAME fixture. */
+    behaviorSplits: number;
+    ranking: GrayZoneRecord[];
+  };
   nodes: NodeStatus[];
 }
 
@@ -140,6 +156,19 @@ export function buildStatusReport(cwd: string): StatusReport {
     edges: loadEdges(cwd),
   });
 
+  // Gray-zone ranking: latest disagreement record per LIVE node (records for
+  // deleted nodes are ignored, not pruned — the next multi-draw run on a live
+  // node upserts its own entry). Most-disagreeing first; entropy breaks ties.
+  const liveIds = new Set(nodes.map((n) => n.id));
+  const grayRecords = Object.values(readGrayZoneRecords(cwd))
+    .filter((rec) => liveIds.has(rec.nodeId))
+    .sort(
+      (a, b) =>
+        b.disagreementRate - a.disagreementRate ||
+        b.clusterEntropyBits - a.clusterEntropyBits ||
+        a.nodeId.localeCompare(b.nodeId),
+    );
+
   return {
     totalNodes: nodes.length,
     trackable: trackable.length,
@@ -156,6 +185,12 @@ export function buildStatusReport(cwd: string): StatusReport {
       underDeclared: audit.nodesWithMissingExports,
       missingExports: audit.totalMissingExports,
       proseRules: audit.totalProseRulesOnCodeNodes,
+    },
+    grayZone: {
+      measured: grayRecords.length,
+      gray: grayRecords.filter((rec) => rec.zone === "gray").length,
+      behaviorSplits: grayRecords.filter((rec) => rec.behaviorSplit).length,
+      ranking: grayRecords,
     },
     nodes: nodeStatuses,
   };
@@ -232,6 +267,24 @@ function emit(report: StatusReport, options: StatusCommandOptions): void {
       if (rd.frontier.length > 12) console.log(`    ...and ${rd.frontier.length - 12} more`);
     } else {
       console.log(`  ✓ no blockers — every core node is batch-syncable`);
+    }
+  }
+
+  if (options.grayZone) {
+    const gz = r.grayZone;
+    console.log("");
+    console.log(`  ── gray-zone index (draw disagreement → repair-the-ficha-first) ──`);
+    if (gz.measured === 0) {
+      console.log(`  (no measurements yet — a multi-draw \`onto sync\`/\`onto regenerate --draws N\` records one per node)`);
+    } else {
+      console.log(`  measured: ${gz.measured} node(s)\tgray: ${gz.gray}\tbehaviour splits: ${gz.behaviorSplits}`);
+      for (const rec of gz.ranking.slice(0, 12)) {
+        const split = rec.behaviorSplit ? "  ⚠ behaviour split" : "";
+        console.log(
+          `    ${rec.nodeId}\t[${rec.zone}]\tdisagreement ${rec.disagreementRate.toFixed(2)} (${rec.clusterCount} cluster(s)/${rec.compiledDraws} draws)\t${rec.measuredAt.slice(0, 10)}${split}`,
+        );
+      }
+      if (gz.ranking.length > 12) console.log(`    ...and ${gz.ranking.length - 12} more`);
     }
   }
 

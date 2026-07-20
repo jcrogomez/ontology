@@ -93,6 +93,34 @@ Ordered by leverage. Detail/context in the session-handoff note.
    claim without seeing `src/`. First concrete step toward the Open-Prompt
    distinctive-badge idea.
 
+### Shipped 2026-07-20 — disagreement instrumentation + executor memory
+
+Three slices toward A1/A2 (inspiration: the flip-flop-as-decision-boundary
+framing from D. Lin's memory-not-fine-tuning talk — external prior, T3; her
+numbers are not evidence here):
+
+- **Gray-zone index ($0).** Multi-draw `sync`/`regenerate` runs now fold the
+  losing draws into a per-node draw-vs-draw disagreement record
+  (`laws/gray-zone.ts` → `.ontology/reports/gray-zone.json`); `onto status
+  --gray-zone` ranks the repair-the-ficha-first queue. Draws that disagree
+  localise under-determined fichas (Gap A); draws that agree yet fail point at
+  capacity (Gap B).
+- **Disagreement router in `onto execute`.** A one-shot multi-draw probe
+  before any plateau verdict; `extraction-gap` vs `capacity-ceiling` is now
+  decided by draw evidence first (`gapEvidence` on every plateau record), lint
+  proxy as fallback. Gap-A nodes flagged by disagreement are listed as the
+  ficha-repair route in the report.
+- **Episodic precedent store.** Executor outcomes persist keyed to a
+  ficha-content hash (`executor-precedents.json`): κ* warm-starts survive the
+  process, and an extraction-gap on an unchanged ficha is cited at zero cost
+  instead of re-burning the ladder (voided by any ficha edit / taller ladder;
+  capacity never short-circuits — F is high-variance). `--no-precedents`
+  re-measures.
+
+Specs updated in `EXECUTOR_SPEC.md` §3/§5.1 + `SYNC_LOOP_SPEC.md` §3. This
+makes the A1 queue *measured* (which fichas to repair first) but the repair
+lever itself is still open — A1 stays item 2 above.
+
 ### Shipped 2026-06-18 (against the four-gap checkpoint below)
 
 - **Gap 1 (trustworthy core) — done.** Deterministic ficha cleanup

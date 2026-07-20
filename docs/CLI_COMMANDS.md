@@ -707,16 +707,29 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
   classify what it can't close, honestly. Generalises `sync` into a decision
   loop with memory + capability escalation. No new verification semantics — the
   gates are `regenerate`'s. **T2 operational; not autonomous correctness.**
-- **Terminal per node:** `closed` · `extraction-gap` (clean lint at the top
-  rung yet failing → the *intention* is the limit; not written) ·
-  `capacity-ceiling` · `blocked-upstream` · `unverified-no-fixture` ·
-  `infra-error`. The enum IS the report taxonomy.
+- **Terminal per node:** `closed` · `extraction-gap` (the *intention* is the
+  limit; not written) · `capacity-ceiling` · `blocked-upstream` ·
+  `unverified-no-fixture` · `infra-error`. The enum IS the report taxonomy.
+- **Disagreement router (2026-07-20):** before conceding a plateau the
+  executor fires ONE multi-draw probe and reads the gray-zone fold: draws that
+  **disagree with each other** → `extraction-gap` (`draw-disagreement` /
+  `behaviour-split` — repair the ficha, listed as the gap-A route in the
+  report); draws that **agree yet fail** → `capacity-ceiling`
+  (`draw-agreement`); no draw evidence → the original clean-lint proxy. The
+  evidence lands on each node's `gapEvidence`.
+- **Episodic precedents (2026-07-20):** outcomes persist to
+  `.ontology/reports/executor-precedents.json` keyed to a hash of the ficha's
+  intent surface. `closed` warm-starts κ* next run; `extraction-gap` on an
+  UNCHANGED ficha is cited at zero cost (voided by any ficha edit or a taller
+  ladder); `capacity-ceiling` never short-circuits (local F is high-variance).
+  `--no-precedents` re-measures from scratch (still records).
 - **Capability ladder:** ordered cheapest→capable by resolving a `ModelPremise`
   against the registry's `caps` (a model is a rung only with explicit `caps`).
   $0/local default forbids paid; `--allow-paid` opts into the frontier rung.
   Live ladder: `qwen2.5-coder:7b` → `qwen3-coder:480b-cloud` → `claude-opus-4-7`.
 - **Flags:** `--dry-run` (decide + gate but never write), `--max-attempts <n>`
   (backstop, default 8), `--allow-paid` (allow paid models in the ladder),
+  `--no-precedents` (ignore stored precedents; measure from scratch),
   `--behavior-fixtures-dir <path>`, `--ollama-host <host>`, `--json`.
 - **Governance:** writes only the passing attempt (gated by `regenerate`); a
   draft is run in a disposable child process so a deferred throw can't crash the
@@ -742,7 +755,11 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **Flags:** `--list` (node ids per tier), `--blockers` (dependency-order
   readiness: the syncable **ideal** — core nodes whose whole closure is core —
   plus the fix-first **blocker antichain** ranked by how many nodes each blocks),
-  `--json` (full per-node detail + the `readiness` object).
+  `--gray-zone` (2026-07-20: the draw-disagreement ranking recorded by
+  multi-draw `sync`/`regenerate` runs into `.ontology/reports/gray-zone.json` —
+  nodes whose draws disagreed with each other, most-ambiguous first: the
+  repair-the-ficha-first queue; draws nothing itself),
+  `--json` (full per-node detail + the `readiness` + `grayZone` objects).
 - **`--blockers` (order theory):** the batch-syncable set is the largest
   down-closed subset (order ideal) of the core tier under the dependency poset;
   the minimal non-ready nodes are the leverage. Live (2026-06-18): 136 core but
@@ -751,7 +768,7 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **Example:** `onto status` · `onto status --list` · `onto status --blockers`
 - **Live graph (2026-06-14):** 228 nodes, 221 with a shadow → 43 core, 178
   lower-confidence, 0 blocked; 43/221 have fixtures; 5 shadows drifted.
-- **Output (JSON):** `{ ok, report: { totalNodes, trackable, core, lowerConfidence, blocked, withFixture, drift: { hasAnchor, drifted }, ficha: { underDeclared, missingExports, proseRules }, nodes: [...] } }`.
+- **Output (JSON):** `{ ok, report: { totalNodes, trackable, core, lowerConfidence, blocked, withFixture, drift: { hasAnchor, drifted }, ficha: { underDeclared, missingExports, proseRules }, grayZone: { measured, gray, behaviorSplits, ranking: [...] }, nodes: [...] } }`.
 
 ### `dod <nodeId>` *(2026-07-12 — per-node definition of done, read-only)*
 
