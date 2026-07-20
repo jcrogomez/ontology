@@ -23,8 +23,12 @@ import {
   planDecomposition,
   buildSliceInstruction,
   assembleSlices,
+  hasSyntaxErrors,
+  type AssemblyPart,
 } from "../../forward/compile/decompose-plan.js";
+import { computeKeepSet } from "../../forward/compile/slice-keep.js";
 import { scanFileSymbols } from "../../inverse/ast-symbol-scanner.js";
+import { computeGrayZone, recordGrayZone, type GrayZoneIndex } from "../../laws/gray-zone.js";
 import type { LlmProvider } from "../../runtime/llm/types.js";
 
 // `onto regenerate <nodeId>` — the governed lever that turns the
@@ -92,6 +96,13 @@ export interface RegenerateCommandOptions {
   // and gate the whole. Attacks the "can't hold the whole contract at once" 7B
   // ceiling. v1: implies a single assembled candidate (no consensus/refine).
   decompose?: boolean;
+  // Monotone decompose (composes with --decompose --refine N): between refine
+  // rounds, slices that no failure implicates are FROZEN (reused verbatim, no
+  // dispatch) and only the implicated slices re-generate — "passing work is
+  // kept", so coverage grows monotonically across rounds instead of every
+  // round re-rolling the whole module. Attribution is deterministic and
+  // conservative (slice-keep.ts): any unattributable failure unfreezes all.
+  keepSlices?: boolean;
   noLock?: boolean;
   json?: boolean;
 }
@@ -130,7 +141,10 @@ export interface RegenerateResult {
   consensusSize?: number;
   consensusK?: number;
   clusterSizes?: number[];
-  draftSummary?: { i: number; verdict?: HomeomorphismVerdict; behaviorVerdict: BehaviorVerdict | "no_fixture"; acceptable: boolean }[];
+  draftSummary?: { i: number; verdict?: HomeomorphismVerdict; behaviorVerdict: BehaviorVerdict | "no_fixture"; declKey?: string; acceptable: boolean }[];
+  /** Draw-vs-draw disagreement fold (present only when draws > 1) — the
+   *  gray-zone index persisted to .ontology/reports/gray-zone.json. */
+  grayZone?: GrayZoneIndex;
   // Verify-refine fields (present only when refine > 1).
   refineRounds?: number;
   refineRoundsUsed?: number;
@@ -149,6 +163,12 @@ interface DraftEval {
   ruleViolations?: number;
   // Per-case behaviour outcomes (when a fixture ran) — drives refine feedback.
   behaviorCases?: { name: string; outcome: string; detail?: string }[];
+  // The checker's verdict reason (e.g. "regen_load_failed: <load error>").
+  // Load failures produce NO cases, so without this the refine loop is BLIND
+  // to a draft that throws at import time (observed 2026-07-08: a wrong
+  // z.discriminatedUnion discriminator threw on load; 4 rounds re-rolled
+  // with zero feedback). Draft-side only — safe to feed back.
+  behaviorReason?: string;
 }
 
 // Reduce the behaviour checker's per-case detail to a DRAFT-SIDE-ONLY
@@ -374,18 +394,46 @@ export async function runRegenerate(
   // the slice outputs into one module written to the canonical draft path, so
   // the SAME structural + behaviour gates judge the whole. Returns a single
   // compiled entry (i=1) like a draws=1 run.
+  // Monotone-decompose state (--keep-slices): the prior round's per-slice
+  // outputs and the KEEP set computed from its failures. Both live across
+  // rounds; keepIdx is recomputed after every evaluated round (attribution is
+  // per-round, so a kept slice that a NEW failure implicates unfreezes).
+  let prevSliceParts: AssemblyPart[] | null = null;
+  let keepIdx: ReadonlySet<number> = new Set<number>();
+  // Fixture SOURCE TEXT for case → slice attribution (trusted test infra;
+  // read once, "" on failure so attribution degrades to unfreeze-all).
+  let fixtureTextCache: string | null = null;
+  const readFixtureText = (): string => {
+    if (fixtureTextCache !== null) return fixtureTextCache;
+    try {
+      fixtureTextCache = fixture ? fs.readFileSync(fixture.path, "utf-8") : "";
+    } catch {
+      fixtureTextCache = "";
+    }
+    return fixtureTextCache;
+  };
+  // The decomposition plan is deterministic from the (unchanged) source —
+  // compute once, reuse across rounds and for keep-set attribution.
+  let cachedSlices: ReturnType<typeof planDecomposition> | null = null;
+  const getSlices = (): ReturnType<typeof planDecomposition> | null => {
+    if (cachedSlices) return cachedSlices;
+    try {
+      cachedSlices = planDecomposition(scanTopLevelDecls(fs.readFileSync(sourcePath, "utf-8")));
+    } catch {
+      return null;
+    }
+    return cachedSlices;
+  };
+
   const compileDecomposed = async (
     round: number,
     refineFeedback: RefineFeedback | undefined,
   ): Promise<{ i: number; ok: boolean; message?: string }[]> => {
-    let sourceText: string;
-    try {
-      sourceText = fs.readFileSync(sourcePath, "utf-8");
-    } catch (e) {
-      return [{ i: 1, ok: false, message: `cannot read source for decomposition: ${String(e)}` }];
+    const slices = getSlices();
+    if (slices === null) {
+      return [{ i: 1, ok: false, message: `cannot read source for decomposition` }];
     }
-    const slices = planDecomposition(scanTopLevelDecls(sourceText));
-    const sliceOutputs: { code: string; owned: typeof slices[number]["targets"] }[] = [];
+    const sliceOutputs: AssemblyPart[] = [];
     let priorCode = "";
     // The prior assembled attempt's critique (lint + failed criteria), shared
     // across this round's slices so the slice that owns a flagged export (e.g.
@@ -393,6 +441,15 @@ export async function runRegenerate(
     const refineSection = refineFeedback ? buildRefineFeedbackSection(refineFeedback) : null;
     for (let s = 0; s < slices.length; s++) {
       const slice = slices[s];
+      // Kept slice (monotone decompose): no failure implicated it last round —
+      // reuse its output verbatim, no dispatch. Still chained into priorCode so
+      // later (re-generated) slices build against the frozen truth.
+      const frozen = round > 1 && keepIdx.has(s) ? prevSliceParts?.[s] : undefined;
+      if (frozen) {
+        sliceOutputs.push(frozen);
+        priorCode = priorCode.length > 0 ? `${priorCode}\n\n${frozen.code}` : frozen.code;
+        continue;
+      }
       const slicePath = path.join(stagingDir, `${nodeId}.slice${s}${ext}`);
       const r = await runCompilePlan({
         focalId: nodeId,
@@ -427,9 +484,20 @@ export async function runRegenerate(
       } catch (e) {
         return [{ i: 1, ok: false, message: `cannot read decomposition slice output: ${String(e)}` }];
       }
+      // A syntactically-broken slice (typically a truncated generation) must
+      // not enter the assembly OR the priorCode chain — it would poison the
+      // whole module into regen_load_failed and mislead later slices. Empty
+      // code keeps the slot; the resulting missing-export feedback implicates
+      // exactly this slice, so the next round re-dispatches it while healthy
+      // slices stay frozen (see hasSyntaxErrors).
+      if (hasSyntaxErrors(out)) {
+        sliceOutputs.push({ code: "", owned: slice.targets });
+        continue;
+      }
       sliceOutputs.push({ code: out, owned: slice.targets });
       priorCode = priorCode.length > 0 ? `${priorCode}\n\n${out}` : out;
     }
+    prevSliceParts = sliceOutputs;
     try {
       fs.writeFileSync(draftPath(1), assembleSlices(sliceOutputs), "utf-8");
     } catch (e) {
@@ -457,6 +525,7 @@ export async function runRegenerate(
       const verdict = classifyVerdict(metrics, thresholds);
       let behaviorVerdict: BehaviorVerdict | "no_fixture" = "no_fixture";
       let behaviorCases: { name: string; outcome: string }[] | undefined;
+      let behaviorReason: string | undefined;
       if (fixture) {
         // Contain a pathological draft: the v0 behaviour checker imports and
         // runs LLM-generated code in-process (no sandbox — spec §3.2), so a
@@ -472,6 +541,7 @@ export async function runRegenerate(
           const bc = runBehaviorCheckIsolated({ nodeId, sourcePath, regenPath: rp, fixturePath: fixture.path });
           behaviorVerdict = bc.verdict;
           behaviorCases = bc.cases?.map((cc) => ({ name: cc.name, outcome: cc.outcome, detail: cc.detail }));
+          behaviorReason = bc.reason;
         } catch {
           // A draft that makes the trustworthy oracle itself throw is, for
           // our purposes, a behavioural failure — never acceptable to write.
@@ -494,7 +564,7 @@ export async function runRegenerate(
       // back to the structural gate (untested/no_fixture is expected there).
       const behaviorOk = fixture ? behaviorVerdict === "pass" : behaviorVerdict !== "fail";
       const acceptable = WRITE_SAFE_VERDICTS.has(verdict) && behaviorOk && ruleViolations === 0;
-      out.push({ i: c.i, regenPath: rp, compiled: true, metrics, verdict, behaviorVerdict, declKey, acceptable, ruleViolations, behaviorCases });
+      out.push({ i: c.i, regenPath: rp, compiled: true, metrics, verdict, behaviorVerdict, declKey, acceptable, ruleViolations, behaviorCases, behaviorReason });
     }
     return out;
   };
@@ -536,6 +606,22 @@ export async function runRegenerate(
     const failedCriteria = (best.behaviorCases ?? [])
       .filter((cc) => cc.outcome !== "match")
       .map((cc) => ({ name: cc.name, diagnostic: draftSideDiagnostic(cc.outcome, cc.detail) }));
+    // A draft that THROWS AT IMPORT TIME produces no cases at all — without
+    // this synthetic criterion the refine loop is blind to the single most
+    // blocking defect (observed 2026-07-08: a wrong z.discriminatedUnion
+    // discriminator threw on load and 4 rounds re-rolled with zero feedback).
+    // The load error is the draft's own runtime output — draft-side, leak-free.
+    if (
+      fixture &&
+      best.behaviorVerdict === "untested" &&
+      best.behaviorReason !== undefined &&
+      best.behaviorReason.startsWith("regen_load_failed")
+    ) {
+      failedCriteria.push({
+        name: "module must load: importing your output threw before any case could run",
+        diagnostic: best.behaviorReason.slice("regen_load_failed: ".length) || best.behaviorReason,
+      });
+    }
     const original = new Set(best.metrics!.originalDeclarations);
     const regen = new Set(best.metrics!.regenDeclarations);
     const extraExports = [...regen].filter((d) => !original.has(d));
@@ -636,7 +722,28 @@ export async function runRegenerate(
             adopt(roundCompiled, roundEvals);
             break;
           }
-          if (round < rounds) refineFeedback = buildFeedback(roundEvals, round + 1);
+          if (round < rounds) {
+            refineFeedback = buildFeedback(roundEvals, round + 1);
+            // Monotone decompose: freeze the slices this round's failures do
+            // NOT implicate. The feedback already carries the failure facts
+            // (failed criteria / export drift / lint symbols); attribution is
+            // conservative — anything unattributable unfreezes everything.
+            if (decompose && options.keepSlices === true) {
+              const slices = getSlices();
+              keepIdx =
+                refineFeedback && slices && prevSliceParts && fixture
+                  ? computeKeepSet({
+                      slices,
+                      parts: prevSliceParts,
+                      failingCaseNames: refineFeedback.failedCriteria.map((c) => c.name),
+                      fixtureText: readFixtureText(),
+                      missingExports: refineFeedback.missingExports,
+                      extraExports: refineFeedback.extraExports,
+                      lintSymbols: (refineFeedback.lintIssues ?? []).map((i) => i.symbol),
+                    })
+                  : new Set<number>();
+            }
+          }
         }
       },
       { skipLock: options.noLock, command: `regenerate ${nodeId}` },
@@ -719,6 +826,19 @@ export async function runRegenerate(
   const rep = consensusClass[0];
   const clusterSizes = ranked.map((c) => c.length);
 
+  // Gray-zone index: what the losing draws prove about the FICHA. Folded from
+  // the same evals the consensus ranking just consumed; persisted best-effort
+  // (a bookkeeping failure must never sink a regeneration that already has a
+  // verdict). Preview runs record too — the measurement is read-only.
+  const grayZone = computeGrayZone(
+    evals.map((e) => ({ i: e.i, compiled: e.compiled, declKey: e.declKey, verdict: e.verdict, behaviorVerdict: e.behaviorVerdict, acceptable: e.acceptable })),
+  );
+  try {
+    recordGrayZone(cwd, { nodeId, measuredAt: new Date().toISOString(), provider: options.provider, ...grayZone });
+  } catch {
+    // best-effort by contract
+  }
+
   const base: RegenerateResult = {
     ok: true,
     nodeId,
@@ -735,7 +855,8 @@ export async function runRegenerate(
     consensusSize: consensusClass.length,
     consensusK,
     clusterSizes,
-    draftSummary: evals.map((e) => ({ i: e.i, verdict: e.verdict, behaviorVerdict: e.behaviorVerdict, acceptable: e.acceptable })),
+    draftSummary: evals.map((e) => ({ i: e.i, verdict: e.verdict, behaviorVerdict: e.behaviorVerdict, declKey: e.declKey, acceptable: e.acceptable })),
+    grayZone,
     ...refineFields,
   };
 
@@ -757,6 +878,27 @@ export async function regenerateCommand(
   nodeId: string,
   options: RegenerateCommandOptions,
 ): Promise<void> {
+  // Footgun guard: an omitted --provider silently routes the compile-back to
+  // the mock provider, which is the IDENTITY functor for code_sketch (returns
+  // the prompt verbatim). That yields a run whose metrics look pristine
+  // (locDistance≈0) but measures nothing — a fake-measured result, worse than
+  // no run. Require an explicit provider at the human/CLI boundary; mock stays
+  // reachable, but only when asked for by name. (Internal callers — sync.ts,
+  // the executor — invoke runRegenerate directly and are unaffected.)
+  if (options.provider === undefined) {
+    const result: RegenerateResult = {
+      ok: false,
+      nodeId,
+      written: false,
+      failure:
+        "regenerate needs an explicit --provider (mock | ollama | anthropic | gemini). " +
+        "Omitting it would route to the mock identity functor and produce a fake-measured run. " +
+        "Pass --provider mock to force an identity/self-test run deliberately.",
+    };
+    emit(result, options.json);
+    process.exitCode = 1;
+    return;
+  }
   const result = await runRegenerate(nodeId, options, process.cwd());
   emit(result, options.json);
   if (!result.ok || result.writeBlockedReason) process.exitCode = 1;

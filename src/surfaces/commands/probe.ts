@@ -38,7 +38,7 @@ export interface ProbeCommandOptions {
   json?: boolean;
 }
 
-interface ProbeResult {
+export interface ProbeResult {
   ok: boolean;
   nodeId: string;
   sourceFile?: string;
@@ -80,8 +80,14 @@ function emit(r: ProbeResult, json?: boolean): void {
   }
 }
 
-export async function probeCommand(nodeId: string, options: ProbeCommandOptions): Promise<void> {
-  const cwd = process.cwd();
+// The actuator: generate + self-validate + persist a fixture, returning the
+// ProbeResult. NEVER calls emit or process.exit — that is `probeCommand`'s job.
+// Callable from the Walker (`p` async fire) and the sync/executor machinery.
+export async function runProbe(
+  nodeId: string,
+  options: ProbeCommandOptions,
+  cwd: string = process.cwd(),
+): Promise<ProbeResult> {
   const fixturesDir = options.fixturesDir ?? path.join(cwd, "tests/behavior-fixtures");
 
   // 1. Validate provider.
@@ -89,8 +95,7 @@ export async function probeCommand(nodeId: string, options: ProbeCommandOptions)
   if (options.provider !== undefined) {
     const allowed = ["mock", "ollama", "anthropic", "gemini"];
     if (!allowed.includes(options.provider)) {
-      emit({ ok: false, nodeId, written: false, failure: `unsupported provider: ${options.provider}` }, options.json);
-      process.exit(1);
+      return { ok: false, nodeId, written: false, failure: `unsupported provider: ${options.provider}` };
     }
     provider = options.provider as LlmProvider;
   }
@@ -98,32 +103,21 @@ export async function probeCommand(nodeId: string, options: ProbeCommandOptions)
   // 2. Load node + source.
   const node = loadNodeById(nodeId, cwd);
   if (!node) {
-    emit({ ok: false, nodeId, written: false, failure: `node not found: ${nodeId}` }, options.json);
-    process.exit(1);
-    return;
+    return { ok: false, nodeId, written: false, failure: `node not found: ${nodeId}` };
   }
   const sourceRel = node.outputs?.files?.[0];
   if (!sourceRel) {
-    emit({ ok: false, nodeId, written: false, failure: "node has no outputs.files[0] — nothing to probe" }, options.json);
-    process.exit(1);
-    return;
+    return { ok: false, nodeId, written: false, failure: "node has no outputs.files[0] — nothing to probe" };
   }
   const sourcePath = path.isAbsolute(sourceRel) ? sourceRel : path.join(cwd, sourceRel);
   if (!fs.existsSync(sourcePath)) {
-    emit({ ok: false, nodeId, sourceFile: sourceRel, written: false, failure: `source not found on disk: ${sourceRel}` }, options.json);
-    process.exit(1);
-    return;
+    return { ok: false, nodeId, sourceFile: sourceRel, written: false, failure: `source not found on disk: ${sourceRel}` };
   }
 
   // 3. Governance: protect a hand-written fixture.
   const finalPath = fixturePathFor(nodeId, fixturesDir);
   if (fs.existsSync(finalPath) && !isGeneratedFixture(finalPath) && !options.force) {
-    emit(
-      { ok: false, nodeId, sourceFile: sourceRel, fixturePath: finalPath, written: false, failure: "a hand-written fixture exists here — pass --force to replace it" },
-      options.json,
-    );
-    process.exit(1);
-    return;
+    return { ok: false, nodeId, sourceFile: sourceRel, fixturePath: finalPath, written: false, failure: "a hand-written fixture exists here — pass --force to replace it" };
   }
 
   // 4. Dispatch: LLM proposes the fixture, with the node's behavioural rules as
@@ -147,16 +141,12 @@ export async function probeCommand(nodeId: string, options: ProbeCommandOptions)
     );
     candidateRaw = response.text ?? "";
   } catch (err: unknown) {
-    emit({ ok: false, nodeId, sourceFile: sourceRel, written: false, failure: `LLM dispatch failed: ${err instanceof Error ? err.message : String(err)}` }, options.json);
-    process.exit(1);
-    return;
+    return { ok: false, nodeId, sourceFile: sourceRel, written: false, failure: `LLM dispatch failed: ${err instanceof Error ? err.message : String(err)}` };
   }
 
   const candidateTs = extractFixtureSource(candidateRaw);
   if (!candidateTs.includes("export const cases")) {
-    emit({ ok: false, nodeId, sourceFile: sourceRel, written: false, failure: "model output did not contain an `export const cases` fixture" }, options.json);
-    process.exit(1);
-    return;
+    return { ok: false, nodeId, sourceFile: sourceRel, written: false, failure: "model output did not contain an `export const cases` fixture" };
   }
 
   // 5. Self-validate. probe runs under tsx (like --behavior-check), so write
@@ -171,9 +161,7 @@ export async function probeCommand(nodeId: string, options: ProbeCommandOptions)
   try {
     validation = await selfValidateFixture(nodeId, sourcePath, candPath, candDir);
   } catch (err: unknown) {
-    emit({ ok: false, nodeId, sourceFile: sourceRel, written: false, failure: `candidate failed to load/validate: ${err instanceof Error ? err.message : String(err)}` }, options.json);
-    process.exit(1);
-    return;
+    return { ok: false, nodeId, sourceFile: sourceRel, written: false, failure: `candidate failed to load/validate: ${err instanceof Error ? err.message : String(err)}` };
   }
 
   const dropped = validation.caseResults.filter((c) => !c.kept).map((c) => ({ name: c.name, outcome: c.outcome }));
@@ -191,9 +179,7 @@ export async function probeCommand(nodeId: string, options: ProbeCommandOptions)
   };
 
   if (validation.kept.length === 0) {
-    emit({ ...base, failure: "no generated case self-validated against the source" }, options.json);
-    process.exit(1);
-    return;
+    return { ...base, failure: "no generated case self-validated against the source" };
   }
 
   // 6. Persist the validated fixture.
@@ -202,5 +188,13 @@ export async function probeCommand(nodeId: string, options: ProbeCommandOptions)
   fs.mkdirSync(path.dirname(finalPath), { recursive: true });
   fs.writeFileSync(finalPath, finalTs);
 
-  emit({ ...base, written: true }, options.json);
+  return { ...base, written: true };
+}
+
+export async function probeCommand(nodeId: string, options: ProbeCommandOptions): Promise<void> {
+  const r = await runProbe(nodeId, options, process.cwd());
+  emit(r, options.json);
+  // Parity with the old hard exits: a probe that wrote nothing (bad input,
+  // dispatch failure, or no case self-validated) is a non-zero outcome.
+  if (!r.written) process.exitCode = 1;
 }

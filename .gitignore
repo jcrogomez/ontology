@@ -26,12 +26,38 @@ src/generated/
 .ontology.self-ingest-*-result/
 .ontology.*-backup/
 .ontology.scratch-*/
-# Self-ingest sidecar JSONs are intentionally NOT ignored — they are
-# the raw pre-registered output of Move 3α (Arm A/B/C-local + synthesis)
-# and live next to the corresponding reports in docs/legend/calibrations/.
-# In-flight sidecars (e.g. the Arm A0 control run) are excluded until
-# their run completes and a co-located report lands:
-.ontology.self-ingest-*.stderr.log
+
+# Scratch run artifacts (baseline/lever/decompose/exec/probe/diag/fullsuite/…):
+# ad-hoc experiment dumps + their logs, never staged. Every run log is scratch,
+# every dated result/backup dir is scratch, and every sidecar JSON is scratch
+# EXCEPT the pre-registered records enumerated below.
+.ontology.*.log
+.ontology.*-result/
+.ontology.pre-*/
+.ontology.*-backup-*/
+.ontology.*.json
+# ...but these sidecar JSONs are intentionally TRACKED — the raw pre-registered
+# output of Move 3α (self-ingest ε Arm A/A0/B/C-local + synthesis) and the
+# 2026-06-09 contract-column baseline, living next to their reports in
+# docs/legend/calibrations/. Keep them versioned; never let the catch-all above
+# swallow them:
+!.ontology.self-ingest-epsilon-*.json
+!.ontology.contract-column-2026-06-09.json
+
+# Compiled/emitted output tree — regenerable, not source.
+outputs/
+
+# Automated agent-review snapshots — state hypotheses, not source of truth
+# (findings roll into docs/ROADMAP.md). Kept locally, never staged.
+AGENT_REVIEW_*.md
+# Stray copy of the private ~/.claude memory index — never commit personal notes.
+/MEMORY.md
+# Root-level scratch experiment dumps (executor/monotone sweeps, probe worklists).
+gap2-*.json
+monotone-*.json
+.probe-*
+probe-*.mjs
+_chk_tmp.ts
 
 # Workspace artifacts
 .claude/

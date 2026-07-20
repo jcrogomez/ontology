@@ -1,0 +1,503 @@
+{
+  "total": 13,
+  "closed": 3,
+  "extractionGap": 3,
+  "capacityCeiling": 0,
+  "blockedUpstream": 7,
+  "unverified": 0,
+  "infraError": 0,
+  "kappa": {
+    "byRung": {
+      "0": 2,
+      "1": 1
+    },
+    "closed": 3,
+    "neverClosed": 10
+  },
+  "economics": {
+    "totalDurationMs": 2706844,
+    "attemptsLocal": 11,
+    "attemptsCloud": 10,
+    "closedLocal": 2,
+    "closedCloud": 1,
+    "localCloseShare": 0.6666666666666666
+  },
+  "nodes": [
+    {
+      "nodeId": "node_0011",
+      "terminal": "closed",
+      "written": false,
+      "finalRung": 0,
+      "attempts": 1,
+      "decisions": [
+        {
+          "rung": 0,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "generate"
+            }
+          }
+        },
+        {
+          "rung": 0,
+          "action": {
+            "type": "terminate",
+            "terminal": "closed"
+          }
+        }
+      ],
+      "lastDetail": "behaviour pass",
+      "kappa": 0,
+      "totalDurationMs": 88585,
+      "attemptsLocal": 1,
+      "attemptsCloud": 0,
+      "closedLocality": "local"
+    },
+    {
+      "nodeId": "node_0017",
+      "terminal": "closed",
+      "written": false,
+      "finalRung": 1,
+      "attempts": 3,
+      "decisions": [
+        {
+          "rung": 0,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "generate"
+            }
+          }
+        },
+        {
+          "rung": 0,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "refine",
+              "rounds": 3
+            }
+          }
+        },
+        {
+          "rung": 0,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "escalate"
+            }
+          }
+        },
+        {
+          "rung": 1,
+          "action": {
+            "type": "terminate",
+            "terminal": "closed"
+          }
+        }
+      ],
+      "lastDetail": "behaviour pass",
+      "kappa": 1,
+      "totalDurationMs": 109848,
+      "attemptsLocal": 2,
+      "attemptsCloud": 1,
+      "closedLocality": "cloud"
+    },
+    {
+      "nodeId": "node_0022",
+      "terminal": "extraction-gap",
+      "written": false,
+      "finalRung": 1,
+      "attempts": 5,
+      "decisions": [
+        {
+          "rung": 0,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "generate"
+            }
+          }
+        },
+        {
+          "rung": 0,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "refine",
+              "rounds": 3
+            }
+          }
+        },
+        {
+          "rung": 0,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "escalate"
+            }
+          }
+        },
+        {
+          "rung": 1,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "refine",
+              "rounds": 3
+            }
+          }
+        },
+        {
+          "rung": 1,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "decompose"
+            }
+          }
+        },
+        {
+          "rung": 1,
+          "action": {
+            "type": "terminate",
+            "terminal": "extraction-gap"
+          }
+        }
+      ],
+      "lastDetail": "behaviour fail",
+      "kappa": null,
+      "totalDurationMs": 395952,
+      "attemptsLocal": 2,
+      "attemptsCloud": 3,
+      "closedLocality": null
+    },
+    {
+      "nodeId": "node_0032",
+      "terminal": "extraction-gap",
+      "written": false,
+      "finalRung": 1,
+      "attempts": 5,
+      "decisions": [
+        {
+          "rung": 0,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "generate"
+            }
+          }
+        },
+        {
+          "rung": 0,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "refine",
+              "rounds": 3
+            }
+          }
+        },
+        {
+          "rung": 0,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "escalate"
+            }
+          }
+        },
+        {
+          "rung": 1,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "refine",
+              "rounds": 3
+            }
+          }
+        },
+        {
+          "rung": 1,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "decompose"
+            }
+          }
+        },
+        {
+          "rung": 1,
+          "action": {
+            "type": "terminate",
+            "terminal": "extraction-gap"
+          }
+        }
+      ],
+      "lastDetail": "behaviour fail",
+      "kappa": null,
+      "totalDurationMs": 1335727,
+      "attemptsLocal": 2,
+      "attemptsCloud": 3,
+      "closedLocality": null
+    },
+    {
+      "nodeId": "node_0026",
+      "terminal": "blocked-upstream",
+      "written": false,
+      "finalRung": 0,
+      "attempts": 0,
+      "decisions": [
+        {
+          "rung": 0,
+          "action": {
+            "type": "terminate",
+            "terminal": "blocked-upstream"
+          }
+        }
+      ],
+      "kappa": null,
+      "totalDurationMs": 0,
+      "attemptsLocal": 0,
+      "attemptsCloud": 0,
+      "closedLocality": null
+    },
+    {
+      "nodeId": "node_0012",
+      "terminal": "closed",
+      "written": false,
+      "finalRung": 0,
+      "attempts": 2,
+      "decisions": [
+        {
+          "rung": 0,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "generate"
+            }
+          }
+        },
+        {
+          "rung": 0,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "refine",
+              "rounds": 3
+            }
+          }
+        },
+        {
+          "rung": 0,
+          "action": {
+            "type": "terminate",
+            "terminal": "closed"
+          }
+        }
+      ],
+      "lastDetail": "behaviour pass",
+      "kappa": 0,
+      "totalDurationMs": 326932,
+      "attemptsLocal": 2,
+      "attemptsCloud": 0,
+      "closedLocality": "local"
+    },
+    {
+      "nodeId": "node_0031",
+      "terminal": "blocked-upstream",
+      "written": false,
+      "finalRung": 0,
+      "attempts": 0,
+      "decisions": [
+        {
+          "rung": 0,
+          "action": {
+            "type": "terminate",
+            "terminal": "blocked-upstream"
+          }
+        }
+      ],
+      "kappa": null,
+      "totalDurationMs": 0,
+      "attemptsLocal": 0,
+      "attemptsCloud": 0,
+      "closedLocality": null
+    },
+    {
+      "nodeId": "node_0106",
+      "terminal": "blocked-upstream",
+      "written": false,
+      "finalRung": 0,
+      "attempts": 0,
+      "decisions": [
+        {
+          "rung": 0,
+          "action": {
+            "type": "terminate",
+            "terminal": "blocked-upstream"
+          }
+        }
+      ],
+      "kappa": null,
+      "totalDurationMs": 0,
+      "attemptsLocal": 0,
+      "attemptsCloud": 0,
+      "closedLocality": null
+    },
+    {
+      "nodeId": "node_0014",
+      "terminal": "blocked-upstream",
+      "written": false,
+      "finalRung": 0,
+      "attempts": 0,
+      "decisions": [
+        {
+          "rung": 0,
+          "action": {
+            "type": "terminate",
+            "terminal": "blocked-upstream"
+          }
+        }
+      ],
+      "kappa": null,
+      "totalDurationMs": 0,
+      "attemptsLocal": 0,
+      "attemptsCloud": 0,
+      "closedLocality": null
+    },
+    {
+      "nodeId": "node_0029",
+      "terminal": "blocked-upstream",
+      "written": false,
+      "finalRung": 0,
+      "attempts": 0,
+      "decisions": [
+        {
+          "rung": 0,
+          "action": {
+            "type": "terminate",
+            "terminal": "blocked-upstream"
+          }
+        }
+      ],
+      "kappa": null,
+      "totalDurationMs": 0,
+      "attemptsLocal": 0,
+      "attemptsCloud": 0,
+      "closedLocality": null
+    },
+    {
+      "nodeId": "node_0168",
+      "terminal": "extraction-gap",
+      "written": false,
+      "finalRung": 1,
+      "attempts": 5,
+      "decisions": [
+        {
+          "rung": 0,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "generate"
+            }
+          }
+        },
+        {
+          "rung": 0,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "refine",
+              "rounds": 3
+            }
+          }
+        },
+        {
+          "rung": 0,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "escalate"
+            }
+          }
+        },
+        {
+          "rung": 1,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "refine",
+              "rounds": 3
+            }
+          }
+        },
+        {
+          "rung": 1,
+          "action": {
+            "type": "apply",
+            "lever": {
+              "kind": "decompose"
+            }
+          }
+        },
+        {
+          "rung": 1,
+          "action": {
+            "type": "terminate",
+            "terminal": "extraction-gap"
+          }
+        }
+      ],
+      "lastDetail": "behaviour fail",
+      "kappa": null,
+      "totalDurationMs": 449800,
+      "attemptsLocal": 2,
+      "attemptsCloud": 3,
+      "closedLocality": null
+    },
+    {
+      "nodeId": "node_0143",
+      "terminal": "blocked-upstream",
+      "written": false,
+      "finalRung": 0,
+      "attempts": 0,
+      "decisions": [
+        {
+          "rung": 0,
+          "action": {
+            "type": "terminate",
+            "terminal": "blocked-upstream"
+          }
+        }
+      ],
+      "kappa": null,
+      "totalDurationMs": 0,
+      "attemptsLocal": 0,
+      "attemptsCloud": 0,
+      "closedLocality": null
+    },
+    {
+      "nodeId": "node_0225",
+      "terminal": "blocked-upstream",
+      "written": false,
+      "finalRung": 0,
+      "attempts": 0,
+      "decisions": [
+        {
+          "rung": 0,
+          "action": {
+            "type": "terminate",
+            "terminal": "blocked-upstream"
+          }
+        }
+      ],
+      "kappa": null,
+      "totalDurationMs": 0,
+      "attemptsLocal": 0,
+      "attemptsCloud": 0,
+      "closedLocality": null
+    }
+  ]
+}

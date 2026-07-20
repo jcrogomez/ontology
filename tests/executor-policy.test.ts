@@ -122,6 +122,10 @@ describe("executor policy — lever ladder on needs-work outcomes", () => {
 });
 
 describe("executor policy — plateau classification (the hardest call)", () => {
+  // Lever/ladder space exhausted AND the disagreement probe already spent —
+  // the probe fires once before any plateau verdict (see the disagreement
+  // router coverage in executor-disagreement.test.ts), so the classification
+  // stage is reached with a probe attempt in the history.
   const exhaustedTop = (last: GateVerdict): NodeExecState =>
     state({
       rung: 1,
@@ -131,9 +135,25 @@ describe("executor policy — plateau classification (the hardest call)", () => 
         attempt(0, "refine", verdict("behavior-fail")),
         attempt(1, "escalate", verdict("behavior-fail")),
         attempt(1, "refine", verdict("behavior-fail")),
-        attempt(1, "decompose", last),
+        attempt(1, "decompose", verdict("behavior-fail")),
+        attempt(1, "probe", last),
       ],
     });
+
+  it("probes for draw evidence once before conceding a plateau", () => {
+    const s = state({
+      rung: 1,
+      ladderSize: 2,
+      history: [
+        attempt(0, "generate", verdict("behavior-fail")),
+        attempt(0, "refine", verdict("behavior-fail")),
+        attempt(1, "escalate", verdict("behavior-fail")),
+        attempt(1, "refine", verdict("behavior-fail")),
+        attempt(1, "decompose", verdict("behavior-fail", { lintClean: true })),
+      ],
+    });
+    expect(decide(s)).toEqual({ type: "apply", lever: { kind: "probe", draws: 3 } });
+  });
 
   it("clean lint at the top rung, still failing → extraction-gap (blame intention)", () => {
     expect(decide(exhaustedTop(verdict("behavior-fail", { lintClean: true })))).toEqual({
@@ -156,7 +176,7 @@ describe("executor policy — plateau classification (the hardest call)", () => 
     });
   });
 
-  it("hard attempt budget terminates even mid-ladder", () => {
+  it("hard attempt budget terminates even mid-ladder (no probe past the backstop)", () => {
     const history = Array.from({ length: 4 }, (_, i) =>
       attempt(0, i === 0 ? "generate" : "refine", verdict("behavior-fail", { lintClean: true })),
     );

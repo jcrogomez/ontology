@@ -120,12 +120,22 @@ export function scanTopLevelDecls(sourceText: string): TopLevelDecl[] {
   return out;
 }
 
+/** Above this many scaffold declarations, the scaffold is CHUNKED into
+ *  ordered slices of at most this size. Measured motivation (Gap-2 sweep,
+ *  2026-07-07): a declaration-only module like the Zod schema core
+ *  (`node_0032`, 60+ exported consts) has NO exported functions, so the
+ *  whole module folded into ONE scaffold slice — decomposition degenerated
+ *  to a whole-file regen and the lever bought nothing. Chunking preserves
+ *  source order, which in a declaration module is the dependency order
+ *  (later schemas reference earlier ones through the priorCode chain). */
+export const SCAFFOLD_CHUNK_SIZE = 8;
+
 /**
- * Plan the slices: a single scaffold slice (every type/interface/enum/class +
- * every NON-exported value declaration), then one slice per EXPORTED function.
- * Exported non-function values fold into the scaffold (they are usually
- * constants, not the hard generation target). When there are no exported
- * functions, the scaffold is the only — and final — slice.
+ * Plan the slices: the scaffold (every type/interface/enum/class + every
+ * NON-exported value declaration + exported consts) in SOURCE ORDER — chunked
+ * into slices of at most SCAFFOLD_CHUNK_SIZE when large — then one slice per
+ * EXPORTED function. When there are no exported functions, the (last)
+ * scaffold chunk is the final slice.
  */
 export function planDecomposition(decls: readonly TopLevelDecl[]): DecompositionSlice[] {
   const isScaffold = (d: TopLevelDecl): boolean =>
@@ -135,7 +145,20 @@ export function planDecomposition(decls: readonly TopLevelDecl[]): Decomposition
   const entrypoints = decls.filter((d) => d.isExported && d.kind === "function");
 
   const slices: DecompositionSlice[] = [];
-  if (scaffold.length > 0) {
+  if (scaffold.length > SCAFFOLD_CHUNK_SIZE) {
+    // Chunk in source order (dependency order for declaration modules).
+    const chunks: TopLevelDecl[][] = [];
+    for (let i = 0; i < scaffold.length; i += SCAFFOLD_CHUNK_SIZE) {
+      chunks.push(scaffold.slice(i, i + SCAFFOLD_CHUNK_SIZE));
+    }
+    chunks.forEach((c, i) => {
+      slices.push({
+        label: `scaffold ${i + 1}/${chunks.length} (${c[0].name}…)`,
+        targets: c,
+        isFinal: false,
+      });
+    });
+  } else if (scaffold.length > 0) {
     slices.push({ label: "scaffold (types + private helpers)", targets: scaffold, isFinal: entrypoints.length === 0 });
   }
   entrypoints.forEach((e, i) => {
@@ -196,6 +219,26 @@ export function buildSliceInstruction(slice: DecompositionSlice, priorCode: stri
   return lines.join("\n");
 }
 
+/**
+ * True when the text has TypeScript SYNTAX errors (parse diagnostics). Used
+ * to keep a truncated slice OUT of the assembly: a generation cut mid-
+ * declaration (observed 2026-07-07 on the 7B local run — context overflow,
+ * `truncated=1` in the server log) otherwise poisons the whole assembled
+ * module into `regen_load_failed`, discarding every healthy slice with it.
+ * Excluding the broken slice instead yields missing-export feedback that
+ * implicates EXACTLY that slice, so the keep-slices round re-dispatches it
+ * while the healthy slices stay frozen — the monotone loop heals truncation.
+ */
+export function hasSyntaxErrors(code: string): boolean {
+  try {
+    const sf = ts.createSourceFile("s.ts", code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const diags = (sf as unknown as { parseDiagnostics?: unknown[] }).parseDiagnostics;
+    return Array.isArray(diags) && diags.length > 0;
+  } catch {
+    return true;
+  }
+}
+
 /** One slice's generated code plus the declarations it OWNS (its plan
  *  targets). Ownership is what makes assembly robust to a model that — as
  *  measured on a 7B — ignores "reuse, don't redefine" and regenerates the
@@ -227,9 +270,53 @@ const NAMED_DECL = (
   return null;
 };
 
+// Re-render an import declaration with any binding whose LOCAL name collides
+// with an assembly-declared name REMOVED. Returns null when nothing remains
+// (the whole import should be dropped). Side-effect imports (no clause) are
+// kept verbatim. Motivation (Gap-2 `node_0032`, 2026-07-07): slice models
+// reliably ignore "REUSE, do not re-import" and import earlier chunks'
+// declarations from an invented module (`from './types'`) — the assembled
+// module then declares AND imports the same names, so it can never load.
+// The collision is mechanically decidable, so the assembler resolves it.
+function stripCollidingImport(
+  stmt: ts.ImportDeclaration,
+  sf: ts.SourceFile,
+  declared: ReadonlySet<string>,
+): string | null {
+  const clause = stmt.importClause;
+  if (!clause) return stmt.getText(sf).trim(); // side-effect import — keep
+  const spec = stmt.moduleSpecifier.getText(sf);
+
+  const defaultName = clause.name && !declared.has(clause.name.text) ? clause.name.text : undefined;
+  let namespace: string | undefined;
+  const named: string[] = [];
+  if (clause.namedBindings) {
+    if (ts.isNamespaceImport(clause.namedBindings)) {
+      const n = clause.namedBindings.name.text;
+      if (!declared.has(n)) namespace = n;
+    } else if (ts.isNamedImports(clause.namedBindings)) {
+      for (const el of clause.namedBindings.elements) {
+        if (!declared.has(el.name.text)) named.push(el.getText(sf).trim());
+      }
+    }
+  }
+  if (!defaultName && !namespace && named.length === 0) return null; // fully colliding — drop
+
+  const typeOnly = clause.isTypeOnly ? "type " : "";
+  const pieces: string[] = [];
+  if (defaultName) pieces.push(defaultName);
+  if (namespace) pieces.push(`* as ${namespace}`);
+  if (named.length > 0) pieces.push(`{ ${named.join(", ")} }`);
+  return `import ${typeOnly}${pieces.join(", ")} from ${spec};`;
+}
+
 /**
  * Assemble per-slice outputs into one module. Robust to overlap:
- *   - imports are collected and DEDUPLICATED;
+ *   - imports are collected and DEDUPLICATED, and any import BINDING whose
+ *     local name collides with a declaration the assembly itself emits is
+ *     stripped (the import is dropped entirely when nothing remains) — a
+ *     slice that re-imports earlier slices' declarations from an invented
+ *     module would otherwise make the whole module unloadable;
  *   - each top-level named declaration is kept ONLY from the slice that owns
  *     it (its plan target); duplicate copies from other slices are dropped.
  *     Names owned by no slice (model extras) are kept on first occurrence;
@@ -285,7 +372,11 @@ export function assembleSlices(parts: readonly AssemblyPart[]): string {
         if (owner !== undefined && owner !== idx) continue; // owned by another slice — drop
         if (emitted.has(named.name)) continue; // already emitted once — drop any repeat
         emitted.add(named.name);
-        if (named.isExported) exportedNames.add(named.name);
+        // Only CONTRACT (plan-owned) names reach the export surface. An
+        // invented declaration a model exports inline (`export const ApiKey…`,
+        // 31 observed on the 2026-07-07 7B run) stays as an internal helper —
+        // it never becomes extra-export drift the structural gate rejects.
+        if (named.isExported && ownerOf.has(named.name)) exportedNames.add(named.name);
         // Strip an inline `export`/`export default` modifier; the single
         // trailing export block owns the export surface.
         keptDecls.push(stmt.getText(sf).replace(/^export\s+(default\s+)?/, "").trim());
@@ -296,7 +387,31 @@ export function assembleSlices(parts: readonly AssemblyPart[]): string {
     }
   });
 
-  const head = importLines.join("\n");
+  // Post-pass: `emitted` is now the complete set of names the assembly
+  // declares — strip any import binding that collides with one (and drop
+  // imports left empty), then re-dedupe the rewritten lines.
+  const finalImports: string[] = [];
+  const seenFinal = new Set<string>();
+  for (const line of importLines) {
+    let rendered: string | null = line;
+    try {
+      const isf = ts.createSourceFile("imp.ts", line, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+      const stmt = isf.statements[0];
+      if (stmt && ts.isImportDeclaration(stmt)) {
+        rendered = stripCollidingImport(stmt, isf, emitted);
+      }
+    } catch {
+      // unparseable line — keep verbatim (best-effort, matches the walk)
+    }
+    if (rendered === null) continue;
+    const key = collapse(rendered);
+    if (!seenFinal.has(key)) {
+      seenFinal.add(key);
+      finalImports.push(rendered);
+    }
+  }
+
+  const head = finalImports.join("\n");
   const exportBlock =
     exportedNames.size > 0 ? `export {\n  ${[...exportedNames].sort().join(",\n  ")},\n};` : "";
   return [head, keptDecls.join("\n\n"), exportBlock]

@@ -5,6 +5,7 @@ import { getOntologyPaths } from "../../kernel/core/project/paths.js";
 import { auditFichas } from "../../inverse/ficha-quality.js";
 import { checkRules } from "../../inverse/rule-checker.js";
 import { computeSyncReadiness, type SyncReadiness } from "../../kernel/graph/sync-readiness.js";
+import { readGrayZoneRecords, type GrayZoneRecord } from "../../laws/gray-zone.js";
 import { readDriftState } from "./drift.js";
 import { errorMessage } from "../../kernel/core/errors.js";
 
@@ -30,11 +31,15 @@ export interface StatusCommandOptions {
   /** Show the dependency-order readiness view: the syncable ideal + the
    *  fix-first blocker antichain (human output only; always in JSON). */
   blockers?: boolean;
+  /** Show the gray-zone ranking: nodes whose multi-draw regenerations
+   *  disagree with each other — repair-the-ficha-first candidates (human
+   *  output only; always in JSON). */
+  grayZone?: boolean;
 }
 
-type Tier = "core" | "lower" | "blocked" | "no-shadow";
+export type Tier = "core" | "lower" | "blocked" | "no-shadow";
 
-interface NodeStatus {
+export interface NodeStatus {
   nodeId: string;
   srcFile: string | null;
   hasShadow: boolean;
@@ -44,7 +49,7 @@ interface NodeStatus {
   tier: Tier;
 }
 
-interface StatusReport {
+export interface StatusReport {
   totalNodes: number;
   /** Nodes with a code shadow present on disk — the syncable universe. */
   trackable: number;
@@ -64,14 +69,25 @@ interface StatusReport {
   };
   /** Dependency-order readiness: the syncable ideal + the blocker antichain. */
   readiness: SyncReadiness;
+  /** Gray-zone index: latest per-node draw-disagreement measurements (from
+   *  multi-draw sync/regenerate runs), ranked most-ambiguous first. Empty
+   *  until a multi-draw run has recorded — status never draws by itself. */
+  grayZone: {
+    measured: number;
+    /** Nodes in the "gray" zone (no majority cluster) — Gap-A suspects. */
+    gray: number;
+    /** Nodes where draws split pass/fail on the SAME fixture. */
+    behaviorSplits: number;
+    ranking: GrayZoneRecord[];
+  };
   nodes: NodeStatus[];
 }
 
-function fixturePathFor(nodeId: string, cwd: string): string {
+export function fixturePathFor(nodeId: string, cwd: string): string {
   return path.join(cwd, "tests/behavior-fixtures", `${nodeId}.fixture.ts`);
 }
 
-function classify(hasShadow: boolean, hasFixture: boolean, ruleViolations: number): Tier {
+export function classify(hasShadow: boolean, hasFixture: boolean, ruleViolations: number): Tier {
   if (!hasShadow) return "no-shadow";
   if (ruleViolations > 0) return "blocked";
   return hasFixture ? "core" : "lower";
@@ -140,6 +156,19 @@ export function buildStatusReport(cwd: string): StatusReport {
     edges: loadEdges(cwd),
   });
 
+  // Gray-zone ranking: latest disagreement record per LIVE node (records for
+  // deleted nodes are ignored, not pruned — the next multi-draw run on a live
+  // node upserts its own entry). Most-disagreeing first; entropy breaks ties.
+  const liveIds = new Set(nodes.map((n) => n.id));
+  const grayRecords = Object.values(readGrayZoneRecords(cwd))
+    .filter((rec) => liveIds.has(rec.nodeId))
+    .sort(
+      (a, b) =>
+        b.disagreementRate - a.disagreementRate ||
+        b.clusterEntropyBits - a.clusterEntropyBits ||
+        a.nodeId.localeCompare(b.nodeId),
+    );
+
   return {
     totalNodes: nodes.length,
     trackable: trackable.length,
@@ -156,6 +185,12 @@ export function buildStatusReport(cwd: string): StatusReport {
       underDeclared: audit.nodesWithMissingExports,
       missingExports: audit.totalMissingExports,
       proseRules: audit.totalProseRulesOnCodeNodes,
+    },
+    grayZone: {
+      measured: grayRecords.length,
+      gray: grayRecords.filter((rec) => rec.zone === "gray").length,
+      behaviorSplits: grayRecords.filter((rec) => rec.behaviorSplit).length,
+      ranking: grayRecords,
     },
     nodes: nodeStatuses,
   };
@@ -220,14 +255,36 @@ function emit(report: StatusReport, options: StatusCommandOptions): void {
     console.log(`  blocked-from-below:${rd.blockedReady.length}\tcore nodes held back only by an unready dependency`);
     if (rd.frontier.length > 0) {
       console.log(`  fix-first (antichain of ${rd.frontier.length}): close these to unblock a down-set —`);
-      // Show the frontier blockers with their leverage (blockedDescendants).
+      // Show the frontier blockers with their leverage (blockedDescendants) AND
+      // their trust-tier, so the triage answers both "how much does this block"
+      // and "why is it not ready" (blocked = rule violation, lower = no fixture)
+      // in one line instead of cross-referencing `--list`.
       const byId = new Map(rd.blockers.map((b) => [b.nodeId, b.blockedDescendants]));
+      const tierById = new Map(r.nodes.map((n) => [n.nodeId, n.tier]));
       for (const id of rd.frontier.slice(0, 12)) {
-        console.log(`    ${id}\tblocks ${byId.get(id) ?? 0} node(s)`);
+        console.log(`    ${id}\t[${tierById.get(id) ?? "?"}]\tblocks ${byId.get(id) ?? 0} node(s)`);
       }
       if (rd.frontier.length > 12) console.log(`    ...and ${rd.frontier.length - 12} more`);
     } else {
       console.log(`  ✓ no blockers — every core node is batch-syncable`);
+    }
+  }
+
+  if (options.grayZone) {
+    const gz = r.grayZone;
+    console.log("");
+    console.log(`  ── gray-zone index (draw disagreement → repair-the-ficha-first) ──`);
+    if (gz.measured === 0) {
+      console.log(`  (no measurements yet — a multi-draw \`onto sync\`/\`onto regenerate --draws N\` records one per node)`);
+    } else {
+      console.log(`  measured: ${gz.measured} node(s)\tgray: ${gz.gray}\tbehaviour splits: ${gz.behaviorSplits}`);
+      for (const rec of gz.ranking.slice(0, 12)) {
+        const split = rec.behaviorSplit ? "  ⚠ behaviour split" : "";
+        console.log(
+          `    ${rec.nodeId}\t[${rec.zone}]\tdisagreement ${rec.disagreementRate.toFixed(2)} (${rec.clusterCount} cluster(s)/${rec.compiledDraws} draws)\t${rec.measuredAt.slice(0, 10)}${split}`,
+        );
+      }
+      if (gz.ranking.length > 12) console.log(`    ...and ${gz.ranking.length - 12} more`);
     }
   }
 

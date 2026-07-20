@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import React from "react";
 import { render } from "ink-testing-library";
@@ -69,14 +70,29 @@ async function mountWalker(cwd: string, focal = "node_0000_canon"): Promise<Harn
 
 describe("walker keyboard flows (stdin-driven)", () => {
   let tempDir: string;
+  let tmpHome: string;
+  let originalXdg: string | undefined;
 
   beforeEach(() => {
+    // Redirect the project registry (XDG_CONFIG_HOME/ontology/projects.json)
+    // to a throwaway dir so the `:projects` flow never reads or writes the
+    // developer's real registry. Set BEFORE `init` so the subprocess inherits
+    // it and registers the temp project into the isolated registry.
+    tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "onto-walker-xdg-"));
+    originalXdg = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = tmpHome;
     tempDir = createTempProject();
     expect(runCli(tempDir, ["init"]).status).toBe(0);
   });
 
   afterEach(() => {
     cleanupTempProject(tempDir);
+    if (originalXdg === undefined) {
+      delete process.env.XDG_CONFIG_HOME;
+    } else {
+      process.env.XDG_CONFIG_HOME = originalXdg;
+    }
+    fs.rmSync(tmpHome, { recursive: true, force: true });
   });
 
   it("`:` enters command mode, Esc returns to view mode", async () => {
@@ -222,5 +238,104 @@ describe("walker keyboard flows (stdin-driven)", () => {
       fs.readFileSync(path.join(tempDir, ".ontology/models/registry.json"), "utf-8"),
     );
     expect(reg.routing).toEqual({ code_sketch: "mock_default" });
+  });
+
+  it("`:projects` opens the switcher (current project + create row); n enters create, Esc dismisses", async () => {
+    const w = await mountWalker(tempDir);
+
+    // Open the switcher — `init` registered the temp project into the isolated
+    // registry, so it shows as the current row alongside the create row.
+    await w.press(":");
+    await waitFor(w.frame, (f) => f.includes(":_"), "command prompt");
+    await w.press("projects");
+    await waitFor(w.frame, (f) => f.includes(":projects_"), "projects typed");
+    await w.press(ENTER);
+    const panel = await waitFor(w.frame, (f) => f.includes("PROJECTS"), "projects panel");
+    // A real registered project row rendered (not the empty-state placeholder),
+    // plus the always-present create row. (The "current" tag is intentionally
+    // not asserted: macOS resolves os.tmpdir() through a /private symlink, so
+    // the registered path and the live cwd compare unequal — orthogonal to this
+    // flow.)
+    expect(panel).not.toContain("No projects registered yet");
+    expect(panel).toContain("+ Create new Ontology project");
+
+    // n → create sub-mode: the TextInput mounts (name prompt).
+    await w.press("n");
+    await waitFor(w.frame, (f) => f.includes("name:"), "create mode name field");
+
+    // Esc from create returns to the list (still open), Esc again dismisses.
+    await w.press(ESC);
+    await waitFor(w.frame, (f) => f.includes("enter open"), "back to list hints");
+    await w.press(ESC);
+    await waitFor(w.frame, (f) => f.includes("projects panel dismissed"), "panel dismissed");
+    w.unmount();
+  });
+
+  it("`:next` opens the safe-action panel and Esc dismisses it", async () => {
+    const w = await mountWalker(tempDir);
+    await w.press(":");
+    await waitFor(w.frame, (f) => f.includes(":_"), "command prompt");
+    await w.press("next");
+    await waitFor(w.frame, (f) => f.includes(":next_"), "next typed");
+    await w.press(ENTER);
+    // Fresh `init` graph: canon has no shadow → nothing blocked → the panel
+    // shows the header + the batch-syncable line, not a crash.
+    await waitFor(w.frame, (f) => f.includes("NEXT SAFE ACTIONS"), "next-actions panel");
+    await waitFor(w.frame, (f) => f.includes("batch-syncable now"), "syncable line");
+    // j/k on a possibly-empty list must be harmless.
+    await w.press("j");
+    await w.press("k");
+    await w.press(ESC);
+    await waitFor(w.frame, (f) => f.includes("next-actions panel dismissed"), "panel dismissed");
+    w.unmount();
+  });
+
+  it("`:prov` sets the fire provider; `s` fires an async sync that resolves to a proc", async () => {
+    // A code node with a shadow to sync (mirror of the status/dod fixtures).
+    expect(runCli(tempDir, ["node", "create", "--level", "domain", "--kind", "entity", "--prompt", "Dominio"]).status).toBe(0);
+    expect(runCli(tempDir, ["node", "create", "--level", "artifact", "--kind", "artifact", "--manifestation", "code", "--language", "python", "--prompt", 'print("hi")']).status).toBe(0);
+    expect(runCli(tempDir, ["node", "link", "--from", "node_0002", "--to", "node_0001", "--type", "refines"]).status).toBe(0);
+    const shadowRel = "src/hi.py";
+    fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, shadowRel), 'print("hi")\n');
+    const np = path.join(tempDir, ".ontology/nodes", "node_0002.json");
+    const n = JSON.parse(fs.readFileSync(np, "utf-8"));
+    n.outputs = { ...(n.outputs ?? {}), files: [shadowRel] };
+    fs.writeFileSync(np, JSON.stringify(n, null, 2));
+
+    const w = await mountWalker(tempDir, "node_0002");
+    // Set the fire provider to mock (deterministic, no real LLM; identity regen
+    // is structurally unstable → sync refuses → no write).
+    await w.press(":");
+    await waitFor(w.frame, (f) => f.includes(":_"), "command prompt");
+    await w.press("prov mock");
+    await w.press(ENTER);
+    await waitFor(w.frame, (f) => f.includes("fire:mock"), "action bar shows fire provider");
+
+    // s → async cast: a casting row now, a proc when it resolves.
+    await w.press("s");
+    await waitFor(w.frame, (f) => f.includes("⟳ casting sync node_0002"), "casting row");
+    await waitFor(w.frame, (f) => /[✓✖] node_0002 sync →/.test(f), "sync proc flashed", 25000);
+
+    // p → async probe cast (mock output has no `export const cases` → refused).
+    await w.press("p");
+    await waitFor(w.frame, (f) => /[✓✖] node_0002 probe →/.test(f), "probe proc flashed", 25000);
+    w.unmount();
+  });
+
+  it("the action bar is always visible; Tab rotates safe actions; d shows the focal DoD", async () => {
+    const w = await mountWalker(tempDir);
+    // Always-on cockpit strip.
+    await waitFor(w.frame, (f) => f.includes("⚔") && f.includes("syncable"), "action bar");
+    await waitFor(w.frame, (f) => f.includes("Tab next · s sync · p probe · d dod"), "action-bar key hints");
+
+    // Fresh init graph: canon has no shadow → nothing blocks → Tab says so.
+    await w.press("\t");
+    await waitFor(w.frame, (f) => /no blockers/.test(f), "Tab on an unblocked graph");
+
+    // d → the focal (canon) definition-of-done at a glance.
+    await w.press("d");
+    await waitFor(w.frame, (f) => f.includes("dod node_0000_canon"), "focal DoD line");
+    w.unmount();
   });
 });

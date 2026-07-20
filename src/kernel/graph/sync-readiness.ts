@@ -73,6 +73,27 @@ function buildDownClosures(edges: readonly OntologyEdge[]): Map<string, Set<stri
   return memo;
 }
 
+/** Universal per-node downstream blast radius: for every node, how many
+ *  SHADOWED nodes transitively depend on it (have it in their hard-dependency
+ *  down-closure). Unlike `SyncReadiness.blockers[].blockedDescendants` — which
+ *  is populated ONLY for un-ready blockers — this is defined for every node,
+ *  including ready/core ones: the "if this drifts, N shadowed nodes sit
+ *  downstream of it" number the per-node DoD report shows. Same closure
+ *  inversion as computeSyncReadiness, without the blocker filter. */
+export function downstreamDependents(
+  edges: readonly OntologyEdge[],
+  shadowed: ReadonlySet<string>,
+): Map<string, number> {
+  const closures = buildDownClosures(edges);
+  const counts = new Map<string, number>();
+  for (const n of shadowed) {
+    for (const m of closures.get(n) ?? []) {
+      counts.set(m, (counts.get(m) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
 export function computeSyncReadiness(args: {
   /** Nodes with a code shadow — the syncable universe. */
   shadowed: ReadonlySet<string>;

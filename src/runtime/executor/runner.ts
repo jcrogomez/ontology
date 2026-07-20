@@ -11,10 +11,12 @@ import { computeCompilePlan, HARD_DEPENDENCY_EDGE_TYPES } from "../../kernel/gra
 import type { OntologyEdge } from "../../kernel/schemas/ontology.js";
 import type { ResolvedNodeModel } from "../llm/resolve-node-model.js";
 import type { RegenerateCommandOptions, RegenerateResult } from "../../surfaces/commands/regenerate.js";
-import { decide, DEFAULT_REFINE_ROUNDS } from "./policy.js";
+import { decide, DEFAULT_REFINE_ROUNDS, classifyPlateauWithEvidence } from "./policy.js";
 import { normalize } from "./verdict.js";
 import { kappaStar } from "./kappa-star.js";
+import { rungLocality, type LadderRung } from "./model-ladder.js";
 import { buildReport, type ExecReport } from "./report.js";
+import type { PrecedentStore } from "./precedents.js";
 import type { Decision, Lever, NodeExecState, NodeRecord } from "./types.js";
 
 export interface ExecutorConfig {
@@ -23,7 +25,10 @@ export interface ExecutorConfig {
   // attempted once across focals.
   focalIds: string[];
   // Resolved capability ladder (rung 0 cheapest). See model-ladder.resolveLadder.
-  ladder: ResolvedNodeModel[];
+  // Rungs MAY carry caps (resolveLadder always attaches them); locality falls
+  // back to the provider heuristic for hand-built ladders. ResolvedNodeModel-
+  // shaped arrays therefore remain valid configs.
+  ladder: (ResolvedNodeModel | LadderRung)[];
   maxAttemptsPerNode?: number;
   refineRounds?: number;
   behaviorFixturesDir?: string;
@@ -42,6 +47,11 @@ export interface ExecutorDeps {
   edges: OntologyEdge[];
   // The single effectful actuator. In production this is runRegenerate.
   regenerate: (nodeId: string, opts: RegenerateCommandOptions) => Promise<RegenerateResult>;
+  // Episodic memory (optional): prior-run outcomes keyed to ficha content.
+  // The runner consults it BEFORE a node's climb (warm-start κ*, honour an
+  // extraction-gap precedent on an unchanged ficha) and records each node's
+  // terminal AFTER. Absent → every run starts from scratch, as before.
+  precedents?: PrecedentStore;
 }
 
 const HARD_TYPES: ReadonlySet<string> = new Set(HARD_DEPENDENCY_EDGE_TYPES as readonly string[]);
@@ -81,7 +91,24 @@ function leverOptions(
     return { ...base, refine: lever.rounds ?? config.refineRounds ?? DEFAULT_REFINE_ROUNDS };
   }
   if (lever.kind === "decompose") {
-    return { ...base, decompose: true };
+    // Decompose composes with refine + monotone keep-slices: slices whose
+    // behaviour cases pass are frozen between rounds and only the implicated
+    // slices re-generate ("passing work is kept" — slice-keep.ts). This is
+    // what makes the lever effective on large declaration modules, where the
+    // chunked scaffold gives keep-slices real granularity.
+    return {
+      ...base,
+      decompose: true,
+      refine: config.refineRounds ?? DEFAULT_REFINE_ROUNDS,
+      keepSlices: true,
+    };
+  }
+  if (lever.kind === "probe") {
+    // Disagreement probe: N independent draws at the current rung. The
+    // consensus write gate inside runRegenerate still governs (a majority
+    // pass writes and closes); what the probe ADDS is the grayZone fold the
+    // plateau classification needs.
+    return { ...base, draws: lever.draws };
   }
   // generate / escalate → a plain draw at the current rung.
   return base;
@@ -101,9 +128,17 @@ async function runNode(
 ): Promise<NodeRecord> {
   const ladderSize = config.ladder.length;
   const targets = upstreamTargets(nodeId, deps.edges);
-  // Warm start at the prior κ* (least-element search from a known lower bound),
-  // clamped to the ladder. Absent → rung 0.
-  const startRung = Math.min(Math.max(0, config.priorKappa?.[nodeId] ?? 0), ladderSize - 1);
+  // Episodic precedent (valid = ficha unchanged; the store enforces that).
+  const precedent = deps.precedents?.lookup(nodeId);
+  // Warm start at the prior κ* (least-element search from a known lower bound):
+  // the in-config priorKappa wins over the persisted precedent when both exist.
+  // Clamped to the ladder. Absent → rung 0.
+  const warmKappa = config.priorKappa?.[nodeId] ?? (precedent?.terminal === "closed" ? precedent.kappa : null) ?? 0;
+  const startRung = Math.min(Math.max(0, warmKappa), ladderSize - 1);
+  // An extraction-gap precedent binds only while there is no NEW capacity to
+  // try: a taller current ladder voids it (the prior run never saw those rungs).
+  const priorExtractionGap =
+    precedent?.terminal === "extraction-gap" && ladderSize <= precedent.ladderSize;
   let state: NodeExecState = {
     nodeId,
     rung: startRung,
@@ -111,6 +146,7 @@ async function runNode(
     history: [],
     upstreamAllClosed: targets.every((t) => closed.has(t)),
     maxAttemptsPerNode: config.maxAttemptsPerNode ?? 8,
+    priorExtractionGap,
   };
   const decisions: Decision[] = [];
   // Whether the attempt that produced the most recent verdict actually wrote.
@@ -129,6 +165,23 @@ async function runNode(
       const kappa = kappaStar(
         state.history.map((a) => ({ rung: a.rung, closed: a.verdict.outcome === "pass" })),
       ).kappa;
+      // Ladder economics: wall-clock + rung-locality accounting per attempt.
+      // Measured facts only — the oracle-routing interpretation (how much cloud
+      // spend the local rungs avoided) lives in the report/proposal doc.
+      const localityOf = (r: number): "local" | "cloud" =>
+        rungLocality(config.ladder[Math.min(r, ladderSize - 1)]);
+      const totalDurationMs = state.history.reduce((s, a) => s + (a.durationMs ?? 0), 0);
+      const attemptsLocal = state.history.filter((a) => localityOf(a.rung) === "local").length;
+      // Plateau terminals record WHY: the same evidence fold the policy used
+      // (single source — no separate mapping that could drift). A zero-attempt
+      // extraction-gap can only have come from an honoured precedent.
+      const lastVerdict = state.history.at(-1)?.verdict;
+      const gapEvidence =
+        (action.terminal === "extraction-gap" || action.terminal === "capacity-ceiling") && lastVerdict
+          ? classifyPlateauWithEvidence(lastVerdict).evidence
+          : action.terminal === "extraction-gap" && state.priorExtractionGap
+            ? ("precedent" as const)
+            : undefined;
       return {
         nodeId,
         terminal: action.terminal,
@@ -137,7 +190,12 @@ async function runNode(
         attempts: state.history.length,
         decisions,
         lastDetail: state.history.at(-1)?.verdict.detail,
+        gapEvidence,
         kappa,
+        totalDurationMs,
+        attemptsLocal,
+        attemptsCloud: state.history.length - attemptsLocal,
+        closedLocality: kappa === null ? null : localityOf(kappa),
       };
     }
 
@@ -155,6 +213,7 @@ async function runNode(
     // throw from an orphaned draft timer can still escape this; the principled fix
     // is child-process isolation of the behaviour check — tracked follow-up.)
     let verdict;
+    const attemptStart = Date.now();
     try {
       const result = await deps.regenerate(nodeId, leverOptions(action.lever, config, model));
       verdict = normalize(result);
@@ -168,10 +227,11 @@ async function runNode(
       };
       lastWritten = false;
     }
+    const durationMs = Date.now() - attemptStart;
     state = {
       ...state,
       rung,
-      history: [...state.history, { rung, lever: action.lever.kind, verdict }],
+      history: [...state.history, { rung, lever: action.lever.kind, verdict, durationMs }],
     };
   }
 }
@@ -199,6 +259,10 @@ export async function runExecutor(config: ExecutorConfig, deps: ExecutorDeps): P
         decisions: [],
         lastDetail: `compile plan failed: ${plan.reason}`,
         kappa: null,
+        totalDurationMs: 0,
+        attemptsLocal: 0,
+        attemptsCloud: 0,
+        closedLocality: null,
       });
       continue;
     }
@@ -207,6 +271,25 @@ export async function runExecutor(config: ExecutorConfig, deps: ExecutorDeps): P
       seen.add(step.nodeId);
       const record = await runNode(step.nodeId, config, deps, closed);
       if (record.terminal === "closed") closed.add(step.nodeId);
+      // Record the episodic precedent for MEASURED outcomes only: closed (its
+      // κ* seeds the next warm start) and the two plateau verdicts. Cited
+      // precedents are not re-recorded (that would overwrite the original
+      // evidence with "precedent" and refresh its date); blocked/unverified/
+      // infra say nothing about this ficha's limit.
+      if (
+        record.gapEvidence !== "precedent" &&
+        (record.terminal === "closed" ||
+          record.terminal === "extraction-gap" ||
+          record.terminal === "capacity-ceiling")
+      ) {
+        deps.precedents?.record({
+          nodeId: step.nodeId,
+          terminal: record.terminal,
+          kappa: record.kappa,
+          gapEvidence: record.gapEvidence,
+          ladderSize: config.ladder.length,
+        });
+      }
       records.push(record);
     }
   }

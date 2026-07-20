@@ -57,7 +57,19 @@ describe("behavior-checker / deepEqual", () => {
   it("walks plain objects key-by-key, order-insensitive", () => {
     expect(deepEqual({ a: 1, b: 2 }, { b: 2, a: 1 })).toBe(true);
     expect(deepEqual({ a: 1, b: 2 }, { a: 1, b: 3 })).toBe(false);
-    expect(deepEqual({ a: 1 }, { a: 1, b: undefined })).toBe(false);
+  });
+
+  it("treats an own key set to undefined as ABSENT (law change 2026-07-08)", () => {
+    // `obj.k === undefined` is indistinguishable between the two shapes at
+    // the API level; comparing raw key sets produced false divergences
+    // (a regen writing `defaultImport: undefined` vs the source omitting
+    // the key — byte-identical JSON, "divergent" verdict). Normalised.
+    expect(deepEqual({ a: 1 }, { a: 1, b: undefined })).toBe(true);
+    expect(deepEqual({ a: 1, b: undefined }, { a: 1 })).toBe(true);
+    // A DEFINED value still compares by value — never a false match.
+    expect(deepEqual({ a: 1, b: "x" }, { a: 1 })).toBe(false);
+    expect(deepEqual({ a: 1 }, { a: 1, b: null })).toBe(false); // null ≠ absent
+    expect(deepEqual({ a: 1, b: undefined }, { a: 1, b: "x" })).toBe(false);
   });
 
   it("walks arrays in order", () => {

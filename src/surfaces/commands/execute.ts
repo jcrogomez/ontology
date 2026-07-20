@@ -13,6 +13,7 @@
 
 import { runRegenerate } from "./regenerate.js";
 import { loadEdges, loadModelsRegistry } from "../../kernel/core/project/load.js";
+import { createPrecedentStore } from "../../runtime/executor/precedents.js";
 import { runExecutor, type ExecutorConfig } from "../../runtime/executor/runner.js";
 import {
   DEFAULT_PREMISE,
@@ -28,6 +29,10 @@ export interface ExecuteCommandOptions {
   maxAttempts?: number;
   /** Allow paid models into the ladder (default: $0 — paid excluded). */
   allowPaid?: boolean;
+  /** Ignore stored precedents for this run (measure every node from scratch).
+   *  Fresh outcomes are still recorded — a from-scratch re-measure is exactly
+   *  when you want the store refreshed. */
+  noPrecedents?: boolean;
   behaviorFixturesDir?: string;
   ollamaHost?: string;
   json?: boolean;
@@ -58,9 +63,16 @@ export async function runExecutorLive(
     ollamaHost: options.ollamaHost,
   };
 
+  // Episodic memory: warm-start κ* + honour extraction-gap precedents on
+  // unchanged fichas. --no-precedents blinds the LOOKUP only; outcomes are
+  // recorded either way so the store stays current.
+  const store = createPrecedentStore(cwd);
+  const precedents = options.noPrecedents ? { lookup: () => undefined, record: store.record } : store;
+
   return runExecutor(config, {
     edges,
     regenerate: (id, opts) => runRegenerate(id, opts, cwd),
+    precedents,
   });
 }
 

@@ -46,6 +46,10 @@ import {
   classifySourceFile,
   type StructuralClassification,
 } from "../../../inverse/structural-classifier.js";
+import {
+  computeRoutingSignature,
+  type RoutingSignature,
+} from "../../../inverse/routing-signature.js";
 import { buildStaticSummary } from "../../../inverse/static-summary.js";
 import {
   INTENT_NARRATION_PROMPT,
@@ -574,6 +578,29 @@ function classifyIfEnabled(
   try {
     const content = fs.readFileSync(filePath, "utf-8");
     return classifySourceFile({ path: filePath, content });
+  } catch {
+    return undefined;
+  }
+}
+
+// s(c) — RECORD-ONLY routing signature (P7, STOCHASTIC_FUNCTORS.md).
+// Computed alongside the report-only classifier as a PURE OBSERVATION: it
+// is surfaced in ingest's --json output so operators (and the P3
+// calibration, P7_ROUTING_CALIBRATION_2026-07-08) can see which
+// prompt-profile / model-tier s(c) WOULD pick — but it does NOT change the
+// dispatched prompt or model. Acting on it is gated behind the P3
+// validation (see that hypothesis' decision rule). Same gating as the
+// classifier: "off" observes nothing; report-only/enabled observe only.
+// A failed read returns undefined and ingest proceeds unchanged.
+function routingSignatureIfEnabled(
+  filePath: string,
+  mode: StaticClassifierMode,
+  classification: StructuralClassification | undefined,
+): RoutingSignature | undefined {
+  if (mode === "off" || classification === undefined) return undefined;
+  try {
+    const content = fs.readFileSync(filePath, "utf-8");
+    return computeRoutingSignature({ path: filePath, content, classification });
   } catch {
     return undefined;
   }
@@ -1706,6 +1733,13 @@ async function runSingleFileIngest(
   opts: SingleFileOptions,
 ): Promise<void> {
   const classification = classifyIfEnabled(filePath, opts.staticClassifier);
+  // Record-only: what s(c) WOULD route (prompt-profile / model-tier). Does
+  // not alter dispatch — see routingSignatureIfEnabled.
+  const routingSignature = routingSignatureIfEnabled(
+    filePath,
+    opts.staticClassifier,
+    classification,
+  );
   const { result, action } = await extractWithRouting({
     inputs: {
       filePath,
@@ -1733,6 +1767,7 @@ async function runSingleFileIngest(
             usage: result.response.usage,
             model: result.response.model,
             provider: result.response.provider,
+            routingSignature,
           },
           null,
           2,
@@ -1779,6 +1814,7 @@ async function runSingleFileIngest(
           usage: result.response.usage,
           model: result.response.model,
           provider: result.response.provider,
+          routingSignature,
         },
         null,
         2,

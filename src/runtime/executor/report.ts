@@ -5,6 +5,24 @@
 import type { NodeRecord, Terminal } from "./types.js";
 import { kappaDistribution, type KappaDistribution } from "./kappa-star.js";
 
+/** Ladder economics — the run's oracle-routing measurement (measured facts
+ *  only: wall-clock + rung locality; no fabricated dollars/watts). The
+ *  interpretation frame is docs/design/proposals/LADDER_ECONOMICS.md: the
+ *  share of nodes the local rungs close IS the project's analogue of the
+ *  Stanford intelligence-per-watt "local coverage" number — with deterministic
+ *  gates instead of a probabilistic router. */
+export interface ExecEconomics {
+  /** Sum of every attempt's wall-clock across the run. */
+  totalDurationMs: number;
+  attemptsLocal: number;
+  attemptsCloud: number;
+  /** Closed nodes whose κ* rung was local / cloud. */
+  closedLocal: number;
+  closedCloud: number;
+  /** closedLocal / closed — the local-coverage share. null when nothing closed. */
+  localCloseShare: number | null;
+}
+
 export interface ExecReport {
   total: number;
   closed: number;
@@ -16,7 +34,23 @@ export interface ExecReport {
   /** κ* distribution over the run — how much ladder capacity the closed nodes
    *  needed (rung → count) + how many never closed. The capability barometer. */
   kappa: KappaDistribution;
+  /** Wall-clock + locality accounting — the ladder-economics barometer. */
+  economics: ExecEconomics;
   nodes: NodeRecord[];
+}
+
+function buildEconomics(nodes: NodeRecord[]): ExecEconomics {
+  const closedLocal = nodes.filter((n) => n.terminal === "closed" && n.closedLocality === "local").length;
+  const closedCloud = nodes.filter((n) => n.terminal === "closed" && n.closedLocality === "cloud").length;
+  const closed = nodes.filter((n) => n.terminal === "closed").length;
+  return {
+    totalDurationMs: nodes.reduce((s, n) => s + n.totalDurationMs, 0),
+    attemptsLocal: nodes.reduce((s, n) => s + n.attemptsLocal, 0),
+    attemptsCloud: nodes.reduce((s, n) => s + n.attemptsCloud, 0),
+    closedLocal,
+    closedCloud,
+    localCloseShare: closed > 0 ? closedLocal / closed : null,
+  };
 }
 
 export function buildReport(nodes: NodeRecord[]): ExecReport {
@@ -30,6 +64,7 @@ export function buildReport(nodes: NodeRecord[]): ExecReport {
     unverified: count("unverified-no-fixture"),
     infraError: count("infra-error"),
     kappa: kappaDistribution(nodes.map((n) => n.kappa)),
+    economics: buildEconomics(nodes),
     nodes,
   };
 }
@@ -46,10 +81,23 @@ export function formatReport(report: ExecReport): string {
   const lines = report.nodes.map((n) => {
     const mark =
       n.terminal === "closed" ? (n.written ? "✓ closed" : "✓ closed (not written)") : `· ${n.terminal}`;
+    const evidence = n.gapEvidence ? ` (${n.gapEvidence})` : "";
     const k = n.kappa === null ? "" : `, κ*=${n.kappa}`;
-    return `  ${n.nodeId}  ${mark}  [rung ${n.finalRung}, ${n.attempts} attempt(s)${k}]` +
+    return `  ${n.nodeId}  ${mark}${evidence}  [rung ${n.finalRung}, ${n.attempts} attempt(s)${k}]` +
       (n.lastDetail ? `  — ${n.lastDetail}` : "");
   });
+  // Gap-A routing: extraction-gaps flagged by DRAW DISAGREEMENT are ficha-
+  // repair work, not re-run work — surface the queue explicitly so the human
+  // route (Walker / onto ficha) is one glance away.
+  const grayGaps = report.nodes.filter(
+    (n) =>
+      n.terminal === "extraction-gap" &&
+      (n.gapEvidence === "draw-disagreement" || n.gapEvidence === "behaviour-split"),
+  );
+  const routeLine =
+    grayGaps.length > 0
+      ? `gap-A route: draws disagreed on ${grayGaps.map((n) => n.nodeId).join(", ")} — repair the ficha first (\`onto status --gray-zone\`, \`onto ficha\`/walker), then re-run`
+      : "";
   // κ* barometer: how much capability the closed nodes needed.
   const kd = report.kappa;
   const hist = Object.keys(kd.byRung)
@@ -61,5 +109,17 @@ export function formatReport(report: ExecReport): string {
     kd.closed > 0
       ? `κ* barometer: ${hist}${kd.neverClosed ? ` · never-closed: ${kd.neverClosed}` : ""}`
       : "";
-  return [head, ...lines, ...(kappaLine ? ["", kappaLine] : [])].join("\n");
+  // Ladder economics: local-coverage share + attempt split + wall-clock.
+  const eco = report.economics;
+  const secs = (eco.totalDurationMs / 1000).toFixed(1);
+  const share =
+    eco.localCloseShare === null ? "" : ` (${Math.round(eco.localCloseShare * 100)}% local)`;
+  const ecoLine =
+    report.total > 0
+      ? `economics: closed local ${eco.closedLocal} / cloud ${eco.closedCloud}${share}` +
+        ` · attempts local ${eco.attemptsLocal} / cloud ${eco.attemptsCloud}` +
+        ` · ${secs}s wall-clock`
+      : "";
+  const footer = [routeLine, kappaLine, ecoLine].filter(Boolean);
+  return [head, ...lines, ...(footer.length ? ["", ...footer] : [])].join("\n");
 }

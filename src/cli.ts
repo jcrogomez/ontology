@@ -56,6 +56,7 @@ import { regenerateCommand } from "./surfaces/commands/regenerate.js";
 import { syncCommand } from "./surfaces/commands/sync.js";
 import { executeCommand } from "./surfaces/commands/execute.js";
 import { statusCommand } from "./surfaces/commands/status.js";
+import { dodCommand } from "./surfaces/commands/dod.js";
 import { probeCommand } from "./surfaces/commands/probe.js";
 import { rulesCheckCommand, rulesAuditCommand } from "./surfaces/commands/rules.js";
 import { fichaAuditCommand, fichaCleanupCommand } from "./surfaces/commands/ficha.js";
@@ -1094,7 +1095,7 @@ program
   .command("regenerate <nodeId>")
   .description("Regenerate a node's code shadow from its intent (forward functor F), verify the candidate against the source on disk, and — only with --write, and only when the regeneration is structure-preserving — overwrite the real source file. Default is preview-only (stages + reports, touches no source). The governed lever for the kernel-of-equivalence map (ROUNDTRIP_BILATERAL_2026-06-12).")
   .option("--write", "Overwrite the shadow source file. Gated: refuses unless the verdict is structure-preserving (epsilon_equivalent / divergent_loc) and any behaviour fixture passes.")
-  .option("--provider <provider>", "LLM provider override for the compile-back (mock|ollama|anthropic|gemini).")
+  .option("--provider <provider>", "REQUIRED. LLM provider for the compile-back (mock|ollama|anthropic|gemini). No default: omitting it used to silently route to the mock identity functor and fake a pristine measurement. Pass --provider mock to force an identity/self-test run deliberately.")
   .option("--model <model>", "Model override (use with --provider).")
   .option("--ollama-host <host>", "Host for the Ollama provider.")
   .option("--behavior-check", "Run the node's behaviour fixture (if present) against source vs regen; a failing check blocks --write.")
@@ -1103,6 +1104,7 @@ program
   .option("--consensus <k>", "Consensus floor: write only when at least K of N draws agree (default strict majority, floor(N/2)+1).", (v) => parseInt(v, 10))
   .option("--refine <n>", "Verify-refine rounds (REGEN_INTENT_CONSUMPTION_2026-06-17 #2): when a round fails the gates, feed the failed behaviour criteria + export drift back into the next round's prompt. Needs --behavior-check for the behaviour signal. Default 1 (no refine); clamped to 4.", (v) => parseInt(v, 10))
   .option("--decompose", "Decomposition (REGEN_INTENT_CONSUMPTION_2026-06-17 #4): regenerate the module in slices (scaffold types+helpers → one slice per exported function, each seeing prior slices as fixed context), then assemble and gate the whole. Attacks the 'whole-contract-at-once' capacity limit. Implies a single assembled candidate.")
+  .option("--keep-slices", "Monotone decompose (composes with --decompose --refine N): slices no failure implicates are FROZEN between rounds (reused verbatim, no dispatch); only implicated slices re-generate — passing work is kept, so coverage grows across rounds. Attribution is deterministic and conservative: any unattributable failure regenerates everything.")
   .option("--loc-threshold <n>", "LoC distance threshold for the verdict (default 0.3).", (v) => parseFloat(v))
   .option("--jaccard-threshold <n>", "Structural Jaccard threshold for the verdict (default 0.5).", (v) => parseFloat(v))
   .option("--no-open-world", "Enforce strict requires-satisfaction during compile-back (default open-world).")
@@ -1137,12 +1139,28 @@ program
   .description("Read-only graph health for the sync loop: how many nodes are syncable-with-confidence (code shadow + behaviour fixture + rules statically clean), how many are lower-confidence (no fixture) or blocked (rule violation), how many shadows drifted from the anchor, and the ficha-quality summary. A pure composition of shadow/fixture presence + `onto drift` + `onto ficha audit` — writes nothing, runs no fixtures. See docs/design/runtime/SYNC_LOOP_SPEC.md §4.")
   .option("--list", "List the node ids in each syncability tier.")
   .option("--blockers", "Show the dependency-order readiness view: the syncable ideal (core nodes whose whole closure is core) + the fix-first blocker antichain ranked by how many nodes each blocks.")
-  .option("--json", "Output the full report (incl. per-node detail + readiness) as JSON.")
+  .option("--gray-zone", "Show the gray-zone index: nodes whose multi-draw regenerations disagreed with EACH OTHER (recorded by `onto sync`/`onto regenerate --draws N`), ranked most-ambiguous first — the repair-the-ficha-first queue. Reads .ontology/reports/gray-zone.json; draws nothing.")
+  .option("--json", "Output the full report (incl. per-node detail + readiness + gray-zone ranking) as JSON.")
   .action(async (options) => {
     try {
       await statusCommand(options);
     } catch (err: unknown) {
       console.error(`✖ Error during status: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("dod <nodeId>")
+  .description("Per-node DEFINITION OF DONE, read-only: the three verification gates (structural F∘G, behaviour fixture, declared rules) in one view, plus trust-tier and downstream blast-radius. Rules are checked live ($0); structural + behaviour are measured against a CACHED regen (`.ontology/verify/<id>`) when one exists — else reported `unmeasured` (run `onto sync`). Writes nothing, dispatches no LLM.")
+  .option("--no-run", "Skip the behaviour gate's fixture execution (the isolated child run). Structural still measures (pure file compare); behaviour reports `unmeasured`.")
+  .option("--json", "Output the full DoD report as JSON.")
+  .action(async (nodeId, options) => {
+    try {
+      // commander maps `--no-run` to options.run===false (default true).
+      await dodCommand(nodeId, { json: options.json, noRun: options.run === false });
+    } catch (err: unknown) {
+      console.error(`✖ Error during dod: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
@@ -1182,12 +1200,15 @@ program
   .option("--dry-run", "Run the whole loop (regen + gates + decisions) but write nothing — preview the decisions.")
   .option("--max-attempts <n>", "Hard backstop on attempts per node (default 8).", (v) => parseInt(v, 10))
   .option("--allow-paid", "Allow paid models into the capability ladder (default: $0 — paid models excluded).")
+  .option("--no-precedents", "Ignore the episodic precedent store for this run (measure every node from scratch; fresh outcomes are still recorded). Default: warm-start κ* from the last run and honour extraction-gap precedents on unchanged fichas.")
   .option("--behavior-fixtures-dir <path>", "Override the behaviour-fixtures directory (default tests/behavior-fixtures).")
   .option("--ollama-host <host>", "Host for the Ollama provider.")
   .option("--json", "Output the full report as JSON.")
   .action(async (nodeIds, options) => {
     try {
-      await executeCommand(nodeIds, options);
+      // commander maps `--no-precedents` to options.precedents === false.
+      const { precedents, ...rest } = options as Record<string, unknown> & { precedents?: boolean };
+      await executeCommand(nodeIds, { ...rest, ...(precedents === false ? { noPrecedents: true } : {}) });
     } catch (err: unknown) {
       console.error(`✖ Error during execute: ${errorMessage(err)}`);
       process.exit(1);

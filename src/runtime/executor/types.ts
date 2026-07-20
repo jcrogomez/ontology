@@ -25,11 +25,17 @@ import type { GateVerdict } from "./verdict.js";
 //   - decompose: slice-and-assemble (--decompose) for "can't hold the whole
 //                contract at once" ceilings
 //   - escalate:  climb one rung of the capability ladder, then a plain draw
+//   - probe:     N independent draws at the current rung (--draws N) fired
+//                ONCE, just before a plateau verdict, to measure whether the
+//                draws disagree with EACH OTHER (the gray-zone index). The
+//                probe is evidence-gathering that can still close the node
+//                (a consensus pass writes) — it adds no verification semantics
 export type Lever =
   | { kind: "generate" }
   | { kind: "refine"; rounds: number }
   | { kind: "decompose" }
-  | { kind: "escalate" };
+  | { kind: "escalate" }
+  | { kind: "probe"; draws: number };
 
 export type LeverKind = Lever["kind"];
 
@@ -61,6 +67,19 @@ export type Action =
   | { type: "apply"; lever: Lever }
   | { type: "terminate"; terminal: Terminal };
 
+// WHY a plateau landed on extraction-gap vs capacity-ceiling — the evidence
+// axis behind the Terminal, ranked strongest-first. Draw-vs-draw evidence
+// (probe/multi-draw) outranks the lint proxy: draws that DISAGREE with each
+// other prove the intent under-determines the artifact (Gap A → repair the
+// ficha); draws that AGREE yet fail point at the models (Gap B → ladder).
+export type PlateauEvidence =
+  | "behaviour-split" // draws split pass/fail on the SAME fixture → Gap A
+  | "draw-disagreement" // no majority declKey cluster across draws → Gap A
+  | "clean-lint" // lint-clean at plateau, still failing → Gap A (legacy proxy)
+  | "draw-agreement" // draws agree AND lint not clean → Gap B with evidence
+  | "dirty-or-unknown-lint" // no draw evidence, lint dirty/unknown → Gap B
+  | "precedent"; // a prior run flagged this exact ficha; unchanged since → Gap A cited, not re-measured
+
 // One recorded attempt: which rung, which lever produced it, and the normalized
 // gate outcome. The history is the audit log; replaying `decide` over it is
 // deterministic (the only non-determinism is the LLM draw that produced each
@@ -69,6 +88,12 @@ export interface Attempt {
   rung: number;
   lever: LeverKind | "initial";
   verdict: GateVerdict;
+  /** Wall-clock milliseconds the attempt took (regenerate + gates). Optional so
+   *  synthetic policy-test histories stay terse; the runner always records it.
+   *  This is the honest, measurable unit of the ladder-economics report — we
+   *  measure time and rung locality, never fabricated dollars or watts (see
+   *  docs/design/proposals/LADDER_ECONOMICS.md). */
+  durationMs?: number;
 }
 
 export interface NodeExecState {
@@ -81,6 +106,12 @@ export interface NodeExecState {
   // Set by the runner from the topological walk: are all hard dependencies
   // closed? When false the only honest action is terminate("blocked-upstream").
   upstreamAllClosed: boolean;
+  // Set by the runner from the episodic precedent store: a PRIOR run ended
+  // this node extraction-gap, the ficha is UNCHANGED since, and the current
+  // ladder is no taller. Re-burning the ladder cannot change that verdict, so
+  // the policy honours the precedent on first touch (data in, purity kept —
+  // the store lookup itself is runner-side IO).
+  priorExtractionGap?: boolean;
   // Hard backstop against a runaway loop. The ladder/lever logic terminates well
   // before this in practice.
   maxAttemptsPerNode: number;
@@ -101,7 +132,21 @@ export interface NodeRecord {
   attempts: number;
   decisions: Decision[];
   lastDetail?: string;
+  /** Present only on plateau terminals (extraction-gap / capacity-ceiling):
+   *  the evidence that decided the Gap A vs Gap B call. Routes Gap A to the
+   *  ficha-repair queue (`onto status --gray-zone`) instead of a re-run. */
+  gapEvidence?: PlateauEvidence;
   /** κ* — the least ladder rung observed to close this node (null if it never
    *  closed). The capability barometer; see runtime/executor/kappa-star.ts. */
   kappa: number | null;
+  /** Total wall-clock ms across all attempts (sum of Attempt.durationMs). */
+  totalDurationMs: number;
+  /** Attempts spent at local vs cloud rungs (rung locality from the ladder's
+   *  caps, provider-derived when unannotated). The per-node input to the
+   *  oracle-routing economics: how much of the work stayed on-device. */
+  attemptsLocal: number;
+  attemptsCloud: number;
+  /** Locality of the κ* rung — where the node actually closed. null when it
+   *  never closed (or the ladder rung is unknown). */
+  closedLocality: "local" | "cloud" | null;
 }

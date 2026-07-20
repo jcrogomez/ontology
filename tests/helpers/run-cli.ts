@@ -35,6 +35,15 @@ export function runCli(cwd: string, args: string[]): RunCliResult {
     cwd,
     encoding: 'utf-8',
     env: { ...process.env }, // Pass along environment variables
+    // Fail-fast guard: spawnSync blocks until the child exits, and a
+    // regressed interactive-command guard (e.g. `walk` mounting the TUI
+    // instead of refusing a non-TTY stdin) would otherwise hang the whole
+    // runner forever with no signal. Any single CLI invocation completes in
+    // well under a second; 30s is orders of magnitude of slack. On timeout
+    // the child is SIGKILLed and `status` comes back null → the test FAILS
+    // loudly rather than stalling CI.
+    timeout: 30_000,
+    killSignal: 'SIGKILL',
   });
 
   return {

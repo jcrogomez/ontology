@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Box, Text, useInput, useApp } from "ink";
 import {
   loadFocalNeighborhood,
@@ -55,6 +55,20 @@ import {
   nodesOwningFile,
 } from "./state/shadow-status.js";
 import { ProposalsPanel, type ProposalsPanelState } from "./layout/proposals-panel.js";
+import { ProjectsPanel, emptyProjectsPanelState, type ProjectsPanelState } from "./layout/projects-panel.js";
+import {
+  projectsForWalker,
+  openProjectFromWalker,
+  createProjectFromWalker,
+} from "./actions/projects-from-walker.js";
+import { NextActionsPanel, emptyNextActionsPanelState, type NextActionsPanelState } from "./layout/next-actions-panel.js";
+import { nextActions, nextActionsFromReport } from "./actions/next-actions.js";
+import { ActionBar, type FocalTone } from "./layout/action-bar.js";
+import { buildStatusReport } from "../commands/status.js";
+import { buildDodReport } from "../commands/dod.js";
+import { runSync } from "../commands/sync.js";
+import { runProbe } from "../commands/probe.js";
+import { CastsPanel, type CastView } from "./layout/casts-panel.js";
 import {
   loadProposalsForWalker,
   applyProposalFromWalker,
@@ -83,8 +97,12 @@ type WalkerMode = "view" | "command" | "edit";
 // ephemeral on-disk state under .ontology/work/drafts/. They become real
 // proposals when the user types `:propose` from the focal node that owns
 // the draft.
-export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
+export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactElement {
   const { exit } = useApp();
+  // `cwd` is prop-seeded but stateful so the Projects panel can switch the
+  // Walker to another `.ontology/` project in place (setCwd + setFocalId).
+  // Every downstream `cwd` reference reads this state unchanged.
+  const [cwd, setCwd] = useState(initialCwd ?? process.cwd());
   const [focalId, setFocalId] = useState(initialNodeId);
   const [mode, setMode] = useState<WalkerMode>("view");
   const [command, setCommand] = useState("");
@@ -135,6 +153,19 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
     proposals: [],
     cursor: 0,
   });
+  const [projectsPanel, setProjectsPanel] = useState<ProjectsPanelState>(
+    emptyProjectsPanelState(),
+  );
+  const [nextPanel, setNextPanel] = useState<NextActionsPanelState>(
+    emptyNextActionsPanelState(),
+  );
+  // Async fire pool ("casts") — the raid tempo. `s` fires a governed sync on the
+  // focal that runs in the BACKGROUND (non-blocking) so you Tab to the next
+  // target and fire again; when a cast resolves a green/red proc flashes and the
+  // graph refreshes (reloadTick). sessionProvider is what `s` dispatches to.
+  const castIdRef = useRef(0);
+  const [casts, setCasts] = useState<CastView[]>([]);
+  const [sessionProvider, setSessionProvider] = useState<LlmProvider>("ollama");
   const [pendingLinkAnalysis, setPendingLinkAnalysis] = useState<{ focalId: string } | null>(null);
   // Async sentinel for `:workflow` (v1.5) — same two-stage pattern as :run.
   const [pendingWorkflow, setPendingWorkflow] = useState<WorkflowArgs | null>(null);
@@ -146,6 +177,38 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       return { error: err instanceof Error ? err.message : String(err) };
     }
   }, [focalId, cwd, reloadTick]);
+
+  // Action-bar substrate: the status report drives BOTH the fix-first rotation
+  // (Tab) and the per-focal recommendation. Memoised on the graph so a keypress
+  // is instant; recomputed only when the graph changes (reloadTick).
+  const statusReport = useMemo(() => {
+    try {
+      return buildStatusReport(cwd);
+    } catch {
+      return null;
+    }
+  }, [cwd, reloadTick]);
+  const safeActions = useMemo(
+    () => (statusReport ? nextActionsFromReport(statusReport) : null),
+    [statusReport],
+  );
+  // Tab cycles through the fix-first list like WoW's next-target; the index
+  // survives across presses but resets when the list changes.
+  const [rotationIdx, setRotationIdx] = useState(0);
+
+  // The recommendation the action bar lights for the CURRENT focal, derived from
+  // its tier + drift + whether it sits in the batch-syncable ideal.
+  const focalRec = useMemo<{ label: string; tone: FocalTone }>(() => {
+    const ns = statusReport?.nodes.find((n) => n.nodeId === focalId);
+    if (!ns || !ns.hasShadow) return { label: "intent — i edit / decompose", tone: "intent" };
+    if (ns.drifted) return { label: "drifted → :sync", tone: "warn" };
+    if (ns.tier === "blocked") return { label: `${ns.ruleViolations} rule-viol → fix`, tone: "warn" };
+    if (ns.tier === "lower") return { label: "no fixture → :probe", tone: "todo" };
+    const inIdeal = statusReport?.readiness.ideal.includes(focalId) ?? false;
+    return inIdeal
+      ? { label: "✓ ready → :sync", tone: "ready" }
+      : { label: "ready, blocked from below", tone: "todo" };
+  }, [statusReport, focalId]);
 
   // Whether the focal node currently has a saved draft. Recomputed on every
   // focalId change and whenever draftTick advances (i.e., after save/clear).
@@ -309,6 +372,38 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingCompile]);
+
+  // Fire a governed action on a node ASYNC — the raid-tempo actuator. Returns
+  // immediately (the LLM work runs in the background); a "casting" row shows now
+  // and a green/red "proc" flashes when it resolves. Both verbs are governed —
+  // sync WRITES only behind its three green gates, probe persists only cases
+  // that self-validate against the source — so a single-key fire is safe.
+  function fireCast(nodeId: string, verb: "sync" | "probe"): void {
+    const id = ++castIdRef.current;
+    setCasts((cs) => [...cs, { id, nodeId, verb, status: "casting" }]);
+    setMessage(`⟳ casting ${verb} ${nodeId} [${sessionProvider}] — Tab to the next target`);
+    void (async () => {
+      let proc: { ok: boolean; label: string };
+      try {
+        if (verb === "sync") {
+          const res = await runSync(nodeId, { provider: sessionProvider }, cwd);
+          if (res.decision === "wrote") proc = { ok: true, label: "wrote + re-anchored" };
+          else if (res.decision === "refused")
+            proc = { ok: false, label: `refused: ${res.reason ?? "gate"}` };
+          else proc = { ok: false, label: `${res.decision}${res.reason ? `: ${res.reason}` : ""}` };
+        } else {
+          const res = await runProbe(nodeId, { provider: sessionProvider }, cwd);
+          if (res.written)
+            proc = { ok: true, label: `wrote ${res.keptCases}/${res.generatedCases} case(s)` };
+          else proc = { ok: false, label: res.failure ?? "no case self-validated" };
+        }
+      } catch (err) {
+        proc = { ok: false, label: err instanceof Error ? err.message : String(err) };
+      }
+      setCasts((cs) => cs.map((c) => (c.id === id ? { ...c, status: "done", proc } : c)));
+      setReloadTick((t) => t + 1); // refresh DoD / action bar / next list after a write
+    })();
+  }
 
   // Helper: persist the current edit-mode buffer and exit edit mode.
   function commitDraftAndExit(): void {
@@ -491,6 +586,105 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       return;
     }
 
+    // When the projects panel is open its keys take priority, mirroring the
+    // proposals panel. In create sub-mode the TextInput owns the keyboard —
+    // only Esc (cancel) is handled here; typing + Enter flow to the TextInput.
+    if (projectsPanel.open) {
+      if (projectsPanel.mode === "create") {
+        if (key.escape) {
+          setProjectsPanel((s) => ({ ...s, mode: "list", createName: "", message: undefined }));
+        }
+        return;
+      }
+      if (key.escape) {
+        setProjectsPanel(emptyProjectsPanelState());
+        setMessage("projects panel dismissed");
+        return;
+      }
+      if (input === "R") {
+        const reload = projectsForWalker(cwd);
+        setProjectsPanel((s) => ({
+          ...s,
+          rows: reload.rows,
+          cursor: Math.min(s.cursor, Math.max(0, reload.rows.length - 1)),
+          message: reload.ok ? undefined : `✖ ${reload.message ?? "reload failed"}`,
+        }));
+        return;
+      }
+      if (input === "j" || key.downArrow) {
+        setProjectsPanel((s) => ({ ...s, cursor: Math.min(s.rows.length - 1, s.cursor + 1) }));
+        return;
+      }
+      if (input === "k" || key.upArrow) {
+        setProjectsPanel((s) => ({ ...s, cursor: Math.max(0, s.cursor - 1) }));
+        return;
+      }
+      if (input === "n") {
+        setProjectsPanel((s) => ({ ...s, mode: "create", createName: "", message: undefined }));
+        return;
+      }
+      if (key.return) {
+        const row = projectsPanel.rows[projectsPanel.cursor];
+        if (!row) return;
+        if (row.kind === "create") {
+          setProjectsPanel((s) => ({ ...s, mode: "create", createName: "", message: undefined }));
+          return;
+        }
+        const opened = openProjectFromWalker(row.entry.path);
+        if (opened.ok && opened.cwd && opened.rootNodeId) {
+          setCwd(opened.cwd);
+          setFocalId(opened.rootNodeId);
+          setProjectsPanel(emptyProjectsPanelState());
+          setMessage(`opened ${row.entry.name}`);
+        } else {
+          setProjectsPanel((s) => ({ ...s, message: `✖ ${opened.message ?? "open failed"}` }));
+        }
+        return;
+      }
+      // Any other key is ignored — keep the panel focused.
+      return;
+    }
+
+    // The "next safe action" panel: j/k scroll the fix-first list, enter FOCUSES
+    // the selected node (so you can act on it), R recomputes, Esc closes.
+    if (nextPanel.open) {
+      if (key.escape) {
+        setNextPanel(emptyNextActionsPanelState());
+        setMessage("next-actions panel dismissed");
+        return;
+      }
+      if (input === "R") {
+        const r = nextActions(cwd);
+        setNextPanel((s) => ({
+          ...s,
+          syncableNow: r.syncableNow,
+          actions: r.actions,
+          cursor: Math.min(s.cursor, Math.max(0, r.actions.length - 1)),
+          message: r.ok ? undefined : `✖ ${r.message ?? "reload failed"}`,
+        }));
+        return;
+      }
+      if (input === "j" || key.downArrow) {
+        setNextPanel((s) => ({ ...s, cursor: Math.min(s.actions.length - 1, s.cursor + 1) }));
+        return;
+      }
+      if (input === "k" || key.upArrow) {
+        setNextPanel((s) => ({ ...s, cursor: Math.max(0, s.cursor - 1) }));
+        return;
+      }
+      if (key.return) {
+        const a = nextPanel.actions[nextPanel.cursor];
+        if (a) {
+          setFocalId(a.nodeId);
+          setNextPanel(emptyNextActionsPanelState());
+          setMessage(`focal → ${a.nodeId}  (${a.suggestion})`);
+        }
+        return;
+      }
+      // Any other key ignored — keep the panel focused.
+      return;
+    }
+
     // VIEW mode bindings.
     if (key.upArrow) {
       const next = navigateUp(neighborhood);
@@ -535,7 +729,54 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       return;
     }
     if (key.tab) {
-      setMessage("plane rotation arrives in walker v2");
+      // WoW's next-target, for development: cycle the fix-first list, focusing
+      // the highest-leverage node first. Shift+Tab steps back. The action bar
+      // then lights what that node needs.
+      const acts = safeActions?.actions ?? [];
+      if (acts.length === 0) {
+        setMessage(`no blockers — ${safeActions?.syncableNow ?? 0} node(s) batch-syncable`);
+        return;
+      }
+      const idx = key.shift
+        ? (rotationIdx - 1 + acts.length) % acts.length
+        : rotationIdx % acts.length;
+      const a = acts[idx];
+      setRotationIdx(key.shift ? idx : idx + 1);
+      setFocalId(a.nodeId);
+      setMessage(`▶ ${a.nodeId}  ${a.reason} → ${a.suggestion}  (unblocks ${a.unblocks})`);
+      return;
+    }
+    if (input === "s" || input === "p") {
+      // Fire a governed action on the focal, async: s = sync, p = probe (mint a
+      // behaviour fixture). Only code nodes (with a shadow) qualify; intent
+      // nodes have no code to close or characterise.
+      const verb = input === "s" ? "sync" : "probe";
+      const ns = statusReport?.nodes.find((n) => n.nodeId === focalId);
+      if (!ns || !ns.hasShadow) {
+        setMessage(`${verb}: focal has no code shadow (nothing to ${input === "s" ? "close" : "probe"})`);
+        return;
+      }
+      fireCast(focalId, verb);
+      return;
+    }
+    if (input === "d") {
+      // Focal definition-of-done at a glance — the "why is this not done?"
+      // reflex. Read-only, no fixture execution (structural stays, pure compare).
+      try {
+        const rep = buildDodReport(focalId, cwd, { runBehaviour: false });
+        if ("error" in rep) {
+          setMessage(`dod: ${rep.error}`);
+        } else {
+          const g = rep.gates;
+          const cell = (s: string): string =>
+            s === "pass" ? "✓" : s === "fail" ? "✖" : s === "no-fixture" ? "no-fix" : "—";
+          setMessage(
+            `dod ${rep.nodeId} · ${rep.tier} · rules ${cell(g.rules.state)} struct ${cell(g.structural.state)} behav ${cell(g.behaviour.state)} · blocks ${rep.blastRadius} · ${rep.drift}`,
+          );
+        }
+      } catch (err) {
+        setMessage(`dod: ${err instanceof Error ? err.message : String(err)}`);
+      }
       return;
     }
     if (input === "T") {
@@ -602,7 +843,7 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       return;
     }
     if (cmd === "help") {
-      setMessage("i edit · a/:preview artifact · :which <file> · :health (node dashboard) · :fichacleanup · :reanchor · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :models · :route <task> <model-id|off> · :clear{run,plan,compile,info,draft,preview} · :q");
+      setMessage("i edit · a/:preview artifact · :which <file> · s (async sync focal) · p (async probe focal) · :prov <provider> · :health (node dashboard) · :next (what to do next) · :projects (switch/create project) · :fichacleanup · :reanchor · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :models · :route <task> <model-id|off> · :clear{run,plan,compile,info,draft,preview} · :q");
       return;
     }
     if (cmd === "propose") {
@@ -979,6 +1220,71 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       setMessage("proposals panel dismissed");
       return;
     }
+    if (cmd === "projects" || cmd === "proj") {
+      // Walker v2 — project switcher. Lists registered `.ontology/` projects
+      // (live + stale) plus a create row; the operator drives it with j/k,
+      // enter to open (switches cwd + focal in place), n to create.
+      const result = projectsForWalker(cwd);
+      const projectCount = result.rows.filter((r) => r.kind === "project").length;
+      setProjectsPanel({
+        ...emptyProjectsPanelState(),
+        open: true,
+        rows: result.rows,
+        message: result.ok ? undefined : `✖ ${result.message ?? "failed to load projects"}`,
+      });
+      setMessage(
+        projectCount === 0
+          ? "no projects registered — n to create one"
+          : `${projectCount} project${projectCount === 1 ? "" : "s"} — j/k navigate, enter open, n new`,
+      );
+      return;
+    }
+    if (cmd === "clearprojects") {
+      setProjectsPanel(emptyProjectsPanelState());
+      setMessage("projects panel dismissed");
+      return;
+    }
+    if (cmd === "next" || cmd === "actions") {
+      // Walker v2 — the "what do I do next?" cockpit. Reuses the sync-readiness
+      // triage (`onto status`/`onto dod`): syncable-now count + the fix-first
+      // frontier ranked by leverage. enter focuses a node so you can act on it.
+      const r = nextActions(cwd);
+      setNextPanel({
+        ...emptyNextActionsPanelState(),
+        open: true,
+        syncableNow: r.syncableNow,
+        actions: r.actions,
+        message: r.ok ? undefined : `✖ ${r.message ?? "failed to compute next actions"}`,
+      });
+      setMessage(
+        r.actions.length === 0
+          ? `${r.syncableNow} node(s) syncable — no blockers`
+          : `next: ${r.actions.length} fix-first action(s) — j/k, enter to focus`,
+      );
+      return;
+    }
+    if (cmd === "clearnext") {
+      setNextPanel(emptyNextActionsPanelState());
+      setMessage("next-actions panel dismissed");
+      return;
+    }
+    if (cmd === "prov" || cmd.startsWith("prov ")) {
+      // Set the provider that `s` fires against.
+      const name = cmd.slice(4).trim();
+      const allowed = ["mock", "ollama", "anthropic", "gemini"];
+      if (allowed.includes(name)) {
+        setSessionProvider(name as LlmProvider);
+        setMessage(`fire provider → ${name}`);
+      } else {
+        setMessage(`:prov <${allowed.join("|")}>  (current: ${sessionProvider})`);
+      }
+      return;
+    }
+    if (cmd === "clearcasts") {
+      setCasts([]);
+      setMessage("casts cleared");
+      return;
+    }
     setMessage(`unknown command: :${cmd}`);
   }
 
@@ -1031,6 +1337,44 @@ export function App({ initialNodeId, cwd }: AppProps): React.ReactElement {
       <CompileResultPanel state={compileState} />
       <InfoPanel state={infoState} />
       <ProposalsPanel state={proposalsPanel} />
+      <ProjectsPanel
+        state={projectsPanel}
+        onCreateNameChange={(value) =>
+          setProjectsPanel((s) => ({ ...s, createName: value }))
+        }
+        onCreateSubmit={(value) => {
+          setProjectsPanel((s) => ({ ...s, loading: true, message: undefined }));
+          // baseDir is the launch directory (matches the panel's help text),
+          // so a new project always lands under where the Walker started even
+          // after switching into another project in-session.
+          void createProjectFromWalker({ name: value, baseDir: initialCwd ?? process.cwd() }).then((res) => {
+            if (res.ok && res.cwd && res.rootNodeId) {
+              setCwd(res.cwd);
+              setFocalId(res.rootNodeId);
+              setProjectsPanel(emptyProjectsPanelState());
+              setMessage(`created & opened ${res.name ?? value}`);
+            } else {
+              setProjectsPanel((s) => ({
+                ...s,
+                loading: false,
+                message: `✖ ${res.message ?? "create failed"}`,
+              }));
+            }
+          });
+        }}
+      />
+      <NextActionsPanel state={nextPanel} />
+      <CastsPanel casts={casts} />
+      <ActionBar
+        syncableNow={safeActions?.syncableNow ?? 0}
+        next={
+          safeActions && safeActions.actions.length > 0
+            ? { nodeId: safeActions.actions[0].nodeId, unblocks: safeActions.actions[0].unblocks }
+            : null
+        }
+        focal={focalRec}
+        provider={sessionProvider}
+      />
       <HintBar mode={mode === "edit" ? "view" : mode} command={command} message={message} />
     </Box>
   );
