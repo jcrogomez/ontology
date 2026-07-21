@@ -49,6 +49,16 @@ export interface DrawObservation {
 
 export type GrayZone = "unanimous" | "majority" | "gray" | "no-signal";
 
+/** Floor on `evaluatedDraws` (compiled draws that ran ≥1 fixture case) below
+ *  which `semanticSplit` will NOT fire even with ≥2 distinct failure
+ *  fingerprints. Guards the false-positive residual found on the dequal/lite
+ *  capacity control (2026-07-21): with only 2 evaluated draws, "fail on
+ *  different cases" is coin-flip noise for a high-variance model, not evidence
+ *  the ficha under-determines the artifact. Matches DEFAULT_PROBE_DRAWS /
+ *  sync's default `--draws 3` — the signal wants a fully-evaluated round, and
+ *  a run wanting more discriminating power should draw more. */
+export const SEMANTIC_SPLIT_MIN_RAN_DRAWS = 3;
+
 export interface GrayZoneIndex {
   /** Total draws requested (compiled or not). */
   draws: number;
@@ -68,17 +78,25 @@ export interface GrayZoneIndex {
   /** True when, under the same fixture, some compiled draw passes and another
    *  fails — behaviour-grounded flip-flop, the strongest disagreement signal. */
   behaviorSplit: boolean;
+  /** Compiled draws that produced case-level evidence (ran ≥1 fixture case).
+   *  The evidence base for the semantic signal; `semanticSplit` needs enough
+   *  of these to trust a divergence read (see SEMANTIC_SPLIT_MIN_RAN_DRAWS). */
+  evaluatedDraws: number;
   /** Distinct NON-EMPTY failure fingerprints among compiled draws that ran the
    *  fixture. A fingerprint is the sorted set of case names a draw did not
    *  `match`. 0 ⇔ no fixture ran (or every runner passed); 1 ⇔ every failing
    *  draw failed the SAME cases (consistent failure ⇒ capacity); ≥2 ⇔ draws
    *  fail DIFFERENT cases. */
   semanticClusterCount: number;
-  /** semanticClusterCount ≥ 2: draws agree nothing is right yet disagree on
-   *  WHAT is wrong. The bespoke extraction-gap signal that fires even when
-   *  declaration sets agree and no draw passes (found inert on foreign code
-   *  2026-07-21: query-string thin-ficha draws all failed but on different
-   *  arrayFormat cases, which declKey/behaviorSplit read as `unanimous`). */
+  /** semanticClusterCount ≥ 2 AND evaluatedDraws ≥ SEMANTIC_SPLIT_MIN_RAN_DRAWS:
+   *  draws agree nothing is right yet disagree on WHAT is wrong. The bespoke
+   *  extraction-gap signal that fires even when declaration sets agree and no
+   *  draw passes (found inert on foreign code 2026-07-21: query-string
+   *  thin-ficha draws all failed but on different arrayFormat cases, which
+   *  declKey/behaviorSplit read as `unanimous`). The floor guards the residual
+   *  false positive: with only 2 evaluated draws, "fail differently" is
+   *  coin-flip noise for a high-variance model, not evidence of ficha
+   *  under-determination. */
   semanticSplit: boolean;
   zone: GrayZone;
 }
@@ -113,8 +131,10 @@ export function computeGrayZone(observations: DrawObservation[]): GrayZoneIndex 
   // This fires where the declKey cluster and behaviorSplit are both inert:
   // structure agrees and no draw passes.
   const failureFingerprints = new Set<string>();
+  let evaluatedDraws = 0;
   for (const o of compiled) {
     if (!o.caseOutcomes || o.caseOutcomes.length === 0) continue;
+    evaluatedDraws++;
     const failed = o.caseOutcomes
       .filter((c) => c.outcome !== "match")
       .map((c) => c.name)
@@ -122,7 +142,10 @@ export function computeGrayZone(observations: DrawObservation[]): GrayZoneIndex 
     if (failed.length > 0) failureFingerprints.add(failed.join(""));
   }
   const semanticClusterCount = failureFingerprints.size;
-  const semanticSplit = semanticClusterCount >= 2;
+  // Floor guard: a divergence read is only trustworthy with enough draws that
+  // actually produced case evidence — 2 diverging draws is noise, not signal.
+  const semanticSplit =
+    semanticClusterCount >= 2 && evaluatedDraws >= SEMANTIC_SPLIT_MIN_RAN_DRAWS;
 
   const agreementRate = n === 0 ? 0 : top / n;
   // Any grounded disagreement makes the zone gray. Semantic disagreement takes
@@ -145,6 +168,7 @@ export function computeGrayZone(observations: DrawObservation[]): GrayZoneIndex 
     disagreementRate: n === 0 ? 0 : 1 - agreementRate,
     clusterEntropyBits: entropy,
     behaviorSplit: verdicts.has("pass") && verdicts.has("fail"),
+    evaluatedDraws,
     semanticClusterCount,
     semanticSplit,
     zone,

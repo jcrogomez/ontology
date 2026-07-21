@@ -82,8 +82,12 @@ Branch order (read from the 2026-06-17 calibration record):
      and behaviour-split both miss: structure agrees, no draw passes, yet each
      draw fails a different case ⇒ the ficha under-determines WHICH behaviour is
      correct. `gray-zone.ts` fingerprints each compiled draw by the set of
-     fixture cases it did not `match`; ≥2 distinct non-empty fingerprints ⇒
-     `semanticSplit` ⇒ `zone: gray`. Validated on foreign code (query-string
+     fixture cases it did not `match`; ≥2 distinct non-empty fingerprints AND
+     ≥`SEMANTIC_SPLIT_MIN_RAN_DRAWS` (3) draws that actually ran cases ⇒
+     `semanticSplit` ⇒ `zone: gray`. The floor blinds the false-positive
+     residual: with only 2 evaluated draws, "fail differently" is coin-flip
+     noise for a high-variance model, so the signal wants a fully-evaluated
+     round (draw more for more power). Validated on foreign code (query-string
      bespoke node → gray via semanticSplit where the old signals read
      `unanimous`; `dequal/lite` capacity node with 3 loading-and-failing 7B
      drafts → `semanticSplit false`, no false positive — consistent failure is

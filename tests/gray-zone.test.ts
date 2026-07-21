@@ -100,21 +100,37 @@ describe("computeGrayZone (pure fold)", () => {
         { name: "comma", outcome: "divergent" }, { name: "bracket", outcome: "match" }] }),
       obs(2, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: [
         { name: "comma", outcome: "match" }, { name: "bracket", outcome: "divergent" }] }),
+      obs(3, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: [
+        { name: "comma", outcome: "divergent" }, { name: "bracket", outcome: "match" }] }),
     ]);
     expect(gz.clusterCount).toBe(1);         // declKey agrees
     expect(gz.behaviorSplit).toBe(false);    // no draw passed
+    expect(gz.evaluatedDraws).toBe(3);       // meets the floor
     expect(gz.semanticClusterCount).toBe(2); // {comma} vs {bracket}
     expect(gz.semanticSplit).toBe(true);
     expect(gz.zone).toBe("gray");
   });
 
-  it("draws fail the SAME cases → no semanticSplit → unanimous (capacity, not extraction)", () => {
+  it("floor guard: only 2 evaluated draws failing differently → NO semanticSplit (noise, not signal)", () => {
     const gz = computeGrayZone([
       obs(1, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: [
-        { name: "setIdentity", outcome: "divergent" }, { name: "primitives", outcome: "match" }] }),
+        { name: "comma", outcome: "divergent" }, { name: "bracket", outcome: "match" }] }),
       obs(2, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: [
-        { name: "setIdentity", outcome: "divergent" }, { name: "primitives", outcome: "match" }] }),
+        { name: "comma", outcome: "match" }, { name: "bracket", outcome: "divergent" }] }),
+      // 3rd draw did not evaluate (load failure) → below the floor
+      obs(3, { behaviorVerdict: "untested", acceptable: false }),
     ]);
+    expect(gz.evaluatedDraws).toBe(2);
+    expect(gz.semanticClusterCount).toBe(2); // they DO differ...
+    expect(gz.semanticSplit).toBe(false);    // ...but too few evaluated to trust
+    expect(gz.zone).toBe("unanimous");
+  });
+
+  it("3 draws fail the SAME cases → no semanticSplit → unanimous (capacity, not extraction — the dequal/lite control)", () => {
+    const same = { behaviorVerdict: "fail", acceptable: false, caseOutcomes: [
+      { name: "setIdentity", outcome: "divergent" }, { name: "primitives", outcome: "match" }] };
+    const gz = computeGrayZone([obs(1, same), obs(2, same), obs(3, same)]);
+    expect(gz.evaluatedDraws).toBe(3);        // meets the floor — so it is NOT the guard
     expect(gz.semanticClusterCount).toBe(1);  // one shared failure fingerprint
     expect(gz.semanticSplit).toBe(false);
     expect(gz.zone).toBe("unanimous");
