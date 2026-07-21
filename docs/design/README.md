@@ -13,6 +13,20 @@
 > [`../MATHEMATICAL_CLAIMS.md`](../MATHEMATICAL_CLAIMS.md). For the concrete
 > module map of `src/`, read [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
+> **How to read the docs (three audiences, not one).** The `docs/` tree serves
+> three purposes and you don't need all of them:
+> - **Learn** — start at the root [`../../README.md`](../../README.md) →
+>   [`../GETTING_STARTED.md`](../GETTING_STARTED.md) →
+>   [`../../examples/hello-world`](../../examples/hello-world). That's the whole
+>   onboarding path; the rest is reference.
+> - **Contribute / go deep** — *these* design docs (grouped by role below) +
+>   [`ARCHITECTURE.md`](ARCHITECTURE.md) + [`../CLI_COMMANDS.md`](../CLI_COMMANDS.md).
+> - **Audit** — [`../legend/calibrations/`](../legend/) is the **dated,
+>   pre-registered experiment corpus** (hypotheses committed *before* runs). It is
+>   *historical evidence*, not onboarding reading — immutable by convention, and
+>   you never need to read it to learn or use the system. It exists so the honesty
+>   claims can be checked, not followed.
+
 ## `kernel/` — the category **C** of intent
 
 The objects (typed nodes) and morphisms (edges) F and G act on, plus the

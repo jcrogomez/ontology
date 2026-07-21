@@ -52,6 +52,26 @@ Two pains every team using LLM-assisted development feels today:
 
 Longer term, the **Open-Prompt protocol** turns the signed intent + audit chain into a trust-transparency layer between fully open-source and proprietary self-attestation: an organisation publishes its *intent* and lets third parties verify the running code respects it, without exposing the implementation. The read-only half (`onto mcp`) already ships; signing/replay are roadmap.
 
+## Who this is for — and when not to use it
+
+The same honest tiering the math gets (below) applies to the pitch. This is a
+**research-grade, terminal-first, single-user alpha** — a thinking tool and an
+honest instrument, not a drop-in codegen product.
+
+**Reach for it if you want to:**
+
+- Version *intent* and treat code as a re-derivable shadow of a graph you can read.
+- **Measure** how faithfully a codebase can be regenerated from its stated intent, and localise *where* the intent is under-specified (repair the spec) vs *where* the model is the limit (escalate) — the discrimination is instrumented, not guessed.
+- Explore governed dynamic-agent loops that write only behind green gates and refuse (loudly) otherwise.
+
+**Don't reach for it (yet) if you want:**
+
+- A production codegen tool — it is alpha, and every write is preview-by-default behind verification gates for a reason.
+- High-throughput generation on a small machine — the quality bar needs a frontier/cloud model; local 7–8 GB runs are for plumbing and $0 experiments, not the real loop.
+- A proven categorical framework — most categorical terms are operational or analogy (T2–T4); only the load-bearing few are test-pinned laws (T1). The value is honest measurement, not a topos.
+
+**The honest headline:** the binding constraint on intent→code is **specification quality** — not the compiler, and (for bespoke, project-specific intent) not the model. Ontology's real contribution is making that gap *measurable and governed*, not making code generation magic. What's measured lives in [Status](#status) and the [Roadmap](docs/ROADMAP.md); what's aspirational is labelled as such.
+
 ## What you actually get
 
 | Verb | What it does |
@@ -138,7 +158,7 @@ $$F\colon \text{Intent} \longrightarrow \text{Code}$$
 
 with a semantic gate ($\text{validateIntent} \to \Omega$, a three-valued predicate algebra) that refuses to emit an artifact whose declared contract is violated. The inverse lift is [Project Legend](docs/design/inverse/PROJECT_LEGEND.md): an operational adjunction $G \dashv F$ ($G$ the ingest lift, left adjoint), with the round-trip $F \circ G \approx \mathrm{id}$ **measured empirically** — per-axis distances and tolerances on a fidelity matrix, against pre-registered falsifiers, not asserted.
 
-**Every load-bearing term in this README** — "functor", "presheaf", "Yoneda", "topos", "fibration", "adjoint" — is graded in [`MATHEMATICAL_CLAIMS.md`](docs/MATHEMATICAL_CLAIMS.md): **T1** (a law pinned by tests), **T2** (operational, no law test), **T3** (useful analogy), or **T4** (aspirational). Some of the most useful entries are *negative* results stated plainly: the default context gluing is a separated presheaf, **not** a sheaf (the opt-in `identify-if-equal` mode is a sheaf on the equal-signature subcategory, T1); the Ω algebra is Kleene, **not** a Heyting/topos implication; and $G$ is irreducibly probabilistic, so the adjunction is graded T2 with a measurement program, not claimed as a theorem. The intent is to neither hide the mathematical content nor oversell it.
+**Every load-bearing term in this README** — "functor", "presheaf", "Yoneda", "topos", "fibration", "adjoint" — is graded in [`MATHEMATICAL_CLAIMS.md`](docs/MATHEMATICAL_CLAIMS.md): **T1** (a law pinned by tests), **T2** (operational, no law test), **T3** (useful analogy), or **T4** (aspirational). Some of the most useful entries are *negative* results stated plainly: the default context gluing is a separated presheaf, **not** a sheaf (the opt-in `identify-if-equal` mode is the signature-sheaf gluing on the standard site — equal-signature-on-overlaps is the *matching* condition, not a sub-coverage; the site is a genuine Grothendieck coverage, T1 — [`GLUING_SITE_THEOREM.md`](docs/design/laws/GLUING_SITE_THEOREM.md)); the Ω algebra is Kleene, **not** a Heyting/topos implication; and $G$ is irreducibly probabilistic, so the adjunction is graded T2 with a measurement program, not claimed as a theorem. The intent is to neither hide the mathematical content nor oversell it.
 
 ## Where to go next
 
@@ -178,7 +198,7 @@ runtime AND the governed **dynamic-agent executor**. In one breath:
 
 - **Both directions are operational** — F (compile) and G (ingest) — and the round-trip is *measured*: AST grounding contributes Δ = +0.355 mean structural Jaccard over an ablation control on this repo's 125-file core; the fidelity matrix fills 3 of 5 columns (structural + behaviour + contract), the rest are explicit no-data.
 - **The dynamic half exists** — `onto execute` closes a node by refining/decomposing/escalating a model capability ladder, writing only behind green gates and flagging *extraction-gap* (intent too thin) vs *capacity-ceiling* honestly. Child-process draft isolation, an order-ideal readiness view (`onto status --blockers`), and the κ\* capability barometer ship with it. The trustworthy core (shadow + fixture + clean rules) is **136 / 221** nodes.
-- **The kernel's mathematical claims are test-pinned where it matters** — 15 T1 laws (crash-atomic durable event log, presheaf restriction, sheaf-on-subcategory gluing, compiler functoriality, monad laws, Ω closed-world parity, content-addressed runs, the syncable order ideal, …).
+- **The kernel's mathematical claims are test-pinned where it matters** — 14 T1 laws (crash-atomic durable event log, presheaf restriction, signature-sheaf gluing on the standard Grothendieck site, compiler functoriality, monad laws, Ω closed-world parity, content-addressed runs, the syncable order ideal, …).
 - **Durability:** `state.json` writes are atomic + durable, `events.jsonl` appends are durable; the advisory lock covers the long-running mutators only (quick mutations rely on per-write atomicity — worst case last-writer-wins, never corruption).
 - **Not yet:** the *measured* executor close-rate sweep over a calibrated sample (the number that gates building the meta-agent "Architect"); a clean real-LLM pass of the ζ verify-refine loop; the signing half of Open-Prompt.
 
