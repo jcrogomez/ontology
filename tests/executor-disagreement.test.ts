@@ -20,6 +20,7 @@ const agreement = (over: Partial<DrawAgreement> = {}): DrawAgreement => ({
   clusterCount: 1,
   compiledDraws: 3,
   behaviorSplit: false,
+  semanticSplit: false,
   ...over,
 });
 
@@ -114,6 +115,17 @@ describe("classifyPlateauWithEvidence — the Gap A / Gap B split", () => {
     ).toEqual({ terminal: "extraction-gap", evidence: "behaviour-split" });
   });
 
+  it("semantic split (all fail on DIFFERENT cases) → extraction-gap, semantic-split, even with structure agreeing + lint dirty", () => {
+    // The bespoke case found inert on foreign code 2026-07-21: structure agrees
+    // (unanimous declKey cluster), no draw passes (so behaviorSplit is false),
+    // lint dirty — the OLD hierarchy would call this capacity. semanticSplit
+    // rescues it: draws fail different cases ⇒ the ficha under-determines which
+    // behaviour is correct.
+    expect(
+      classifyPlateauWithEvidence(failing(agreement({ semanticSplit: true }), false)),
+    ).toEqual({ terminal: "extraction-gap", evidence: "semantic-split" });
+  });
+
   it("draws agree + lint dirty → capacity-ceiling with draw-agreement evidence", () => {
     expect(classifyPlateauWithEvidence(failing(agreement(), false))).toEqual({
       terminal: "capacity-ceiling",
@@ -168,6 +180,7 @@ describe("verdict.normalize — draw-agreement passthrough", () => {
       clusterCount: 3,
       compiledDraws: 3,
       behaviorSplit: true,
+      semanticSplit: false,
     });
   });
 

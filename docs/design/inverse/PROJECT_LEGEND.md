@@ -171,9 +171,10 @@ the local fiber).
 
 > **Honest amendment (2026-06-09).** The default gluing is a *separated
 > presheaf* — it detects conflicts rather than computing a colimit; the
-> sheaf gluing axiom holds only in the opt-in `identify-if-equal` mode
-> on the equal-signature subcategory — see `MATHEMATICAL_CLAIMS.md`
-> §Axiom 5.
+> sheaf gluing axiom holds in the opt-in `identify-if-equal` mode, where
+> equal-signature-on-overlaps is the sheaf's matching condition on the
+> standard site (not a sub-coverage) — see `MATHEMATICAL_CLAIMS.md`
+> §Axiom 5 and `design/laws/GLUING_SITE_THEOREM.md`.
 
 ### 2.3 The Yoneda principle, made operational
 

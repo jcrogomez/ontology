@@ -5,10 +5,12 @@ import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js
 import { runCli } from "./helpers/run-cli.js";
 import {
   computeGrayZone,
+  compareGrayZoneRepairPriority,
   recordGrayZone,
   readGrayZoneRecords,
   grayZoneReportPath,
   type DrawObservation,
+  type GrayZoneIndex,
 } from "../src/laws/gray-zone.js";
 
 // Gray-zone index — per-node draw-vs-draw disagreement. The pure fold is
@@ -87,6 +89,62 @@ describe("computeGrayZone (pure fold)", () => {
     const gz = computeGrayZone([obs(1), obs(2), obs(3, { compiled: false, acceptable: false })]);
     expect(gz.draws).toBe(3);
     expect(gz.compiledDraws).toBe(2);
+    expect(gz.zone).toBe("unanimous");
+  });
+
+  // Semantic-divergence signal — draws that AGREE structurally (same declKey)
+  // and all FAIL, but on DIFFERENT cases. This is the bespoke extraction-gap
+  // the structural cluster and behaviorSplit both miss (found inert on foreign
+  // code 2026-07-21: query-string thin-ficha).
+  it("draws fail DIFFERENT cases → semanticSplit → gray (even if structurally unanimous)", () => {
+    const gz = computeGrayZone([
+      obs(1, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: [
+        { name: "comma", outcome: "divergent" }, { name: "bracket", outcome: "match" }] }),
+      obs(2, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: [
+        { name: "comma", outcome: "match" }, { name: "bracket", outcome: "divergent" }] }),
+      obs(3, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: [
+        { name: "comma", outcome: "divergent" }, { name: "bracket", outcome: "match" }] }),
+    ]);
+    expect(gz.clusterCount).toBe(1);         // declKey agrees
+    expect(gz.behaviorSplit).toBe(false);    // no draw passed
+    expect(gz.evaluatedDraws).toBe(3);       // meets the floor
+    expect(gz.semanticClusterCount).toBe(2); // {comma} vs {bracket}
+    expect(gz.semanticSplit).toBe(true);
+    expect(gz.zone).toBe("gray");
+  });
+
+  it("floor guard: only 2 evaluated draws failing differently → NO semanticSplit (noise, not signal)", () => {
+    const gz = computeGrayZone([
+      obs(1, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: [
+        { name: "comma", outcome: "divergent" }, { name: "bracket", outcome: "match" }] }),
+      obs(2, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: [
+        { name: "comma", outcome: "match" }, { name: "bracket", outcome: "divergent" }] }),
+      // 3rd draw did not evaluate (load failure) → below the floor
+      obs(3, { behaviorVerdict: "untested", acceptable: false }),
+    ]);
+    expect(gz.evaluatedDraws).toBe(2);
+    expect(gz.semanticClusterCount).toBe(2); // they DO differ...
+    expect(gz.semanticSplit).toBe(false);    // ...but too few evaluated to trust
+    expect(gz.zone).toBe("unanimous");
+  });
+
+  it("3 draws fail the SAME cases → no semanticSplit → unanimous (capacity, not extraction — the dequal/lite control)", () => {
+    const same = { behaviorVerdict: "fail", acceptable: false, caseOutcomes: [
+      { name: "setIdentity", outcome: "divergent" }, { name: "primitives", outcome: "match" }] };
+    const gz = computeGrayZone([obs(1, same), obs(2, same), obs(3, same)]);
+    expect(gz.evaluatedDraws).toBe(3);        // meets the floor — so it is NOT the guard
+    expect(gz.semanticClusterCount).toBe(1);  // one shared failure fingerprint
+    expect(gz.semanticSplit).toBe(false);
+    expect(gz.zone).toBe("unanimous");
+  });
+
+  it("pass vs fail is behaviorSplit, not semanticSplit (only one non-empty fingerprint)", () => {
+    const gz = computeGrayZone([
+      obs(1, { behaviorVerdict: "pass", caseOutcomes: [{ name: "a", outcome: "match" }] }),
+      obs(2, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: [{ name: "a", outcome: "divergent" }] }),
+    ]);
+    expect(gz.behaviorSplit).toBe(true);
+    expect(gz.semanticSplit).toBe(false);
     expect(gz.zone).toBe("unanimous");
   });
 });
@@ -215,5 +273,41 @@ describe("gray-zone wiring (regenerate → report → status)", () => {
     expect(shown.stdout).toContain("gray-zone index");
     expect(shown.stdout).toContain(`${id}\t[gray]`);
     expect(shown.stdout).not.toContain("node_deleted");
+  });
+});
+
+describe("compareGrayZoneRepairPriority (repair-first ordering)", () => {
+  const failCases = (names: string[]): DrawObservation["caseOutcomes"] =>
+    names.map((n) => ({ name: n, outcome: "divergent" }));
+
+  // Structure agrees, all fail on DIFFERENT cases → gray via semanticSplit,
+  // but disagreementRate is 0 (one declKey cluster). The regression guard.
+  const semanticGray: GrayZoneIndex = computeGrayZone([
+    obs(1, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: failCases(["a"]) }),
+    obs(2, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: failCases(["b"]) }),
+    obs(3, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: failCases(["a"]) }),
+  ]);
+  const unanimousPass: GrayZoneIndex = computeGrayZone([obs(1), obs(2), obs(3)]);
+  const structuralGray: GrayZoneIndex = computeGrayZone([
+    obs(1, { declKey: "a" }),
+    obs(2, { declKey: "b" }),
+    obs(3, { declKey: "c" }),
+  ]);
+
+  it("a semantic-split node (disagreementRate 0) outranks a unanimous node", () => {
+    expect(semanticGray.zone).toBe("gray");
+    expect(semanticGray.disagreementRate).toBe(0); // the trap the old sort fell into
+    expect(compareGrayZoneRepairPriority(semanticGray, unanimousPass)).toBeLessThan(0);
+  });
+
+  it("structural gray outranks semantic gray (more draws disagreeing)", () => {
+    expect(compareGrayZoneRepairPriority(structuralGray, semanticGray)).toBeLessThan(0);
+  });
+
+  it("sorting the queue puts both gray kinds ahead of unanimous", () => {
+    const ranked = [unanimousPass, semanticGray, structuralGray].sort(
+      compareGrayZoneRepairPriority,
+    );
+    expect(ranked).toEqual([structuralGray, semanticGray, unanimousPass]);
   });
 });

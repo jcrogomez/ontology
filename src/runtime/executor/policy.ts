@@ -34,9 +34,11 @@ const probedEver = (s: NodeExecState): boolean => s.history.some((a) => a.lever 
 
 // The hardest call in the system, isolated and honest. Evidence hierarchy:
 //   1. Draw-vs-draw disagreement (when a multi-draw probe ran): draws that
-//      DISAGREE with each other — no majority declKey cluster, or a pass/fail
-//      split on the same fixture — prove the intent under-determines the
-//      artifact → extraction-gap, with direct evidence. Draws that AGREE yet
+//      DISAGREE with each other — no majority declKey cluster, a pass/fail
+//      split on the same fixture, or all failing but on DIFFERENT cases
+//      (semantic-split — the bespoke case where structure agrees and none
+//      passes) — prove the intent under-determines the artifact →
+//      extraction-gap, with direct evidence. Draws that AGREE yet
 //      still fail show the intent is consumed consistently → the models are
 //      the limit (capacity-ceiling), UNLESS lint is clean (the pre-existing
 //      calibrated rule: consistent, clean, still failing → the intention).
@@ -50,6 +52,7 @@ export function classifyPlateauWithEvidence(
   const gz = last.grayZone;
   if (gz && gz.compiledDraws >= 2) {
     if (gz.behaviorSplit) return { terminal: "extraction-gap", evidence: "behaviour-split" };
+    if (gz.semanticSplit) return { terminal: "extraction-gap", evidence: "semantic-split" };
     if (gz.zone === "gray") return { terminal: "extraction-gap", evidence: "draw-disagreement" };
     if (last.lintClean === true) return { terminal: "extraction-gap", evidence: "clean-lint" };
     return { terminal: "capacity-ceiling", evidence: "draw-agreement" };

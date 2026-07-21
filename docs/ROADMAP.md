@@ -56,42 +56,64 @@ exhaustively pinned by `tests/runtime/topos/closed-world-parity.test.ts`)
 
 ## Open follow-ups
 
-### Next up — start here (queued 2026-07-17)
+### Next up — start here (refreshed 2026-07-21)
 
-Ordered by leverage. Detail/context in the session-handoff note.
+Two tracks — **empirical/functional** (the stronger near-term bet) and
+**mathematical**. Ordered by leverage within each. Session context:
+[[project_session_handoff_2026_07_21]].
 
-1. **Run the Gap-2 executor sweep** — the number that gates the Architect,
-   now unblocked (both blocking extraction-gaps converged). `onto execute` over
-   the 13-node closure (`node_0011 node_0012 node_0017 node_0022 node_0026
-   node_0029 node_0031 node_0014 node_0106 node_0143 node_0225 node_0032
-   node_0168`), `--dry-run --json`. **Paused 2026-07-17 on 8 GB memory** (7B
-   loaded → 7% free); needs `ollama serve` + `qwen2.5-coder:7b` (both present).
-   To cut the memory/time peak, run the critical subset first: `node_0032` +
-   its 5 downstream (0026/0031/0106/0014/0029). The question: do `node_0032` /
-   `node_0168` flip extraction-gap → **closed** in the *real executor* (not just
-   the isolated MONOTONE_DECOMPOSE runs), and cascade-unblock the 7 downstream?
-2. **A1 — a ficha-repair lever for `onto execute`.** Today's levers
-   (`refine`/`decompose`/`escalate`) all act on the code draft; none touches the
-   *intention*. The n=2 convergence playbook (fixture-guided ficha enrichment) is
-   still HUMAN-driven. Turning it into an executor lever is the single biggest
-   yield unlock — better models do NOT close extraction-gaps. This is the path to
-   an autonomous overnight run.
-3. **A2 — field-level oracle feedback.** The divergent-case oracle says "values
-   diverged" without naming the field → the refine loop re-rolls blind (caused the
-   `node_0168` 7/8→5/8 regression). Cheap, already scoped; survives the
-   "capable models" assumption.
-4. **B1/B2 — autonomy scaffolding** for unsupervised runs: provider
-   failover + quota-aware retry (the Ollama-cloud free-tier session limit kept
-   surfacing as infra-error), and a **spend-budget governor** the executor
-   respects before `--allow-paid` climbs opus overnight.
-5. **Prune the 57 prose-rules** (behavioural → `onto probe`; noise → human
-   review) and keep the trustworthy core growing past 136 by putting fixtures on
-   the fix-first hubs (`node_0021` unblocks 82, `node_0106` unblocks 63).
-6. **Attestation-layer design (audit-without-source thread).** Sketch the exact
-   fields `onto` must emit — log/hash/gate-verdict/coverage — so a third party can
-   verify the "no gap between declared and implemented intent, full coverage"
-   claim without seeing `src/`. First concrete step toward the Open-Prompt
-   distinctive-badge idea.
+**Empirical / functional**
+
+1. **E3 — foreign-corpus extraction/capacity classifier study** (the paper's
+   spine). Pre-registered:
+   [`legend/calibrations/EXTRACTION_CAPACITY_CLASSIFIER_PREREG_2026-07-21.md`](legend/calibrations/EXTRACTION_CAPACITY_CLASSIFIER_PREREG_2026-07-21.md).
+   Scales the n=3 pilot (dequal/query-string/lite) to 8 foreign repos / ~30–50
+   nodes with an INDEPENDENT 2×2 ground truth + a confusion matrix + the
+   `semanticSplit` ablation. **Next concrete step: a 2–3 repo shake-out** of the
+   harness before the full sweep. Ladder note: `qwen3-coder:480b` RETIRED
+   2026-07-15 → strong rung = `gpt-oss:120b-cloud`.
+2. **A1 — a ficha-repair lever for `onto execute`.** Levers today
+   (`refine`/`decompose`/`escalate`) act on the code draft; none touches the
+   *intention*. The n=2 (now n≈1-per-pole external) fixture-guided ficha-enrichment
+   playbook is still HUMAN-driven. Biggest yield unlock — better models do NOT
+   close bespoke extraction-gaps. Path to an autonomous overnight run. The
+   gray-zone `semanticSplit` queue now *measures which fichas to repair first*.
+3. **A2 — field-level oracle feedback.** Divergent-case oracle says "values
+   diverged" without naming the field → refine re-rolls blind (`node_0168`
+   7/8→5/8). Cheap, scoped; feeds A1.
+4. **Semantic-signal follow-ups** (shipped this session — see below): a 2nd
+   STRONG capacity control with ≥3 loading drafts to further harden the
+   `evaluatedDraws≥3` floor; surface the gray-zone in `sync`/`regenerate
+   --explain` and Walker `:health`.
+5. **Run the Gap-2 executor sweep** — the Architect gate, unblocked (both
+   extraction-gaps converged). `onto execute --dry-run --json` over the 13-node
+   closure; **paused 2026-07-17 on 8 GB** (run the `node_0032` + 5-downstream
+   subset first). Do `node_0032`/`node_0168` flip → closed in the *real executor*?
+6. **B1/B2 autonomy scaffolding** (provider failover + quota-aware retry; a
+   spend-budget governor before `--allow-paid`) and **prune the 57 prose-rules**
+   + grow the trustworthy core past 136 (fixtures on `node_0021` unblocks 82,
+   `node_0106` unblocks 63).
+7. **Attestation-layer design** (audit-without-source): the exact fields `onto`
+   must emit — log/hash/gate-verdict/coverage — so a third party verifies "no gap
+   between declared and implemented intent" without seeing `src/`. Open-Prompt seed.
+
+**Mathematical** (the honest applied-CT contribution; smaller audience — see the
+categorical-vs-empirical discussion in the handoff)
+
+8. **Gap 4 — disentangle admissibility from the sheaf structure.**
+   requires/forbids/branch are an admissibility predicate cutting out a
+   subpresheaf; they are NOT part of the gluing/site structure. Reframed in
+   [`design/laws/GLUING_SITE_THEOREM.md`](design/laws/GLUING_SITE_THEOREM.md);
+   pin it (separate the two in code comments + a test that the admissibility
+   predicate is orthogonal to signature-matching).
+9. **Gap 5 — the complete IFF characterisation** of "which covers glue",
+   including the interaction with requires/forbids (the Part-3 sweep sets them
+   empty to isolate gluing). State + prove necessity ∧ sufficiency.
+10. **Rigor sprint (T2→T1 candidates):** the §3.10 variance real-LLM N-run
+    (`verdict-variance.ts` core shipped; only the budget-gated frontier run
+    remains); property-based tests over the effect-monad laws
+    (`MATHEMATICAL_CLAIMS.md` §effect). Package the negatives as theorems (the
+    gluing dichotomy is now done; §3.4 "not a colimit" is the next).
 
 ### Shipped 2026-07-20 — disagreement instrumentation + executor memory
 
@@ -117,9 +139,56 @@ numbers are not evidence here):
   capacity never short-circuits — F is high-variance). `--no-precedents`
   re-measures.
 
+- **Typed failure channel** (same day, from REVIEW_2026-07-20 §3): failing
+  regenerations stamp `failureKind` (transport/compile/oracle/lock/not-found/
+  config/io) derived from the compile-plan's typed reasons; the executor's
+  broken-vs-infra call routes on the enum, string regexes demoted to legacy
+  fallback. Kills the classifier-poisoning + producer-wording coupling
+  findings; prerequisite groundwork for B1/B2 unsupervised runs.
+
 Specs updated in `EXECUTOR_SPEC.md` §3/§5.1 + `SYNC_LOOP_SPEC.md` §3. This
 makes the A1 queue *measured* (which fichas to repair first) but the repair
 lever itself is still open — A1 stays item 2 above.
+
+### Shipped 2026-07-21 — first FOREIGN-repo validation + semantic-split signal
+
+First runs of the pipeline on repos NOT written here (E1/E2), and a fix for a
+router blind spot they exposed. Both taxonomy poles reproduced externally, $0:
+
+- **E1/E2 — both poles on foreign code.** `dequal` (canonical) = capacity: a
+  120B closes it from a thin ficha, ficha-repair does NOT flip 7B. `query-string`
+  `base.js` (bespoke `arrayFormat`) = extraction-gap: a 120B FAILS from a thin
+  ficha, and enriching the ficha flips the SAME held-fixed 120B FAIL→PASS. The
+  external replication of the home n=2 ficha-repair playbook; answers the n=1
+  circularity objection. Surfaced a hidden third axis — **model-prior /
+  canonicality** — that confounds capacity vs extraction on canonical code.
+- **Semantic-split signal (the router fix).** P3 found the shipped disagreement
+  router read query-string's bespoke gap as `unanimous` (declKey empty + no
+  acceptable draws → both old signals inert). Fix: `gray-zone.ts` now
+  fingerprints each compiled draw by the fixture cases it did not `match`; ≥2
+  distinct non-empty fingerprints ⇒ `semanticSplit` ⇒ `zone: gray` ⇒ the
+  executor routes `extraction-gap` (evidence `semantic-split`). Additive
+  (inert without per-case data — old tests unchanged). Validated on 3 nodes:
+  query-string→gray (5 loaded), `dequal/lite` capacity→unanimous (3 loading-and-
+  failing 7B drafts failed identically — no false positive). Residual: a weak
+  model *could* fail differently by noise; empirically absent where capacity
+  failure is systematic. Spec: `EXECUTOR_SPEC.md` §3. Records: the foreign-repo
+  memory note. (`492022b`)
+- **Floor guard + repair-first ranking.** `semanticSplit` now also requires
+  `evaluatedDraws ≥ 3` (blinds the weak-model false-positive residual, `a2f4d9e`),
+  and `onto status --gray-zone` ranks Gap-A suspects first via a pure tested
+  `compareGrayZoneRepairPriority` — a semantic-split node (`disagreementRate 0`)
+  no longer sorts LAST; a `semantic splits` count + `⚠ semantic split` flag
+  surface it (`c2f5dc6`, verified end-to-end on the query-string workspace).
+- **Gluing site theorem + §Axiom 5 framing correction** (`2ff9362`). The context
+  presheaf is a sheaf on the FULL standard site — a genuine Grothendieck coverage;
+  "equal-signature" is the matching condition, not a sub-coverage (the ledger
+  wording is corrected, T1 unchanged/better-founded). Two policies = two
+  value-presheaves over one site. General amalgamation proved + fast-check pinned.
+  [`design/laws/GLUING_SITE_THEOREM.md`](design/laws/GLUING_SITE_THEOREM.md).
+- **Infra:** `qwen3-coder:480b` was RETIRED by Ollama 2026-07-15 — the
+  `7b → 480b-cloud → opus` ladder's cloud rung is dead; re-anchor to
+  `gpt-oss:120b-cloud`.
 
 ### Shipped 2026-06-18 (against the four-gap checkpoint below)
 
@@ -344,7 +413,7 @@ ordered by value. #1 shipped; #2–#4 are designed and queued.
 ### Phase ζ + speculative
 
 - 🔵 **Open-Prompt protocol:** `onto sign <branch>`, `onto verify-published`, `onto replay --against`. The read surface (`onto mcp`, above) ships; signing/replay are the remaining write/verify halves.
-- 🟡 **Context-gluing regimes → sound sheaf** (staged plan, [`legend/CONTEXT_GLUING_REGIMES.md`](design/laws/CONTEXT_GLUING_REGIMES.md)). Provider-uniqueness is right for the static regime (SSoT) and a straitjacket for the dynamic/agentic one; the seam is a content/interface-signature discriminator. Bottom-up order: **O1 populate the discriminator** ✅ (signature threaded to `context.provides[].signature` via a side channel; `provides` stays `string[]`) → **O2 opt-in `identify-if-equal` gluing policy + §3.9 parity guard** ✅ (default-preserving; ledger §Axiom 5 records it as a sheaf on the equal-signature subcategory — **promoted T2→T1 2026-06-09** once the gluing axiom was pinned as a characterising law over an explicit cover, Path-to-T1 gate #2) → **O3 first dynamic-mutation consumer** ✅ v0 (`onto workflow run --as-proposal`: an accepted workflow's artefact → pending `node_create` proposal → `onto proposal apply`; the execution→intent loop closes over the existing proposal substrate). O2's first consumer landed (`onto run context --validate --identify-equal-providers`, opt-in). **O4 closes the loop end-to-end:** a workflow graph declares an output contract (`provides`+signature); `onto workflow run --as-proposal` measures the produced artefact against it (round-trip `F∘G≈id`, for code) and the proposed node is born with `provides`+signature — exactly what `identify-if-equal` reconciles. Resolved-type discriminator **wired** as opt-in `onto ingest --resolved-signatures` (fidelity refinement — broadens the T1 subcategory, not a law gap). Apply-time auto-gluing **landed** as opt-in `onto proposal apply --check-providers` (identify on equal signature, warn on drift), with **`--strict` blocking mode landed 2026-06-09** (drift or an errored check blocks; the proposal stays *pending*, not staled). Node-update/edges proposals **landed** (2026-06-09, spec §3.6): new `node_update` mutation kind (artefact → prompt, contract → provides, `nodeHash` staleness pin) via `onto workflow run --as-proposal --update-node`, plus graph-declared `proposesEdges` → `edge_create` proposals (update mode; create mode defers them — the γ-6 analogue is the one remaining horizon item). Run-record persistence **landed** (2026-06-09): every `--as-proposal` run persists a self-certifying `wfrun_*` record and all its proposals carry a non-null `workflow_run` source (graph/input hashes + per-step trace summary). **The O1→O4 + apply-gate stack is complete.** Terrain review + §3.9 silent-regression risk recorded in the doc.
+- 🟡 **Context-gluing regimes → sound sheaf** (staged plan, [`legend/CONTEXT_GLUING_REGIMES.md`](design/laws/CONTEXT_GLUING_REGIMES.md)). Provider-uniqueness is right for the static regime (SSoT) and a straitjacket for the dynamic/agentic one; the seam is a content/interface-signature discriminator. Bottom-up order: **O1 populate the discriminator** ✅ (signature threaded to `context.provides[].signature` via a side channel; `provides` stays `string[]`) → **O2 opt-in `identify-if-equal` gluing policy + §3.9 parity guard** ✅ (default-preserving; ledger §Axiom 5 records it as the signature-sheaf gluing on the standard site — **promoted T2→T1 2026-06-09** once the gluing axiom was pinned as a characterising law over an explicit cover, Path-to-T1 gate #2; framing corrected + generalised 2026-07-21, `GLUING_SITE_THEOREM.md`) → **O3 first dynamic-mutation consumer** ✅ v0 (`onto workflow run --as-proposal`: an accepted workflow's artefact → pending `node_create` proposal → `onto proposal apply`; the execution→intent loop closes over the existing proposal substrate). O2's first consumer landed (`onto run context --validate --identify-equal-providers`, opt-in). **O4 closes the loop end-to-end:** a workflow graph declares an output contract (`provides`+signature); `onto workflow run --as-proposal` measures the produced artefact against it (round-trip `F∘G≈id`, for code) and the proposed node is born with `provides`+signature — exactly what `identify-if-equal` reconciles. Resolved-type discriminator **wired** as opt-in `onto ingest --resolved-signatures` (fidelity refinement — broadens which providers match, not a law gap). Apply-time auto-gluing **landed** as opt-in `onto proposal apply --check-providers` (identify on equal signature, warn on drift), with **`--strict` blocking mode landed 2026-06-09** (drift or an errored check blocks; the proposal stays *pending*, not staled). Node-update/edges proposals **landed** (2026-06-09, spec §3.6): new `node_update` mutation kind (artefact → prompt, contract → provides, `nodeHash` staleness pin) via `onto workflow run --as-proposal --update-node`, plus graph-declared `proposesEdges` → `edge_create` proposals (update mode; create mode defers them — the γ-6 analogue is the one remaining horizon item). Run-record persistence **landed** (2026-06-09): every `--as-proposal` run persists a self-certifying `wfrun_*` record and all its proposals carry a non-null `workflow_run` source (graph/input hashes + per-step trace summary). **The O1→O4 + apply-gate stack is complete.** Terrain review + §3.9 silent-regression risk recorded in the doc.
 - 🟡 **Ladder economics** (2026-07-07). The executor read as a gate-verified *oracle router* (Stanford intelligence-per-watt, DSpark draft/verify, SLM-evals — the June 2026 signal cluster). **Instrumentation shipped same day:** every executor attempt records wall-clock + rung locality; `ExecReport.economics` derives the local-coverage share (`tests/executor-economics.test.ts`), so the **Gap 2 sweep now yields close-rate AND economics in one run**. Queued behind Gap 2 numbers: persisted κ\* warm starts, speculative sweep ordering, consensus lever. RL training explicitly de-scoped (T4). Spec: [`LADDER_ECONOMICS.md`](design/proposals/LADDER_ECONOMICS.md). **First payoff, same day:** the first instrumented sweep attempt ran against a down Ollama and the economics line (30 attempts / 1.3 s wall-clock) exposed a real verdict misclassification — `ECONNREFUSED` buried in a "compile-back failed" string ranked `broken`, burning the ladder into 6 false `capacity-ceiling`s. **Fixed:** infra signatures now take precedence in `verdict.ts` (`normalize` → `infra-error`, policy terminates on first attempt); pinned by `tests/executor-verdict.test.ts` + `executor-runner.test.ts`. The Gap 2 measurement itself remains open (rerun with Ollama up).
 - 🟡 **Monotone decompose (`--keep-slices`) — shipped 2026-07-07 pm** (TestSprite signal: verifier reports + *passing work is kept*). Two changes aimed at the `node_0032` recall-bound failure: (1) **scaffold chunking** — a declaration-only module (60+ exported consts, no exported functions) used to fold into ONE scaffold slice, degenerating decompose to a whole-file regen; scaffolds > 8 decls now chunk in source order; (2) **keep-slices** — between refine rounds, slices no failure implicates are frozen (zero dispatch) and only implicated slices regenerate; deterministic conservative attribution (`slice-keep.ts`, T1-pinned by `tests/slice-keep.test.ts`; unattributable ⇒ unfreeze all). Executor `decompose` lever now composes refine + keep-slices. **Pre-registered check, round 1 (2026-07-07 pm):** still extraction-gap, but the staged slices told the story — chunking + the enriched ficha produced **all 70 declarations with exact enum values** ($0, and 0032's wall-clock fell 22 → 4 min); the module failed to LOAD because slice models re-import earlier chunks' declarations from an invented `'./types'` module. **Assembler fix shipped same day:** import bindings colliding with assembly-declared names are stripped deterministically (`stripCollidingImport`, pinned in `decompose-plan.test.ts`). **Offline re-assembly of the same staged slices then measured 19/30 behaviour cases matching** (from 0 — unloadable), and every remaining failure attributed to a specific un-enriched ficha clause (string-vs-number timestamps, ContextContract/Proposal-payload defaults) → **ficha round 2 applied** (14 clauses sharpened; timestamp convention made normative). Two side-finds fixed: `node inspect` persisted the translator cache **without re-hashing** the node (latent kernel bug — only triggers on the update-then-inspect flow; fix + live `node_0022` re-hash, `validate` green). **Round 2 (same evening) was invalidated by provider quota:** the Ollama-cloud free tier hit its session usage limit mid-decompose (scaffold 5/9 on `node_0032`; `node_0168` then burned 5 attempts in 4.8 s against the exhausted provider) and the executor mis-reported `capacity-ceiling` — the second same-day instance of the infra-vs-capacity misclassification, now also fixed (quota / rate-limit / 429 signatures → `infra-error`, pinned in `executor-verdict.test.ts`). **First real measurement of the monotone lever (2026-07-07 night, local 7B, $0, 3h40m):** `onto regenerate node_0032 --provider ollama --model qwen2.5-coder:7b --decompose --refine 4 --keep-slices` produced **all 72/72 declarations (0 missing), lint 0, verdict `epsilon_equivalent` (Jaccard 0.699)** — full-recall extraction of the module that was the canonical recall-bound failure, from a 7B on an 8 GB Mac. Two residuals, both mechanically fixed same night: (1) ONE truncated slice (7B context overflow, `truncated=1`) poisoned the assembly into `regen_load_failed`/untested, discarding 4 rounds of good work → syntactically-broken slice outputs are now EXCLUDED from assembly + priorCode (`hasSyntaxErrors`), so their missing-export feedback implicates exactly that slice and the monotone round re-dispatches it; (2) 31 invented declarations (`ApiKey`, `AuthToken`, …) were reaching the export surface → the assembly export block is now CONTRACT-ONLY (plan-owned names; inventions stay internal helpers). Both pinned in `decompose-plan.test.ts`. (A prior mock-identity run — `regenerate` without `--provider` silently routing to `mock_default` — is a known UX footgun, unfixed *at the time of this run* — since fixed 2026-07-12, `1cc6869`: `regenerate` now requires an explicit `--provider`.) **Round 2 (2026-07-08 am, local 7B, 3h33m, $0): structural PERFECTION — Jaccard 1.0, 72/72 declarations, 0 missing, 0 extra, lint 0, `epsilon_equivalent`.** Both same-night fixes held (no truncation poisoning, no invented exports). The one remaining defect: the draft chose the wrong `z.discriminatedUnion` discriminator (`'role'` vs the source's `"type"`), which **throws at module LOAD** → `untested` with zero cases → the refine loop ran BLIND for 4 rounds (nothing to feed back). Two fixes shipped 2026-07-08: (1) **load-failure reason now enters refine feedback** as a synthetic criterion ("module must load" + the draft's own load error — the loop can no longer be starved by an import-time throw); (2) **ficha round 3**: both discriminated unions now state their discriminator explicitly (`NodeInputSchema` on `"type"`, `ProposalMutationSchema` on `"kind"`). **Round 3 (2026-07-08 am, cloud 480b, ~30 min, $0): 29/30 behaviour cases.** Jaccard 1.0, 0 missing/extra, lint 0, module loads (the discriminator ficha + load-failure feedback both held). The ONE failing case (`rule:18`) traced to an **extraction error in the human-enriched ficha itself**: round 2 asserted an `integrity` field on `OntologyEventSchema` that the source does not have — the model faithfully implemented a wrong intention. Ficha round 4 removes it (events carry no integrity; the append-only log is the audit mechanism). Side-note: a plain single cloud draw (accidental flag loss) on the r3 ficha scored Jaccard 0.986 — the ficha alone now carries a one-shot draw to near-perfection. **Round 4 (2026-07-08, cloud 480b, $0): CONVERGED — behaviour PASS 30/30, Jaccard 1.0, 0 missing/extra, lint 0, rules 0, in 2 refine rounds.** `node_0032` — the recall-bound canonical failure and this sample's fix-first antichain (gating 5 nodes) — now regenerates completely from intent, gates green (preview; `--write` at the operator's discretion). The full causal chain, each step measured: ficha rounds 1–4 (exact enums/defaults/discriminators/timestamp-convention; one HUMAN extraction error found and removed by the loop itself) + scaffold chunking + keep-slices + collision-stripping assembly + truncation exclusion + load-failure feedback. `MONOTONE_DECOMPOSE.md` §4's "T2 pending measurement" is now **measured**. Open: same treatment for `node_0168` — **in progress 2026-07-08: round 1 (cloud) hit Jaccard 1.0 + 6/8 cases**; the two failures exposed a **behaviour-oracle law bug**: `deepEqual` compared raw key sets, so an own key explicitly set to `undefined` diverged from an absent key — API-indistinguishable shapes ruled different (one failing case had byte-identical JSON on both sides). **Law changed + re-pinned** (`deepEqual` now treats undefined-valued own keys as absent; can only flip undefined-vs-absent to match, never a false equality — `tests/behavior-checker.test.ts`). Same draft re-scored 7/8; last case (a phantom `localName` on unaliased re-exports) got its ficha clause (r3). **`node_0168` CONVERGED 2026-07-08 (cloud, $0): behaviour PASS 8/8, Jaccard 1.0, in ONE refine round** — after ficha r4 turned the three shape-sensitive cases into normative input→output examples (the r2→r3 regression, 7/8 → 5/8 between drafts, documented the real limit: divergent-case feedback is generic — "values diverged" names no field — so the model re-rolls blind; field-level diff in case detail is the queued fix). **The playbook is now n=2** (declaration module + logic module): fixture-guided ficha enrichment + monotone decompose closes extraction-gaps that whole-module regeneration could not, at $0. Both calibrated-sample extraction-gaps have fallen. Executor sweep over the full original six-focal sample (the Gap-2 close-out number) queued. Design record: [`MONOTONE_DECOMPOSE.md`](design/proposals/MONOTONE_DECOMPOSE.md).
 - 🟡 **Wakeup Scanners** (Fase 1 = topological, no LLM; independent of other work). Spec: [`WAKEUP_SCANNERS.md`](design/proposals/WAKEUP_SCANNERS.md).

@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { loadNodeById } from "../../kernel/core/project/load.js";
-import { runCompilePlan } from "../../forward/compile/compile-plan-runner.js";
+import { runCompilePlan, type CompilePlanRunResult } from "../../forward/compile/compile-plan-runner.js";
 import { withLock, LockAcquireError } from "../../kernel/core/fs/lock.js";
 import { writeArtifact, TargetExistsError } from "../../forward/compile/artifact-writer.js";
 import { shadowReport } from "../walker/state/shadow-status.js";
@@ -56,6 +56,35 @@ const WRITE_SAFE_VERDICTS: ReadonlySet<HomeomorphismVerdict> = new Set([
   "divergent_loc",
 ]);
 
+// One draw's compile outcome inside a round, with the typed failure cause.
+type RoundDraft = { i: number; ok: boolean; message?: string; kind?: RegenFailureKind };
+
+// Fold a compile-plan failure into the typed channel. The plan runner's
+// step records carry compile-node's typed reason as a "<reason>: <message>"
+// prefix, so the discrimination never depends on the free-text message (which
+// can quote draft content).
+function planFailureKind(r: Extract<CompilePlanRunResult, { ok: false }>): RegenFailureKind {
+  if (r.reason === "missing_node") return "not-found";
+  if (r.reason !== "step_failed") return "config"; // missing_branch / focal_off_branch / plan_failed
+  const inner = r.completedSteps?.find((s) => s.status === "failed")?.reason?.split(":")[0]?.trim();
+  if (inner === "dispatch_failed") return "transport";
+  if (inner === "model_ref_unresolved") return "config";
+  if (inner === "write_failed" || inner === "persist_failed" || inner === "target_exists") return "io";
+  // validate_failed / intent_failed / runtime_failed — the draft is the problem.
+  return "compile";
+}
+
+// When every draw of a round failed, pick the kind the whole run reports.
+// Infra-ish causes outrank draft-quality (the 2026-07-07 lesson: a dead
+// provider must never be read as a capacity result).
+const FAILURE_KIND_PRIORITY: readonly RegenFailureKind[] = [
+  "transport", "config", "io", "lock", "not-found", "oracle", "compile",
+];
+function dominantFailureKind(drafts: RoundDraft[]): RegenFailureKind {
+  const kinds = drafts.filter((d) => !d.ok).map((d) => d.kind ?? "compile");
+  return FAILURE_KIND_PRIORITY.find((k) => kinds.includes(k)) ?? "compile";
+}
+
 // Multi-draw consensus (--draws N): a single local-model draw is unsafe in two
 // independent ways — random VARIANCE (one draw drops an `export` or a token)
 // and SYSTEMATIC error (a stale ficha that mis-specifies the behaviour). This
@@ -107,6 +136,28 @@ export interface RegenerateCommandOptions {
   json?: boolean;
 }
 
+// Typed failure channel (2026-07-20, REVIEW_2026-07-20 §3). Consumers that
+// must tell "the DRAFT is the problem" (refinable) from "the MACHINE is the
+// problem" (terminal infra) route on this enum — never by sniffing the
+// human-readable `failure` string, which can QUOTE draft content (a TS
+// diagnostic citing 'ECONNREFUSED' must not read as a dead provider).
+//   transport — provider/LLM dispatch failed; no draft was produced
+//   compile   — a draft was attempted but does not build / fails the
+//               compile-side gates / cannot be compared (draft-quality)
+//   oracle    — the behaviour-oracle machinery itself failed
+//   lock      — advisory-lock contention
+//   not-found — node / shadow missing
+//   config    — unresolvable provider/model/branch/plan configuration
+//   io        — disk read/write on OUR side (staging, assembly, persist)
+export type RegenFailureKind =
+  | "transport"
+  | "compile"
+  | "oracle"
+  | "lock"
+  | "not-found"
+  | "config"
+  | "io";
+
 export interface RegenerateResult {
   ok: boolean;
   nodeId: string;
@@ -122,6 +173,8 @@ export interface RegenerateResult {
   written: boolean;
   writeBlockedReason?: string;
   failure?: string;
+  /** Present whenever `failure` is — the typed cause. */
+  failureKind?: RegenFailureKind;
   /** Static-lint issue count of the chosen candidate (undefined-reference +
    *  async/sync drift against the source signatures). Surfaced so the executor
    *  policy can tell a clean-but-failing draft (intention-insufficient →
@@ -283,7 +336,7 @@ export async function runRegenerate(
   if (options.provider !== undefined) {
     const allowed = ["mock", "ollama", "anthropic", "gemini"];
     if (!allowed.includes(options.provider)) {
-      return { ok: false, nodeId, written: false, failure: `unsupported provider: ${options.provider}` };
+      return { ok: false, nodeId, written: false, failure: `unsupported provider: ${options.provider}`, failureKind: "config" };
     }
     provider = options.provider as LlmProvider;
   }
@@ -291,17 +344,17 @@ export async function runRegenerate(
   // 2. Load the node.
   const node = loadNodeById(nodeId, cwd);
   if (!node) {
-    return { ok: false, nodeId, written: false, failure: `node not found: ${nodeId}` };
+    return { ok: false, nodeId, written: false, failure: `node not found: ${nodeId}`, failureKind: "not-found" };
   }
 
   // 3. Precondition: a shadow to regenerate.
   const sourceRel = node.outputs?.files?.[0];
   if (!sourceRel) {
-    return { ok: false, nodeId, written: false, failure: "node has no outputs.files[0] — no shadow to regenerate" };
+    return { ok: false, nodeId, written: false, failure: "node has no outputs.files[0] — no shadow to regenerate", failureKind: "not-found" };
   }
   const sourcePath = path.isAbsolute(sourceRel) ? sourceRel : path.join(cwd, sourceRel);
   if (!fs.existsSync(sourcePath)) {
-    return { ok: false, nodeId, sourceFile: sourceRel, written: false, failure: `shadow source not found on disk: ${sourceRel}` };
+    return { ok: false, nodeId, sourceFile: sourceRel, written: false, failure: `shadow source not found on disk: ${sourceRel}`, failureKind: "not-found" };
   }
   const shadow = shadowReport(node, cwd);
   const thresholds: VerdictThresholds = {
@@ -364,8 +417,8 @@ export async function runRegenerate(
   const compileRound = async (
     round: number,
     refineFeedback: RefineFeedback | undefined,
-  ): Promise<{ i: number; ok: boolean; message?: string }[]> => {
-    const out: { i: number; ok: boolean; message?: string }[] = [];
+  ): Promise<RoundDraft[]> => {
+    const out: RoundDraft[] = [];
     for (let i = 1; i <= draws; i++) {
       const r = await runCompilePlan({
         focalId: nodeId,
@@ -382,7 +435,12 @@ export async function runRegenerate(
         behaviorOracle,
         refineFeedback,
       });
-      out.push({ i, ok: r.ok, message: r.ok ? undefined : r.message ?? r.reason ?? "compile-back failed" });
+      out.push({
+        i,
+        ok: r.ok,
+        message: r.ok ? undefined : r.message ?? r.reason ?? "compile-back failed",
+        kind: r.ok ? undefined : planFailureKind(r),
+      });
     }
     return out;
   };
@@ -428,10 +486,10 @@ export async function runRegenerate(
   const compileDecomposed = async (
     round: number,
     refineFeedback: RefineFeedback | undefined,
-  ): Promise<{ i: number; ok: boolean; message?: string }[]> => {
+  ): Promise<RoundDraft[]> => {
     const slices = getSlices();
     if (slices === null) {
-      return [{ i: 1, ok: false, message: `cannot read source for decomposition` }];
+      return [{ i: 1, ok: false, message: `cannot read source for decomposition`, kind: "io" }];
     }
     const sliceOutputs: AssemblyPart[] = [];
     let priorCode = "";
@@ -476,13 +534,13 @@ export async function runRegenerate(
             : `decompose_r${round}_slice_${s}_of_${slices.length}`,
       });
       if (!r.ok) {
-        return [{ i: 1, ok: false, message: `decomposition slice "${slice.label}" failed: ${r.message ?? r.reason ?? "compile failed"}` }];
+        return [{ i: 1, ok: false, message: `decomposition slice "${slice.label}" failed: ${r.message ?? r.reason ?? "compile failed"}`, kind: planFailureKind(r) }];
       }
       let out: string;
       try {
         out = fs.readFileSync(slicePath, "utf-8");
       } catch (e) {
-        return [{ i: 1, ok: false, message: `cannot read decomposition slice output: ${String(e)}` }];
+        return [{ i: 1, ok: false, message: `cannot read decomposition slice output: ${String(e)}`, kind: "io" }];
       }
       // A syntactically-broken slice (typically a truncated generation) must
       // not enter the assembly OR the priorCode chain — it would poison the
@@ -501,14 +559,14 @@ export async function runRegenerate(
     try {
       fs.writeFileSync(draftPath(1), assembleSlices(sliceOutputs), "utf-8");
     } catch (e) {
-      return [{ i: 1, ok: false, message: `cannot write assembled module: ${String(e)}` }];
+      return [{ i: 1, ok: false, message: `cannot write assembled module: ${String(e)}`, kind: "io" }];
     }
     return [{ i: 1, ok: true }];
   };
 
   // Evaluate one round's compiled drafts: structural verdict + behaviour.
   const evaluateRound = async (
-    roundCompiled: { i: number; ok: boolean; message?: string }[],
+    roundCompiled: RoundDraft[],
   ): Promise<DraftEval[]> => {
     const out: DraftEval[] = [];
     for (const c of roundCompiled) {
@@ -656,7 +714,7 @@ export async function runRegenerate(
   // behaviour check, the write) runs under withRegenDraftGuard so a draft's
   // deferred throw cannot abort the run before it returns a verdict.
   return await withRegenDraftGuard(async (): Promise<RegenerateResult> => {
-  let compiled: { i: number; ok: boolean; message?: string }[] = [];
+  let compiled: RoundDraft[] = [];
   let evals: DraftEval[] = [];
   let roundsUsed = 0;
   let converged = false;
@@ -750,13 +808,20 @@ export async function runRegenerate(
     );
   } catch (err: unknown) {
     if (err instanceof LockAcquireError) {
-      return { ok: false, nodeId, written: false, failure: err.message };
+      return { ok: false, nodeId, written: false, failure: err.message, failureKind: "lock" };
     }
     throw err;
   }
 
   if (compiled.length === 0 || compiled.every((c) => !c.ok)) {
-    return { ok: false, nodeId, sourceFile: sourceRel, written: false, failure: `compile-back failed: ${compiled[0]?.message ?? "no draft compiled"}` };
+    return {
+      ok: false,
+      nodeId,
+      sourceFile: sourceRel,
+      written: false,
+      failure: `compile-back failed: ${compiled[0]?.message ?? "no draft compiled"}`,
+      failureKind: dominantFailureKind(compiled),
+    };
   }
 
   // Verify-refine reporting fields, attached to whichever result shape we
@@ -793,7 +858,7 @@ export async function runRegenerate(
       ...refineFields,
     };
     if (e.metrics === undefined) {
-      return { ...base, ok: false, failure: "could not read source or regen for comparison" };
+      return { ...base, ok: false, failure: "could not read source or regen for comparison", failureKind: "compile" };
     }
     if (!options.write) {
       return base;
@@ -831,7 +896,7 @@ export async function runRegenerate(
   // (a bookkeeping failure must never sink a regeneration that already has a
   // verdict). Preview runs record too — the measurement is read-only.
   const grayZone = computeGrayZone(
-    evals.map((e) => ({ i: e.i, compiled: e.compiled, declKey: e.declKey, verdict: e.verdict, behaviorVerdict: e.behaviorVerdict, acceptable: e.acceptable })),
+    evals.map((e) => ({ i: e.i, compiled: e.compiled, declKey: e.declKey, verdict: e.verdict, behaviorVerdict: e.behaviorVerdict, acceptable: e.acceptable, caseOutcomes: e.behaviorCases })),
   );
   try {
     recordGrayZone(cwd, { nodeId, measuredAt: new Date().toISOString(), provider: options.provider, ...grayZone });
@@ -894,6 +959,7 @@ export async function regenerateCommand(
         "regenerate needs an explicit --provider (mock | ollama | anthropic | gemini). " +
         "Omitting it would route to the mock identity functor and produce a fake-measured run. " +
         "Pass --provider mock to force an identity/self-test run deliberately.",
+      failureKind: "config",
     };
     emit(result, options.json);
     process.exitCode = 1;

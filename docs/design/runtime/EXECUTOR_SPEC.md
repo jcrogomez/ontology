@@ -77,6 +77,22 @@ Branch order (read from the 2026-06-17 calibration record):
    inspired by the flip-flop-as-boundary-signal framing — external, T3):
    - draws split pass/fail on the same fixture → `extraction-gap`
      (`behaviour-split`);
+   - draws ALL fail but on DIFFERENT fixture cases → `extraction-gap`
+     (`semantic-split`, added 2026-07-21). The bespoke case the declKey cluster
+     and behaviour-split both miss: structure agrees, no draw passes, yet each
+     draw fails a different case ⇒ the ficha under-determines WHICH behaviour is
+     correct. `gray-zone.ts` fingerprints each compiled draw by the set of
+     fixture cases it did not `match`; ≥2 distinct non-empty fingerprints AND
+     ≥`SEMANTIC_SPLIT_MIN_RAN_DRAWS` (3) draws that actually ran cases ⇒
+     `semanticSplit` ⇒ `zone: gray`. The floor blinds the false-positive
+     residual: with only 2 evaluated draws, "fail differently" is coin-flip
+     noise for a high-variance model, so the signal wants a fully-evaluated
+     round (draw more for more power). Validated on foreign code (query-string
+     bespoke node → gray via semanticSplit where the old signals read
+     `unanimous`; `dequal/lite` capacity node with 3 loading-and-failing 7B
+     drafts → `semanticSplit false`, no false positive — consistent failure is
+     the capacity signature). Residual: a weak model *could* fail differently by
+     noise; empirically absent where capacity failure is systematic;
    - no majority declKey cluster across draws → `extraction-gap`
      (`draw-disagreement`) — the draws PROVE the ficha under-determines;
    - draws agree + clean lint → `extraction-gap` (`clean-lint`, the original
@@ -97,6 +113,19 @@ overloaded `no_fixture` verdict: a fixture-present-but-unevaluable draw is
 `broken` (refinable), not `untested` (unverifiable). `grayZone` (present only
 on multi-draw attempts) carries the draw-agreement fold the plateau
 classification needs.
+
+**Typed failure channel (2026-07-20, REVIEW_2026-07-20 §3).** Failing
+`runRegenerate` results stamp `failureKind: transport | compile | oracle |
+lock | not-found | config | io`, derived from the compile-plan's typed step
+reasons (`dispatch_failed` → transport, `validate/intent/runtime_failed` →
+compile, …). `verdict.ts` routes broken-vs-infra on the enum — `compile`/
+`oracle` → `broken` (refinable), everything else → `infra-error` — so a draft
+diagnostic that QUOTES an infra token ("Cannot find name 'ECONNREFUSED'") can
+no longer poison the classification, and producer message rewording cannot
+silently flip the verdict. The old string regexes survive only as the
+fallback for legacy results without the field. End-to-end producer→classifier
+coverage: `tests/regen-failure-kind.test.ts` (including a real dead-provider
+transport run).
 
 ## 4. The capability ladder (`model-ladder.ts`)
 

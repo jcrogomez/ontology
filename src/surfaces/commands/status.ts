@@ -5,7 +5,7 @@ import { getOntologyPaths } from "../../kernel/core/project/paths.js";
 import { auditFichas } from "../../inverse/ficha-quality.js";
 import { checkRules } from "../../inverse/rule-checker.js";
 import { computeSyncReadiness, type SyncReadiness } from "../../kernel/graph/sync-readiness.js";
-import { readGrayZoneRecords, type GrayZoneRecord } from "../../laws/gray-zone.js";
+import { readGrayZoneRecords, compareGrayZoneRepairPriority, type GrayZoneRecord } from "../../laws/gray-zone.js";
 import { readDriftState } from "./drift.js";
 import { errorMessage } from "../../kernel/core/errors.js";
 
@@ -74,10 +74,12 @@ export interface StatusReport {
    *  until a multi-draw run has recorded — status never draws by itself. */
   grayZone: {
     measured: number;
-    /** Nodes in the "gray" zone (no majority cluster) — Gap-A suspects. */
+    /** Nodes in the "gray" zone (no majority cluster OR a semantic split) — Gap-A suspects. */
     gray: number;
     /** Nodes where draws split pass/fail on the SAME fixture. */
     behaviorSplits: number;
+    /** Nodes where draws all fail but on DIFFERENT cases (bespoke extraction-gap). */
+    semanticSplits: number;
     ranking: GrayZoneRecord[];
   };
   nodes: NodeStatus[];
@@ -159,14 +161,16 @@ export function buildStatusReport(cwd: string): StatusReport {
   // Gray-zone ranking: latest disagreement record per LIVE node (records for
   // deleted nodes are ignored, not pruned — the next multi-draw run on a live
   // node upserts its own entry). Most-disagreeing first; entropy breaks ties.
+  // Repair-first ordering (compareGrayZoneRepairPriority): Gap-A suspects first,
+  // then intensity. Without it a semantic-split node ranks LAST (its structural
+  // disagreementRate is 0), defeating the queue for the bespoke class. nodeId
+  // breaks ties for stable output.
   const liveIds = new Set(nodes.map((n) => n.id));
   const grayRecords = Object.values(readGrayZoneRecords(cwd))
     .filter((rec) => liveIds.has(rec.nodeId))
     .sort(
       (a, b) =>
-        b.disagreementRate - a.disagreementRate ||
-        b.clusterEntropyBits - a.clusterEntropyBits ||
-        a.nodeId.localeCompare(b.nodeId),
+        compareGrayZoneRepairPriority(a, b) || a.nodeId.localeCompare(b.nodeId),
     );
 
   return {
@@ -190,6 +194,7 @@ export function buildStatusReport(cwd: string): StatusReport {
       measured: grayRecords.length,
       gray: grayRecords.filter((rec) => rec.zone === "gray").length,
       behaviorSplits: grayRecords.filter((rec) => rec.behaviorSplit).length,
+      semanticSplits: grayRecords.filter((rec) => rec.semanticSplit).length,
       ranking: grayRecords,
     },
     nodes: nodeStatuses,
@@ -277,11 +282,13 @@ function emit(report: StatusReport, options: StatusCommandOptions): void {
     if (gz.measured === 0) {
       console.log(`  (no measurements yet — a multi-draw \`onto sync\`/\`onto regenerate --draws N\` records one per node)`);
     } else {
-      console.log(`  measured: ${gz.measured} node(s)\tgray: ${gz.gray}\tbehaviour splits: ${gz.behaviorSplits}`);
+      console.log(`  measured: ${gz.measured} node(s)\tgray: ${gz.gray}\tsemantic splits: ${gz.semanticSplits}\tbehaviour splits: ${gz.behaviorSplits}`);
       for (const rec of gz.ranking.slice(0, 12)) {
-        const split = rec.behaviorSplit ? "  ⚠ behaviour split" : "";
+        const flags =
+          (rec.semanticSplit ? "  ⚠ semantic split (draws fail different cases)" : "") +
+          (rec.behaviorSplit ? "  ⚠ behaviour split" : "");
         console.log(
-          `    ${rec.nodeId}\t[${rec.zone}]\tdisagreement ${rec.disagreementRate.toFixed(2)} (${rec.clusterCount} cluster(s)/${rec.compiledDraws} draws)\t${rec.measuredAt.slice(0, 10)}${split}`,
+          `    ${rec.nodeId}\t[${rec.zone}]\tdisagreement ${rec.disagreementRate.toFixed(2)} (${rec.clusterCount} cluster(s)/${rec.compiledDraws} draws)\t${rec.measuredAt.slice(0, 10)}${flags}`,
         );
       }
       if (gz.ranking.length > 12) console.log(`    ...and ${gz.ranking.length - 12} more`);

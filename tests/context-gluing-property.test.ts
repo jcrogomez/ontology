@@ -248,6 +248,93 @@ describe("glueFragments — sheaf-on-equal-signature invariants (identify-if-equ
   });
 });
 
+// ---------------------------------------------------------------------------
+// The Grothendieck site (Lemma 1) + general amalgamation/uniqueness + the
+// two-value-presheaf correspondence. docs/design/laws/GLUING_SITE_THEOREM.md.
+// These pin the 2026-07-21 development: the sheaf lives on the FULL standard
+// site (joint-surjection coverage), which is a genuine Grothendieck pretopology,
+// and the two policies are two value-presheaves over it (differ only on
+// provenance). Together with the arbitrary-family sheaf invariants above, this
+// is the general theorem — the fixed 3-key sweep in presheaf-sheaf-laws.test.ts
+// is its finite shadow.
+// ---------------------------------------------------------------------------
+
+const arbCover = fc.array(fc.uniqueArray(fc.constantFrom(...KEYS), { maxLength: 4 }), {
+  minLength: 1,
+  maxLength: 5,
+});
+
+describe("gluing site — the joint-surjection coverage is Grothendieck (Lemma 1)", () => {
+  // A cover {Ui} of U (= ⋃Ui). Identity ({U} covers U) and transitivity
+  // (⋃⋃Uij = ⋃Ui) are immediate unions; the substantive axiom is stability.
+  it("stability under pullback (= ∩): {Ui} covers U, V ⊆ U ⟹ {Ui ∩ V} covers V", () => {
+    fc.assert(
+      fc.property(arbCover, fc.uniqueArray(fc.constantFrom(...KEYS)), (pieces, Vraw) => {
+        const U = new Set(pieces.flat());
+        const V = Vraw.filter((k) => U.has(k)); // V ⊆ U
+        const pulled = pieces.flatMap((p) => p.filter((k) => V.includes(k))); // ⋃(Ui ∩ V)
+        expect(sortedUnique(pulled)).toEqual(sortedUnique(V)); // = V
+      }),
+    );
+  });
+});
+
+describe("sheaf on the site — general amalgamation + uniqueness (identify-if-equal)", () => {
+  it("EXISTENCE (any cover): a signature-coherent family amalgamates to the union of the cover", () => {
+    fc.assert(
+      fc.property(arbSignedFamily, (family) => {
+        const g = glueFragments(family, { onDuplicateProvider: "identify-if-equal" });
+        expect(g.conflicts.filter((c) => c.type === "duplicate_provider")).toEqual([]);
+        expect(g.merged.provides).toEqual(unionOf(family, "provides"));
+      }),
+    );
+  });
+
+  it("UNIQUENESS (any cover): glue → restrict to each piece → re-glue recovers the section (s determined by its restrictions)", () => {
+    fc.assert(
+      fc.property(arbSignedFamily, (family) => {
+        const first = glueFragments(family, { onDuplicateProvider: "identify-if-equal" });
+        const restrictions = family.map((p) => restrictSection(first.merged, p));
+        const reglued = glueFragments(restrictions, { onDuplicateProvider: "identify-if-equal" });
+        expect(reglued.merged).toEqual(first.merged);
+      }),
+    );
+  });
+});
+
+describe("two value-presheaves over one site — default (SSoT) vs identify-if-equal differ only on provenance", () => {
+  it("a shared key with EQUAL signatures: default conflicts (provenance-tagged F_Node), identify-if-equal glues (F_Sig)", () => {
+    fc.assert(
+      fc.property(
+        arbSignedFamily.filter((f) => f.length >= 2),
+        fc.constantFrom(...KEYS),
+        (family, key) => {
+          // Two DISTINCT providers of `key`, same (table) signature → coherent.
+          const forced = family.map((f, i) =>
+            i <= 1
+              ? {
+                  ...f,
+                  provides: sortedUnique([...f.provides, key]),
+                  provideSignatures: { ...(f.provideSignatures ?? {}), [key]: SIG[key] },
+                }
+              : f,
+          );
+          const dupFor = (r: ReturnType<typeof glueFragments>) =>
+            r.conflicts.some(
+              (c) => c.type === "duplicate_provider" && c.message.includes(`key: ${key}`),
+            );
+          // F_Node: two nodeIds ⇒ non-matching ⇒ conflict (single-source-of-truth).
+          expect(dupFor(glueFragments(forced))).toBe(true);
+          // F_Sig: equal signature ⇒ matching ⇒ glued (no duplicate conflict).
+          expect(
+            dupFor(glueFragments(forced, { onDuplicateProvider: "identify-if-equal" })),
+          ).toBe(false);
+        },
+      ),
+    );
+  });
+});
+
 describe("restrictSection — restriction is a projection for any family", () => {
   it("restricting the merged union by any piece recovers exactly that piece's domains (set-equality)", () => {
     fc.assert(

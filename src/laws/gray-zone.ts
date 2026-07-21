@@ -39,9 +39,25 @@ export interface DrawObservation {
   verdict?: HomeomorphismVerdict;
   behaviorVerdict: string;
   acceptable: boolean;
+  /** Per-case behaviour outcomes for this draw, when a fixture ran (subset of
+   *  regenerate's DraftEval.behaviorCases). Drives the SEMANTIC-divergence
+   *  signal below: draws that fail DIFFERENT cases localise a bespoke
+   *  extraction-gap even when their declaration sets agree and none passes —
+   *  the class declKey-clustering and the pass/fail behaviorSplit both miss. */
+  caseOutcomes?: ReadonlyArray<{ name: string; outcome: string }>;
 }
 
 export type GrayZone = "unanimous" | "majority" | "gray" | "no-signal";
+
+/** Floor on `evaluatedDraws` (compiled draws that ran ≥1 fixture case) below
+ *  which `semanticSplit` will NOT fire even with ≥2 distinct failure
+ *  fingerprints. Guards the false-positive residual found on the dequal/lite
+ *  capacity control (2026-07-21): with only 2 evaluated draws, "fail on
+ *  different cases" is coin-flip noise for a high-variance model, not evidence
+ *  the ficha under-determines the artifact. Matches DEFAULT_PROBE_DRAWS /
+ *  sync's default `--draws 3` — the signal wants a fully-evaluated round, and
+ *  a run wanting more discriminating power should draw more. */
+export const SEMANTIC_SPLIT_MIN_RAN_DRAWS = 3;
 
 export interface GrayZoneIndex {
   /** Total draws requested (compiled or not). */
@@ -62,6 +78,26 @@ export interface GrayZoneIndex {
   /** True when, under the same fixture, some compiled draw passes and another
    *  fails — behaviour-grounded flip-flop, the strongest disagreement signal. */
   behaviorSplit: boolean;
+  /** Compiled draws that produced case-level evidence (ran ≥1 fixture case).
+   *  The evidence base for the semantic signal; `semanticSplit` needs enough
+   *  of these to trust a divergence read (see SEMANTIC_SPLIT_MIN_RAN_DRAWS). */
+  evaluatedDraws: number;
+  /** Distinct NON-EMPTY failure fingerprints among compiled draws that ran the
+   *  fixture. A fingerprint is the sorted set of case names a draw did not
+   *  `match`. 0 ⇔ no fixture ran (or every runner passed); 1 ⇔ every failing
+   *  draw failed the SAME cases (consistent failure ⇒ capacity); ≥2 ⇔ draws
+   *  fail DIFFERENT cases. */
+  semanticClusterCount: number;
+  /** semanticClusterCount ≥ 2 AND evaluatedDraws ≥ SEMANTIC_SPLIT_MIN_RAN_DRAWS:
+   *  draws agree nothing is right yet disagree on WHAT is wrong. The bespoke
+   *  extraction-gap signal that fires even when declaration sets agree and no
+   *  draw passes (found inert on foreign code 2026-07-21: query-string
+   *  thin-ficha draws all failed but on different arrayFormat cases, which
+   *  declKey/behaviorSplit read as `unanimous`). The floor guards the residual
+   *  false positive: with only 2 evaluated draws, "fail differently" is
+   *  coin-flip noise for a high-variance model, not evidence of ficha
+   *  under-determination. */
+  semanticSplit: boolean;
   zone: GrayZone;
 }
 
@@ -85,9 +121,40 @@ export function computeGrayZone(observations: DrawObservation[]): GrayZoneIndex 
     if (p > 0) entropy -= p * Math.log2(p);
   }
   const verdicts = new Set(compiled.map((o) => o.behaviorVerdict));
+
+  // Semantic-divergence signal. Fingerprint each compiled draw that ran the
+  // fixture by the sorted set of case names it did NOT `match`; keep only the
+  // non-empty ones (a draw that passed every case contributes no failure
+  // fingerprint). ≥2 distinct fingerprints ⇒ draws fail DIFFERENT cases ⇒ the
+  // ficha under-determines WHICH behaviour is correct (bespoke extraction-gap),
+  // as opposed to every draw failing the SAME cases (consistent ⇒ capacity).
+  // This fires where the declKey cluster and behaviorSplit are both inert:
+  // structure agrees and no draw passes.
+  const failureFingerprints = new Set<string>();
+  let evaluatedDraws = 0;
+  for (const o of compiled) {
+    if (!o.caseOutcomes || o.caseOutcomes.length === 0) continue;
+    evaluatedDraws++;
+    const failed = o.caseOutcomes
+      .filter((c) => c.outcome !== "match")
+      .map((c) => c.name)
+      .sort();
+    if (failed.length > 0) failureFingerprints.add(failed.join(""));
+  }
+  const semanticClusterCount = failureFingerprints.size;
+  // Floor guard: a divergence read is only trustworthy with enough draws that
+  // actually produced case evidence — 2 diverging draws is noise, not signal.
+  const semanticSplit =
+    semanticClusterCount >= 2 && evaluatedDraws >= SEMANTIC_SPLIT_MIN_RAN_DRAWS;
+
   const agreementRate = n === 0 ? 0 : top / n;
+  // Any grounded disagreement makes the zone gray. Semantic disagreement takes
+  // precedence over structural agreement: draws can share a declaration set yet
+  // implement conflicting behaviour, which is the exact bespoke case the
+  // structural cluster misses.
   const zone: GrayZone =
     n === 0 ? "no-signal"
+    : semanticSplit ? "gray"
     : clusters.size === 1 ? "unanimous"
     : top * 2 > n ? "majority"
     : "gray";
@@ -101,12 +168,38 @@ export function computeGrayZone(observations: DrawObservation[]): GrayZoneIndex 
     disagreementRate: n === 0 ? 0 : 1 - agreementRate,
     clusterEntropyBits: entropy,
     behaviorSplit: verdicts.has("pass") && verdicts.has("fail"),
+    evaluatedDraws,
+    semanticClusterCount,
+    semanticSplit,
     zone,
   };
 }
 
 // ── Persistence: .ontology/reports/gray-zone.json ──
 //
+/** Repair-first ordering for the `onto status --gray-zone` queue. Gap-A
+ *  suspects — a gray zone (no majority cluster OR a semantic split) or a
+ *  pass/fail behaviour split — rank first, then by structural disagreement,
+ *  then the behaviour-grounded splits, then entropy. Pure and total (no id
+ *  tiebreak; callers append their own for stability). WHY this exists: a
+ *  semantic-split node has `disagreementRate === 0` (its draws share a
+ *  declaration set), so sorting on disagreement alone buries it LAST — exactly
+ *  the bespoke class the semantic signal exists to surface. Descending: a
+ *  negative result means `a` outranks `b`. */
+export function compareGrayZoneRepairPriority(
+  a: GrayZoneIndex,
+  b: GrayZoneIndex,
+): number {
+  const gapA = (r: GrayZoneIndex): number => (r.zone === "gray" || r.behaviorSplit ? 1 : 0);
+  return (
+    gapA(b) - gapA(a) ||
+    b.disagreementRate - a.disagreementRate ||
+    (b.semanticSplit ? 1 : 0) - (a.semanticSplit ? 1 : 0) ||
+    (b.behaviorSplit ? 1 : 0) - (a.behaviorSplit ? 1 : 0) ||
+    b.clusterEntropyBits - a.clusterEntropyBits
+  );
+}
+
 // One latest record per node (not a history): the index answers "which fichas
 // should I repair FIRST, today", so the freshest measurement wins. History
 // lives in the dated calibration records when a run is worth preserving.

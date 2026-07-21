@@ -304,15 +304,19 @@ describe("Axiom 5 — glueFragments is a separated presheaf, NOT a sheaf", () =>
 // ---------------------------------------------------------------------------
 // Part 3 — the SHEAF GLUING AXIOM as a stated law over an explicit cover
 // (Path-to-T1 gate #2). Part 2 pinned behaviour (equal-sig duplicates glue);
-// this pins the categorical LAW with restriction maps: on the subcategory of
-// covers whose overlaps carry identical signatures, a COMPATIBLE FAMILY glues
-// to a section that RESTRICTS BACK to each piece (existence + s|_Ui = s_i),
-// and is the UNIQUE such section (well-defined + reconstructible). Off the
-// subcategory (drift on the overlap) the axiom fails — still only a sheaf on
-// the equal-signature subcategory.
+// this pins the categorical LAW with restriction maps: a COMPATIBLE FAMILY
+// (its overlaps carry identical signatures — the sheaf MATCHING condition)
+// glues to a section that RESTRICTS BACK to each piece (existence + s|_Ui = s_i)
+// and is the UNIQUE such section (well-defined + reconstructible). A DRIFTED
+// overlap is a NON-matching family: the axiom asserts nothing about it and the
+// code reports an obstruction. So this is the sheaf of the signature presheaf
+// on the STANDARD site — equal-signature is the equalizer, NOT a sub-coverage.
+// The general theorem (arbitrary covers) + the Grothendieck-site proof are in
+// docs/design/laws/GLUING_SITE_THEOREM.md; the exhaustive 2-piece sweep below
+// is its finite shadow.
 // ---------------------------------------------------------------------------
 
-describe("Axiom 5 — sheaf gluing axiom over an explicit cover (equal-signature subcategory)", () => {
+describe("Axiom 5 — sheaf gluing axiom over an explicit cover (signature-matching on the standard site)", () => {
   const frag = (over: Partial<ContextFragment> & { nodeId: string }): ContextFragment => ({
     branch: "main",
     provides: [],
@@ -378,10 +382,10 @@ describe("Axiom 5 — sheaf gluing axiom over an explicit cover (equal-signature
   it("CHARACTERISATION (exhaustive over 2-piece covers on {A,B,C}): glue ⟺ overlaps agree, and every glue restricts back", () => {
     // Not a sample — a sweep over ALL 49 ordered pairs of non-empty provide-sets
     // on a 3-key universe (with requires/forbids empty to isolate the gluing
-    // axiom). Combined with Part 2's order-independence (n-piece reduces to
-    // pairwise on an order-independent presheaf), this characterises the sheaf
-    // gluing axiom on the equal-signature subcategory rather than illustrating
-    // it — the §3.9-style exhaustiveness the T1 bar asks for.
+    // axiom). This is the finite shadow of the general theorem (arbitrary
+    // covers, GLUING_SITE_THEOREM.md): the amalgamation is per-key across ALL
+    // providers, so it is native n-ary, not a pairwise reduction. See the
+    // property-based generalisation in context-gluing-property.test.ts.
     const universe = ["A", "B", "C"];
     const subsets: string[][] = [];
     for (let m = 1; m < 1 << universe.length; m++) {
@@ -420,7 +424,7 @@ describe("Axiom 5 — sheaf gluing axiom over an explicit cover (equal-signature
     expect(blocked).toBeGreaterThan(0); // and the disagreeing overlaps were all blocked
   });
 
-  it("BOUNDARY: off the equal-signature subcategory (drift on the overlap) the gluing axiom FAILS — still only a sheaf on the subcategory", () => {
+  it("BOUNDARY: a drifted overlap is a NON-matching family — no amalgamation required, and the code reports an obstruction", () => {
     const f2drift = frag({
       nodeId: "n2",
       provides: ["B", "C"],
