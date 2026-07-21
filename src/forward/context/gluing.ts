@@ -25,7 +25,7 @@ export interface GluingOptions {
   //   "conflict" (default) — provider-uniqueness: always a
   //     `duplicate_provider` conflict. This is the separated-presheaf
   //     behaviour the Axiom 5 ledger pins; every existing caller uses it.
-  //   "identify-if-equal" — sheaf-on-identical-overlaps: two providers of
+  //   "identify-if-equal" — the signature-sheaf gluing: two providers of
   //     the same key are IDENTIFIED (glued, no conflict) iff they carry an
   //     identical, defined syntactic signature (`fragment.provideSignatures`).
   //     A missing signature on either side, or differing signatures (drift),
@@ -85,8 +85,11 @@ export function glueFragments(
 
     // Multiple distinct providers of `key`. Under "identify-if-equal", glue
     // them iff every provider declares the SAME, defined signature for the
-    // key — that is the precise sense in which agreeing local sections glue
-    // to one global section (a sheaf on the identical-overlap subcategory).
+    // key — that is the sheaf MATCHING condition: agreeing local sections
+    // amalgamate to one global section (the signature sheaf on the standard
+    // site; equal-signature-on-overlaps is the equalizer, not a sub-coverage —
+    // docs/design/laws/GLUING_SITE_THEOREM.md). Checked across ALL providers
+    // of the key, so the n-ary matching is native, not a pairwise reduction.
     if (onDuplicateProvider === "identify-if-equal") {
       const sigs = fragments
         .filter((f) => f.provides.includes(key))

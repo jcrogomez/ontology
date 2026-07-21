@@ -200,8 +200,8 @@ the `MATHEMATICAL_CLAIMS.md` scale (T1 tested law … T4 aspirational).
 - **Tool.** The executor's `decompose` lever + `slice-keep.ts`
   (MONOTONE_DECOMPOSE, shipped 2026-07-07: passing slices are *kept*, so
   recall grows monotonically across rounds) for the split; `context/
-  gluing.ts` `identify-if-equal` (T1 sheaf on the equal-signature
-  subcategory) for the correct recomposition.
+  gluing.ts` `identify-if-equal` (T1 signature-sheaf gluing on the
+  standard site) for the correct recomposition.
 - **Tier.** Split machinery **T2** (shipped executor lever), gluing law
   **T1**; the *theorem* "fidelity recovers under a good cover" is **T4**
   (unproven) but **falsifiable** — re-run the 22 decomposed and measure

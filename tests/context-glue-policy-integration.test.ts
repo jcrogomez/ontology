@@ -4,8 +4,9 @@
 // Two edge-neighbour nodes that provide the SAME key with an identical
 // syntactic signature (the kind O1's static extractor populates) are assembled
 // into one context. Under the default policy they conflict (duplicate_provider,
-// the separated presheaf); under `identify-if-equal` they glue (the sheaf on
-// the equal-signature subcategory). A divergent signature still conflicts.
+// the separated presheaf); under `identify-if-equal` they glue (the signature
+// sheaf — equal-signature is the matching condition). A divergent signature
+// still conflicts.
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";

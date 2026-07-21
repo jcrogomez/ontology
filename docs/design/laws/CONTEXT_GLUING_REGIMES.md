@@ -180,12 +180,14 @@ false identification).
 - **Guard shipped:** `tests/intent-validator.test.ts` pins `glued.ok` ↔
   `gluing_ok` token under *both* policies, so §3.9 closed-world parity cannot
   regress silently. Policy behaviour pinned in `tests/context-gluing.test.ts`.
-- **Ledger:** `MATHEMATICAL_CLAIMS.md` §Axiom 5 records the mode — a **sheaf on
-  the equal-signature overlap subcategory** — initially at T2, then **promoted
-  to T1 (2026-06-09)** once Path-to-T1 gate #2 landed (the gluing axiom pinned
-  as a characterising law over an explicit cover; see O-gate below). Default
-  stays the T1 restriction / T2 separated-presheaf; no existing tier changed
-  (T1 13→14).
+- **Ledger:** `MATHEMATICAL_CLAIMS.md` §Axiom 5 records the mode — the
+  **signature-sheaf gluing on the standard site** (equal-signature-on-overlaps is
+  the sheaf's *matching* condition, not a sub-coverage; the site is Grothendieck,
+  proved generally in [`GLUING_SITE_THEOREM.md`](GLUING_SITE_THEOREM.md), framing
+  corrected 2026-07-21) — initially at T2, then **promoted to T1 (2026-06-09)**
+  once Path-to-T1 gate #2 landed (the gluing axiom pinned as a characterising law
+  over an explicit cover; see O-gate below). Default stays the T1 restriction /
+  T2 separated-presheaf; no existing tier changed (T1 13→14).
 - **First consumer landed (2026-06-09):** `onto run context --validate
   --identify-equal-providers` threads the policy into the validation gluing
   step (opt-in; default still enforces uniqueness). Demonstrated end-to-end
@@ -273,7 +275,7 @@ reconcile. What remains: (a) the discriminator defaults to syntactic, but the
 `onto ingest --resolved-signatures` (`typescript-resolved.ts` + the ingest
 override; captures inferred returns/consts and follows re-export aliases the
 syntactic tier can't, tier-tagged so it never confuses with syntactic) — a
-fidelity refinement that broadens the T1 subcategory, default unchanged;
+fidelity refinement that broadens which providers match, default unchanged;
 (b) `apply` now runs the
 `identify-if-equal` check against the existing graph as opt-in
 `onto proposal apply --check-providers` — it reports compatible re-provisions
