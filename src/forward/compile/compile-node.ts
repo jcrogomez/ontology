@@ -53,7 +53,6 @@ import {
   type EffectWithLog,
   type LogEntry,
   pureWithLog,
-  failWithLog,
   bindWithLog,
   runWithLog,
 } from "../../laws/effects/io.js";
@@ -1317,7 +1316,3 @@ export async function compileNode(options: CompileNodeOptions): Promise<CompileN
 function packageFailure(failure: CompileFailure, logs: readonly LogEntry[]): CompileNodeResult {
   return { ok: false, reason: failure.reason, message: failure.message, logs };
 }
-
-// Tiny helper used by `failWithLog` consumers in unit tests. Re-exported
-// for symmetry with the other effect modules; not load-bearing.
-export const _internalFailWithLog = failWithLog;
