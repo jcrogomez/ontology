@@ -89,6 +89,46 @@ describe("computeGrayZone (pure fold)", () => {
     expect(gz.compiledDraws).toBe(2);
     expect(gz.zone).toBe("unanimous");
   });
+
+  // Semantic-divergence signal — draws that AGREE structurally (same declKey)
+  // and all FAIL, but on DIFFERENT cases. This is the bespoke extraction-gap
+  // the structural cluster and behaviorSplit both miss (found inert on foreign
+  // code 2026-07-21: query-string thin-ficha).
+  it("draws fail DIFFERENT cases → semanticSplit → gray (even if structurally unanimous)", () => {
+    const gz = computeGrayZone([
+      obs(1, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: [
+        { name: "comma", outcome: "divergent" }, { name: "bracket", outcome: "match" }] }),
+      obs(2, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: [
+        { name: "comma", outcome: "match" }, { name: "bracket", outcome: "divergent" }] }),
+    ]);
+    expect(gz.clusterCount).toBe(1);         // declKey agrees
+    expect(gz.behaviorSplit).toBe(false);    // no draw passed
+    expect(gz.semanticClusterCount).toBe(2); // {comma} vs {bracket}
+    expect(gz.semanticSplit).toBe(true);
+    expect(gz.zone).toBe("gray");
+  });
+
+  it("draws fail the SAME cases → no semanticSplit → unanimous (capacity, not extraction)", () => {
+    const gz = computeGrayZone([
+      obs(1, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: [
+        { name: "setIdentity", outcome: "divergent" }, { name: "primitives", outcome: "match" }] }),
+      obs(2, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: [
+        { name: "setIdentity", outcome: "divergent" }, { name: "primitives", outcome: "match" }] }),
+    ]);
+    expect(gz.semanticClusterCount).toBe(1);  // one shared failure fingerprint
+    expect(gz.semanticSplit).toBe(false);
+    expect(gz.zone).toBe("unanimous");
+  });
+
+  it("pass vs fail is behaviorSplit, not semanticSplit (only one non-empty fingerprint)", () => {
+    const gz = computeGrayZone([
+      obs(1, { behaviorVerdict: "pass", caseOutcomes: [{ name: "a", outcome: "match" }] }),
+      obs(2, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: [{ name: "a", outcome: "divergent" }] }),
+    ]);
+    expect(gz.behaviorSplit).toBe(true);
+    expect(gz.semanticSplit).toBe(false);
+    expect(gz.zone).toBe("unanimous");
+  });
 });
 
 describe("gray-zone persistence", () => {

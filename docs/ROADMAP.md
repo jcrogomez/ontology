@@ -117,9 +117,44 @@ numbers are not evidence here):
   capacity never short-circuits — F is high-variance). `--no-precedents`
   re-measures.
 
+- **Typed failure channel** (same day, from REVIEW_2026-07-20 §3): failing
+  regenerations stamp `failureKind` (transport/compile/oracle/lock/not-found/
+  config/io) derived from the compile-plan's typed reasons; the executor's
+  broken-vs-infra call routes on the enum, string regexes demoted to legacy
+  fallback. Kills the classifier-poisoning + producer-wording coupling
+  findings; prerequisite groundwork for B1/B2 unsupervised runs.
+
 Specs updated in `EXECUTOR_SPEC.md` §3/§5.1 + `SYNC_LOOP_SPEC.md` §3. This
 makes the A1 queue *measured* (which fichas to repair first) but the repair
 lever itself is still open — A1 stays item 2 above.
+
+### Shipped 2026-07-21 — first FOREIGN-repo validation + semantic-split signal
+
+First runs of the pipeline on repos NOT written here (E1/E2), and a fix for a
+router blind spot they exposed. Both taxonomy poles reproduced externally, $0:
+
+- **E1/E2 — both poles on foreign code.** `dequal` (canonical) = capacity: a
+  120B closes it from a thin ficha, ficha-repair does NOT flip 7B. `query-string`
+  `base.js` (bespoke `arrayFormat`) = extraction-gap: a 120B FAILS from a thin
+  ficha, and enriching the ficha flips the SAME held-fixed 120B FAIL→PASS. The
+  external replication of the home n=2 ficha-repair playbook; answers the n=1
+  circularity objection. Surfaced a hidden third axis — **model-prior /
+  canonicality** — that confounds capacity vs extraction on canonical code.
+- **Semantic-split signal (the router fix).** P3 found the shipped disagreement
+  router read query-string's bespoke gap as `unanimous` (declKey empty + no
+  acceptable draws → both old signals inert). Fix: `gray-zone.ts` now
+  fingerprints each compiled draw by the fixture cases it did not `match`; ≥2
+  distinct non-empty fingerprints ⇒ `semanticSplit` ⇒ `zone: gray` ⇒ the
+  executor routes `extraction-gap` (evidence `semantic-split`). Additive
+  (inert without per-case data — old tests unchanged). Validated on 3 nodes:
+  query-string→gray (5 loaded), `dequal/lite` capacity→unanimous (3 loading-and-
+  failing 7B drafts failed identically — no false positive). Residual: a weak
+  model *could* fail differently by noise; empirically absent where capacity
+  failure is systematic. Spec: `EXECUTOR_SPEC.md` §3. Records: the foreign-repo
+  memory note.
+- **Infra:** `qwen3-coder:480b` was RETIRED by Ollama 2026-07-15 — the
+  `7b → 480b-cloud → opus` ladder's cloud rung is dead; re-anchor to
+  `gpt-oss:120b-cloud`.
 
 ### Shipped 2026-06-18 (against the four-gap checkpoint below)
 

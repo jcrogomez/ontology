@@ -74,6 +74,7 @@ export type Action =
 // ficha); draws that AGREE yet fail point at the models (Gap B → ladder).
 export type PlateauEvidence =
   | "behaviour-split" // draws split pass/fail on the SAME fixture → Gap A
+  | "semantic-split" // draws all FAIL but on DIFFERENT cases → Gap A (bespoke; structure agrees, none passes)
   | "draw-disagreement" // no majority declKey cluster across draws → Gap A
   | "clean-lint" // lint-clean at plateau, still failing → Gap A (legacy proxy)
   | "draw-agreement" // draws agree AND lint not clean → Gap B with evidence

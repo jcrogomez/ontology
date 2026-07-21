@@ -24,6 +24,11 @@ export interface DrawAgreement {
   clusterCount: number;
   compiledDraws: number;
   behaviorSplit: boolean;
+  // Draws that all FAIL but on DIFFERENT fixture cases — a bespoke
+  // extraction-gap that structural (declKey) clustering and behaviorSplit
+  // both miss when structure agrees and no draw passes. Added 2026-07-21
+  // after the signal was found inert on foreign code (query-string).
+  semanticSplit: boolean;
 }
 
 export interface GateVerdict {
@@ -42,23 +47,25 @@ export interface GateVerdict {
   detail: string;
 }
 
-// "compile-back failed" / "could not read source" mean the model produced an
-// artifact that does not build — a draft-quality failure (broken), not a
-// machine failure. Everything else under !ok (node not found, unsupported
-// provider, missing shadow, lock contention) is infra.
+// LEGACY FALLBACK ONLY (results predating `failureKind`, 2026-07-20): when
+// the typed channel is absent, sniff the failure string. "compile-back
+// failed" / "could not read source" mean a draft-quality failure (broken);
+// everything else under !ok is infra — EXCEPT when the root cause buried in
+// the string is a dead or exhausted provider (infra wins over the
+// compile-back prefix; observed TWICE on 2026-07-07: the Ollama-down sweep
+// and the cloud-quota re-run both mis-read as capacity without it).
+//
+// The sniffing is inherently poisonable — a TS diagnostic that QUOTES draft
+// content ("Cannot find name 'ECONNREFUSED'") reads as infra — which is
+// exactly why live producers now emit `failureKind` and this path is
+// fallback-only (REVIEW_2026-07-20 §3.1/§3.2).
 const BROKEN_FAILURE = /compile-back failed|could not read source/i;
-
-// …EXCEPT when the root cause buried in the failure string is a dead or
-// exhausted provider. A "compile-back failed: … connect ECONNREFUSED" (no
-// draft was ever produced) or "… you have reached your session usage limit"
-// (provider quota, not model capability) is NOT a draft-quality result.
-// Without this precedence the policy burns the whole ladder against an
-// unusable provider and mis-reports capacity-ceiling — observed TWICE on
-// 2026-07-07: the Ollama-down sweep (6 false ceilings, 1.3s wall-clock) and
-// the cloud-quota-exhausted re-run (5 attempts in 4.8s, same false verdict).
-// Infra wins over the compile-back prefix.
 const INFRA_FAILURE =
   /ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|socket hang up|usage limit|rate limit|too many requests|quota|status code 429/i;
+
+// The typed route: the DRAFT is the problem (refinable) vs the MACHINE is the
+// problem (terminal infra). No string in draft reach can influence this.
+const BROKEN_KINDS: ReadonlySet<string> = new Set(["compile", "oracle"]);
 
 export function normalize(r: RegenerateResult): GateVerdict {
   // Prefer the unambiguous fixturePresent signal; fall back to the behaviorVerdict
@@ -74,16 +81,22 @@ export function normalize(r: RegenerateResult): GateVerdict {
         clusterCount: r.grayZone.clusterCount,
         compiledDraws: r.grayZone.compiledDraws,
         behaviorSplit: r.grayZone.behaviorSplit,
+        semanticSplit: r.grayZone.semanticSplit ?? false,
       }
     : undefined;
 
   if (!r.ok) {
     const failure = r.failure ?? "unknown failure";
-    const outcome = INFRA_FAILURE.test(failure)
-      ? "infra-error"
-      : BROKEN_FAILURE.test(failure)
-        ? "broken"
-        : "infra-error";
+    const outcome: GateOutcome =
+      r.failureKind !== undefined
+        ? BROKEN_KINDS.has(r.failureKind)
+          ? "broken"
+          : "infra-error"
+        : INFRA_FAILURE.test(failure)
+          ? "infra-error"
+          : BROKEN_FAILURE.test(failure)
+            ? "broken"
+            : "infra-error";
     return {
       outcome,
       lintClean,

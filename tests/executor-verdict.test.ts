@@ -92,3 +92,52 @@ describe("normalize — infra beats broken", () => {
     ).toBe("broken");
   });
 });
+
+// The typed failure channel (REVIEW_2026-07-20 §3.1/§3.2): when a producer
+// stamps `failureKind`, normalize routes on the enum and the failure STRING
+// has zero influence — a TS diagnostic that quotes an infra token can no
+// longer poison the classification. The regex path above survives only as
+// the fallback for legacy results without the field.
+describe("normalize — typed failureKind beats string sniffing", () => {
+  it("adversarial: a compile failure whose diagnostic QUOTES an infra token stays broken", () => {
+    const v = normalize(
+      result({
+        ok: false,
+        failure: "compile-back failed: error TS2304: Cannot find name 'ECONNREFUSED'",
+        failureKind: "compile",
+      }),
+    );
+    expect(v.outcome).toBe("broken");
+  });
+
+  it("adversarial: rate-limit / quota / 429 quoted in draft diagnostics stay broken", () => {
+    for (const bait of ["rate limit", "quota", "status code 429", "socket hang up"]) {
+      expect(
+        normalize(
+          result({
+            ok: false,
+            failure: `compile-back failed: error TS1005: ';' expected near "${bait}"`,
+            failureKind: "compile",
+          }),
+        ).outcome,
+      ).toBe("broken");
+    }
+  });
+
+  it("transport kind → infra-error even when the message looks draft-like", () => {
+    expect(
+      normalize(
+        result({ ok: false, failure: "compile-back failed: candidate did not parse", failureKind: "transport" }),
+      ).outcome,
+    ).toBe("infra-error");
+  });
+
+  it("kind routing: compile/oracle → broken; transport/lock/not-found/config/io → infra-error", () => {
+    for (const kind of ["compile", "oracle"] as const) {
+      expect(normalize(result({ ok: false, failure: "x", failureKind: kind })).outcome).toBe("broken");
+    }
+    for (const kind of ["transport", "lock", "not-found", "config", "io"] as const) {
+      expect(normalize(result({ ok: false, failure: "x", failureKind: kind })).outcome).toBe("infra-error");
+    }
+  });
+});

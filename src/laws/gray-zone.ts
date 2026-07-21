@@ -39,6 +39,12 @@ export interface DrawObservation {
   verdict?: HomeomorphismVerdict;
   behaviorVerdict: string;
   acceptable: boolean;
+  /** Per-case behaviour outcomes for this draw, when a fixture ran (subset of
+   *  regenerate's DraftEval.behaviorCases). Drives the SEMANTIC-divergence
+   *  signal below: draws that fail DIFFERENT cases localise a bespoke
+   *  extraction-gap even when their declaration sets agree and none passes —
+   *  the class declKey-clustering and the pass/fail behaviorSplit both miss. */
+  caseOutcomes?: ReadonlyArray<{ name: string; outcome: string }>;
 }
 
 export type GrayZone = "unanimous" | "majority" | "gray" | "no-signal";
@@ -62,6 +68,18 @@ export interface GrayZoneIndex {
   /** True when, under the same fixture, some compiled draw passes and another
    *  fails — behaviour-grounded flip-flop, the strongest disagreement signal. */
   behaviorSplit: boolean;
+  /** Distinct NON-EMPTY failure fingerprints among compiled draws that ran the
+   *  fixture. A fingerprint is the sorted set of case names a draw did not
+   *  `match`. 0 ⇔ no fixture ran (or every runner passed); 1 ⇔ every failing
+   *  draw failed the SAME cases (consistent failure ⇒ capacity); ≥2 ⇔ draws
+   *  fail DIFFERENT cases. */
+  semanticClusterCount: number;
+  /** semanticClusterCount ≥ 2: draws agree nothing is right yet disagree on
+   *  WHAT is wrong. The bespoke extraction-gap signal that fires even when
+   *  declaration sets agree and no draw passes (found inert on foreign code
+   *  2026-07-21: query-string thin-ficha draws all failed but on different
+   *  arrayFormat cases, which declKey/behaviorSplit read as `unanimous`). */
+  semanticSplit: boolean;
   zone: GrayZone;
 }
 
@@ -85,9 +103,35 @@ export function computeGrayZone(observations: DrawObservation[]): GrayZoneIndex 
     if (p > 0) entropy -= p * Math.log2(p);
   }
   const verdicts = new Set(compiled.map((o) => o.behaviorVerdict));
+
+  // Semantic-divergence signal. Fingerprint each compiled draw that ran the
+  // fixture by the sorted set of case names it did NOT `match`; keep only the
+  // non-empty ones (a draw that passed every case contributes no failure
+  // fingerprint). ≥2 distinct fingerprints ⇒ draws fail DIFFERENT cases ⇒ the
+  // ficha under-determines WHICH behaviour is correct (bespoke extraction-gap),
+  // as opposed to every draw failing the SAME cases (consistent ⇒ capacity).
+  // This fires where the declKey cluster and behaviorSplit are both inert:
+  // structure agrees and no draw passes.
+  const failureFingerprints = new Set<string>();
+  for (const o of compiled) {
+    if (!o.caseOutcomes || o.caseOutcomes.length === 0) continue;
+    const failed = o.caseOutcomes
+      .filter((c) => c.outcome !== "match")
+      .map((c) => c.name)
+      .sort();
+    if (failed.length > 0) failureFingerprints.add(failed.join(""));
+  }
+  const semanticClusterCount = failureFingerprints.size;
+  const semanticSplit = semanticClusterCount >= 2;
+
   const agreementRate = n === 0 ? 0 : top / n;
+  // Any grounded disagreement makes the zone gray. Semantic disagreement takes
+  // precedence over structural agreement: draws can share a declaration set yet
+  // implement conflicting behaviour, which is the exact bespoke case the
+  // structural cluster misses.
   const zone: GrayZone =
     n === 0 ? "no-signal"
+    : semanticSplit ? "gray"
     : clusters.size === 1 ? "unanimous"
     : top * 2 > n ? "majority"
     : "gray";
@@ -101,6 +145,8 @@ export function computeGrayZone(observations: DrawObservation[]): GrayZoneIndex 
     disagreementRate: n === 0 ? 0 : 1 - agreementRate,
     clusterEntropyBits: entropy,
     behaviorSplit: verdicts.has("pass") && verdicts.has("fail"),
+    semanticClusterCount,
+    semanticSplit,
     zone,
   };
 }
