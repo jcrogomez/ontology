@@ -52,6 +52,26 @@ Two pains every team using LLM-assisted development feels today:
 
 Longer term, the **Open-Prompt protocol** turns the signed intent + audit chain into a trust-transparency layer between fully open-source and proprietary self-attestation: an organisation publishes its *intent* and lets third parties verify the running code respects it, without exposing the implementation. The read-only half (`onto mcp`) already ships; signing/replay are roadmap.
 
+## Who this is for — and when not to use it
+
+The same honest tiering the math gets (below) applies to the pitch. This is a
+**research-grade, terminal-first, single-user alpha** — a thinking tool and an
+honest instrument, not a drop-in codegen product.
+
+**Reach for it if you want to:**
+
+- Version *intent* and treat code as a re-derivable shadow of a graph you can read.
+- **Measure** how faithfully a codebase can be regenerated from its stated intent, and localise *where* the intent is under-specified (repair the spec) vs *where* the model is the limit (escalate) — the discrimination is instrumented, not guessed.
+- Explore governed dynamic-agent loops that write only behind green gates and refuse (loudly) otherwise.
+
+**Don't reach for it (yet) if you want:**
+
+- A production codegen tool — it is alpha, and every write is preview-by-default behind verification gates for a reason.
+- High-throughput generation on a small machine — the quality bar needs a frontier/cloud model; local 7–8 GB runs are for plumbing and $0 experiments, not the real loop.
+- A proven categorical framework — most categorical terms are operational or analogy (T2–T4); only the load-bearing few are test-pinned laws (T1). The value is honest measurement, not a topos.
+
+**The honest headline:** the binding constraint on intent→code is **specification quality** — not the compiler, and (for bespoke, project-specific intent) not the model. Ontology's real contribution is making that gap *measurable and governed*, not making code generation magic. What's measured lives in [Status](#status) and the [Roadmap](docs/ROADMAP.md); what's aspirational is labelled as such.
+
 ## What you actually get
 
 | Verb | What it does |
