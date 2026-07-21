@@ -56,42 +56,64 @@ exhaustively pinned by `tests/runtime/topos/closed-world-parity.test.ts`)
 
 ## Open follow-ups
 
-### Next up — start here (queued 2026-07-17)
+### Next up — start here (refreshed 2026-07-21)
 
-Ordered by leverage. Detail/context in the session-handoff note.
+Two tracks — **empirical/functional** (the stronger near-term bet) and
+**mathematical**. Ordered by leverage within each. Session context:
+[[project_session_handoff_2026_07_21]].
 
-1. **Run the Gap-2 executor sweep** — the number that gates the Architect,
-   now unblocked (both blocking extraction-gaps converged). `onto execute` over
-   the 13-node closure (`node_0011 node_0012 node_0017 node_0022 node_0026
-   node_0029 node_0031 node_0014 node_0106 node_0143 node_0225 node_0032
-   node_0168`), `--dry-run --json`. **Paused 2026-07-17 on 8 GB memory** (7B
-   loaded → 7% free); needs `ollama serve` + `qwen2.5-coder:7b` (both present).
-   To cut the memory/time peak, run the critical subset first: `node_0032` +
-   its 5 downstream (0026/0031/0106/0014/0029). The question: do `node_0032` /
-   `node_0168` flip extraction-gap → **closed** in the *real executor* (not just
-   the isolated MONOTONE_DECOMPOSE runs), and cascade-unblock the 7 downstream?
-2. **A1 — a ficha-repair lever for `onto execute`.** Today's levers
-   (`refine`/`decompose`/`escalate`) all act on the code draft; none touches the
-   *intention*. The n=2 convergence playbook (fixture-guided ficha enrichment) is
-   still HUMAN-driven. Turning it into an executor lever is the single biggest
-   yield unlock — better models do NOT close extraction-gaps. This is the path to
-   an autonomous overnight run.
-3. **A2 — field-level oracle feedback.** The divergent-case oracle says "values
-   diverged" without naming the field → the refine loop re-rolls blind (caused the
-   `node_0168` 7/8→5/8 regression). Cheap, already scoped; survives the
-   "capable models" assumption.
-4. **B1/B2 — autonomy scaffolding** for unsupervised runs: provider
-   failover + quota-aware retry (the Ollama-cloud free-tier session limit kept
-   surfacing as infra-error), and a **spend-budget governor** the executor
-   respects before `--allow-paid` climbs opus overnight.
-5. **Prune the 57 prose-rules** (behavioural → `onto probe`; noise → human
-   review) and keep the trustworthy core growing past 136 by putting fixtures on
-   the fix-first hubs (`node_0021` unblocks 82, `node_0106` unblocks 63).
-6. **Attestation-layer design (audit-without-source thread).** Sketch the exact
-   fields `onto` must emit — log/hash/gate-verdict/coverage — so a third party can
-   verify the "no gap between declared and implemented intent, full coverage"
-   claim without seeing `src/`. First concrete step toward the Open-Prompt
-   distinctive-badge idea.
+**Empirical / functional**
+
+1. **E3 — foreign-corpus extraction/capacity classifier study** (the paper's
+   spine). Pre-registered:
+   [`legend/calibrations/EXTRACTION_CAPACITY_CLASSIFIER_PREREG_2026-07-21.md`](legend/calibrations/EXTRACTION_CAPACITY_CLASSIFIER_PREREG_2026-07-21.md).
+   Scales the n=3 pilot (dequal/query-string/lite) to 8 foreign repos / ~30–50
+   nodes with an INDEPENDENT 2×2 ground truth + a confusion matrix + the
+   `semanticSplit` ablation. **Next concrete step: a 2–3 repo shake-out** of the
+   harness before the full sweep. Ladder note: `qwen3-coder:480b` RETIRED
+   2026-07-15 → strong rung = `gpt-oss:120b-cloud`.
+2. **A1 — a ficha-repair lever for `onto execute`.** Levers today
+   (`refine`/`decompose`/`escalate`) act on the code draft; none touches the
+   *intention*. The n=2 (now n≈1-per-pole external) fixture-guided ficha-enrichment
+   playbook is still HUMAN-driven. Biggest yield unlock — better models do NOT
+   close bespoke extraction-gaps. Path to an autonomous overnight run. The
+   gray-zone `semanticSplit` queue now *measures which fichas to repair first*.
+3. **A2 — field-level oracle feedback.** Divergent-case oracle says "values
+   diverged" without naming the field → refine re-rolls blind (`node_0168`
+   7/8→5/8). Cheap, scoped; feeds A1.
+4. **Semantic-signal follow-ups** (shipped this session — see below): a 2nd
+   STRONG capacity control with ≥3 loading drafts to further harden the
+   `evaluatedDraws≥3` floor; surface the gray-zone in `sync`/`regenerate
+   --explain` and Walker `:health`.
+5. **Run the Gap-2 executor sweep** — the Architect gate, unblocked (both
+   extraction-gaps converged). `onto execute --dry-run --json` over the 13-node
+   closure; **paused 2026-07-17 on 8 GB** (run the `node_0032` + 5-downstream
+   subset first). Do `node_0032`/`node_0168` flip → closed in the *real executor*?
+6. **B1/B2 autonomy scaffolding** (provider failover + quota-aware retry; a
+   spend-budget governor before `--allow-paid`) and **prune the 57 prose-rules**
+   + grow the trustworthy core past 136 (fixtures on `node_0021` unblocks 82,
+   `node_0106` unblocks 63).
+7. **Attestation-layer design** (audit-without-source): the exact fields `onto`
+   must emit — log/hash/gate-verdict/coverage — so a third party verifies "no gap
+   between declared and implemented intent" without seeing `src/`. Open-Prompt seed.
+
+**Mathematical** (the honest applied-CT contribution; smaller audience — see the
+categorical-vs-empirical discussion in the handoff)
+
+8. **Gap 4 — disentangle admissibility from the sheaf structure.**
+   requires/forbids/branch are an admissibility predicate cutting out a
+   subpresheaf; they are NOT part of the gluing/site structure. Reframed in
+   [`design/laws/GLUING_SITE_THEOREM.md`](design/laws/GLUING_SITE_THEOREM.md);
+   pin it (separate the two in code comments + a test that the admissibility
+   predicate is orthogonal to signature-matching).
+9. **Gap 5 — the complete IFF characterisation** of "which covers glue",
+   including the interaction with requires/forbids (the Part-3 sweep sets them
+   empty to isolate gluing). State + prove necessity ∧ sufficiency.
+10. **Rigor sprint (T2→T1 candidates):** the §3.10 variance real-LLM N-run
+    (`verdict-variance.ts` core shipped; only the budget-gated frontier run
+    remains); property-based tests over the effect-monad laws
+    (`MATHEMATICAL_CLAIMS.md` §effect). Package the negatives as theorems (the
+    gluing dichotomy is now done; §3.4 "not a colimit" is the next).
 
 ### Shipped 2026-07-20 — disagreement instrumentation + executor memory
 
@@ -151,7 +173,19 @@ router blind spot they exposed. Both taxonomy poles reproduced externally, $0:
   failing 7B drafts failed identically — no false positive). Residual: a weak
   model *could* fail differently by noise; empirically absent where capacity
   failure is systematic. Spec: `EXECUTOR_SPEC.md` §3. Records: the foreign-repo
-  memory note.
+  memory note. (`492022b`)
+- **Floor guard + repair-first ranking.** `semanticSplit` now also requires
+  `evaluatedDraws ≥ 3` (blinds the weak-model false-positive residual, `a2f4d9e`),
+  and `onto status --gray-zone` ranks Gap-A suspects first via a pure tested
+  `compareGrayZoneRepairPriority` — a semantic-split node (`disagreementRate 0`)
+  no longer sorts LAST; a `semantic splits` count + `⚠ semantic split` flag
+  surface it (`c2f5dc6`, verified end-to-end on the query-string workspace).
+- **Gluing site theorem + §Axiom 5 framing correction** (`2ff9362`). The context
+  presheaf is a sheaf on the FULL standard site — a genuine Grothendieck coverage;
+  "equal-signature" is the matching condition, not a sub-coverage (the ledger
+  wording is corrected, T1 unchanged/better-founded). Two policies = two
+  value-presheaves over one site. General amalgamation proved + fast-check pinned.
+  [`design/laws/GLUING_SITE_THEOREM.md`](design/laws/GLUING_SITE_THEOREM.md).
 - **Infra:** `qwen3-coder:480b` was RETIRED by Ollama 2026-07-15 — the
   `7b → 480b-cloud → opus` ladder's cloud rung is dead; re-anchor to
   `gpt-oss:120b-cloud`.
