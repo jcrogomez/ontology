@@ -71,15 +71,21 @@ are tested. It does not introduce new verification logic.
 Since 2026-07-20 every multi-draw run (sync's default) also folds the
 losing draws into a per-node **gray-zone index** (`laws/gray-zone.ts`):
 how much the draws disagreed with EACH OTHER (declKey clusters →
-`agreementRate`/`disagreementRate`/entropy, plus a pass/fail
-`behaviorSplit` under the same fixture). The latest record per node is
-upserted to `.ontology/reports/gray-zone.json` (best-effort — a
-bookkeeping failure never sinks the run; preview runs record too, the
-measurement is read-only). `onto status --gray-zone` ranks the records:
-draws that disagree localise fichas that under-determine the artifact —
-the repair-the-ficha-first queue (Gap A), as opposed to draws that agree
-yet fail (capacity, Gap B). The executor's plateau router consumes the
-same fold (EXECUTOR_SPEC §3).
+`agreementRate`/`disagreementRate`/entropy, a pass/fail `behaviorSplit`
+under the same fixture, and — since 2026-07-21 — a **`semanticSplit`**:
+draws that all fail but on DIFFERENT fixture cases, gated by an
+`evaluatedDraws ≥ 3` floor so a two-draw fluke does not trip it. Any of
+these makes `zone: gray`; semanticSplit catches the bespoke case the
+declKey cluster misses because structure agrees and no draw passes). The
+latest record per node is upserted to `.ontology/reports/gray-zone.json`
+(best-effort — a bookkeeping failure never sinks the run; preview runs
+record too, the measurement is read-only). `onto status --gray-zone`
+ranks the records by repair priority (`compareGrayZoneRepairPriority`:
+Gap-A suspects first, so a semantic-split node with `disagreementRate 0`
+is NOT buried): draws that disagree localise fichas that under-determine
+the artifact — the repair-the-ficha-first queue (Gap A), as opposed to
+draws that agree yet fail (capacity, Gap B). The executor's plateau
+router consumes the same fold (EXECUTOR_SPEC §3).
 
 ### Flag surface (inherited from `regenerate`, defaults flipped)
 

@@ -5,10 +5,12 @@ import { createTempProject, cleanupTempProject } from "./helpers/temp-project.js
 import { runCli } from "./helpers/run-cli.js";
 import {
   computeGrayZone,
+  compareGrayZoneRepairPriority,
   recordGrayZone,
   readGrayZoneRecords,
   grayZoneReportPath,
   type DrawObservation,
+  type GrayZoneIndex,
 } from "../src/laws/gray-zone.js";
 
 // Gray-zone index — per-node draw-vs-draw disagreement. The pure fold is
@@ -271,5 +273,41 @@ describe("gray-zone wiring (regenerate → report → status)", () => {
     expect(shown.stdout).toContain("gray-zone index");
     expect(shown.stdout).toContain(`${id}\t[gray]`);
     expect(shown.stdout).not.toContain("node_deleted");
+  });
+});
+
+describe("compareGrayZoneRepairPriority (repair-first ordering)", () => {
+  const failCases = (names: string[]): DrawObservation["caseOutcomes"] =>
+    names.map((n) => ({ name: n, outcome: "divergent" }));
+
+  // Structure agrees, all fail on DIFFERENT cases → gray via semanticSplit,
+  // but disagreementRate is 0 (one declKey cluster). The regression guard.
+  const semanticGray: GrayZoneIndex = computeGrayZone([
+    obs(1, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: failCases(["a"]) }),
+    obs(2, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: failCases(["b"]) }),
+    obs(3, { behaviorVerdict: "fail", acceptable: false, caseOutcomes: failCases(["a"]) }),
+  ]);
+  const unanimousPass: GrayZoneIndex = computeGrayZone([obs(1), obs(2), obs(3)]);
+  const structuralGray: GrayZoneIndex = computeGrayZone([
+    obs(1, { declKey: "a" }),
+    obs(2, { declKey: "b" }),
+    obs(3, { declKey: "c" }),
+  ]);
+
+  it("a semantic-split node (disagreementRate 0) outranks a unanimous node", () => {
+    expect(semanticGray.zone).toBe("gray");
+    expect(semanticGray.disagreementRate).toBe(0); // the trap the old sort fell into
+    expect(compareGrayZoneRepairPriority(semanticGray, unanimousPass)).toBeLessThan(0);
+  });
+
+  it("structural gray outranks semantic gray (more draws disagreeing)", () => {
+    expect(compareGrayZoneRepairPriority(structuralGray, semanticGray)).toBeLessThan(0);
+  });
+
+  it("sorting the queue puts both gray kinds ahead of unanimous", () => {
+    const ranked = [unanimousPass, semanticGray, structuralGray].sort(
+      compareGrayZoneRepairPriority,
+    );
+    expect(ranked).toEqual([structuralGray, semanticGray, unanimousPass]);
   });
 });

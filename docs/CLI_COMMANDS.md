@@ -757,8 +757,10 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
   plus the fix-first **blocker antichain** ranked by how many nodes each blocks),
   `--gray-zone` (2026-07-20: the draw-disagreement ranking recorded by
   multi-draw `sync`/`regenerate` runs into `.ontology/reports/gray-zone.json` —
-  nodes whose draws disagreed with each other, most-ambiguous first: the
-  repair-the-ficha-first queue; draws nothing itself),
+  Gap-A suspects first (repair-the-ficha-first queue); draws nothing itself.
+  Since 2026-07-21 also flags a **semantic split** — draws that all fail but on
+  DIFFERENT fixture cases, the bespoke extraction-gap where structure agrees so
+  `disagreementRate` is 0; the ranking floats these up instead of burying them),
   `--json` (full per-node detail + the `readiness` + `grayZone` objects).
 - **`--blockers` (order theory):** the batch-syncable set is the largest
   down-closed subset (order ideal) of the core tier under the dependency poset;

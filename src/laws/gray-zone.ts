@@ -177,6 +177,29 @@ export function computeGrayZone(observations: DrawObservation[]): GrayZoneIndex 
 
 // ── Persistence: .ontology/reports/gray-zone.json ──
 //
+/** Repair-first ordering for the `onto status --gray-zone` queue. Gap-A
+ *  suspects — a gray zone (no majority cluster OR a semantic split) or a
+ *  pass/fail behaviour split — rank first, then by structural disagreement,
+ *  then the behaviour-grounded splits, then entropy. Pure and total (no id
+ *  tiebreak; callers append their own for stability). WHY this exists: a
+ *  semantic-split node has `disagreementRate === 0` (its draws share a
+ *  declaration set), so sorting on disagreement alone buries it LAST — exactly
+ *  the bespoke class the semantic signal exists to surface. Descending: a
+ *  negative result means `a` outranks `b`. */
+export function compareGrayZoneRepairPriority(
+  a: GrayZoneIndex,
+  b: GrayZoneIndex,
+): number {
+  const gapA = (r: GrayZoneIndex): number => (r.zone === "gray" || r.behaviorSplit ? 1 : 0);
+  return (
+    gapA(b) - gapA(a) ||
+    b.disagreementRate - a.disagreementRate ||
+    (b.semanticSplit ? 1 : 0) - (a.semanticSplit ? 1 : 0) ||
+    (b.behaviorSplit ? 1 : 0) - (a.behaviorSplit ? 1 : 0) ||
+    b.clusterEntropyBits - a.clusterEntropyBits
+  );
+}
+
 // One latest record per node (not a history): the index answers "which fichas
 // should I repair FIRST, today", so the freshest measurement wins. History
 // lives in the dated calibration records when a run is worth preserving.
