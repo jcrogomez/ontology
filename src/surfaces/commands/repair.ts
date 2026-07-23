@@ -26,6 +26,8 @@ export interface RepairCommandOptions {
   repairProvider?: string;
   repairModel?: string;
   draws?: number;
+  /** commander maps --no-holdout to holdout === false. */
+  holdout?: boolean;
   budgetChars?: number;
   behaviorFixturesDir?: string;
   ollamaHost?: string;
@@ -89,6 +91,7 @@ export async function repairCommand(target: string, options: RepairCommandOption
     repairProvider: options.repairProvider,
     repairModel: options.repairModel,
     draws: options.draws,
+    holdout: options.holdout,
     budgetChars: options.budgetChars,
     behaviorFixturesDir: options.behaviorFixturesDir,
     ollamaHost: options.ollamaHost,
@@ -116,9 +119,18 @@ export async function repairCommand(target: string, options: RepairCommandOption
   const d = report.diff!;
   emit(`✔ ${target} ${report.operator} → ${report.proposalId}`);
   emit(`  parent ${report.parentFichaHash!.slice(0, 8)} → fork ${report.forkFichaHash!.slice(0, 8)} (rung fixed: ${config.provider}${config.model ? `:${config.model}` : ""})`);
-  emit(`  flips: +${d.wrongToRight.length} wrong→right, -${d.rightToWrong.length} right→wrong (net ${d.netFlips >= 0 ? "+" : ""}${d.netFlips} over ${d.comparableCases} cases)`);
+  emit(`  AUTHOR flips: +${d.wrongToRight.length} wrong→right, -${d.rightToWrong.length} right→wrong (net ${d.netFlips >= 0 ? "+" : ""}${d.netFlips} over ${d.comparableCases} cases)`);
   if (d.wrongToRight.length > 0) emit(`    fixed: ${d.wrongToRight.map((f) => f.name).join(", ")}`);
   if (d.rightToWrong.length > 0) emit(`    broke: ${d.rightToWrong.map((f) => f.name).join(", ")}`);
+  if (report.split && report.confirmDiff) {
+    const c = report.confirmDiff;
+    emit(
+      `  CONFIRM (held-out ${report.split.confirm.length} case(s), never prompted): +${c.wrongToRight.length}/-${c.rightToWrong.length}` +
+        (report.confirmRegression ? " ⚠ REGRESSION — the repair broke a case the author never saw" : " ✓ no regression"),
+    );
+  } else {
+    emit(`  holdout: none (${options.holdout === false ? "--no-holdout" : "fixture too small to split"}) — AUTHOR flips are in-sample`);
+  }
   if (d.parentOnlyCases.length > 0 || d.forkOnlyCases.length > 0) {
     emit(`  ⚠ fixture drift: parent-only [${d.parentOnlyCases.join(", ")}] fork-only [${d.forkOnlyCases.join(", ")}]`);
   }

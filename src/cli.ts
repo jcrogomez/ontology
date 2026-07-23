@@ -1227,6 +1227,7 @@ program
   .option("--repair-provider <provider>", "Repairer provider (default: the generator's). Pass a STRONGER one — repairing is G-side reasoning.")
   .option("--repair-model <model>", "Repairer model override.")
   .option("--draws <n>", "Draws per side (default 3 — the semanticSplit floor).", (v) => parseInt(v, 10))
+  .option("--no-holdout", "Disable the AUTHOR/CONFIRM split (default: fixtures with ≥4 cases hold ~1/3 out of every prompt and report a held-out CONFIRM flip diff — the honest readout).")
   .option("--budget-chars <n>", "Injected-text budget: max chars the repair may ADD to the ficha surface (default 2000).", (v) => parseInt(v, 10))
   .option("--behavior-fixtures-dir <path>", "Override the behaviour-fixtures directory (default tests/behavior-fixtures).")
   .option("--ollama-host <host>", "Host for the Ollama provider.")

@@ -35,8 +35,12 @@ import {
   computeFlipDiff,
   buildRepairEventPayload,
   recordRepairEvent,
+  splitAuthorConfirm,
+  seedFromFichaHash,
+  restrictSide,
   type AggregatedSide,
   type CaseOutcome,
+  type CaseSplit,
   type FlipDiff,
   type ForkSpec,
 } from "./counterfactual.js";
@@ -69,6 +73,12 @@ export interface RepairConfig {
   repairModel?: string;
   /** Draws per side. Defaults to the semanticSplit floor (3). */
   draws?: number;
+  /** AUTHOR/CONFIRM holdout (FORK_AND_DIFF slice 2). Default true: fixtures
+   *  with ≥ MIN_CASES_TO_SPLIT cases hold ~1/3 out of every prompt (oracle
+   *  grounding, refine critique, the repair author) and report a separate
+   *  CONFIRM flip diff. false = in-sample everywhere, honestly recorded as
+   *  split-absent in the audit event. */
+  holdout?: boolean;
   budgetChars?: number;
   behaviorFixturesDir?: string;
   ollamaHost?: string;
@@ -100,7 +110,16 @@ export interface RepairReport {
   budget?: BudgetCheck;
   parentSide?: AggregatedSide;
   forkSide?: AggregatedSide;
+  /** AUTHOR-side flip diff (all cases when no split ran). */
   diff?: FlipDiff;
+  /** The seeded AUTHOR/CONFIRM split, when the fixture was big enough and the
+   *  holdout was on. Absent = the measurement is in-sample (honestly so). */
+  split?: CaseSplit;
+  /** CONFIRM-side flip diff — cases no prompt ever saw. */
+  confirmDiff?: FlipDiff;
+  /** True when the fork REGRESSED a held-out case (right→wrong on CONFIRM).
+   *  The promotion-blocking signal for the human (and for v2's auto-gate). */
+  confirmRegression?: boolean;
   /** True when the parent baseline ALREADY passes (nothing to repair). */
   parentAlreadyPasses?: boolean;
 }
@@ -149,13 +168,29 @@ export async function runFichaRepair(config: RepairConfig, deps: RepairDeps = {}
     detail,
   });
 
-  // ── 1. Load + parent baseline ─────────────────────────────────────────────
+  // ── 1. Load + split + parent baseline ─────────────────────────────────────
   const node = loadNodeById(config.nodeId, cwd);
   if (!node) return fail("load", `node not found: ${config.nodeId}`);
   const parentHash = fichaHashFor(config.nodeId, cwd);
   if (parentHash === undefined) return fail("load", "ficha surface not hashable");
   const fichaPrompt = node.prompt?.raw ?? "";
   const rules = node.rules ?? [];
+
+  // The behaviour oracle's black-box criteria — loaded BEFORE the baseline
+  // because the AUTHOR/CONFIRM split must filter the very first generation:
+  // a holdout applied only at scoring time would still be in-sample.
+  const fixturesDir = config.behaviorFixturesDir ?? path.join(cwd, "tests/behavior-fixtures");
+  const fixture = await loadFixture(fixturesDir, config.nodeId).catch(() => null);
+  const allCases = fixture ? fixture.fixture.cases.map((c) => ({ name: c.name, description: c.description })) : [];
+
+  // Seeded from the parent ficha hash: parent and fork of THIS repair share
+  // the split by construction, and the deal rotates when the ficha changes.
+  const split: CaseSplit | null =
+    config.holdout === false
+      ? null
+      : splitAuthorConfirm(allCases.map((c) => c.name), seedFromFichaHash(parentHash));
+  const confirmSet = new Set(split?.confirm ?? []);
+  const oracle = allCases.filter((c) => !confirmSet.has(c.name));
 
   const evalOptions: RegenerateCommandOptions = {
     provider: config.provider,
@@ -169,6 +204,7 @@ export async function runFichaRepair(config: RepairConfig, deps: RepairDeps = {}
     behaviorFixturesDir: config.behaviorFixturesDir,
     ollamaHost: config.ollamaHost,
     maxTokens: config.maxTokens,
+    ...(split ? { confirmHoldout: split.confirm } : {}),
   };
   let parentResult: RegenerateResult;
   try {
@@ -181,13 +217,26 @@ export async function runFichaRepair(config: RepairConfig, deps: RepairDeps = {}
   if (parentSide.cases.length === 0) {
     return fail("baseline", "no behaviour cases evaluated at baseline — a repair cannot be measured without an oracle (unverified-no-fixture territory)");
   }
-  const parentFailing = parentSide.cases.filter((c) => c.outcome !== "match");
+  // "Nothing to repair" is judged on the AUTHOR side: the author cannot
+  // honestly target a failure it is not allowed to see. Failures living only
+  // in CONFIRM are reported as such, not smuggled into the prompt.
+  const parentAuthorSide = split ? restrictSide(parentSide, split.author) : parentSide;
+  const parentFailing = parentAuthorSide.cases.filter((c) => c.outcome !== "match");
   if (parentFailing.length === 0) {
+    const confirmFailing = split
+      ? restrictSide(parentSide, split.confirm).cases.filter((c) => c.outcome !== "match").length
+      : 0;
     return {
-      ...fail("baseline", "parent baseline already passes every case on majority — nothing to repair"),
+      ...fail(
+        "baseline",
+        confirmFailing > 0
+          ? `parent passes every AUTHOR case; ${confirmFailing} failure(s) live only in held-out CONFIRM — grow the fixture or re-deal (the author must not see them)`
+          : "parent baseline already passes every case on majority — nothing to repair",
+      ),
       parentAlreadyPasses: true,
       parentFichaHash: parentHash,
       parentSide,
+      ...(split ? { split } : {}),
     };
   }
 
@@ -206,14 +255,8 @@ export async function runFichaRepair(config: RepairConfig, deps: RepairDeps = {}
   const metrics = parentResult.metrics;
   const original = new Set(metrics?.originalDeclarations ?? []);
   const regen = new Set(metrics?.regenDeclarations ?? []);
-  // The behaviour oracle's black-box criteria (same lift oracle-grounding
-  // feeds the generator) — the repairer sees the SPEC the artifact is judged
-  // against, never the fixture's function bodies.
-  const fixturesDir = config.behaviorFixturesDir ?? path.join(cwd, "tests/behavior-fixtures");
-  const fixture = await loadFixture(fixturesDir, config.nodeId).catch(() => null);
-  const oracle = fixture
-    ? fixture.fixture.cases.map((c) => ({ name: c.name, description: c.description }))
-    : [];
+  // The repairer sees the AUTHOR-side spec only: the filtered oracle and the
+  // author-side failures (`parentFailing` is already author-restricted).
   const userPrompt = buildRepairUserPrompt(config.operator, {
     nodeId: config.nodeId,
     fichaPrompt,
@@ -290,12 +333,26 @@ export async function runFichaRepair(config: RepairConfig, deps: RepairDeps = {}
       cwd,
     });
     proposalId = proposal.id;
-    recordRepairEvent(cwd, "repair_proposed", buildRepairEventPayload(spec, undefined, proposalId));
   } catch (err) {
     return fail("propose", `proposal creation failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   // ── 5. Fork evaluation (fixed rung, no write, ficha overlay) ─────────────
+  // The repair_proposed event is emitted AFTER the evaluation so one event
+  // carries the full measurement (split + AUTHOR flips + CONFIRM flips) —
+  // that single record is what the agreement-rate fold and any out-of-session
+  // resolution read back. A failed evaluation still emits the event (split
+  // only, no flips) so the proposal never dangles unaudited.
+  const emitProposed = (diffs?: { diff: FlipDiff; confirmDiff?: FlipDiff }): void => {
+    recordRepairEvent(
+      cwd,
+      "repair_proposed",
+      buildRepairEventPayload(spec, diffs?.diff, proposalId, {
+        ...(split ? { split } : {}),
+        ...(diffs?.confirmDiff ? { confirmDiff: diffs.confirmDiff } : {}),
+      }),
+    );
+  };
   let forkResult: RegenerateResult;
   try {
     forkResult = await regenerate(
@@ -304,13 +361,24 @@ export async function runFichaRepair(config: RepairConfig, deps: RepairDeps = {}
       cwd,
     );
   } catch (err) {
-    return { ...fail("fork-eval", `fork evaluation threw: ${err instanceof Error ? err.message : String(err)}`), proposalId, repaired, budget, parentFichaHash: parentHash, forkFichaHash: forkHash, parentSide };
+    emitProposed();
+    return { ...fail("fork-eval", `fork evaluation threw: ${err instanceof Error ? err.message : String(err)}`), proposalId, repaired, budget, parentFichaHash: parentHash, forkFichaHash: forkHash, parentSide, ...(split ? { split } : {}) };
   }
   if (!forkResult.ok) {
-    return { ...fail("fork-eval", forkResult.failure ?? "fork evaluation failed"), proposalId, repaired, budget, parentFichaHash: parentHash, forkFichaHash: forkHash, parentSide };
+    emitProposed();
+    return { ...fail("fork-eval", forkResult.failure ?? "fork evaluation failed"), proposalId, repaired, budget, parentFichaHash: parentHash, forkFichaHash: forkHash, parentSide, ...(split ? { split } : {}) };
   }
   const forkSide = aggregateCaseOutcomes(sidesFromResult(forkResult));
-  const diff = computeFlipDiff(parentSide, forkSide);
+  // AUTHOR-side flips = what the author was allowed to target; CONFIRM-side
+  // flips = the held-out readout. Without a split there is one full diff and
+  // the confirm fields stay absent (in-sample, honestly so).
+  const diff = split
+    ? computeFlipDiff(parentAuthorSide, restrictSide(forkSide, split.author))
+    : computeFlipDiff(parentSide, forkSide);
+  const confirmDiff = split
+    ? computeFlipDiff(restrictSide(parentSide, split.confirm), restrictSide(forkSide, split.confirm))
+    : undefined;
+  emitProposed({ diff, ...(confirmDiff ? { confirmDiff } : {}) });
 
   return {
     ok: true,
@@ -324,6 +392,9 @@ export async function runFichaRepair(config: RepairConfig, deps: RepairDeps = {}
     parentSide,
     forkSide,
     diff,
+    ...(split ? { split } : {}),
+    ...(confirmDiff ? { confirmDiff } : {}),
+    ...(confirmDiff ? { confirmRegression: confirmDiff.rightToWrong.length > 0 } : {}),
   };
 }
 

@@ -769,6 +769,15 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
   (oracle criteria, failing-case diagnostics, export drift); the honest floor.
   `--operator perm` — may read the reference source; the ceiling. Never mixed
   in one run; the strict↔perm closure gap is itself the measurement.
+- **AUTHOR/CONFIRM holdout (2026-07-23, FORK_AND_DIFF slice 2, default ON):**
+  fixtures with ≥4 cases deal ~1/3 into a held-out CONFIRM set — seeded from
+  the parent `fichaHash` (replayable; recorded in `repair_proposed`), excluded
+  from oracle grounding, refine critique AND the repair author's prompt, yet
+  still run and score. The report shows AUTHOR flips + a separate
+  `CONFIRM … ✓ no regression / ⚠ REGRESSION` line; failures living only in
+  CONFIRM stop the repair (the author must not see them). `--no-holdout`
+  disables (readout then says in-sample honestly). Small fixtures: `holdout:
+  none`, never a 1-case coin flip.
 - **Key flags:** `--provider/--model` (the fixed generator rung, required),
   `--repair-provider/--repair-model` (the repairer — pass a stronger rung;
   repairing is G-side reasoning), `--draws`, `--budget-chars`, `--json`.

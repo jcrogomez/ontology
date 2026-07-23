@@ -43,10 +43,17 @@ export async function fireRepairFromWalker(
   }
   const d = report.diff!;
   const floor = d.meetsDrawFloor ? "" : " (below draw floor)";
+  // The CONFIRM readout rides the proc label: regression is the one signal
+  // the human must not miss before pressing 'a' in the proposals panel.
+  const confirm = report.confirmDiff
+    ? report.confirmRegression
+      ? ` · CONFIRM ⚠ -${report.confirmDiff.rightToWrong.length}`
+      : ` · CONFIRM ok`
+    : " · in-sample";
   return {
     ok: true,
     proposalId: report.proposalId,
-    label: `+${d.wrongToRight.length}/-${d.rightToWrong.length} flips${floor} → ${report.proposalId} (:proposals to review)`,
+    label: `+${d.wrongToRight.length}/-${d.rightToWrong.length} flips${floor}${confirm} → ${report.proposalId} (:proposals to review)`,
   };
 }
 

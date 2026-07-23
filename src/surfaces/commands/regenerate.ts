@@ -100,6 +100,13 @@ export interface RegenerateCommandOptions {
   model?: string;
   ollamaHost?: string;
   write?: boolean;
+  /** CONFIRM holdout (FORK_AND_DIFF slice 2 / repair.ts): behaviour-fixture
+   *  case NAMES that must never surface to generation — excluded from the
+   *  oracle-grounding section and from refine-round critiques — while still
+   *  running in the behaviour check and scoring the result. This is what
+   *  makes a held-out readout honest: the generator and any repair author
+   *  never saw these cases. */
+  confirmHoldout?: string[];
   /** Counterfactual ficha overlay (MVP_REGEN_LOOP.md §4.2 / repair.ts):
    *  evaluate the node AS IF its ficha surface were this, WITHOUT mutating
    *  the node on disk. The overlay is applied right after load, so every
@@ -430,8 +437,21 @@ export async function runRegenerate(
   // will be executed against, instead of compiling blind and being judged
   // after. Carries only black-box contract prose (no implementation): the
   // fixture's setup/invoke/assert function bodies never reach the prompt.
+  //
+  // CONFIRM holdout (FORK_AND_DIFF slice 2): cases named in
+  // options.confirmHoldout are excluded from the GUIDING surfaces — this
+  // oracle section and the refine-round critique — while still RUNNING in
+  // the behaviour check and scoring the result. Without the holdout, the
+  // fixture leaks into generation twice and every pass is in-sample by
+  // construction (Regimes measured that cost: in-sample +0.18 → held-out
+  // +0.04). The filter changes the assembled prompt, so it folds into the
+  // run-cache contextHash for free — held-out and full-oracle runs never
+  // share a cache entry.
+  const holdout = new Set(options.confirmHoldout ?? []);
   const behaviorOracle = fixture
-    ? fixture.fixture.cases.map((c) => ({ name: c.name, description: c.description }))
+    ? fixture.fixture.cases
+        .filter((c) => !holdout.has(c.name))
+        .map((c) => ({ name: c.name, description: c.description }))
     : undefined;
 
   // Verify-refine: up to `rounds` generate→check→refine iterations. rounds=1
@@ -702,8 +722,11 @@ export async function runRegenerate(
       return matches + (WRITE_SAFE_VERDICTS.has(e.verdict!) ? 0.5 : 0);
     };
     const best = [...candidates].sort((a, b) => score(b) - score(a))[0];
+    // Held-out cases never reach the critique either — a refine round that
+    // names a CONFIRM failure would leak exactly the signal the holdout
+    // exists to protect (same filter as the oracle section above).
     const failedCriteria = (best.behaviorCases ?? [])
-      .filter((cc) => cc.outcome !== "match")
+      .filter((cc) => cc.outcome !== "match" && !holdout.has(cc.name))
       .map((cc) => ({ name: cc.name, diagnostic: draftSideDiagnostic(cc.outcome, cc.detail) }));
     // A draft that THROWS AT IMPORT TIME produces no cases at all — without
     // this synthetic criterion the refine loop is blind to the single most

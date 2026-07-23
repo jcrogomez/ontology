@@ -8,6 +8,10 @@ import {
   computeFlipDiff,
   buildRepairEventPayload,
   recordRepairEvent,
+  splitAuthorConfirm,
+  seedFromFichaHash,
+  restrictSide,
+  MIN_CASES_TO_SPLIT,
   type CaseOutcome,
   type ForkSpec,
 } from "../src/runtime/executor/counterfactual.js";
@@ -121,6 +125,49 @@ describe("computeFlipDiff (the promotion currency)", () => {
     const parent = agg([c("z", "divergent"), c("a", "divergent")], 3);
     const fork = agg([c("a", "match"), c("z", "match")], 3);
     expect(computeFlipDiff(parent, fork).wrongToRight.map((f) => f.name)).toEqual(["z", "a"]);
+  });
+});
+
+describe("splitAuthorConfirm (the seeded AUTHOR/CONFIRM deal — slice 2)", () => {
+  const names = ["c1", "c2", "c3", "c4", "c5", "c6"];
+
+  it("is deterministic: same (names, seed) → byte-identical split, forever", () => {
+    const a = splitAuthorConfirm(names, 12345)!;
+    const b = splitAuthorConfirm(names, 12345)!;
+    expect(a).toEqual(b);
+  });
+
+  it("partitions: disjoint, exhaustive, ~1/3 held out, original order kept", () => {
+    const s = splitAuthorConfirm(names, 777)!;
+    expect(s.confirm).toHaveLength(2); // floor(6/3)
+    expect(s.author).toHaveLength(4);
+    expect([...s.author, ...s.confirm].sort()).toEqual([...names].sort());
+    expect(s.author.every((n, i, arr) => i === 0 || names.indexOf(arr[i - 1]) < names.indexOf(n))).toBe(true);
+    expect(s.seed).toBe(777);
+  });
+
+  it("refuses to split below the floor (n < 4) — heldOut: none, never a 1-case coin flip", () => {
+    expect(splitAuthorConfirm(["a", "b", "c"], 1)).toBeNull();
+    expect(splitAuthorConfirm(["a", "b", "c", "d"], 1)).not.toBeNull();
+    expect(MIN_CASES_TO_SPLIT).toBe(4);
+  });
+
+  it("holds out at least one case even at the floor", () => {
+    const s = splitAuthorConfirm(["a", "b", "c", "d"], 9)!;
+    expect(s.confirm.length).toBeGreaterThanOrEqual(1);
+    expect(s.author.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("seedFromFichaHash: hex prefix → uint32; garbage → 0", () => {
+    expect(seedFromFichaHash("deadbeefcafe")).toBe(0xdeadbeef);
+    expect(seedFromFichaHash("zzzz")).toBe(0);
+  });
+
+  it("restrictSide keeps only the named cases and the draw count", () => {
+    const side = { cases: [c("a", "match"), c("b", "divergent")], evaluatedDraws: 3 };
+    const r = restrictSide(side, ["b"]);
+    expect(r.cases.map((x) => x.name)).toEqual(["b"]);
+    expect(r.evaluatedDraws).toBe(3);
   });
 });
 

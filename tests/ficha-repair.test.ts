@@ -10,6 +10,7 @@ import {
   checkRepairBudget,
 } from "../src/runtime/executor/repair-prompt.js";
 import { runFichaRepair, resolveRepair, type RepairConfig, type RepairDeps } from "../src/runtime/executor/repair.js";
+import { splitAuthorConfirm, seedFromFichaHash } from "../src/runtime/executor/counterfactual.js";
 import { fichaHashFor } from "../src/runtime/executor/precedents.js";
 import { loadProposal, listProposals } from "../src/kernel/core/proposals/persist.js";
 import { loadNodeById } from "../src/kernel/core/project/load.js";
@@ -27,6 +28,13 @@ import type { LlmResponse } from "../src/runtime/llm/types.js";
 
 const REPAIRED = { prompt: "Repaired: greet with locale-aware casing", rules: ["greeting must be locale-aware"] };
 const asResponse = (text: string): LlmResponse => ({ text, model: "test-repairer", provider: "mock" }) as unknown as LlmResponse;
+
+const readEvents = (dir: string): Array<{ eventType: string; payload: Record<string, unknown> }> =>
+  fs
+    .readFileSync(path.join(dir, ".ontology", "events.jsonl"), "utf-8")
+    .split("\n")
+    .filter((l) => l.trim())
+    .map((l) => JSON.parse(l) as { eventType: string; payload: Record<string, unknown> });
 
 describe("repair-prompt (pure)", () => {
   const inputs = {
@@ -246,6 +254,18 @@ describe("runFichaRepair (orchestration, scripted deps)", () => {
     expect(events.some((e) => e.eventType === "repair_promoted")).toBe(true);
   });
 
+  it("no fixture on disk → no split: the report and event are honestly in-sample", async () => {
+    const report = await runFichaRepair(
+      { ...config, cwd: tempDir },
+      deps({ parent: drawResult(failing), fork: drawResult(passing), response: JSON.stringify(REPAIRED) }),
+    );
+    expect(report.ok).toBe(true);
+    expect(report.split).toBeUndefined();
+    expect(report.confirmDiff).toBeUndefined();
+    const proposed = readEvents(tempDir).find((e) => e.eventType === "repair_proposed")!;
+    expect((proposed.payload as { split?: unknown }).split).toBeUndefined();
+  });
+
   it("discard rejects the proposal, records the event, node untouched", async () => {
     const report = await runFichaRepair(
       { ...config, cwd: tempDir },
@@ -267,5 +287,135 @@ describe("runFichaRepair (orchestration, scripted deps)", () => {
     expect(resolved.ok).toBe(true);
     expect(loadProposal(report.proposalId!, tempDir)?.status).toBe("rejected");
     expect(loadNodeById(nodeId, tempDir)?.prompt.raw).toBe("Greet the user");
+  });
+});
+
+describe("AUTHOR/CONFIRM holdout (slice 2, scripted deps + real 6-case fixture)", () => {
+  let tempDir: string;
+  const nodeId = "node_0001";
+  const CASES = ["c1", "c2", "c3", "c4", "c5", "c6"];
+
+  beforeEach(() => {
+    tempDir = createTempProject();
+    expect(runCli(tempDir, ["init"]).status).toBe(0);
+    expect(
+      runCli(tempDir, ["node", "create", "--level", "domain", "--kind", "entity", "--prompt", "Greet the user"]).status,
+    ).toBe(0);
+    const dir = path.join(tempDir, "tests", "behavior-fixtures");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, `${nodeId}.fixture.mjs`),
+      `export const cases = ${JSON.stringify(CASES)}.map((name) => ({\n` +
+        `  name, setup: () => ({}), invoke: () => undefined, assert: () => true,\n` +
+        `}));\n`,
+    );
+  });
+  afterEach(() => cleanupTempProject(tempDir));
+
+  // The test derives the split EXACTLY the way production does — from the
+  // live parent ficha hash — so the scripted draws can be keyed off it.
+  const expectedSplit = () => splitAuthorConfirm(CASES, seedFromFichaHash(fichaHashFor(nodeId, tempDir)!))!;
+
+  const resultWith = (outcomeFor: (name: string) => string): RegenerateResult =>
+    ({
+      ok: true,
+      nodeId,
+      written: false,
+      behaviorVerdict: "fail",
+      draws: 3,
+      draftSummary: [0, 1, 2].map((i) => ({
+        i,
+        behaviorVerdict: "fail" as const,
+        acceptable: false,
+        caseOutcomes: CASES.map((name) => ({ name, outcome: outcomeFor(name) })),
+      })),
+    }) as unknown as RegenerateResult;
+
+  it("threads the holdout everywhere: eval options, repairer prompt, split-aware diffs, event payload", async () => {
+    const split = expectedSplit();
+    const authorSet = new Set(split.author);
+    const seenHoldouts: Array<string[] | undefined> = [];
+    let repairerPrompt = "";
+
+    // Parent: every AUTHOR case fails, CONFIRM cases pass. Fork: every AUTHOR
+    // case fixed, ONE confirm case regresses — the readout must catch it.
+    const regressed = split.confirm[0];
+    const parent = resultWith((n) => (authorSet.has(n) ? "divergent" : "match"));
+    const fork = resultWith((n) => (n === regressed ? "divergent" : "match"));
+
+    const report = await runFichaRepair(
+      { nodeId, operator: "R_strict", provider: "mock", draws: 3, cwd: tempDir },
+      {
+        regenerate: async (_id, opts) => {
+          seenHoldouts.push(opts.confirmHoldout);
+          return opts.fichaOverride ? fork : parent;
+        },
+        dispatch: async (req) => {
+          repairerPrompt = req.prompt;
+          return asResponse(JSON.stringify(REPAIRED));
+        },
+      },
+    );
+
+    expect(report.ok).toBe(true);
+    // (a) BOTH regenerate calls carried the same confirm holdout.
+    expect(seenHoldouts).toHaveLength(2);
+    expect(seenHoldouts[0]).toEqual(split.confirm);
+    expect(seenHoldouts[1]).toEqual(split.confirm);
+    // (b) The repairer prompt names every AUTHOR case and NO CONFIRM case.
+    for (const a of split.author) expect(repairerPrompt).toContain(a);
+    for (const cc of split.confirm) expect(repairerPrompt).not.toContain(cc);
+    // (c) AUTHOR diff covers only author cases; CONFIRM diff caught the regression.
+    expect(report.split).toEqual(split);
+    expect(report.diff!.comparableCases).toBe(split.author.length);
+    expect(report.diff!.wrongToRight.map((f) => f.name).sort()).toEqual([...split.author].sort());
+    expect(report.confirmDiff!.rightToWrong.map((f) => f.name)).toEqual([regressed]);
+    expect(report.confirmRegression).toBe(true);
+    // (d) One repair_proposed event carries split + author flips + confirm flips.
+    const proposed = readEvents(tempDir).filter((e) => e.eventType === "repair_proposed");
+    expect(proposed).toHaveLength(1);
+    const payload = proposed[0].payload as {
+      split?: { seed: number; confirm: string[] };
+      flips?: { comparableCases: number };
+      confirmFlips?: { rightToWrong: string[] };
+    };
+    expect(payload.split?.confirm).toEqual(split.confirm);
+    expect(payload.split?.seed).toBe(split.seed);
+    expect(payload.flips?.comparableCases).toBe(split.author.length);
+    expect(payload.confirmFlips?.rightToWrong).toEqual([regressed]);
+  });
+
+  it("failures living only in CONFIRM stop the repair — the author must not see them", async () => {
+    const split = expectedSplit();
+    const confirmSet = new Set(split.confirm);
+    const parent = resultWith((n) => (confirmSet.has(n) ? "divergent" : "match"));
+    const report = await runFichaRepair(
+      { nodeId, operator: "R_strict", provider: "mock", draws: 3, cwd: tempDir },
+      { regenerate: async () => parent, dispatch: async () => asResponse(JSON.stringify(REPAIRED)) },
+    );
+    expect(report.ok).toBe(false);
+    expect(report.parentAlreadyPasses).toBe(true);
+    expect(report.detail).toMatch(/held-out CONFIRM/);
+  });
+
+  it("--no-holdout disables the split and says so honestly (no confirm fields anywhere)", async () => {
+    const parent = resultWith(() => "divergent");
+    const fork = resultWith(() => "match");
+    const seenHoldouts: Array<string[] | undefined> = [];
+    const report = await runFichaRepair(
+      { nodeId, operator: "R_strict", provider: "mock", draws: 3, holdout: false, cwd: tempDir },
+      {
+        regenerate: async (_id, opts) => {
+          seenHoldouts.push(opts.confirmHoldout);
+          return opts.fichaOverride ? fork : parent;
+        },
+        dispatch: async () => asResponse(JSON.stringify(REPAIRED)),
+      },
+    );
+    expect(report.ok).toBe(true);
+    expect(seenHoldouts).toEqual([undefined, undefined]);
+    expect(report.split).toBeUndefined();
+    expect(report.confirmDiff).toBeUndefined();
+    expect(report.diff!.comparableCases).toBe(CASES.length); // full, in-sample
   });
 });

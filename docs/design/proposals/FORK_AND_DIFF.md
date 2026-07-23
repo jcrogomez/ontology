@@ -71,6 +71,16 @@ voids the old precedent, and a promoted repair records a fresh one.
 
 ## Slice 2 — held-out CONFIRM gate on promotion
 
+> **SHIPPED 2026-07-23** (same-day follow-up to slice 1): seeded
+> `splitAuthorConfirm` (~1/3 held out, n≥4, seed = parent fichaHash → the
+> split replays from the event and rotates when the ficha changes),
+> `confirmHoldout` threaded through regenerate (oracle grounding + refine
+> critique filtered; the cases still RUN and score), author-restricted
+> repairer prompt, dual AUTHOR/CONFIRM flip diffs + `confirmRegression`
+> flag, split + both flip summaries in `repair_proposed`. Still open from
+> this slice: the plateau/anti-over-promotion stopping rule (relevant only
+> when v2 automation arrives — v1 promotion is human).
+
 Today the behavior fixtures leak into generation twice (`behaviorOracle`
 grounding + `refineFeedback` critique), and the same fixtures then score the
 result — in-sample by construction. Regimes measured what that costs: an

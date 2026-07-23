@@ -133,6 +133,75 @@ export function aggregateCaseOutcomes(perDraw: ReadonlyArray<ReadonlyArray<CaseO
 
 const isRight = (c: CaseOutcome): boolean => c.outcome === "match";
 
+// ── AUTHOR / CONFIRM split (FORK_AND_DIFF slice 2) ──────────────────────────
+
+/** Below this many cases a node cannot split: the holdout would be a single
+ *  coin-flip case or the author signal would starve. Reported as
+ *  `heldOut: none`, never silently waived. */
+export const MIN_CASES_TO_SPLIT = 4;
+
+export interface CaseSplit {
+  /** Cases the generator, refine critique and repair author MAY see. */
+  author: string[];
+  /** Cases held out of every prompt — the honest readout. */
+  confirm: string[];
+  /** The PRNG seed the shuffle ran with (recorded in repair_proposed so the
+   *  exact split replays from the log). */
+  seed: number;
+}
+
+// Deterministic 32-bit PRNG (mulberry32). Math.random would make the split
+// unreplayable from the event log — same reason the workflow layer bans it.
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Derive a split seed from a ficha hash (first 8 hex chars → uint32). The
+ *  same ficha therefore always splits the same way — parent and fork of one
+ *  repair share the split by construction — and the split naturally rotates
+ *  when the ficha changes (each promoted repair re-deals the holdout). */
+export function seedFromFichaHash(fichaHash: string): number {
+  const n = Number.parseInt(fichaHash.slice(0, 8), 16);
+  return Number.isFinite(n) ? n >>> 0 : 0;
+}
+
+/** Seeded AUTHOR/CONFIRM partition of a fixture's case names. Returns null
+ *  when the fixture is too small to split honestly (n < MIN_CASES_TO_SPLIT).
+ *  Holdout size is ~1/3 (floor, min 1); the shuffle is a seeded Fisher–Yates
+ *  so the same (names, seed) pair partitions identically forever. Case order
+ *  within each side follows the original fixture order (stable, readable). */
+export function splitAuthorConfirm(caseNames: readonly string[], seed: number): CaseSplit | null {
+  const names = [...caseNames];
+  if (names.length < MIN_CASES_TO_SPLIT) return null;
+  const rand = mulberry32(seed);
+  const shuffled = [...names];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const confirmCount = Math.max(1, Math.floor(names.length / 3));
+  const confirmSet = new Set(shuffled.slice(0, confirmCount));
+  return {
+    author: names.filter((n) => !confirmSet.has(n)),
+    confirm: names.filter((n) => confirmSet.has(n)),
+    seed,
+  };
+}
+
+/** Restrict an aggregated side to a subset of case names — the partition step
+ *  before computing a per-side flip diff (AUTHOR diff vs CONFIRM diff). */
+export function restrictSide(side: AggregatedSide, names: readonly string[]): AggregatedSide {
+  const keep = new Set(names);
+  return { cases: side.cases.filter((c) => keep.has(c.name)), evaluatedDraws: side.evaluatedDraws };
+}
+
 /** The deterministic verdict artifact: per-case flips between the parent's
  *  and the fork's aggregated sides. Pure; order of the flip arrays follows
  *  the parent's case order (deterministic across replays). */
@@ -178,6 +247,19 @@ export type RepairEventType = "repair_proposed" | "repair_promoted" | "repair_di
  *  (nothing measured yet); promoted/discarded carry the diff that informed
  *  the human's Walker decision. `proposalId` links to the proposal-system
  *  record carrying the actual ficha text. */
+export interface FlipSummary {
+  wrongToRight: string[];
+  rightToWrong: string[];
+  netFlips: number;
+  comparableCases: number;
+  parentOnlyCases: string[];
+  forkOnlyCases: string[];
+  parentEvaluatedDraws: number;
+  forkEvaluatedDraws: number;
+  meetsDrawFloor: boolean;
+  drawFloor: number;
+}
+
 export interface RepairEventPayload {
   nodeId: string;
   operator: RepairOperator;
@@ -187,21 +269,38 @@ export interface RepairEventPayload {
   provider?: string;
   model?: string;
   proposalId?: string;
-  flips?: {
-    wrongToRight: string[];
-    rightToWrong: string[];
-    netFlips: number;
-    comparableCases: number;
-    parentOnlyCases: string[];
-    forkOnlyCases: string[];
-    parentEvaluatedDraws: number;
-    forkEvaluatedDraws: number;
-    meetsDrawFloor: boolean;
-    drawFloor: number;
+  /** AUTHOR-side flips (the cases the author was allowed to target). When no
+   *  split ran (fixture too small / holdout disabled) these cover ALL cases. */
+  flips?: FlipSummary;
+  /** The seeded split this repair ran under (FORK_AND_DIFF slice 2). Absent =
+   *  no holdout (small fixture or explicitly disabled) — an honest "this
+   *  measurement is in-sample" marker in the audit trail. */
+  split?: { seed: number; author: string[]; confirm: string[] };
+  /** CONFIRM-side flips — cases the author NEVER saw. The held-out readout. */
+  confirmFlips?: FlipSummary;
+}
+
+function summarizeFlips(diff: FlipDiff): FlipSummary {
+  return {
+    wrongToRight: diff.wrongToRight.map((f) => f.name),
+    rightToWrong: diff.rightToWrong.map((f) => f.name),
+    netFlips: diff.netFlips,
+    comparableCases: diff.comparableCases,
+    parentOnlyCases: diff.parentOnlyCases,
+    forkOnlyCases: diff.forkOnlyCases,
+    parentEvaluatedDraws: diff.parentEvaluatedDraws,
+    forkEvaluatedDraws: diff.forkEvaluatedDraws,
+    meetsDrawFloor: diff.meetsDrawFloor,
+    drawFloor: diff.drawFloor,
   };
 }
 
-export function buildRepairEventPayload(spec: ForkSpec, diff?: FlipDiff, proposalId?: string): RepairEventPayload {
+export function buildRepairEventPayload(
+  spec: ForkSpec,
+  diff?: FlipDiff,
+  proposalId?: string,
+  extras?: { split?: CaseSplit; confirmDiff?: FlipDiff },
+): RepairEventPayload {
   return {
     nodeId: spec.nodeId,
     operator: spec.operator,
@@ -211,22 +310,11 @@ export function buildRepairEventPayload(spec: ForkSpec, diff?: FlipDiff, proposa
     ...(spec.provider !== undefined ? { provider: spec.provider } : {}),
     ...(spec.model !== undefined ? { model: spec.model } : {}),
     ...(proposalId !== undefined ? { proposalId } : {}),
-    ...(diff
-      ? {
-          flips: {
-            wrongToRight: diff.wrongToRight.map((f) => f.name),
-            rightToWrong: diff.rightToWrong.map((f) => f.name),
-            netFlips: diff.netFlips,
-            comparableCases: diff.comparableCases,
-            parentOnlyCases: diff.parentOnlyCases,
-            forkOnlyCases: diff.forkOnlyCases,
-            parentEvaluatedDraws: diff.parentEvaluatedDraws,
-            forkEvaluatedDraws: diff.forkEvaluatedDraws,
-            meetsDrawFloor: diff.meetsDrawFloor,
-            drawFloor: diff.drawFloor,
-          },
-        }
+    ...(diff ? { flips: summarizeFlips(diff) } : {}),
+    ...(extras?.split
+      ? { split: { seed: extras.split.seed, author: extras.split.author, confirm: extras.split.confirm } }
       : {}),
+    ...(extras?.confirmDiff ? { confirmFlips: summarizeFlips(extras.confirmDiff) } : {}),
   };
 }
 
