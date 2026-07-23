@@ -11,9 +11,12 @@
 //     apply/reject + repair_promoted / repair_discarded with the evidence
 //     replayed from the proposed event when available.
 
-import { runFichaRepair, resolveRepair, type RepairConfig } from "../../runtime/executor/repair.js";
-import type { ForkSpec, RepairOperator } from "../../runtime/executor/counterfactual.js";
-import { readEventLog } from "../../kernel/core/state/replay.js";
+import {
+  runFichaRepair,
+  resolveRepair,
+  repairSpecForProposal,
+  type RepairConfig,
+} from "../../runtime/executor/repair.js";
 
 export interface RepairCommandOptions {
   operator?: string;
@@ -36,31 +39,6 @@ const emit = (line: string): void => {
   console.log(line);
 };
 
-/** Recover the ForkSpec of a proposal's repair_proposed event so the
- *  resolution event carries the same identity (and the flips measured at
- *  proposal time, when the payload has them). */
-function specFromProposedEvent(cwd: string, proposalId: string): { spec: ForkSpec } | null {
-  const events = readEventLog(cwd);
-  for (let i = events.length - 1; i >= 0; i--) {
-    const ev = events[i];
-    if (ev.eventType !== "repair_proposed") continue;
-    const p = ev.payload as Record<string, unknown>;
-    if (p.proposalId !== proposalId) continue;
-    return {
-      spec: {
-        nodeId: String(p.nodeId ?? ""),
-        parentFichaHash: String(p.parentFichaHash ?? ""),
-        forkFichaHash: String(p.forkFichaHash ?? ""),
-        operator: (p.operator as RepairOperator) ?? "human",
-        rung: typeof p.rung === "number" ? p.rung : 0,
-        ...(typeof p.provider === "string" ? { provider: p.provider } : {}),
-        ...(typeof p.model === "string" ? { model: p.model } : {}),
-      },
-    };
-  }
-  return null;
-}
-
 export async function repairCommand(target: string, options: RepairCommandOptions): Promise<void> {
   const cwd = process.cwd();
 
@@ -69,14 +47,14 @@ export async function repairCommand(target: string, options: RepairCommandOption
     if (options.promote === options.discard) {
       throw new Error("resolving a repair proposal requires exactly one of --promote / --discard");
     }
-    const recovered = specFromProposedEvent(cwd, target);
-    if (!recovered) {
+    const spec = repairSpecForProposal(cwd, target);
+    if (!spec) {
       throw new Error(`no repair_proposed event found for ${target} — is it a ficha-repair proposal?`);
     }
     const result = resolveRepair({
       proposalId: target,
       decision: options.promote ? "promote" : "discard",
-      spec: recovered.spec,
+      spec,
       cwd,
     });
     if (options.json) {

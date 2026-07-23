@@ -65,9 +65,15 @@ Two tracks — **empirical/functional** (the stronger near-term bet) and
 **Empirical / functional**
 
 > **MVP umbrella (2026-07-23):** items 1 (corpus), 2 (A1 lever) and 6 (B1/B2)
-> now compose into a defined MVP — the human-gated spec-repair regeneration
+> compose into a defined MVP — the human-gated spec-repair regeneration
 > loop with dual repair operators (R_strict/R_perm, gap as measurement):
 > [`design/proposals/MVP_REGEN_LOOP.md`](design/proposals/MVP_REGEN_LOOP.md).
+> **Machinery SHIPPED same day**: counterfactual fork-and-diff core + repair
+> events, the `onto repair` lever (both operators, budget guard, human-gated
+> proposals), the run governor (`--max-cloud-attempts` + dead-provider
+> failover), and the Walker loop (`f` fire → flip-diff proc → repair-aware
+> proposals panel recording promote/discard audit events). Open: the E3
+> shake-out run + the AUTHOR/CONFIRM fixture split (FORK_AND_DIFF slice 2).
 
 1. **E3 — foreign-corpus extraction/capacity classifier study** (the paper's
    spine). Pre-registered:

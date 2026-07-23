@@ -1,7 +1,12 @@
 # MVP — the human-gated spec-repair regeneration loop
 
-Status: **proposal / MVP definition (2026-07-23), not built.** Decisions in §2
-were made explicitly by the project owner; do not silently revisit them.
+Status: **MVP definition (2026-07-23); the three §4 pieces SHIPPED same day**
+(commits `adce413` counterfactual core, `aa14242` repair lever + `onto repair`,
+`13e3edf` run governor, + the Walker wiring: `f` fire + repair-aware proposals
+panel). What remains open: the E3-corpus run itself (§6 numbers) and the
+held-out CONFIRM split wiring (slice 2 of FORK_AND_DIFF — the readout is
+attached but the AUTHOR/CONFIRM fixture split is not yet enforced). Decisions
+in §2 were made explicitly by the project owner; do not silently revisit them.
 Companions: [`FORK_AND_DIFF.md`](FORK_AND_DIFF.md) (the counterfactual
 mechanism this consumes), [`LADDER_ECONOMICS.md`](LADDER_ECONOMICS.md) (the
 economics instrumentation),

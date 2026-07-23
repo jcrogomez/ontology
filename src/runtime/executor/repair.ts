@@ -52,6 +52,7 @@ import {
 } from "./repair-prompt.js";
 import { SEMANTIC_SPLIT_MIN_RAN_DRAWS } from "../../laws/gray-zone.js";
 import { loadFixture } from "../../laws/behavior-checker.js";
+import { readEventLog } from "../../kernel/core/state/replay.js";
 
 export interface RepairConfig {
   nodeId: string;
@@ -327,6 +328,30 @@ export async function runFichaRepair(config: RepairConfig, deps: RepairDeps = {}
 }
 
 // ── Human resolution (the Walker's approve/reject) ─────────────────────────
+
+/** Recover the ForkSpec of a proposal's repair_proposed event so a resolution
+ *  (CLI `onto repair proposal_X --promote` or the Walker panel) carries the
+ *  same identity the proposal was measured under. Returns null when the
+ *  proposal has no repair_proposed event — i.e. it is not a repair proposal. */
+export function repairSpecForProposal(cwd: string, proposalId: string): ForkSpec | null {
+  const events = readEventLog(cwd);
+  for (let i = events.length - 1; i >= 0; i--) {
+    const ev = events[i];
+    if (ev.eventType !== "repair_proposed") continue;
+    const p = ev.payload as Record<string, unknown>;
+    if (p.proposalId !== proposalId) continue;
+    return {
+      nodeId: String(p.nodeId ?? ""),
+      parentFichaHash: String(p.parentFichaHash ?? ""),
+      forkFichaHash: String(p.forkFichaHash ?? ""),
+      operator: (p.operator as ForkSpec["operator"]) ?? "human",
+      rung: typeof p.rung === "number" ? p.rung : 0,
+      ...(typeof p.provider === "string" ? { provider: p.provider } : {}),
+      ...(typeof p.model === "string" ? { model: p.model } : {}),
+    };
+  }
+  return null;
+}
 
 export interface ResolveRepairOptions {
   proposalId: string;
