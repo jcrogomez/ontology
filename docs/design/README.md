@@ -95,6 +95,7 @@ status banner; check `src/` before building against any of them.
 - [`proposals/WAKEUP_SCANNERS.md`](proposals/WAKEUP_SCANNERS.md) — proactive scanners that open proposals (RFC; not implemented).
 - [`proposals/BRANCH_MODEL.md`](proposals/BRANCH_MODEL.md) — branch materialization semantics (design note; awaiting confirmation).
 - [`proposals/FORK_AND_DIFF.md`](proposals/FORK_AND_DIFF.md) — counterfactual fork + held-out gate for the ficha-repair lever (A1 mechanism; ActiveGraph/Regimes import).
+- [`proposals/MVP_REGEN_LOOP.md`](proposals/MVP_REGEN_LOOP.md) — the MVP: human-gated spec-repair regeneration loop on the E3 corpus; dual repair operators R_strict/R_perm with the gap as the measured quantity.
 
 ---
 

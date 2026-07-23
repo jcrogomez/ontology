@@ -64,6 +64,11 @@ Two tracks — **empirical/functional** (the stronger near-term bet) and
 
 **Empirical / functional**
 
+> **MVP umbrella (2026-07-23):** items 1 (corpus), 2 (A1 lever) and 6 (B1/B2)
+> now compose into a defined MVP — the human-gated spec-repair regeneration
+> loop with dual repair operators (R_strict/R_perm, gap as measurement):
+> [`design/proposals/MVP_REGEN_LOOP.md`](design/proposals/MVP_REGEN_LOOP.md).
+
 1. **E3 — foreign-corpus extraction/capacity classifier study** (the paper's
    spine). Pre-registered:
    [`legend/calibrations/EXTRACTION_CAPACITY_CLASSIFIER_PREREG_2026-07-21.md`](legend/calibrations/EXTRACTION_CAPACITY_CLASSIFIER_PREREG_2026-07-21.md).
