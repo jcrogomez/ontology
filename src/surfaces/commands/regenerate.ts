@@ -100,6 +100,17 @@ export interface RegenerateCommandOptions {
   model?: string;
   ollamaHost?: string;
   write?: boolean;
+  /** Counterfactual ficha overlay (MVP_REGEN_LOOP.md §4.2 / repair.ts):
+   *  evaluate the node AS IF its ficha surface were this, WITHOUT mutating
+   *  the node on disk. The overlay is applied right after load, so every
+   *  downstream consumer (prompt assembly, rules-grounding, --check-rules,
+   *  the run-cache contextHash via the assembled prompt) sees the overlaid
+   *  ficha uniformly. Mirrors exactly the fields a node_update proposal can
+   *  carry for the repair flow: prompt (raw) + rules. Write MUST stay off on
+   *  override runs — the caller is measuring a hypothetical, and a draft
+   *  accepted against a ficha the node does not actually have must never
+   *  overwrite the shadow. Enforced here, not left to convention. */
+  fichaOverride?: { prompt?: string; rules?: string[] };
   behaviorCheck?: boolean;
   behaviorFixturesDir?: string;
   locThreshold?: number;
@@ -348,9 +359,33 @@ export async function runRegenerate(
   }
 
   // 2. Load the node.
-  const node = loadNodeById(nodeId, cwd);
+  let node = loadNodeById(nodeId, cwd);
   if (!node) {
     return { ok: false, nodeId, written: false, failure: `node not found: ${nodeId}`, failureKind: "not-found" };
+  }
+  // 2b. Counterfactual ficha overlay (see the option's doc). Refuses to
+  // combine with write: a hypothetical ficha must never gate a real write.
+  if (options.fichaOverride) {
+    if (options.write === true) {
+      return {
+        ok: false,
+        nodeId,
+        written: false,
+        failure: "fichaOverride cannot be combined with write: a hypothetical ficha must not gate a real write",
+        failureKind: "config",
+      };
+    }
+    // Overlay shape mirrors updateNode's own prompt handling ({...prompt, raw})
+    // so evaluating the override and later applying the node_update proposal
+    // see the SAME ficha surface (compile consumes prompt.raw only).
+    node = {
+      ...node,
+      prompt:
+        options.fichaOverride.prompt !== undefined
+          ? { ...node.prompt, raw: options.fichaOverride.prompt }
+          : node.prompt,
+      rules: options.fichaOverride.rules ?? node.rules,
+    };
   }
 
   // 3. Precondition: a shadow to regenerate.

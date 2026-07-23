@@ -739,6 +739,29 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **Real run (2026-06-18):** `node_0013` (lock.ts, glue) closed by escalating
   7B→480b-cloud; pure leaves close at rung 0. See `design/runtime/EXECUTOR_SPEC.md`.
 
+### `repair <target>` *(2026-07-23 — the human-gated ficha-repair lever, MVP regen loop)*
+
+- **Purpose:** attack an **extraction-gap** by enriching the *intention*, not
+  the draft. `onto repair node_XXXX` runs one repair: parent baseline at a
+  FIXED rung (draws=3, no write) → an LLM repairer proposes an enriched ficha →
+  guards (JSON parse + injected-text budget, default 2000 added chars) →
+  `node_update` proposal + `repair_proposed` event → fork evaluation with the
+  ficha overlaid (same rung, `fichaOverride`, write refused) → **per-case flip
+  diff** (wrong→right vs right→wrong, majority across draws, semanticSplit
+  floor reported). Nothing mutates the node.
+- **Resolve:** `onto repair proposal_XXXX --promote|--discard` — apply/reject +
+  `repair_promoted`/`repair_discarded` with the evidence. The fork hash
+  computed at proposal time **predicts** the promoted node's `fichaHash`
+  (pinned in `tests/ficha-repair.test.ts`).
+- **Operators (two pre-registered studies, MVP_REGEN_LOOP.md §3):**
+  `--operator strict` (default) — the repairer sees ONLY spec-side signal
+  (oracle criteria, failing-case diagnostics, export drift); the honest floor.
+  `--operator perm` — may read the reference source; the ceiling. Never mixed
+  in one run; the strict↔perm closure gap is itself the measurement.
+- **Key flags:** `--provider/--model` (the fixed generator rung, required),
+  `--repair-provider/--repair-model` (the repairer — pass a stronger rung;
+  repairing is G-side reasoning), `--draws`, `--budget-chars`, `--json`.
+
 ### `status` *(2026-06-14 — graph health for the sync loop; --blockers 2026-06-18)*
 
 - **Purpose:** read-only "can I sync, and what's in the way" view. A pure

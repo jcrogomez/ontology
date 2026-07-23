@@ -55,6 +55,7 @@ import { verifyHomeomorphismCommand } from "./surfaces/commands/verify/homeomorp
 import { regenerateCommand } from "./surfaces/commands/regenerate.js";
 import { syncCommand } from "./surfaces/commands/sync.js";
 import { executeCommand } from "./surfaces/commands/execute.js";
+import { repairCommand } from "./surfaces/commands/repair.js";
 import { statusCommand } from "./surfaces/commands/status.js";
 import { dodCommand } from "./surfaces/commands/dod.js";
 import { probeCommand } from "./surfaces/commands/probe.js";
@@ -1211,6 +1212,32 @@ program
       await executeCommand(nodeIds, { ...rest, ...(precedents === false ? { noPrecedents: true } : {}) });
     } catch (err: unknown) {
       console.error(`✖ Error during execute: ${errorMessage(err)}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("repair <target>")
+  .description("The ficha-repair lever (MVP regen loop, human-gated). `onto repair node_XXXX` runs one repair: parent baseline at a FIXED rung → an LLM repairer proposes an enriched ficha (R_strict never sees the source; R_perm may) → guards (JSON parse + injected-text budget) → node_update proposal + repair_proposed event → fork evaluation with the ficha overlaid (same rung, no write) → per-case flip diff. `onto repair proposal_XXXX --promote|--discard` resolves it (apply/reject + audit event). Nothing mutates the node without --promote.")
+  .option("--operator <mode>", "Repair operator: strict (spec-side only, the honest floor) or perm (may read the reference source, the ceiling). Default strict.")
+  .option("--provider <provider>", "Generator provider for BOTH baseline and fork evaluation (the fixed rung). Required for runs.")
+  .option("--model <model>", "Generator model override (fixed rung).")
+  .option("--rung <n>", "Ladder rung index of the fixed rung (informational, recorded in the audit events).", (v) => parseInt(v, 10))
+  .option("--repair-provider <provider>", "Repairer provider (default: the generator's). Pass a STRONGER one — repairing is G-side reasoning.")
+  .option("--repair-model <model>", "Repairer model override.")
+  .option("--draws <n>", "Draws per side (default 3 — the semanticSplit floor).", (v) => parseInt(v, 10))
+  .option("--budget-chars <n>", "Injected-text budget: max chars the repair may ADD to the ficha surface (default 2000).", (v) => parseInt(v, 10))
+  .option("--behavior-fixtures-dir <path>", "Override the behaviour-fixtures directory (default tests/behavior-fixtures).")
+  .option("--ollama-host <host>", "Host for the Ollama provider.")
+  .option("--max-tokens <n>", "Override max-output-tokens.", (v) => parseInt(v, 10))
+  .option("--promote", "Resolve shape: apply the repair proposal (records repair_promoted).")
+  .option("--discard", "Resolve shape: reject the repair proposal (records repair_discarded).")
+  .option("--json", "Output the full report as JSON.")
+  .action(async (target, options) => {
+    try {
+      await repairCommand(target, options);
+    } catch (err: unknown) {
+      console.error(`✖ Error during repair: ${errorMessage(err)}`);
       process.exit(1);
     }
   });
