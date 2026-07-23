@@ -78,6 +78,12 @@ Two tracks — **empirical/functional** (the stronger near-term bet) and
    playbook is still HUMAN-driven. Biggest yield unlock — better models do NOT
    close bespoke extraction-gaps. Path to an autonomous overnight run. The
    gray-zone `semanticSplit` queue now *measures which fichas to repair first*.
+   **Mechanism designed 2026-07-23:**
+   [`design/proposals/FORK_AND_DIFF.md`](design/proposals/FORK_AND_DIFF.md) —
+   counterfactual fork at a FIXED rung (prefix ~$0 via the existing run-cache)
+   + held-out CONFIRM gate + flip-count diff as promotion currency (import of
+   ActiveGraph/Regimes, arXiv 2605.21997 / 2606.10241). E3 (#1 above) shares
+   the same flip/McNemar apparatus.
 3. **A2 — field-level oracle feedback.** Divergent-case oracle says "values
    diverged" without naming the field → refine re-rolls blind (`node_0168`
    7/8→5/8). Cheap, scoped; feeds A1.
