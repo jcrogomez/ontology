@@ -739,6 +739,17 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **Real run (2026-06-18):** `node_0013` (lock.ts, glue) closed by escalating
   7B→480b-cloud; pure leaves close at rung 0. See `design/runtime/EXECUTOR_SPEC.md`.
 
+> **Governor flags (2026-07-23, B1/B2):** `execute` now takes
+> `--max-cloud-attempts <n>` — a RUN-level budget on attempts at
+> cloud-locality rungs. Exhausted → later nodes climb a local-only effective
+> ladder (honest plateau); a mid-climb cloud attempt is cut as `infra-error`
+> with the budget in the detail. Independently, a quota/dead-provider infra
+> failure (429, ECONNREFUSED, usage limit) marks that PROVIDER dead for the
+> rest of the run — later nodes skip its rungs instead of re-burning a
+> timeout each. Report gains a `governor:` line + `report.governor` JSON.
+> Plateau precedents record the EFFECTIVE ladder height the node saw, so a
+> gap declared under a governed-down ladder never blocks a future full climb.
+
 ### `repair <target>` *(2026-07-23 — the human-gated ficha-repair lever, MVP regen loop)*
 
 - **Purpose:** attack an **extraction-gap** by enriching the *intention*, not

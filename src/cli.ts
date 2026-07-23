@@ -1201,6 +1201,7 @@ program
   .option("--dry-run", "Run the whole loop (regen + gates + decisions) but write nothing — preview the decisions.")
   .option("--max-attempts <n>", "Hard backstop on attempts per node (default 8).", (v) => parseInt(v, 10))
   .option("--allow-paid", "Allow paid models into the capability ladder (default: $0 — paid models excluded).")
+  .option("--max-cloud-attempts <n>", "Run-level budget on attempts at cloud rungs (the spend governor, B2). When exhausted, later nodes climb local-only; a quota/dead-provider infra failure also removes that provider's rungs for the rest of the run (B1).", (v) => parseInt(v, 10))
   .option("--no-precedents", "Ignore the episodic precedent store for this run (measure every node from scratch; fresh outcomes are still recorded). Default: warm-start κ* from the last run and honour extraction-gap precedents on unchanged fichas.")
   .option("--behavior-fixtures-dir <path>", "Override the behaviour-fixtures directory (default tests/behavior-fixtures).")
   .option("--ollama-host <host>", "Host for the Ollama provider.")

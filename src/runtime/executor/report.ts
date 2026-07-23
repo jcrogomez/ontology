@@ -4,6 +4,7 @@
 
 import type { NodeRecord, Terminal } from "./types.js";
 import { kappaDistribution, type KappaDistribution } from "./kappa-star.js";
+import type { GovernorSummary } from "./governor.js";
 
 /** Ladder economics — the run's oracle-routing measurement (measured facts
  *  only: wall-clock + rung locality; no fabricated dollars/watts). The
@@ -36,6 +37,9 @@ export interface ExecReport {
   kappa: KappaDistribution;
   /** Wall-clock + locality accounting — the ladder-economics barometer. */
   economics: ExecEconomics;
+  /** Run-governor accounting (B1/B2): cloud-attempt budget + dead providers.
+   *  Absent on reports built without a governor (synthetic/legacy). */
+  governor?: GovernorSummary;
   nodes: NodeRecord[];
 }
 
@@ -53,7 +57,7 @@ function buildEconomics(nodes: NodeRecord[]): ExecEconomics {
   };
 }
 
-export function buildReport(nodes: NodeRecord[]): ExecReport {
+export function buildReport(nodes: NodeRecord[], governor?: GovernorSummary): ExecReport {
   const count = (t: Terminal): number => nodes.filter((n) => n.terminal === t).length;
   return {
     total: nodes.length,
@@ -65,6 +69,7 @@ export function buildReport(nodes: NodeRecord[]): ExecReport {
     infraError: count("infra-error"),
     kappa: kappaDistribution(nodes.map((n) => n.kappa)),
     economics: buildEconomics(nodes),
+    ...(governor !== undefined ? { governor } : {}),
     nodes,
   };
 }
@@ -120,6 +125,21 @@ export function formatReport(report: ExecReport): string {
         ` · attempts local ${eco.attemptsLocal} / cloud ${eco.attemptsCloud}` +
         ` · ${secs}s wall-clock`
       : "";
-  const footer = [routeLine, kappaLine, ecoLine].filter(Boolean);
+  // Governor line: only when something governed (a budget was set or a
+  // provider died) — the unlimited default stays silent.
+  const gov = report.governor;
+  const govParts: string[] = [];
+  if (gov) {
+    if (gov.maxCloudAttempts !== null) {
+      govParts.push(
+        `cloud budget ${gov.cloudAttemptsUsed}/${gov.maxCloudAttempts}${gov.budgetExhausted ? " EXHAUSTED (later climbs were local-only)" : ""}`,
+      );
+    }
+    for (const d of gov.deadProviders) {
+      govParts.push(`provider ${d.provider} marked dead: ${d.evidence}`);
+    }
+  }
+  const govLine = govParts.length > 0 ? `governor: ${govParts.join(" · ")}` : "";
+  const footer = [routeLine, kappaLine, ecoLine, govLine].filter(Boolean);
   return [head, ...lines, ...(footer.length ? ["", ...footer] : [])].join("\n");
 }

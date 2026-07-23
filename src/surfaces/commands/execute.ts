@@ -29,6 +29,10 @@ export interface ExecuteCommandOptions {
   maxAttempts?: number;
   /** Allow paid models into the ladder (default: $0 — paid excluded). */
   allowPaid?: boolean;
+  /** Run-level budget on attempts at cloud-locality rungs (B2). When it runs
+   *  out, later nodes climb a local-only effective ladder. The natural
+   *  companion of --allow-paid: frontier ON, but bounded. */
+  maxCloudAttempts?: number;
   /** Ignore stored precedents for this run (measure every node from scratch).
    *  Fresh outcomes are still recorded — a from-scratch re-measure is exactly
    *  when you want the store refreshed. */
@@ -61,6 +65,7 @@ export async function runExecutorLive(
     write: !options.dryRun,
     behaviorFixturesDir: options.behaviorFixturesDir,
     ollamaHost: options.ollamaHost,
+    maxCloudAttempts: options.maxCloudAttempts,
   };
 
   // Episodic memory: warm-start κ* + honour extraction-gap precedents on
