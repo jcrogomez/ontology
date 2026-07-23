@@ -17,6 +17,12 @@ import {
   repairSpecForProposal,
   type RepairConfig,
 } from "../../runtime/executor/repair.js";
+import {
+  foldRepairEvents,
+  computeOperatorGap,
+  computeAgreement,
+} from "../../runtime/executor/repair-report.js";
+import { readEventLog } from "../../kernel/core/state/replay.js";
 
 export interface RepairCommandOptions {
   operator?: string;
@@ -43,6 +49,38 @@ const emit = (line: string): void => {
 
 export async function repairCommand(target: string, options: RepairCommandOptions): Promise<void> {
   const cwd = process.cwd();
+
+  // ── Report shape: the two MVP numbers off the temporal log ────────────
+  if (target === "report") {
+    const { attempts, resolutions } = foldRepairEvents(readEventLog(cwd));
+    const gap = computeOperatorGap(attempts);
+    const agreement = computeAgreement(attempts, resolutions);
+    if (options.json) {
+      emit(JSON.stringify({ attempts: attempts.length, gap, agreement }, null, 2));
+      return;
+    }
+    emit(`repair report — ${attempts.length} measured attempt(s), ${agreement.resolved} resolved`);
+    emit("");
+    emit("strict↔perm gap (same node, same parent ficha — the measured quantity):");
+    if (gap.length === 0) emit("  (no repair attempts recorded yet)");
+    for (const row of gap) {
+      const s = row.strict ? `strict ${row.strict.netFlips >= 0 ? "+" : ""}${row.strict.netFlips}` : "strict —";
+      const p = row.perm ? `perm ${row.perm.netFlips >= 0 ? "+" : ""}${row.perm.netFlips}` : "perm —";
+      const g = row.gap !== undefined ? `  gap ${row.gap >= 0 ? "+" : ""}${row.gap}` : "  (need both arms at this baseline)";
+      emit(`  ${row.nodeId} @${row.parentFichaHash.slice(0, 8)}  ${s} · ${p}${g}`);
+    }
+    emit("");
+    emit("human↔auto agreement (the pre-registered v2 gate — autoDecision vs the human):");
+    if (agreement.rate === null) {
+      emit("  (no resolutions yet — promote/discard some repairs first)");
+    } else {
+      emit(`  rate: ${agreement.agreements}/${agreement.resolved} = ${(agreement.rate * 100).toFixed(0)}%`);
+      for (const r of agreement.rows.filter((x) => !x.agree)) {
+        emit(`  ✗ ${r.proposalId} ${r.nodeId} [${r.operator}] human=${r.human} auto=${r.auto}`);
+      }
+    }
+    return;
+  }
 
   // ── Resolution shape ───────────────────────────────────────────────────
   if (target.startsWith("proposal_")) {
@@ -71,7 +109,7 @@ export async function repairCommand(target: string, options: RepairCommandOption
   }
 
   if (!target.startsWith("node_")) {
-    throw new Error(`repair target must be a node_… (run) or proposal_… (resolve), got: ${target}`);
+    throw new Error(`repair target must be a node_… (run), proposal_… (resolve), or "report", got: ${target}`);
   }
 
   // ── Run shape ──────────────────────────────────────────────────────────

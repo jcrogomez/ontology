@@ -1219,7 +1219,7 @@ program
 
 program
   .command("repair <target>")
-  .description("The ficha-repair lever (MVP regen loop, human-gated). `onto repair node_XXXX` runs one repair: parent baseline at a FIXED rung → an LLM repairer proposes an enriched ficha (R_strict never sees the source; R_perm may) → guards (JSON parse + injected-text budget) → node_update proposal + repair_proposed event → fork evaluation with the ficha overlaid (same rung, no write) → per-case flip diff. `onto repair proposal_XXXX --promote|--discard` resolves it (apply/reject + audit event). Nothing mutates the node without --promote.")
+  .description("The ficha-repair lever (MVP regen loop, human-gated). `onto repair node_XXXX` runs one repair: parent baseline at a FIXED rung → an LLM repairer proposes an enriched ficha (R_strict never sees the source; R_perm may) → guards (JSON parse + injected-text budget) → node_update proposal + repair_proposed event → fork evaluation with the ficha overlaid (same rung, no write) → AUTHOR/CONFIRM flip diffs. `onto repair proposal_XXXX --promote|--discard` resolves it (apply/reject + audit event). `onto repair report` folds the log into the two MVP numbers: the strict↔perm gap and the human↔auto agreement rate (the v2 gate). Nothing mutates the node without --promote.")
   .option("--operator <mode>", "Repair operator: strict (spec-side only, the honest floor) or perm (may read the reference source, the ceiling). Default strict.")
   .option("--provider <provider>", "Generator provider for BOTH baseline and fork evaluation (the fixed rung). Required for runs.")
   .option("--model <model>", "Generator model override (fixed rung).")

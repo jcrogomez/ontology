@@ -780,7 +780,15 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
   none`, never a 1-case coin flip.
 - **Key flags:** `--provider/--model` (the fixed generator rung, required),
   `--repair-provider/--repair-model` (the repairer — pass a stronger rung;
-  repairing is G-side reasoning), `--draws`, `--budget-chars`, `--json`.
+  repairing is G-side reasoning), `--draws`, `--no-holdout`, `--budget-chars`,
+  `--json`.
+- **`onto repair report`** — folds the temporal log into the two MVP numbers:
+  the **strict↔perm gap** per (node, parent-ficha-hash) — only where BOTH arms
+  measured at the same baseline — and the **human↔auto agreement rate**:
+  every human promote/discard scored against the pre-registered `autoDecision`
+  rule (net flips > 0 ∧ draw floor ∧ no fixture drift ∧ held-out CONFIRM clean;
+  in-sample evidence never auto-promotes). That rate is the v2 autonomy gate
+  (MVP_REGEN_LOOP.md §5).
 
 ### `status` *(2026-06-14 — graph health for the sync loop; --blockers 2026-06-18)*
 
