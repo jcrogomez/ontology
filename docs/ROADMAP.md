@@ -71,7 +71,10 @@ Two tracks — **empirical/functional** (the stronger near-term bet) and
    nodes with an INDEPENDENT 2×2 ground truth + a confusion matrix + the
    `semanticSplit` ablation. **Next concrete step: a 2–3 repo shake-out** of the
    harness before the full sweep. Ladder note: `qwen3-coder:480b` RETIRED
-   2026-07-15 → strong rung = `gpt-oss:120b-cloud`.
+   2026-07-15 → strong rung = `gpt-oss:120b-cloud`. Related-work section drafted:
+   [`legend/RELATED_WORK.md`](legend/RELATED_WORK.md) (the 2026 industry
+   convergence — ActiveGraph/Regimes, Gates/Neo4j, turbopuffer, PostHog — and
+   Ontology's differential claim).
 2. **A1 — a ficha-repair lever for `onto execute`.** Levers today
    (`refine`/`decompose`/`escalate`) act on the code draft; none touches the
    *intention*. The n=2 (now n≈1-per-pole external) fixture-guided ficha-enrichment
