@@ -188,13 +188,19 @@ export interface RegenerateResult {
    *  comparable). Callers (the executor policy) need the unambiguous signal to
    *  tell "genuinely unverifiable" from "a bad draw to refine/escalate". */
   fixturePresent?: boolean;
+  /** Per-case behaviour outcomes of the CHOSEN candidate (single-draw: the
+   *  draw; multi-draw: the consensus representative), when a fixture ran.
+   *  This is the flip-diff currency for counterfactual fork evaluation
+   *  (runtime/executor/counterfactual.ts) — without it a repair's effect
+   *  is only visible as a coarse pass/fail, not as per-case flips. */
+  behaviorCases?: { name: string; outcome: string; detail?: string }[];
   // Multi-draw consensus fields (present only when draws > 1).
   draws?: number;
   acceptableDraws?: number;
   consensusSize?: number;
   consensusK?: number;
   clusterSizes?: number[];
-  draftSummary?: { i: number; verdict?: HomeomorphismVerdict; behaviorVerdict: BehaviorVerdict | "no_fixture"; declKey?: string; acceptable: boolean }[];
+  draftSummary?: { i: number; verdict?: HomeomorphismVerdict; behaviorVerdict: BehaviorVerdict | "no_fixture"; declKey?: string; acceptable: boolean; caseOutcomes?: { name: string; outcome: string; detail?: string }[] }[];
   /** Draw-vs-draw disagreement fold (present only when draws > 1) — the
    *  gray-zone index persisted to .ontology/reports/gray-zone.json. */
   grayZone?: GrayZoneIndex;
@@ -854,6 +860,7 @@ export async function runRegenerate(
       ruleViolations: e.ruleViolations,
       lintIssueCount,
       fixturePresent: fixture != null,
+      behaviorCases: e.behaviorCases,
       written: false,
       ...refineFields,
     };
@@ -915,12 +922,13 @@ export async function runRegenerate(
     behaviorVerdict: rep?.behaviorVerdict ?? "no_fixture",
     ruleViolations: rep?.ruleViolations,
     written: false,
+    behaviorCases: rep?.behaviorCases,
     draws,
     acceptableDraws: acceptable.length,
     consensusSize: consensusClass.length,
     consensusK,
     clusterSizes,
-    draftSummary: evals.map((e) => ({ i: e.i, verdict: e.verdict, behaviorVerdict: e.behaviorVerdict, declKey: e.declKey, acceptable: e.acceptable })),
+    draftSummary: evals.map((e) => ({ i: e.i, verdict: e.verdict, behaviorVerdict: e.behaviorVerdict, declKey: e.declKey, acceptable: e.acceptable, caseOutcomes: e.behaviorCases })),
     grayZone,
     ...refineFields,
   };
