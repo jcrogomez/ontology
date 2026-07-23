@@ -739,6 +739,57 @@ Templates are declarative JSON data under `templates/*.json` (shipped in the pac
 - **Real run (2026-06-18):** `node_0013` (lock.ts, glue) closed by escalating
   7B→480b-cloud; pure leaves close at rung 0. See `design/runtime/EXECUTOR_SPEC.md`.
 
+> **Governor flags (2026-07-23, B1/B2):** `execute` now takes
+> `--max-cloud-attempts <n>` — a RUN-level budget on attempts at
+> cloud-locality rungs. Exhausted → later nodes climb a local-only effective
+> ladder (honest plateau); a mid-climb cloud attempt is cut as `infra-error`
+> with the budget in the detail. Independently, a quota/dead-provider infra
+> failure (429, ECONNREFUSED, usage limit) marks that PROVIDER dead for the
+> rest of the run — later nodes skip its rungs instead of re-burning a
+> timeout each. Report gains a `governor:` line + `report.governor` JSON.
+> Plateau precedents record the EFFECTIVE ladder height the node saw, so a
+> gap declared under a governed-down ladder never blocks a future full climb.
+
+### `repair <target>` *(2026-07-23 — the human-gated ficha-repair lever, MVP regen loop)*
+
+- **Purpose:** attack an **extraction-gap** by enriching the *intention*, not
+  the draft. `onto repair node_XXXX` runs one repair: parent baseline at a
+  FIXED rung (draws=3, no write) → an LLM repairer proposes an enriched ficha →
+  guards (JSON parse + injected-text budget, default 2000 added chars) →
+  `node_update` proposal + `repair_proposed` event → fork evaluation with the
+  ficha overlaid (same rung, `fichaOverride`, write refused) → **per-case flip
+  diff** (wrong→right vs right→wrong, majority across draws, semanticSplit
+  floor reported). Nothing mutates the node.
+- **Resolve:** `onto repair proposal_XXXX --promote|--discard` — apply/reject +
+  `repair_promoted`/`repair_discarded` with the evidence. The fork hash
+  computed at proposal time **predicts** the promoted node's `fichaHash`
+  (pinned in `tests/ficha-repair.test.ts`).
+- **Operators (two pre-registered studies, MVP_REGEN_LOOP.md §3):**
+  `--operator strict` (default) — the repairer sees ONLY spec-side signal
+  (oracle criteria, failing-case diagnostics, export drift); the honest floor.
+  `--operator perm` — may read the reference source; the ceiling. Never mixed
+  in one run; the strict↔perm closure gap is itself the measurement.
+- **AUTHOR/CONFIRM holdout (2026-07-23, FORK_AND_DIFF slice 2, default ON):**
+  fixtures with ≥4 cases deal ~1/3 into a held-out CONFIRM set — seeded from
+  the parent `fichaHash` (replayable; recorded in `repair_proposed`), excluded
+  from oracle grounding, refine critique AND the repair author's prompt, yet
+  still run and score. The report shows AUTHOR flips + a separate
+  `CONFIRM … ✓ no regression / ⚠ REGRESSION` line; failures living only in
+  CONFIRM stop the repair (the author must not see them). `--no-holdout`
+  disables (readout then says in-sample honestly). Small fixtures: `holdout:
+  none`, never a 1-case coin flip.
+- **Key flags:** `--provider/--model` (the fixed generator rung, required),
+  `--repair-provider/--repair-model` (the repairer — pass a stronger rung;
+  repairing is G-side reasoning), `--draws`, `--no-holdout`, `--budget-chars`,
+  `--json`.
+- **`onto repair report`** — folds the temporal log into the two MVP numbers:
+  the **strict↔perm gap** per (node, parent-ficha-hash) — only where BOTH arms
+  measured at the same baseline — and the **human↔auto agreement rate**:
+  every human promote/discard scored against the pre-registered `autoDecision`
+  rule (net flips > 0 ∧ draw floor ∧ no fixture drift ∧ held-out CONFIRM clean;
+  in-sample evidence never auto-promotes). That rate is the v2 autonomy gate
+  (MVP_REGEN_LOOP.md §5).
+
 ### `status` *(2026-06-14 — graph health for the sync loop; --blockers 2026-06-18)*
 
 - **Purpose:** read-only "can I sync, and what's in the way" view. A pure

@@ -167,6 +167,12 @@ export function summarizeProposalRow(p: Proposal): string {
   }
   if (p.mutation.kind === "node_update") {
     const payload = p.mutation.payload;
+    // A ficha-repair proposal is a plain node_update whose rationale carries
+    // the lever's stamp — mark the row so the operator knows 'a' promotes
+    // (with the repair audit event) rather than plain-applies.
+    if ((p.provenance.rationale ?? "").startsWith("ficha-repair")) {
+      return `${p.id}  REPAIR  ${payload.nodeId}  (${p.provenance.rationale})`;
+    }
     const what = [
       payload.prompt !== undefined ? "prompt" : null,
       payload.provides !== undefined ? "provides" : null,

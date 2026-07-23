@@ -74,6 +74,11 @@ import {
   applyProposalFromWalker,
   rejectProposalFromWalker,
 } from "./actions/proposals-from-walker.js";
+import {
+  fireRepairFromWalker,
+  isRepairProposal,
+  resolveRepairProposalFromWalker,
+} from "./actions/repair-from-walker.js";
 import { parseProviderArgs } from "./state/parse-provider-args.js";
 import { parseQueryArgs } from "./state/parse-query-args.js";
 import { parseLinkArgs } from "./state/parse-link-args.js";
@@ -375,10 +380,11 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
 
   // Fire a governed action on a node ASYNC — the raid-tempo actuator. Returns
   // immediately (the LLM work runs in the background); a "casting" row shows now
-  // and a green/red "proc" flashes when it resolves. Both verbs are governed —
+  // and a green/red "proc" flashes when it resolves. All three verbs are governed —
   // sync WRITES only behind its three green gates, probe persists only cases
-  // that self-validate against the source — so a single-key fire is safe.
-  function fireCast(nodeId: string, verb: "sync" | "probe"): void {
+  // that self-validate against the source, repair only PROPOSES (the ficha
+  // mutates exclusively through the proposals panel) — so a single-key fire is safe.
+  function fireCast(nodeId: string, verb: "sync" | "probe" | "repair"): void {
     const id = ++castIdRef.current;
     setCasts((cs) => [...cs, { id, nodeId, verb, status: "casting" }]);
     setMessage(`⟳ casting ${verb} ${nodeId} [${sessionProvider}] — Tab to the next target`);
@@ -391,6 +397,9 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
           else if (res.decision === "refused")
             proc = { ok: false, label: `refused: ${res.reason ?? "gate"}` };
           else proc = { ok: false, label: `${res.decision}${res.reason ? `: ${res.reason}` : ""}` };
+        } else if (verb === "repair") {
+          const res = await fireRepairFromWalker(nodeId, { provider: sessionProvider, cwd });
+          proc = { ok: res.ok, label: res.label };
         } else {
           const res = await runProbe(nodeId, { provider: sessionProvider }, cwd);
           if (res.written)
@@ -518,7 +527,17 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
       }
       const focused = proposalsPanel.proposals[proposalsPanel.cursor];
       if (input === "a") {
-        const r = applyProposalFromWalker(focused.id, { cwd });
+        // A ficha-repair proposal resolves through resolveRepair so the audit
+        // trail gets repair_promoted with the measured identity; ordinary
+        // proposals keep the plain apply path.
+        const r = isRepairProposal(focused, cwd)
+          ? (() => {
+              const rr = resolveRepairProposalFromWalker(focused.id, "promote", cwd);
+              return rr.ok
+                ? { ok: true, outcome: "applied" as const, proposalId: rr.proposalId, createdId: undefined, message: "repair promoted — ficha applied" }
+                : { ok: false, outcome: "error" as const, proposalId: rr.proposalId, message: rr.message };
+            })()
+          : applyProposalFromWalker(focused.id, { cwd });
         const at = Date.now();
         // On success we drop the now-applied proposal from the list and
         // keep the cursor on the next item (or the last item if we
@@ -559,7 +578,12 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
         return;
       }
       if (input === "r") {
-        const r = rejectProposalFromWalker(focused.id, { cwd });
+        const r = isRepairProposal(focused, cwd)
+          ? (() => {
+              const rr = resolveRepairProposalFromWalker(focused.id, "discard", cwd);
+              return { ok: rr.ok, proposalId: rr.proposalId, message: rr.message };
+            })()
+          : rejectProposalFromWalker(focused.id, { cwd });
         if (r.ok) {
           const remaining = proposalsPanel.proposals.filter((p) => p.id !== focused.id);
           const newCursor = Math.min(proposalsPanel.cursor, Math.max(0, remaining.length - 1));
@@ -746,14 +770,16 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
       setMessage(`▶ ${a.nodeId}  ${a.reason} → ${a.suggestion}  (unblocks ${a.unblocks})`);
       return;
     }
-    if (input === "s" || input === "p") {
+    if (input === "s" || input === "p" || input === "f") {
       // Fire a governed action on the focal, async: s = sync, p = probe (mint a
-      // behaviour fixture). Only code nodes (with a shadow) qualify; intent
-      // nodes have no code to close or characterise.
-      const verb = input === "s" ? "sync" : "probe";
+      // behaviour fixture), f = ficha-repair (R_strict at the session provider —
+      // proposes an enriched ficha + flip diff, mutates nothing; review with
+      // :proposals). Only code nodes (with a shadow) qualify; intent nodes
+      // have no code to close, characterise, or measure a repair against.
+      const verb = input === "s" ? "sync" : input === "p" ? "probe" : "repair";
       const ns = statusReport?.nodes.find((n) => n.nodeId === focalId);
       if (!ns || !ns.hasShadow) {
-        setMessage(`${verb}: focal has no code shadow (nothing to ${input === "s" ? "close" : "probe"})`);
+        setMessage(`${verb}: focal has no code shadow`);
         return;
       }
       fireCast(focalId, verb);
@@ -843,7 +869,7 @@ export function App({ initialNodeId, cwd: initialCwd }: AppProps): React.ReactEl
       return;
     }
     if (cmd === "help") {
-      setMessage("i edit · a/:preview artifact · :which <file> · s (async sync focal) · p (async probe focal) · :prov <provider> · :health (node dashboard) · :next (what to do next) · :projects (switch/create project) · :fichacleanup · :reanchor · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :models · :route <task> <model-id|off> · :clear{run,plan,compile,info,draft,preview} · :q");
+      setMessage("i edit · a/:preview artifact · :which <file> · s (async sync focal) · p (async probe focal) · f (async ficha-repair focal → proposal) · :prov <provider> · :health (node dashboard) · :next (what to do next) · :projects (switch/create project) · :fichacleanup · :reanchor · :propose · :propose-update · :verify · :workflow <graph> --input <f> [--propose-update] · :link --to <id> --type <edgeType> · :link-analysis · :graph view [depth] · :run [ollama] [--model X] · :plan · :compile [ollama] [--model X] [--runtime-check] · :validate · :branch list · :context · :query [--kind X] · :models · :route <task> <model-id|off> · :clear{run,plan,compile,info,draft,preview} · :q");
       return;
     }
     if (cmd === "propose") {

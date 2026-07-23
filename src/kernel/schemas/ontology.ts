@@ -304,6 +304,16 @@ export const OntologyEventSchema = z.object({
     // measurement runs (no --update) do NOT emit — they are free to
     // repeat and record nothing.
     "drift_anchored",
+    // MVP regen loop (MVP_REGEN_LOOP.md §1 / FORK_AND_DIFF.md slice 1):
+    // the ficha-repair audit trail. `repair_proposed` records a candidate
+    // enriched ficha (operator R_strict/R_perm/human, parent→fork
+    // fichaHash, the FIXED evaluation rung). `repair_promoted` /
+    // `repair_discarded` record the human's Walker decision together with
+    // the flip-diff evidence that informed it. The loop's own history
+    // stays in the same append-only log it already audits.
+    "repair_proposed",
+    "repair_promoted",
+    "repair_discarded",
   ]),
   branch: z.string().default("main"),
   previousEventId: z.string().nullable().default(null),

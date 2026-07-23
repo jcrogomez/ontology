@@ -64,6 +64,17 @@ Two tracks — **empirical/functional** (the stronger near-term bet) and
 
 **Empirical / functional**
 
+> **MVP umbrella (2026-07-23):** items 1 (corpus), 2 (A1 lever) and 6 (B1/B2)
+> compose into a defined MVP — the human-gated spec-repair regeneration
+> loop with dual repair operators (R_strict/R_perm, gap as measurement):
+> [`design/proposals/MVP_REGEN_LOOP.md`](design/proposals/MVP_REGEN_LOOP.md).
+> **Machinery SHIPPED same day**: counterfactual fork-and-diff core + repair
+> events, the `onto repair` lever (both operators, budget guard, human-gated
+> proposals), the run governor (`--max-cloud-attempts` + dead-provider
+> failover), and the Walker loop (`f` fire → flip-diff proc → repair-aware
+> proposals panel recording promote/discard audit events). Open: the E3
+> shake-out run + the AUTHOR/CONFIRM fixture split (FORK_AND_DIFF slice 2).
+
 1. **E3 — foreign-corpus extraction/capacity classifier study** (the paper's
    spine). Pre-registered:
    [`legend/calibrations/EXTRACTION_CAPACITY_CLASSIFIER_PREREG_2026-07-21.md`](legend/calibrations/EXTRACTION_CAPACITY_CLASSIFIER_PREREG_2026-07-21.md).
@@ -71,13 +82,22 @@ Two tracks — **empirical/functional** (the stronger near-term bet) and
    nodes with an INDEPENDENT 2×2 ground truth + a confusion matrix + the
    `semanticSplit` ablation. **Next concrete step: a 2–3 repo shake-out** of the
    harness before the full sweep. Ladder note: `qwen3-coder:480b` RETIRED
-   2026-07-15 → strong rung = `gpt-oss:120b-cloud`.
+   2026-07-15 → strong rung = `gpt-oss:120b-cloud`. Related-work section drafted:
+   [`legend/RELATED_WORK.md`](legend/RELATED_WORK.md) (the 2026 industry
+   convergence — ActiveGraph/Regimes, Gates/Neo4j, turbopuffer, PostHog — and
+   Ontology's differential claim).
 2. **A1 — a ficha-repair lever for `onto execute`.** Levers today
    (`refine`/`decompose`/`escalate`) act on the code draft; none touches the
    *intention*. The n=2 (now n≈1-per-pole external) fixture-guided ficha-enrichment
    playbook is still HUMAN-driven. Biggest yield unlock — better models do NOT
    close bespoke extraction-gaps. Path to an autonomous overnight run. The
    gray-zone `semanticSplit` queue now *measures which fichas to repair first*.
+   **Mechanism designed 2026-07-23:**
+   [`design/proposals/FORK_AND_DIFF.md`](design/proposals/FORK_AND_DIFF.md) —
+   counterfactual fork at a FIXED rung (prefix ~$0 via the existing run-cache)
+   + held-out CONFIRM gate + flip-count diff as promotion currency (import of
+   ActiveGraph/Regimes, arXiv 2605.21997 / 2606.10241). E3 (#1 above) shares
+   the same flip/McNemar apparatus.
 3. **A2 — field-level oracle feedback.** Divergent-case oracle says "values
    diverged" without naming the field → refine re-rolls blind (`node_0168`
    7/8→5/8). Cheap, scoped; feeds A1.

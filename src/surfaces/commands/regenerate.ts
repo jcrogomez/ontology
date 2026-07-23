@@ -100,6 +100,24 @@ export interface RegenerateCommandOptions {
   model?: string;
   ollamaHost?: string;
   write?: boolean;
+  /** CONFIRM holdout (FORK_AND_DIFF slice 2 / repair.ts): behaviour-fixture
+   *  case NAMES that must never surface to generation — excluded from the
+   *  oracle-grounding section and from refine-round critiques — while still
+   *  running in the behaviour check and scoring the result. This is what
+   *  makes a held-out readout honest: the generator and any repair author
+   *  never saw these cases. */
+  confirmHoldout?: string[];
+  /** Counterfactual ficha overlay (MVP_REGEN_LOOP.md §4.2 / repair.ts):
+   *  evaluate the node AS IF its ficha surface were this, WITHOUT mutating
+   *  the node on disk. The overlay is applied right after load, so every
+   *  downstream consumer (prompt assembly, rules-grounding, --check-rules,
+   *  the run-cache contextHash via the assembled prompt) sees the overlaid
+   *  ficha uniformly. Mirrors exactly the fields a node_update proposal can
+   *  carry for the repair flow: prompt (raw) + rules. Write MUST stay off on
+   *  override runs — the caller is measuring a hypothetical, and a draft
+   *  accepted against a ficha the node does not actually have must never
+   *  overwrite the shadow. Enforced here, not left to convention. */
+  fichaOverride?: { prompt?: string; rules?: string[] };
   behaviorCheck?: boolean;
   behaviorFixturesDir?: string;
   locThreshold?: number;
@@ -188,13 +206,19 @@ export interface RegenerateResult {
    *  comparable). Callers (the executor policy) need the unambiguous signal to
    *  tell "genuinely unverifiable" from "a bad draw to refine/escalate". */
   fixturePresent?: boolean;
+  /** Per-case behaviour outcomes of the CHOSEN candidate (single-draw: the
+   *  draw; multi-draw: the consensus representative), when a fixture ran.
+   *  This is the flip-diff currency for counterfactual fork evaluation
+   *  (runtime/executor/counterfactual.ts) — without it a repair's effect
+   *  is only visible as a coarse pass/fail, not as per-case flips. */
+  behaviorCases?: { name: string; outcome: string; detail?: string }[];
   // Multi-draw consensus fields (present only when draws > 1).
   draws?: number;
   acceptableDraws?: number;
   consensusSize?: number;
   consensusK?: number;
   clusterSizes?: number[];
-  draftSummary?: { i: number; verdict?: HomeomorphismVerdict; behaviorVerdict: BehaviorVerdict | "no_fixture"; declKey?: string; acceptable: boolean }[];
+  draftSummary?: { i: number; verdict?: HomeomorphismVerdict; behaviorVerdict: BehaviorVerdict | "no_fixture"; declKey?: string; acceptable: boolean; caseOutcomes?: { name: string; outcome: string; detail?: string }[] }[];
   /** Draw-vs-draw disagreement fold (present only when draws > 1) — the
    *  gray-zone index persisted to .ontology/reports/gray-zone.json. */
   grayZone?: GrayZoneIndex;
@@ -342,9 +366,33 @@ export async function runRegenerate(
   }
 
   // 2. Load the node.
-  const node = loadNodeById(nodeId, cwd);
+  let node = loadNodeById(nodeId, cwd);
   if (!node) {
     return { ok: false, nodeId, written: false, failure: `node not found: ${nodeId}`, failureKind: "not-found" };
+  }
+  // 2b. Counterfactual ficha overlay (see the option's doc). Refuses to
+  // combine with write: a hypothetical ficha must never gate a real write.
+  if (options.fichaOverride) {
+    if (options.write === true) {
+      return {
+        ok: false,
+        nodeId,
+        written: false,
+        failure: "fichaOverride cannot be combined with write: a hypothetical ficha must not gate a real write",
+        failureKind: "config",
+      };
+    }
+    // Overlay shape mirrors updateNode's own prompt handling ({...prompt, raw})
+    // so evaluating the override and later applying the node_update proposal
+    // see the SAME ficha surface (compile consumes prompt.raw only).
+    node = {
+      ...node,
+      prompt:
+        options.fichaOverride.prompt !== undefined
+          ? { ...node.prompt, raw: options.fichaOverride.prompt }
+          : node.prompt,
+      rules: options.fichaOverride.rules ?? node.rules,
+    };
   }
 
   // 3. Precondition: a shadow to regenerate.
@@ -389,8 +437,21 @@ export async function runRegenerate(
   // will be executed against, instead of compiling blind and being judged
   // after. Carries only black-box contract prose (no implementation): the
   // fixture's setup/invoke/assert function bodies never reach the prompt.
+  //
+  // CONFIRM holdout (FORK_AND_DIFF slice 2): cases named in
+  // options.confirmHoldout are excluded from the GUIDING surfaces — this
+  // oracle section and the refine-round critique — while still RUNNING in
+  // the behaviour check and scoring the result. Without the holdout, the
+  // fixture leaks into generation twice and every pass is in-sample by
+  // construction (Regimes measured that cost: in-sample +0.18 → held-out
+  // +0.04). The filter changes the assembled prompt, so it folds into the
+  // run-cache contextHash for free — held-out and full-oracle runs never
+  // share a cache entry.
+  const holdout = new Set(options.confirmHoldout ?? []);
   const behaviorOracle = fixture
-    ? fixture.fixture.cases.map((c) => ({ name: c.name, description: c.description }))
+    ? fixture.fixture.cases
+        .filter((c) => !holdout.has(c.name))
+        .map((c) => ({ name: c.name, description: c.description }))
     : undefined;
 
   // Verify-refine: up to `rounds` generate→check→refine iterations. rounds=1
@@ -661,8 +722,11 @@ export async function runRegenerate(
       return matches + (WRITE_SAFE_VERDICTS.has(e.verdict!) ? 0.5 : 0);
     };
     const best = [...candidates].sort((a, b) => score(b) - score(a))[0];
+    // Held-out cases never reach the critique either — a refine round that
+    // names a CONFIRM failure would leak exactly the signal the holdout
+    // exists to protect (same filter as the oracle section above).
     const failedCriteria = (best.behaviorCases ?? [])
-      .filter((cc) => cc.outcome !== "match")
+      .filter((cc) => cc.outcome !== "match" && !holdout.has(cc.name))
       .map((cc) => ({ name: cc.name, diagnostic: draftSideDiagnostic(cc.outcome, cc.detail) }));
     // A draft that THROWS AT IMPORT TIME produces no cases at all — without
     // this synthetic criterion the refine loop is blind to the single most
@@ -854,6 +918,7 @@ export async function runRegenerate(
       ruleViolations: e.ruleViolations,
       lintIssueCount,
       fixturePresent: fixture != null,
+      behaviorCases: e.behaviorCases,
       written: false,
       ...refineFields,
     };
@@ -915,12 +980,13 @@ export async function runRegenerate(
     behaviorVerdict: rep?.behaviorVerdict ?? "no_fixture",
     ruleViolations: rep?.ruleViolations,
     written: false,
+    behaviorCases: rep?.behaviorCases,
     draws,
     acceptableDraws: acceptable.length,
     consensusSize: consensusClass.length,
     consensusK,
     clusterSizes,
-    draftSummary: evals.map((e) => ({ i: e.i, verdict: e.verdict, behaviorVerdict: e.behaviorVerdict, declKey: e.declKey, acceptable: e.acceptable })),
+    draftSummary: evals.map((e) => ({ i: e.i, verdict: e.verdict, behaviorVerdict: e.behaviorVerdict, declKey: e.declKey, acceptable: e.acceptable, caseOutcomes: e.behaviorCases })),
     grayZone,
     ...refineFields,
   };
